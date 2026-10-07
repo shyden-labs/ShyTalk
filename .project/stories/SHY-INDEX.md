@@ -363,6 +363,15 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0532](SHY-0532-agents-act-on-shytalk-under-their-own-least-privilege-github-identity.md) | P0 | L | infra | Agents act on ShyTalk under their own least-privilege GitHub identity | 📝 Draft | — |  |
 | [SHY-0533](SHY-0533-ci-refuses-a-pull-request-that-leaves-the-story-index-out-of-step.md) | P1 | S | infra | CI refuses a pull request that leaves the story index out of step | 📝 Draft | — |  |
 | [SHY-0534](SHY-0534-every-develop-merge-reaches-dev-without-anyone-dispatching-it.md) | P1 | M | infra | Every develop merge reaches dev without anyone dispatching it | 📝 Draft | — |  |
+| [SHY-0536](SHY-0536-every-open-mvp-story-is-scored-and-the-scale-is-calibrated.md) | P1 | L | infra | Every open MVP story is scored, and the scale is calibrated against merged work | 📝 Draft | — |  |
+| [SHY-0537](SHY-0537-every-open-non-mvp-story-is-scored.md) | P2 | M | infra | Every open non-MVP story is scored, so effort progress covers the whole backlog | 📝 Draft | — |  |
+| [SHY-0538](SHY-0538-the-short-claude-md-is-committed-and-nothing-cites-a-section-it-lacks.md) | P2 | S | chore | The short CLAUDE.md is committed, and no comment cites a section it does not have | 📝 Draft | — |  |
+| [SHY-0539](SHY-0539-the-board-sync-fails-fast-on-a-stale-read-and-counts-every-setup-failure.md) | P2 | M | infra | The board sync fails fast on a stale read instead of sleeping and retrying, and counts every setup failure | 📝 Draft | — |  |
+| [SHY-0540](SHY-0540-security-fixes-open-against-develop.md) | P0 | M | infra | Security fixes open against develop, and the nightly live jobs run released code only | 📝 Draft | — |  |
+| [SHY-0541](SHY-0541-a-production-workflow-started-off-main-restarts-itself-on-main.md) | P0 | M | infra | A production workflow started off main restarts itself on main | 📝 Draft | — |  |
+| [SHY-0542](SHY-0542-production-keys-live-only-in-environments-only-main-can-reach.md) | P0 | L | infra | Production keys live only in environments that only main can reach | 📝 Draft | — |  |
+| [SHY-0543](SHY-0543-dev-cannot-deploy-the-production-web-site.md) | P0 | M | infra | Dev cannot deploy the production web site | 📝 Draft | — |  |
+| [SHY-0544](SHY-0544-local-and-ci-storage-runs-on-a-maintained-s3-stand-in.md) | P0 | L | infra | Local and CI storage runs on a maintained S3 stand-in, not MinIO | 📝 Draft | — |  |
 
 ## Done
 
