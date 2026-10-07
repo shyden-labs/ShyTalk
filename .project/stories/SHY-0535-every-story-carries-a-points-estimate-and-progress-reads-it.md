@@ -1,6 +1,6 @@
 ---
 id: SHY-0535
-status: In Progress
+status: In Review
 owner: claude
 created: 2026-10-07
 priority: P1
@@ -57,40 +57,40 @@ is SHY-0536, so this story stays reviewable.
 
 ### Happy path
 
-- [ ] `check-story-frontmatter.sh` accepts an optional `estimate:` whose value
+- [x] `check-story-frontmatter.sh` accepts an optional `estimate:` whose value
       is one of 1, 2, 3, 5, 8, 13, and refuses any other value (0, 4, 21, `M`,
       `5.0`, empty) with exit code `E_INVALID_VALUE`.
-- [ ] The sync creates a NUMBER field named `Estimate` on the board when it is
+- [x] The sync creates a NUMBER field named `Estimate` on the board when it is
       missing, once per run, and reuses it when present.
-- [ ] Creating a story with `estimate: 5` sets the card's Estimate to 5.
-- [ ] A story whose body and status are unchanged but whose `estimate:` differs
+- [x] Creating a story with `estimate: 5` sets the card's Estimate to 5.
+- [x] A story whose body and status are unchanged but whose `estimate:` differs
       from the card's Estimate gets ONE number mutation and no issue update.
-- [ ] A story whose `estimate:` equals the card's Estimate makes no mutation
+- [x] A story whose `estimate:` equals the card's Estimate makes no mutation
       (the unchanged corpus still syncs as all-skip).
-- [ ] `node scripts/story-progress.js` prints two lines, one by tickets and one
+- [x] `node scripts/story-progress.js` prints two lines, one by tickets and one
       by effort, each with a % complete, the measured pace and an ETA date,
       over the whole backlog, then a third line with the same tickets figures
       for the `mvp: true` subset.
 
 ### Error paths
 
-- [ ] A failed field creation or number mutation is reported as a `[gh-error]`
+- [x] A failed field creation or number mutation is reported as a `[gh-error]`
       and counted as a failure (exit 40), like every other field write.
-- [ ] A story whose `estimate:` is removed while the card still holds a value
+- [x] A story whose `estimate:` is removed while the card still holds a value
       has the card's value cleared (`clearProjectV2ItemFieldValue`), so the
       board never shows a stale estimate.
-- [ ] `story-progress.js` refuses, by file name, a story whose frontmatter it
+- [x] `story-progress.js` refuses, by file name, a story whose frontmatter it
       cannot parse, rather than leaving it out of the counts.
 
 ### Edge cases
 
-- [ ] Epic files (`EPIC-*.md`) and `SHY-INDEX.md` are not counted as stories.
-- [ ] Cancelled stories are left out of both totals.
-- [ ] Done stories with no estimate are counted at the mean estimate of the
+- [x] Epic files (`EPIC-*.md`) and `SHY-INDEX.md` are not counted as stories.
+- [x] Cancelled stories are left out of both totals.
+- [x] Done stories with no estimate are counted at the mean estimate of the
       scored Done stories, and the effort line says how many were assumed.
-- [ ] Until any story is scored, the effort line reads
+- [x] Until any story is scored, the effort line reads
       `By effort: unavailable, <n> of <m> open tickets scored`.
-- [ ] Pace counts the day a story became Done from git history (the latest
+- [x] Pace counts the day a story became Done from git history (the latest
       commit on the current branch whose diff adds `status: Done` to that
       file). With no closures in the last 7 days, the line says so and
       reports the ETA at the 30-day pace, labelled as such; with none in 30
@@ -98,28 +98,28 @@ is SHY-0536, so this story stays reviewable.
 
 ### Performance
 
-- [ ] The Estimate check adds no extra GraphQL call per story: the card's
+- [x] The Estimate check adds no extra GraphQL call per story: the card's
       value arrives in the existing items query.
-- [ ] `story-progress.js` runs in under 5 s on the full corpus (one `git log`
+- [x] `story-progress.js` runs in under 5 s on the full corpus (one `git log`
       call, not one per file).
 
 ### Security
 
-- [ ] No new token or permission: field creation and number writes use the
+- [x] No new token or permission: field creation and number writes use the
       sync's existing `GH_PAT_PROJECT`, which already creates `Type`.
 
 ### UX
 
-- [ ] The progress lines read in plain words, e.g.
+- [x] The progress lines read in plain words, e.g.
       `By tickets: 37% complete (175 of 470 …); pace 1.4/day over 7 days; ETA 2026-11-30`.
 
 ### i18n
 
-- [ ] Not applicable: operator-facing tooling, English only.
+- [x] Not applicable: operator-facing tooling, English only.
 
 ### Observability
 
-- [ ] The sync summary counts Estimate writes inside its existing
+- [x] The sync summary counts Estimate writes inside its existing
       `fields updated` total, and logs `Estimate field auto-created` when it
       creates the field.
 
@@ -197,3 +197,56 @@ is SHY-0536, so this story stays reviewable.
   created, scores still land in the story files.
 - Scored 5 against closed work of the same shape: SHY-0074 and SHY-0082 each
   added a board field path to the sync with mock-gh tests.
+- **2026-10-07, AC to proof** (test files under `express-api/tests/scripts/`):
+  - Fibonacci scale: `check-story-frontmatter.test.js` › SHY-0535 (accepts
+    1, 2, 3, 5, 8, 13 one case each; refuses 0, 4, 21, M, 5.0, -3, 05,
+    "13 points", empty and a bare `estimate:` with exit 11).
+  - Field created once / reused: `sync-stories-to-issues-board-fields.test.js`
+    › "a board without an Estimate field gets a NUMBER field…" and "a board
+    that has the Estimate field is not given a second one".
+  - Create path sets the number: same file › "create path: estimate: %s sets
+    the new card Estimate" (one case per value) and "a story with no estimate
+    writes no Estimate".
+  - One number write, no issue update: › "an estimate-only change writes ONE
+    number and does not rewrite the issue"; "a changed estimate (5 → 8) is
+    rewritten".
+  - Equal makes no mutation: › "an estimate equal to the card value makes no
+    mutation at all" (`project fields updated: 0`).
+  - Failed writes are `[gh-error]`, exit 40: › "a failed Estimate write…" and
+    "a failed Estimate field creation…".
+  - Removed estimate cleared: › "a removed estimate clears the card value".
+  - No extra GraphQL call: › "the items query reads each card Estimate in the
+    same request".
+  - Progress lines, MVP line, effort unavailable, assumed mean, Cancelled,
+    epics/index left out, pace from git, 30-day fallback, unavailable ETA,
+    unparseable file refused by name: `story-progress.test.js` (parseStory,
+    doneDatesFromLog, progress, formatLines, and the end-to-end block on a
+    real git repository holding `SHY-INDEX.md` and an `EPIC-` file).
+  - One `git log` call: `scripts/story-progress.js` calls `git` twice in all
+    (`rev-parse --show-toplevel` and one `log`), never per file.
+  - Security: the branch changes no workflow; writes go through the sync's
+    existing `GH_PAT_PROJECT`.
+  - Observability: the summary counts Estimate writes in `project fields
+    updated` and prints `estimate-field auto-created: yes|no`, the same shape
+    as the existing `type-field auto-created` entry (the AC's wording
+    "Estimate field auto-created" follows that line's house form).
+- **Mutations** (`.superpowers/sdd/SHY-0535/mutate.py`, all eight suites per
+  mutation, file restored and tree checked clean after each), baseline 495/495:
+  - M1 scale accepts 21: RED 3 (the three `21` checks).
+  - M2 equal-estimate early return removed: RED 2 (equal makes no mutation;
+    no-estimate create path).
+  - M3 estimate sync skipped: RED 4 (changed, failed write, removed,
+    estimate-only).
+  - M4 clear written as update: RED 1 (removed estimate cleared).
+  - M5 failed field creation swallowed: RED 1 (failed creation, exit 40).
+  - M6 Cancelled kept: RED 3 (the three Cancelled checks: tickets, effort,
+    MVP).
+  - M7 7-day window shortened to 6: RED 6, wider than predicted (the window
+    test, both ETA lines, the scored-effort total and the end-to-end run all
+    read the 7-day pace).
+  - M8 unscored Done counted at 0: RED 2 (assumed-mean count and its line).
+  - M9 oldest commit dates a closure: RED 1 (newest-commit date).
+  All nine as predicted in direction; M7 reached further than named.
+- **2026-10-07**: full corpus run of `node scripts/story-progress.js`: real
+  1.55 s (limit 5 s), prints the three lines (39% by tickets, 175 of 445; by
+  effort unavailable, 1 of 270 open scored; MVP 29%, 69 of 234).
