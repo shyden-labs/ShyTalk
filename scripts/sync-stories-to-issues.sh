@@ -152,6 +152,7 @@ N_ISSUES_CLOSED=0
 N_ISSUES_REOPENED=0
 N_DRAFTS_MIGRATED=0
 TYPE_FIELD_AUTO_CREATED="no"
+ESTIMATE_FIELD_AUTO_CREATED="no"
 
 # Caches populated at runtime.
 # LABEL_CACHE: newline-delimited list of existing label names.
@@ -263,7 +264,7 @@ body_hash() {
 # `released_in` parse too — it only fed the now-retired issue close-on-Done
 # comment.
 PS_ID="" PS_TITLE="" PS_PRIORITY="" PS_EFFORT="" PS_TYPE="" PS_ROADMAPS=""
-PS_STATUS="" PS_STATUS_LC=""
+PS_STATUS="" PS_STATUS_LC="" PS_ESTIMATE=""
 
 parse_story_fields() {
   local rec
@@ -282,19 +283,20 @@ parse_story_fields() {
       else if (key=="effort")      effort=val
       else if (key=="type")        type=val
       else if (key=="roadmap_ids") roadmaps=val
+      else if (key=="estimate")    estimate=val
       next
     }
     n>=2 && title=="" && /^# / { t=$0; sub(/^# /,"",t); title=trim(t) }
     END{
       gsub(/^\[/,"",roadmaps); gsub(/\]$/,"",roadmaps); gsub(/[[:space:]]/,"",roadmaps)
       status_lc=tolower(status); gsub(/ /,"-",status_lc)
-      printf "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s", \
+      printf "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s", \
         id, US, title, US, priority, US, effort, US, type, US, roadmaps, US, \
-        status, US, status_lc
+        status, US, status_lc, US, estimate
     }
   ' "$1")"
   IFS=$'\x1f' read -r PS_ID PS_TITLE PS_PRIORITY PS_EFFORT PS_TYPE PS_ROADMAPS \
-    PS_STATUS PS_STATUS_LC <<<"$rec"
+    PS_STATUS PS_STATUS_LC PS_ESTIMATE <<<"$rec"
 }
 
 # Pre-flight: required env vars. Skipped in --dry-run mode.
@@ -568,7 +570,7 @@ _items_map_pass() {
   # Single-line query: see note on the projectV2 lookup query above.
   # shellcheck disable=SC2016
   # ^ $owner / $number / $cursor are GraphQL variables, NOT bash.
-  query='query($owner: String!, $number: Int!, $cursor: String) { organization(login: $owner) { projectV2(number: $number) { items(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { id content { __typename ... on Issue { id number state title body } ... on DraftIssue { id title body } } fieldValueByName(name: "SHY ID") { ... on ProjectV2ItemFieldTextValue { text } } } } } } }'
+  query='query($owner: String!, $number: Int!, $cursor: String) { organization(login: $owner) { projectV2(number: $number) { items(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { id content { __typename ... on Issue { id number state title body } ... on DraftIssue { id title body } } fieldValueByName(name: "SHY ID") { ... on ProjectV2ItemFieldTextValue { text } } estimate: fieldValueByName(name: "Estimate") { ... on ProjectV2ItemFieldNumberValue { number } } } } } } }'
   while :; do
     stderr_file="$(mktemp)"
     set +e
@@ -603,7 +605,8 @@ _items_map_pass() {
                         else "OTHER" end),
               contentId: (.content.id // ""),
               issueNumber: (.content.number // 0),
-              draftBody: (.content.body // "")
+              draftBody: (.content.body // ""),
+              estimate: (.estimate.number // null)
             } }
         | select(.key != "") ]
       | from_entries
@@ -671,15 +674,15 @@ load_items_map() {
 
 # Look up one SHY ID in the items map. Results via MAP_* globals.
 MAP_FOUND=0 MAP_ITEM_ID="" MAP_BACKING="" MAP_CONTENT_ID=""
-MAP_ISSUE_NUMBER="" MAP_DRAFT_BODY=""
+MAP_ISSUE_NUMBER="" MAP_DRAFT_BODY="" MAP_ESTIMATE=""
 map_lookup() {
   local id="$1" rec
   MAP_FOUND=0 MAP_ITEM_ID="" MAP_BACKING="" MAP_CONTENT_ID=""
-  MAP_ISSUE_NUMBER="" MAP_DRAFT_BODY=""
+  MAP_ISSUE_NUMBER="" MAP_DRAFT_BODY="" MAP_ESTIMATE=""
   rec="$(printf '%s' "$ITEMS_MAP_JSON" | jq -r --arg k "$id" \
-    'if has($k) then .[$k] | [.itemId, .backing, .contentId, (.issueNumber|tostring)] | join("\u001f") else empty end')"
+    'if has($k) then .[$k] | [.itemId, .backing, .contentId, (.issueNumber|tostring), (.estimate // "" | tostring)] | join("\u001f") else empty end')"
   [ -z "$rec" ] && return 0
-  IFS=$'\x1f' read -r MAP_ITEM_ID MAP_BACKING MAP_CONTENT_ID MAP_ISSUE_NUMBER <<<"$rec"
+  IFS=$'\x1f' read -r MAP_ITEM_ID MAP_BACKING MAP_CONTENT_ID MAP_ISSUE_NUMBER MAP_ESTIMATE <<<"$rec"
   if [ "$MAP_BACKING" = "DRAFT" ] || [ "$MAP_BACKING" = "ISSUE" ]; then
     # Separate jq call: the body is multi-line and would truncate the
     # one-line \x1f read above. SHY-0082 v4: the items query now selects
@@ -736,6 +739,87 @@ ensure_project_type_field() {
   done < <(printf '%s' "$response" | jq -c '.data.createProjectV2Field.projectV2Field.options[]?')
   TYPE_FIELD_AUTO_CREATED="yes"
   verbose "ensure_project_type_field: created Type field id=${TYPE_FIELD_ID}"
+  return 0
+}
+
+# SHY-0535: ensure the board's NUMBER field `Estimate` (story points) exists.
+# Same shape as ensure_project_type_field, but a failure here is a FAILURE
+# (counted, exit 40), never a silent skip: without the field no estimate can
+# reach the board, and the progress-by-effort line would read an empty board.
+ensure_project_estimate_field() {
+  load_project_cache || return 1
+  if [ -n "$(get_field_id "Estimate")" ]; then
+    verbose "ensure_project_estimate_field: already present"
+    return 0
+  fi
+  verbose "ensure_project_estimate_field: creating Estimate field"
+  local query response stderr_file rc field_id
+  stderr_file="$(mktemp)"
+  # shellcheck disable=SC2016
+  # ^ $projectId is a GraphQL variable, NOT bash.
+  query='mutation($projectId: ID!) { createProjectV2Field(input: { projectId: $projectId, dataType: NUMBER, name: "Estimate" }) { projectV2Field { ... on ProjectV2Field { id } } } }'
+  set +e
+  response="$("$GH" api graphql -f query="$query" -f projectId="$PROJECT_NODE_ID" 2>"$stderr_file")"
+  rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    printf '[gh-error] createProjectV2Field Estimate (exit %d): %s\n' "$rc" "$(tr '\n' ' ' <"$stderr_file")" >&2
+    rm -f "$stderr_file"
+    return 1
+  fi
+  rm -f "$stderr_file"
+  field_id="$(printf '%s' "$response" | jq -r '.data.createProjectV2Field.projectV2Field.id // empty')"
+  if [ -z "$field_id" ]; then
+    printf '[gh-error] createProjectV2Field Estimate returned no field id: %s\n' "$(printf '%s' "$response" | head -c 200)" >&2
+    return 1
+  fi
+  set_field_id "Estimate" "$field_id"
+  ESTIMATE_FIELD_AUTO_CREATED="yes"
+  verbose "ensure_project_estimate_field: created Estimate field id=${field_id}"
+  return 0
+}
+
+# SHY-0535: make the card's Estimate equal the story's `estimate:`. The card's
+# current value comes from the items query (MAP_ESTIMATE; empty for a card
+# this run created), so an unchanged estimate costs no API call, a changed
+# one costs one number write, and a removed one clears the stale value.
+sync_estimate() {
+  local item_id="$1" field_id query stderr_file rc
+  field_id="$(get_field_id "Estimate")"
+  [ -z "$field_id" ] && return 0
+  [ "$PS_ESTIMATE" = "$MAP_ESTIMATE" ] && return 0
+  if [ "$DRY_RUN" = "1" ]; then
+    printf 'DRY-RUN: would set Estimate(item=%s) from "%s" to "%s"\n' "$item_id" "$MAP_ESTIMATE" "$PS_ESTIMATE" >&2
+    return 0
+  fi
+  stderr_file="$(mktemp)"
+  set +e
+  if [ -n "$PS_ESTIMATE" ]; then
+    # shellcheck disable=SC2016
+    # ^ GraphQL variables, NOT bash.
+    query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $number: Float!) { updateProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId, value: { number: $number } }) { projectV2Item { id } } }'
+    "$GH" api graphql -f query="$query" \
+      -f projectId="$PROJECT_NODE_ID" -f itemId="$item_id" \
+      -f fieldId="$field_id" -F number="$PS_ESTIMATE" \
+      >/dev/null 2>"$stderr_file"
+  else
+    # shellcheck disable=SC2016
+    # ^ GraphQL variables, NOT bash.
+    query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!) { clearProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId }) { projectV2Item { id } } }'
+    "$GH" api graphql -f query="$query" \
+      -f projectId="$PROJECT_NODE_ID" -f itemId="$item_id" \
+      -f fieldId="$field_id" \
+      >/dev/null 2>"$stderr_file"
+  fi
+  rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    printf '[gh-error] Estimate write (exit %d): %s\n' "$rc" "$(tr '\n' ' ' <"$stderr_file")" >&2
+    rm -f "$stderr_file"
+    return 1
+  fi
+  rm -f "$stderr_file"
+  N_PROJECT_FIELDS_UPDATED=$((N_PROJECT_FIELDS_UPDATED + 1))
   return 0
 }
 
@@ -869,6 +953,8 @@ populate_project_fields() {
   if [ -n "$roadmaps" ] && [ -n "$roadmap_field" ]; then
     set_project_field_text "$item_id" "$roadmap_field" "$roadmaps" || return 1
   fi
+  # Estimate (number; SHY-0535)
+  sync_estimate "$item_id" || return 1
 
   # Status (built-in single-select; SHY-0074 — the board-column defect).
   # Deliberately LAST: for new items GitHub's built-in "Item added → Todo"
@@ -1368,6 +1454,12 @@ sync_one() {
   if [ "$changed" = "0" ] && [ "$transition" = "0" ]; then
     verbose "${id}: body-hash + status unchanged; skipping"
     N_SKIPPED=$((N_SKIPPED + 1))
+    # SHY-0535: `estimate:` is frontmatter, outside the body hash, so an
+    # estimate-only edit lands here. Reconcile the card's number alone.
+    if ! sync_estimate "$MAP_ITEM_ID"; then
+      emit "$id" "project" "failed to set Estimate for item ${MAP_ITEM_ID}"
+      N_FAILED=$((N_FAILED + 1))
+    fi
     return 0
   fi
 
@@ -1492,6 +1584,10 @@ setup_pre_sync() {
   [ "$DRY_RUN" = "1" ] && return 0
   load_project_cache || true
   ensure_project_type_field || true
+  if ! ensure_project_estimate_field; then
+    emit "project" "estimate-field" "the board has no Estimate field and it could not be created"
+    N_FAILED=$((N_FAILED + 1))
+  fi
   bootstrap_repo \
     || fail_global "repo" "repo bootstrap (issue types / story label) failed — aborting before any mutations" "$E_API"
   # ensure_story_label is a no-op once bootstrap resolved the id. If the label
@@ -1553,11 +1649,12 @@ sync_all() {
 
   printf 'Sync result: %d created, %d updated, %d skipped, %d failed' \
     "$N_CREATED" "$N_UPDATED" "$N_SKIPPED" "$N_FAILED" >&2
-  printf ' (labels deleted: %d; project items added: %d; project items deleted: %d; issues deleted: %d; issue types set: %d; issues closed: %d; issues reopened: %d; drafts migrated: %d; project fields updated: %d; status fields set: %d; bodies embedded: %d; bodies truncated: %d; sidecar overlay fills: %d; type-field auto-created: %s)\n' \
+  printf ' (labels deleted: %d; project items added: %d; project items deleted: %d; issues deleted: %d; issue types set: %d; issues closed: %d; issues reopened: %d; drafts migrated: %d; project fields updated: %d; status fields set: %d; bodies embedded: %d; bodies truncated: %d; sidecar overlay fills: %d; type-field auto-created: %s; estimate-field auto-created: %s)\n' \
     "$N_LABELS_DELETED" "$N_PROJECT_ITEMS_ADDED" "$N_ITEMS_DELETED" \
     "$N_ISSUES_DELETED" "$N_ISSUE_TYPES_SET" "$N_ISSUES_CLOSED" "$N_ISSUES_REOPENED" "$N_DRAFTS_MIGRATED" \
     "$N_PROJECT_FIELDS_UPDATED" "$N_STATUS_SET" "$N_BODIES_EMBEDDED" \
-    "$N_BODIES_TRUNCATED" "$N_SIDECAR_FILLS" "$TYPE_FIELD_AUTO_CREATED" >&2
+    "$N_BODIES_TRUNCATED" "$N_SIDECAR_FILLS" "$TYPE_FIELD_AUTO_CREATED" \
+    "$ESTIMATE_FIELD_AUTO_CREATED" >&2
 
   # SHY-0067 reviewer-I2: emit a GITHUB_STEP_SUMMARY audit trail when running
   # under GitHub Actions. Local + test runs skip silently (env var unset).

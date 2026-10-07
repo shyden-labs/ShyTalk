@@ -168,6 +168,9 @@ function selectField(name, id, options) {
 function textField(name, id) {
   return { __typename: 'ProjectV2Field', id, name, dataType: 'TEXT' };
 }
+function numberField(name, id) {
+  return { __typename: 'ProjectV2Field', id, name, dataType: 'NUMBER' };
+}
 
 const STATUS_OPTIONS = {
   Todo: 'opt-st-todo',
@@ -177,7 +180,11 @@ const STATUS_OPTIONS = {
   Cancelled: 'opt-st-cancel',
 };
 
-function fieldsResponse({ omitStatus = false, statusOptions = STATUS_OPTIONS } = {}) {
+function fieldsResponse({
+  omitStatus = false,
+  omitEstimate = false,
+  statusOptions = STATUS_OPTIONS,
+} = {}) {
   const nodes = [
     selectField('Pri', 'field-pri', {
       P0: 'opt-pri-p0',
@@ -204,6 +211,9 @@ function fieldsResponse({ omitStatus = false, statusOptions = STATUS_OPTIONS } =
     textField('SHY ID', 'field-shyid'),
     textField('Roadmap IDs', 'field-roadmap'),
   ];
+  // SHY-0535: the board's story-point field. Present by default (the board
+  // after SHY-0535's first sync); omitEstimate exercises auto-creation.
+  if (!omitEstimate) nodes.push(numberField('Estimate', 'field-estimate'));
   if (!omitStatus) {
     nodes.unshift(selectField('Status', 'field-status', statusOptions));
   }
@@ -282,11 +292,15 @@ function issueNode(
   state = 'OPEN',
   title = `${shyId}: Fixture story`,
   body = '',
+  estimate = null,
 ) {
   return {
     id: itemId,
     content: { __typename: 'Issue', id: `I_node_${number}`, number, state, title, body },
     fieldValueByName: { text: shyId },
+    // SHY-0535: the card's current Estimate (aliased in the items query);
+    // GitHub returns null for an empty number field.
+    estimate: estimate === null ? null : { number: estimate },
   };
 }
 
@@ -319,10 +333,12 @@ function makeStory(
     why = 'Fixture.',
     releasedIn = '',
     notesExtra = '',
+    estimate = '',
   },
 ) {
   const fileSlug = slug ?? `${id}-fixture-story`;
   const releasedLine = releasedIn ? `released_in: ${releasedIn}\n` : '';
+  const estimateLine = estimate ? `estimate: ${estimate}\n` : '';
   const content = `---
 id: ${id}
 status: ${status}
@@ -330,7 +346,7 @@ owner: claude
 created: 2026-06-10
 priority: ${priority}
 effort: ${effort}
-type: ${type}
+${estimateLine}type: ${type}
 roadmap_ids: ${roadmaps}
 pr:
 ${releasedLine}---
@@ -2305,5 +2321,193 @@ describe('SHY-0082 v4: bootstrap + issue-state reconcile edge cases (mock-gh)', 
     // re-create a duplicate. A future idempotency-by-search guard is the fix.
     const sidecar = JSON.parse(fs.readFileSync(path.join(mock.dir, 'board-items.json'), 'utf-8'));
     expect(sidecar['SHY-8604']).toBeUndefined();
+  });
+});
+
+// ============================================================== SHY-0535 Estimate (story points)
+
+describe('SHY-0535: estimate: frontmatter reaches the board Estimate field (mock-gh)', () => {
+  const ESTIMATE_CREATE_RESPONSE = JSON.stringify({
+    data: { createProjectV2Field: { projectV2Field: { id: 'field-estimate-new' } } },
+  });
+
+  /** The items query line — proves the recording saw the run before any
+   *  absence assertion over it. */
+  const itemsQueryLine = (lines) => lines.find((l) => l.includes('items(first: 100'));
+  const estimateWrites = (lines, fieldId = 'field-estimate') =>
+    lines.filter(
+      (l) =>
+        (l.includes('updateProjectV2ItemFieldValue') ||
+          l.includes('clearProjectV2ItemFieldValue')) &&
+        l.includes(`fieldId=${fieldId}`),
+    );
+
+  /** A synced issue whose body hash and status marker match the story, so
+   *  everything but the estimate is unchanged. */
+  function unchangedStory(storiesDir, id, { estimate = '', boardEstimate = null } = {}) {
+    const { content } = makeStory(storiesDir, { id, status: 'Draft', type: 'feature', estimate });
+    const body = existingBody(content, `${id}-fixture-story`, 'Draft');
+    const n = Number(id.slice(4));
+    return itemsResponse([
+      issueNode(id, `ITEM_I${n}`, n, 'OPEN', `${id}: Fixture story`, body, boardEstimate),
+    ]);
+  }
+
+  test('the items query reads each card Estimate in the same request', () => {
+    const mock = makePatternMockGh();
+    const storiesDir = tempDir('stories535q-');
+    const items = unchangedStory(storiesDir, 'SHY-9501');
+    writeRules(mock.dir, createPathRules(mock.dir, { items }));
+    const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(0);
+    const q = itemsQueryLine(readRecording(mock.recording));
+    expect(q).toBeDefined();
+    expect(q).toContain(
+      'estimate: fieldValueByName(name: "Estimate") { ... on ProjectV2ItemFieldNumberValue { number } }',
+    );
+  });
+
+  test('a board without an Estimate field gets a NUMBER field named Estimate, and the write uses it', () => {
+    const mock = makePatternMockGh();
+    const storiesDir = tempDir('stories535c-');
+    makeStory(storiesDir, { id: 'SHY-9502', type: 'feature', estimate: '5' });
+    writeResponse(mock.dir, 'resp-create-estimate.json', ESTIMATE_CREATE_RESPONSE);
+    writeRules(mock.dir, [
+      ['createProjectV2Field.*dataType: NUMBER', 'resp-create-estimate.json', ''],
+      ...createPathRules(mock.dir, { fields: fieldsResponse({ omitEstimate: true }) }),
+    ]);
+    const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(0);
+    const lines = readRecording(mock.recording);
+    const creates = lines.filter((l) => l.includes('createProjectV2Field') && l.includes('NUMBER'));
+    expect(creates).toHaveLength(1);
+    expect(creates[0]).toContain('name: "Estimate"');
+    expect(fieldLine(lines, 'ITEM_1', 'field-estimate-new', 'number=5')).toBeDefined();
+    expect(r.stderr).toMatch(/estimate-field auto-created: yes/);
+  });
+
+  test('a board that has the Estimate field is not given a second one', () => {
+    const mock = makePatternMockGh();
+    const storiesDir = tempDir('stories535n-');
+    makeStory(storiesDir, { id: 'SHY-9503', type: 'feature', estimate: '3' });
+    writeRules(mock.dir, createPathRules(mock.dir));
+    const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(0);
+    const lines = readRecording(mock.recording);
+    expect(itemsQueryLine(lines)).toBeDefined();
+    expect(lines.filter((l) => l.includes('createProjectV2Field'))).toHaveLength(0);
+    expect(r.stderr).toMatch(/estimate-field auto-created: no/);
+  });
+
+  test.each([['1'], ['2'], ['3'], ['5'], ['8'], ['13']])(
+    'create path: estimate: %s sets the new card Estimate to that number',
+    (points) => {
+      const mock = makePatternMockGh();
+      const storiesDir = tempDir('stories535p-');
+      makeStory(storiesDir, { id: 'SHY-9504', type: 'feature', estimate: points });
+      writeRules(mock.dir, createPathRules(mock.dir));
+      const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+      expect(r.code).toBe(0);
+      const writes = estimateWrites(readRecording(mock.recording));
+      expect(writes).toHaveLength(1);
+      expect(writes[0]).toContain('itemId=ITEM_1');
+      expect(writes[0]).toContain(`number=${points}`);
+    },
+  );
+
+  test('create path: a story with no estimate writes no Estimate', () => {
+    const mock = makePatternMockGh();
+    const storiesDir = tempDir('stories535e-');
+    makeStory(storiesDir, { id: 'SHY-9505', type: 'feature' });
+    writeRules(mock.dir, createPathRules(mock.dir));
+    const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(0);
+    const lines = readRecording(mock.recording);
+    // Liveness: the other board fields WERE written for this card.
+    expect(fieldLine(lines, 'ITEM_1', 'field-type', 'optionId=opt-type-feature')).toBeDefined();
+    expect(estimateWrites(lines)).toHaveLength(0);
+  });
+
+  test('an estimate-only change writes ONE number and does not rewrite the issue', () => {
+    const mock = makePatternMockGh();
+    const storiesDir = tempDir('stories535d-');
+    const items = unchangedStory(storiesDir, 'SHY-9506', { estimate: '3', boardEstimate: null });
+    writeRules(mock.dir, createPathRules(mock.dir, { items }));
+    const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(0);
+    const lines = readRecording(mock.recording);
+    const writes = estimateWrites(lines);
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain('itemId=ITEM_I9506');
+    expect(writes[0]).toContain('number=3');
+    expect(itemsQueryLine(lines)).toBeDefined();
+    expect(lines.filter((l) => l.includes('updateIssue'))).toHaveLength(0);
+    expect(r.stderr).toMatch(/1 skipped/);
+    expect(r.stderr).toMatch(/project fields updated: 1;/);
+  });
+
+  test('a changed estimate (5 on the board, 8 in the file) is rewritten', () => {
+    const mock = makePatternMockGh();
+    const storiesDir = tempDir('stories535r-');
+    const items = unchangedStory(storiesDir, 'SHY-9507', { estimate: '8', boardEstimate: 5 });
+    writeRules(mock.dir, createPathRules(mock.dir, { items }));
+    const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(0);
+    const writes = estimateWrites(readRecording(mock.recording));
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain('number=8');
+  });
+
+  test('an estimate equal to the card value makes no mutation at all', () => {
+    const mock = makePatternMockGh();
+    const storiesDir = tempDir('stories535s-');
+    const items = unchangedStory(storiesDir, 'SHY-9508', { estimate: '5', boardEstimate: 5 });
+    writeRules(mock.dir, createPathRules(mock.dir, { items }));
+    const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(0);
+    const lines = readRecording(mock.recording);
+    expect(itemsQueryLine(lines)).toBeDefined();
+    expect(estimateWrites(lines)).toHaveLength(0);
+    expect(r.stderr).toMatch(/project fields updated: 0;/);
+  });
+
+  test('a removed estimate clears the card value so the board shows no stale number', () => {
+    const mock = makePatternMockGh();
+    const storiesDir = tempDir('stories535x-');
+    const items = unchangedStory(storiesDir, 'SHY-9509', { estimate: '', boardEstimate: 5 });
+    writeRules(mock.dir, createPathRules(mock.dir, { items }));
+    const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(0);
+    const writes = estimateWrites(readRecording(mock.recording));
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain('clearProjectV2ItemFieldValue');
+    expect(writes[0]).toContain('itemId=ITEM_I9509');
+  });
+
+  test('a failed Estimate write is a [gh-error] and fails the run (exit 40)', () => {
+    const mock = makePatternMockGh();
+    const storiesDir = tempDir('stories535f-');
+    const items = unchangedStory(storiesDir, 'SHY-9510', { estimate: '2', boardEstimate: null });
+    writeRules(mock.dir, [
+      ['fieldId=field-estimate', '', '1', 'HTTP 502: estimate write refused'],
+      ...createPathRules(mock.dir, { items }),
+    ]);
+    const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(40);
+    expect(r.stderr).toMatch(/\[gh-error\].*estimate write refused/);
+    expect(r.stderr).toMatch(/1 failed/);
+  });
+
+  test('a failed Estimate field creation is a [gh-error] and fails the run (exit 40)', () => {
+    const mock = makePatternMockGh();
+    const storiesDir = tempDir('stories535g-');
+    makeStory(storiesDir, { id: 'SHY-9511', type: 'feature', estimate: '5' });
+    writeRules(mock.dir, [
+      ['createProjectV2Field.*dataType: NUMBER', '', '1', 'Resource not accessible by integration'],
+      ...createPathRules(mock.dir, { fields: fieldsResponse({ omitEstimate: true }) }),
+    ]);
+    const r = runScript(['--all'], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(40);
+    expect(r.stderr).toMatch(/\[gh-error\] createProjectV2Field Estimate.*Resource not accessible/);
   });
 });
