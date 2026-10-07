@@ -409,7 +409,22 @@ describe('scripts/sync-stories-to-issues.sh', () => {
         path.join(dir, 'gh-responses-api-graphql'),
         JSON.stringify({
           data: {
-            organization: { projectV2: { id: 'PVT_test', fields: { nodes: [] } } },
+            organization: {
+              projectV2: {
+                id: 'PVT_test',
+                fields: {
+                  // SHY-0535: the board's Estimate field exists (created on its first sync).
+                  nodes: [
+                    {
+                      __typename: 'ProjectV2Field',
+                      id: 'field-estimate',
+                      name: 'Estimate',
+                      dataType: 'NUMBER',
+                    },
+                  ],
+                },
+              },
+            },
             repository: {
               id: 'REPO_1',
               issueTypes: {
@@ -512,7 +527,22 @@ describe('scripts/sync-stories-to-issues.sh', () => {
         path.join(dir, 'gh-responses-api-graphql'),
         JSON.stringify({
           data: {
-            organization: { projectV2: { id: 'PVT_test', fields: { nodes: [] } } },
+            organization: {
+              projectV2: {
+                id: 'PVT_test',
+                fields: {
+                  // SHY-0535: the board's Estimate field exists (created on its first sync).
+                  nodes: [
+                    {
+                      __typename: 'ProjectV2Field',
+                      id: 'field-estimate',
+                      name: 'Estimate',
+                      dataType: 'NUMBER',
+                    },
+                  ],
+                },
+              },
+            },
             repository: {
               id: 'REPO_1',
               issueTypes: {
