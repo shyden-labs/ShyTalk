@@ -372,6 +372,10 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0542](SHY-0542-production-keys-live-only-in-environments-only-main-can-reach.md) | P0 | L | infra | Production keys live only in environments that only main can reach | 📝 Draft | — |  |
 | [SHY-0543](SHY-0543-dev-cannot-deploy-the-production-web-site.md) | P0 | M | infra | Dev cannot deploy the production web site | 📝 Draft | — |  |
 | [SHY-0544](SHY-0544-local-and-ci-storage-runs-on-a-maintained-s3-stand-in.md) | P0 | L | infra | Local and CI storage runs on a maintained S3 stand-in, not MinIO | 📝 Draft | — |  |
+| [SHY-0546](SHY-0546-the-unit-suite-starts-no-service.md) | P0 | L | infra | The unit suite starts no service; tests that need one run as integration tests | 📝 Draft | — |  |
+| [SHY-0547](SHY-0547-no-backend-test-is-retried.md) | P0 | M | infra | No backend test is retried, so a failure shows the first time it happens | 📝 Draft | — |  |
+| [SHY-0548](SHY-0548-every-jest-unit-test-runs-in-under-one-second.md) | P0 | XL | infra | Every Jest unit test runs in under one second, and no test raises its own limit | 📝 Draft | — |  |
+| [SHY-0549](SHY-0549-every-kotlin-and-swift-unit-test-runs-in-under-one-second.md) | P0 | L | infra | Every Kotlin and Swift unit test runs in under one second, with its dependencies mocked | 📝 Draft | — |  |
 
 ## Done
 
