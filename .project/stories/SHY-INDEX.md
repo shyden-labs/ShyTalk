@@ -376,6 +376,8 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0547](SHY-0547-no-backend-test-is-retried.md) | P0 | M | infra | No backend test is retried, so a failure shows the first time it happens | 📝 Draft | — |  |
 | [SHY-0548](SHY-0548-every-jest-unit-test-runs-in-under-one-second.md) | P0 | XL | infra | Every Jest unit test runs in under one second, and no test raises its own limit | 📝 Draft | — |  |
 | [SHY-0549](SHY-0549-every-kotlin-and-swift-unit-test-runs-in-under-one-second.md) | P0 | L | infra | Every Kotlin and Swift unit test runs in under one second, with its dependencies mocked | 📝 Draft | — |  |
+| [SHY-0550](SHY-0550-production-runs-the-latest-release.md) | P0 | M | infra | Production runs the latest release, so support data is deleted on schedule | 📝 Draft | — |  |
+| [SHY-0551](SHY-0551-a-failing-scheduled-job-opens-an-issue.md) | P0 | S | infra | A failing scheduled job opens an issue instead of failing silently | 📝 Draft | — |  |
 
 ## Done
 
