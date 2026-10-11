@@ -378,6 +378,8 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0549](SHY-0549-every-kotlin-and-swift-unit-test-runs-in-under-one-second.md) | P0 | L | infra | Every Kotlin and Swift unit test runs in under one second, with its dependencies mocked | 📝 Draft | — |  |
 | [SHY-0550](SHY-0550-production-runs-the-latest-release.md) | P0 | M | infra | Production runs the latest release, so support data is deleted on schedule | 📝 Draft | — |  |
 | [SHY-0551](SHY-0551-a-failing-scheduled-job-opens-an-issue.md) | P0 | S | infra | A failing scheduled job opens an issue instead of failing silently | 📝 Draft | — |  |
+| [SHY-0552](SHY-0552-release-notes-list-the-stories-a-release-ships.md) | P1 | S | bug | Release notes list the stories a release ships | 📝 Draft | — |  |
+| [SHY-0553](SHY-0553-store-apps-catch-up-with-the-v0-99-0-server.md) | P0 | M | bug | The store apps catch up with the v0.99.0 server, so the device lock holds again | 📝 Draft | — |  |
 | [SHY-0227](SHY-0227-heal-stale-rules-contract-specs.md) | P1 | S | bug | Heal stale Firestore-rules contract specs and the tautological cohort-forging tests | 📝 Draft | — |  |
 | [SHY-0525](SHY-0525-dev-device-runs-bake-the-test-persona-credential-from-one-source.md) | P1 | S | bug | Dev device runs bake the test-persona credential from one source and never reuse an unproven APK | 📝 Draft | — |  |
 
