@@ -27,7 +27,9 @@ const KINDS = /\.(ya?ml|sh|ps1|js|mjs|cjs|ts|json)$/;
 const DEAD_NAMES = [/minio\/minio\b/gi, /minio\/mc\b/gi, /\/minio\/health\b/gi];
 // Measured 2026-10-12: files under ROOTS with a KINDS extension. Equality,
 // so a file added or lost under ROOTS is seen and this figure re-measured.
-const FILES_READ_FLOOR = 460;
+// 460 -> 461: local/seed-steps.js (01d13590). SHY-0556 moves this figure
+// to the floors record.
+const FILES_READ_FLOOR = 461;
 
 function findDeadNames(text) {
   return DEAD_NAMES.flatMap((re) => text.match(re) ?? []);
