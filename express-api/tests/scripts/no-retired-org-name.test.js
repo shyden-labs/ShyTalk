@@ -75,7 +75,8 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 1976 -> 1980 merging develop 9b3259c34fd (SHY-0544): +5 under ROOTS
 // (no-minio-image, s3-stand-in-pin, seed-steps test and script, the S3
 // integration spec), -1 (seed-minio.test.js).
-const FILES_READ_FLOOR = 1980;
+// 1980 -> 1982: scripts/scan-secrets.js and its test (SHY-0565).
+const FILES_READ_FLOOR = 1982;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

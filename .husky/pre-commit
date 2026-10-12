@@ -11,10 +11,26 @@
 # scope as the pre-push fix — same deprecated script, sibling hook).
 # (SHY-0359 later deleted that script outright — the path above is historical).
 
-# Secret scanning — block commits containing API keys, tokens, or credentials
-# Only scan ADDED lines (starting with +) to avoid false positives on removals
-SECRETS_FOUND=$(git diff --cached --diff-filter=d -U0 | grep '^+' | grep -v '^+++' | grep -iE '(AIzaSy[A-Za-z0-9_-]{33}|sk-[A-Za-z0-9]{48}|ghp_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16}|-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----|password\s*[:=]\s*["\x27][^"\x27]{8,})' || true)
-if [ -n "$SECRETS_FOUND" ]; then
+# Secret scanning — block commits containing API keys, tokens, or credentials.
+# scripts/scan-secrets.js reads only ADDED lines, file by file. SHY-0565:
+# the local emulator persona password is allowed by exact value under local/
+# only (Shyden, 2026-10-12). Exit 1 = findings; any other non-zero = the
+# scan itself failed, which blocks too.
+SECRETS_DIFF=$(mktemp) || exit 1
+if ! git diff --cached --diff-filter=d -U0 > "$SECRETS_DIFF"; then
+  rm -f "$SECRETS_DIFF"
+  echo "✗ Secret scan could not read the staged diff — commit blocked"
+  exit 1
+fi
+# husky runs this file under `sh -e`: a bare failing assignment would exit
+# here silently, so the status is captured inside an && / || list.
+SECRETS_FOUND=$(node scripts/scan-secrets.js < "$SECRETS_DIFF") && SECRETS_STATUS=0 || SECRETS_STATUS=$?
+rm -f "$SECRETS_DIFF"
+if [ "$SECRETS_STATUS" -ne 0 ] && [ "$SECRETS_STATUS" -ne 1 ]; then
+  echo "✗ Secret scan failed (exit $SECRETS_STATUS) — commit blocked"
+  exit 1
+fi
+if [ "$SECRETS_STATUS" -eq 1 ]; then
   echo ""
   echo "╔══════════════════════════════════════════════╗"
   echo "║  SECRET DETECTED IN STAGED FILES — BLOCKED   ║"
