@@ -41,8 +41,8 @@ jobs:
       # SHY-0569: #2190's metadata said 12.19.0 / semver-minor while its title
       # and body said 12.18.0 -> 13.0.0, and a major merged by itself. The
       # judge allows auto-merge only when the metadata AND every version pair
-      # in the PR's title and body are patch or minor (GitHub Actions keep
-      # their SHA-pinned exception). env-bound, never inline ${{ }} in run:.
+      # in the PR's title and body are patch or minor; GitHub Actions get no
+      # exception (SHY-0572). env-bound, never inline ${{ }} in run:.
       - name: Determine if auto-mergeable
         id: check
         env:
