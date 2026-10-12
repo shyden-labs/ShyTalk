@@ -114,11 +114,15 @@ describe('SHY-0565 — the pre-commit hook runs this scan and blocks on it', () 
   test('the staged diff is written once and fed to the scanner once', () => {
     expect({
       diff: occurrences(HOOK_CODE, 'git diff --cached --diff-filter=d -U0 > "$SECRETS_DIFF"'),
+      // husky runs every hook under `sh -e`, which exits on a failing
+      // assignment; inside an && / || list the scan's exit 1 is captured
+      // instead, so the banner and findings still print.
       scan: occurrences(
         HOOK_CODE,
-        'SECRETS_FOUND=$(node scripts/scan-secrets.js < "$SECRETS_DIFF")',
+        'SECRETS_FOUND=$(node scripts/scan-secrets.js < "$SECRETS_DIFF") && SECRETS_STATUS=0 || SECRETS_STATUS=$?',
       ),
-    }).toEqual({ diff: 1, scan: 1 });
+      bareCapture: occurrences(HOOK_CODE, '\nSECRETS_STATUS=$?'),
+    }).toEqual({ diff: 1, scan: 1, bareCapture: 0 });
   });
 
   test('a finding (exit 1) and a failed scan (any other non-zero) both block', () => {

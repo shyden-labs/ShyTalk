@@ -22,8 +22,9 @@ if ! git diff --cached --diff-filter=d -U0 > "$SECRETS_DIFF"; then
   echo "✗ Secret scan could not read the staged diff — commit blocked"
   exit 1
 fi
-SECRETS_FOUND=$(node scripts/scan-secrets.js < "$SECRETS_DIFF")
-SECRETS_STATUS=$?
+# husky runs this file under `sh -e`: a bare failing assignment would exit
+# here silently, so the status is captured inside an && / || list.
+SECRETS_FOUND=$(node scripts/scan-secrets.js < "$SECRETS_DIFF") && SECRETS_STATUS=0 || SECRETS_STATUS=$?
 rm -f "$SECRETS_DIFF"
 if [ "$SECRETS_STATUS" -ne 0 ] && [ "$SECRETS_STATUS" -ne 1 ]; then
   echo "✗ Secret scan failed (exit $SECRETS_STATUS) — commit blocked"
