@@ -387,6 +387,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0558](SHY-0558-actionlint-is-installed-from-a-pinned-source.md) | P0 | S | infra | actionlint is installed from a pinned, verified source | 📝 Draft | — |  |
 | [SHY-0227](SHY-0227-heal-stale-rules-contract-specs.md) | P1 | S | bug | Heal stale Firestore-rules contract specs and the tautological cohort-forging tests | 📝 Draft | — |  |
 | [SHY-0525](SHY-0525-dev-device-runs-bake-the-test-persona-credential-from-one-source.md) | P1 | S | bug | Dev device runs bake the test-persona credential from one source and never reuse an unproven APK | 📝 Draft | — |  |
+| [SHY-0559](SHY-0559-pr-gate-refuses-a-skip-its-flags-did-not-ask-for.md) | P0 | M | infra | The PR Gate refuses a skip that its change flags did not ask for | 📝 Draft | — |  |
 
 ## Done
 
