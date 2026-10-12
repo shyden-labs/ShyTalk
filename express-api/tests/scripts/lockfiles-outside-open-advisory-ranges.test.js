@@ -9,7 +9,7 @@
  * older major and passes an unsafe newer one.
  *
  * How to extend: when Dependabot opens an alert, add its row verbatim from
- * `gh api repos/Shyden-Ltd/ShyTalk/dependabot/alerts?state=open`; the test
+ * `gh api repos/shyden-labs/ShyTalk/dependabot/alerts?state=open`; the test
  * stays red until the lockfile leaves the range. When an advisory is withdrawn
  * or the package is removed, delete its row. The anchor test refuses a vacuous
  * pass: a row naming a package that is not in the lockfile is a typo, not a fix.

@@ -126,7 +126,7 @@ test.describe("English visitors pay zero translate cost", () => {
     const link = page.locator("a.shy-badge", { hasText: "SHY-9001" });
     await expect(link).toHaveAttribute(
       "href",
-      /github\.com\/Shyden-Ltd\/ShyTalk\/blob\/main\/\.project\/stories\/SHY-9001-fixture-slug\.md/,
+      /github\.com\/shyden-labs\/ShyTalk\/blob\/main\/\.project\/stories\/SHY-9001-fixture-slug\.md/,
     );
     await expect(link).toHaveAttribute("target", "_blank");
     await expect(link).toHaveAttribute("rel", /noopener/);

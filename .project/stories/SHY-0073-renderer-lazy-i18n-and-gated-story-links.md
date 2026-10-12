@@ -7,7 +7,7 @@ priority: P1
 effort: M
 type: feature
 roadmap_ids: []
-pr: https://github.com/Shyden-Ltd/ShyTalk/pull/1133
+pr: https://github.com/shyden-labs/ShyTalk/pull/1133
 epic: EPIC-0002
 public: true
 phase: Website & Presence

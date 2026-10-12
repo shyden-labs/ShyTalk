@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SHY-0033: Branch audit snapshot.
 #
-# Enumerates every branch on the Shyden-Ltd/ShyTalk remote via `gh api`,
+# Enumerates every branch on the shyden-labs/ShyTalk remote via `gh api`,
 # joins each with its head-commit metadata + any associated PR (open or
 # closed), and emits a single JSON document to .project/audit/.
 #
@@ -30,7 +30,7 @@
 # Requires: gh CLI authenticated; jq (Bash 3.2 compatible).
 set -euo pipefail
 
-REPO="Shyden-Ltd/ShyTalk"
+REPO="shyden-labs/ShyTalk"
 TODAY="$(date -u +%Y-%m-%d)"
 OUT=".project/audit/branch-snapshot-${TODAY}.json"
 

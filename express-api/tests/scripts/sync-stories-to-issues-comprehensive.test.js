@@ -377,9 +377,9 @@ describe('SHY-0082 v4: script body — typed-issue creation + field population',
     expect(scriptContent).toMatch(/updateProjectV2ItemFieldValue/);
   });
 
-  test('script references the ShyTalk Stories Project v2 (number 1 in Shyden-Ltd)', () => {
+  test('script references the ShyTalk Stories Project v2 (number 1 in shyden-labs)', () => {
     expect(scriptContent).toMatch(
-      /projectV2|ShyTalk Stories|Shyden-Ltd.{0,60}project|projectId|PROJECT_NUMBER/,
+      /projectV2|ShyTalk Stories|shyden-labs.{0,60}project|projectId|PROJECT_NUMBER/,
     );
   });
 });
