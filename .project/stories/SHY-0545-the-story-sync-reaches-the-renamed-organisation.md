@@ -1,6 +1,6 @@
 ---
 id: SHY-0545
-status: In Progress
+status: In Review
 owner: claude
 created: 2026-10-12
 priority: P0
@@ -57,61 +57,73 @@ but not an organisation login in GraphQL, nor org pages, nor `github.io`:
 
 ### Happy path
 
-- [ ] The sync's default project owner is `shyden-labs`, in the code, its
+- [x] The sync's default project owner is `shyden-labs`, in the code, its
       help text and the issue-body source link.
-- [ ] Every live reference (23 of the 24 files above; the 2026-03 plan in
+      _Proof: `sync-stories-alert.test.js` "the default project owner is shyden-labs"; M1 (old default) RED 2 of 55._
+- [x] Every live reference (23 of the 24 files above; the 2026-03 plan in
       `.project/plans` stays as history) names `shyden-labs`, the three Done
       stories' `pr:` fields feeding the roadmap data included, and the two
       404 links point at the board (200) or the reports host.
-- [ ] Report links and the Allure "already generated" fetch name
+      _Proof: `no-retired-org-name.test.js` verdict `{ filesRead: 1976, findings: [] }`; 41 lines changed in 24 files with per-file counts asserted._
+- [x] Report links and the Allure "already generated" fetch name
       `https://reports.shytalk.shyden.co.uk/` directly, not the Pages
       address that redirects over plain http.
+      _Proof: `sync-stories-alert.test.js` report-link pins (action 1, allure-report 2, no `github.io`); `allure-report-summary-step.test.js` RED then green on the new link._
 - [ ] After merge, the sync on `develop` succeeds, and the stories filed
       since 2026-10-07 are on the board (checked by number on the board).
 
 ### Error paths
 
-- [ ] A failed story sync on `develop` opens an issue assigned to
+- [x] A failed story sync on `develop` opens an issue assigned to
       `ShydenMcM` (or comments on the open one), from a separate job with
       its own `issues: write` permission, so the alert does not depend on
       the token the sync uses.
-- [ ] A planted failure (a dispatch with an owner that cannot resolve)
+      _Proof: planted run 38196200473 opened #2252 assigned to ShydenMcM; a second planted run 38196325877 commented on #2252 and opened no other issue._
+- [x] A planted failure (a dispatch with an owner that cannot resolve)
       proves the alert opens the issue.
+      _Proof: real-mode dispatches from this branch (checkout pins develop, still on the old owner) failed at `items-map query failed — aborting before any mutations`; no commit reached develop. A first dry-run plant (38195717677) passed instead, because `--dry-run` skips the board read (SHY-0539 covers that)._
 
 ### Edge cases
 
-- [ ] A guard refuses the retired organisation name in every spelling
+- [x] A guard refuses the retired organisation name in every spelling
       (`Shyden-Ltd`, `shyden-ltd`, `SHYDEN-LTD`, in a URL, a GraphQL login and
       a `github.io` host) in every live file, while the history folders keep
       their record unchanged.
-- [ ] The guard's verdict carries the number of files it read, checked for
+      _Proof: six spellings found, three look-alikes passed; M3 (case-sensitive) RED 5 of 55; planted files in `scripts/`, a README and an extensionless `.husky` hook reported by path._
+- [x] The guard's verdict carries the number of files it read, checked for
       equality against a measured figure, and each scanned root contributes
       at least one file.
+      _Proof: 1,976 read = git's 1,974 tracked + the 2 new test files; one test per root (13); M2 (drop `public`) RED 3._
 
 ### Performance
 
-- [ ] The guard reads only the live roots; its run time is recorded in the PR.
+- [x] The guard reads only the live roots; its run time is recorded in the PR.
+      _Proof: file 0.907 s wall; the walk at load 144 ms wall, 129 ms CPU. A whole-repo guard: it moves to the guards suite with `no-minio-image.test.js` under SHY-0548._
 
 ### Security
 
-- [ ] The alert job's token has `issues: write` and `actions: read` (to name
+- [x] The alert job's token has `issues: write` and `actions: read` (to name
       the failed step) only; the sync job's permissions are unchanged.
+      _Proof: pins on `alert.permissions` equal `{ issues: write, actions: read }`, top level `{ contents: read }`, none on `sync`; M5 (alert borrows `GH_PAT_PROJECT`) RED 1._
 - [ ] Operator action: Pages "Enforce HTTPS" is switched on (repository
       setting; read back as `https_enforced=true`).
 
 ### UX
 
-- [ ] The roadmap footer's "GitHub project" link opens the board (200).
+- [x] The roadmap footer's "GitHub project" link opens the board (200).
+      _Proof: the link now in `public/roadmap.html` (`github.com/orgs/shyden-labs/projects/1`) answers 200; the old one 404. Live once the web deploy carries it._
 
 ### i18n
 
-- [ ] The five translated READMEs change only the URL; no translated text
+- [x] The five translated READMEs change only the URL; no translated text
       changes, so no read-back is needed.
+      _Proof: the five READMEs differ only on line 206, the `git clone` URL._
 
 ### Observability
 
-- [ ] The alert issue names the failed run's URL, the commit, and the failed
+- [x] The alert issue names the failed run's URL, the commit, and the failed
       job and step by name (read from the run's jobs API).
+      _Proof: #2252 body names the run URL, `Mirror stories to Issues: Sync stories to GitHub Issues` and commit `a4015b73cba4`._
 
 ## BDD Scenarios
 
