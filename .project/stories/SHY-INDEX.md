@@ -388,6 +388,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0227](SHY-0227-heal-stale-rules-contract-specs.md) | P1 | S | bug | Heal stale Firestore-rules contract specs and the tautological cohort-forging tests | 📝 Draft | — |  |
 | [SHY-0525](SHY-0525-dev-device-runs-bake-the-test-persona-credential-from-one-source.md) | P1 | S | bug | Dev device runs bake the test-persona credential from one source and never reuse an unproven APK | 📝 Draft | — |  |
 | [SHY-0559](SHY-0559-pr-gate-refuses-a-skip-its-flags-did-not-ask-for.md) | P0 | M | infra | The PR Gate refuses a skip that its change flags did not ask for | 📝 Draft | — |  |
+| [SHY-0560](SHY-0560-story-index-status-is-derived-from-the-story-files.md) | P0 | S | infra | The story index shows each story's real status, read from the story file | 📝 Draft | — |  |
 
 ## Done
 
