@@ -53,17 +53,18 @@ function makeRepo(changes) {
 const story = (status) =>
   `---\nid: SHY-0999\nstatus: ${status}\nowner: claude\ncreated: 2026-06-18\npriority: P1\neffort: S\ntype: infra\nroadmap_ids: []\npr:\n---\n\n# SHY-0999: x\n`;
 
-/** Run the gate; return { code, stderr }. */
+/** Run the gate; return { code, stdout, stderr }. */
 function run(dir, env = {}) {
   try {
-    execFileSync('node', [SCRIPT], {
+    const stdout = execFileSync('node', [SCRIPT], {
       cwd: dir,
       stdio: 'pipe',
+      encoding: 'utf8',
       env: { ...process.env, BASE_SHA: 'main', HEAD_SHA: 'feature', ...env },
     });
-    return { code: 0, stderr: '' };
+    return { code: 0, stdout, stderr: '' };
   } catch (e) {
-    return { code: e.status, stderr: String(e.stderr) };
+    return { code: e.status, stdout: String(e.stdout), stderr: String(e.stderr) };
   }
 }
 
@@ -87,18 +88,17 @@ describe('SHY-0127 Gate 1 — story must be In Review before merge', () => {
     expect(run(dir).code).toBe(0);
   });
 
-  test('FAILS when an EXISTING (modified) story is still Draft (SHY-0131 — exemption is add-only)', () => {
-    // The add-only exemption must NOT apply to a modification: a Draft story
-    // already on main that a PR edits still trips the gate (no SHY-0120 hole).
+  test('FAILS when an EXISTING story is MOVED to Draft (only Draft → Draft is maintenance)', () => {
+    // SHY-0518 exempts a story that was Draft before the PR and is Draft after
+    // it. A story that was anything else before and is Draft now has gone
+    // backwards; that is not backlog maintenance and still trips the gate.
     const dir = makeRepoBase(
+      (d) => fs.writeFileSync(path.join(d, '.project/stories/SHY-0999-x.md'), story('In Review')),
       (d) => fs.writeFileSync(path.join(d, '.project/stories/SHY-0999-x.md'), story('Draft')),
-      (d) =>
-        fs.writeFileSync(
-          path.join(d, '.project/stories/SHY-0999-x.md'),
-          `${story('Draft')}\n- refined a line\n`,
-        ),
     );
-    expect(run(dir).code).not.toBe(0);
+    const { code, stderr } = run(dir);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/SHY-0999-x\.md has status "Draft" — it must be "In Review"/);
   });
 
   test('FAILS when a newly-ADDED story is In Progress (only Draft is exempt at filing)', () => {
@@ -287,5 +287,92 @@ describe('SHY-0486 — an In Progress story may record its own running log', () 
       },
     );
     expect(run(dir).code).toBe(1);
+  });
+});
+
+/**
+ * SHY-0518 — a story that is Draft before the PR and Draft after it is being
+ * maintained (a note, a score, an `epic:` link, a refined criterion), not
+ * implemented. Implementation is what moves a story OUT of Draft, and that move
+ * is still refused until the story reaches In Review.
+ */
+const draftStory = ({ fm = '', body = '' } = {}) =>
+  `---\nid: SHY-0999\nstatus: Draft\nowner: claude\ncreated: 2026-06-18\n` +
+  `priority: P1\neffort: S\ntype: infra\nroadmap_ids: []\n${fm}pr:\n---\n\n` +
+  `# SHY-0999: backlog\n\n## Acceptance Criteria\n\n- [ ] the one thing\n\n## Notes\n${body}\n`;
+
+const EXEMPT_LINE =
+  'pre-merge-gate: .project/stories/SHY-0999-x.md Draft → Draft — backlog maintenance exemption OK';
+
+describe('SHY-0518 — a Draft story may be maintained without leaving Draft', () => {
+  test('a body change to a Draft story passes with the exemption line', () => {
+    const dir = makeRepoBase(
+      (d) => fs.writeFileSync(storyPath(d), draftStory()),
+      (d) => fs.writeFileSync(storyPath(d), draftStory({ body: '- operator reproduction added' })),
+    );
+    const { code, stdout } = run(dir);
+    expect(code).toBe(0);
+    expect(stdout).toContain(EXEMPT_LINE);
+  });
+
+  test('a frontmatter-only change (the epic: field) to a Draft story passes', () => {
+    const dir = makeRepoBase(
+      (d) => fs.writeFileSync(storyPath(d), draftStory()),
+      (d) => fs.writeFileSync(storyPath(d), draftStory({ fm: 'epic: EPIC-0013\n' })),
+    );
+    const { code, stdout } = run(dir);
+    expect(code).toBe(0);
+    expect(stdout).toContain(EXEMPT_LINE);
+  });
+
+  test('Draft → In Progress in the same PR is refused (started, not finished)', () => {
+    const dir = makeRepoBase(
+      (d) => fs.writeFileSync(storyPath(d), draftStory()),
+      (d) => fs.writeFileSync(storyPath(d), inProgressStory('- started')),
+    );
+    const { code, stdout } = run(dir);
+    expect(code).toBe(1);
+    expect(stdout).not.toContain('backlog maintenance exemption');
+  });
+
+  test('a Draft story whose status: line is removed is refused, naming the missing field', () => {
+    const dir = makeRepoBase(
+      (d) => fs.writeFileSync(storyPath(d), draftStory()),
+      (d) => fs.writeFileSync(storyPath(d), draftStory().replace('status: Draft\n', '')),
+    );
+    const { code, stderr } = run(dir);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/has status "\(no status: field\)"/);
+  });
+
+  test('a RENAMED Draft story that stays Draft passes, its base read from the old path', () => {
+    const dir = makeRepoBase(
+      (d) => fs.writeFileSync(path.join(d, '.project/stories/SHY-0999-old.md'), draftStory()),
+      (d) => {
+        git(d, ['mv', '.project/stories/SHY-0999-old.md', '.project/stories/SHY-0999-x.md']);
+        fs.writeFileSync(storyPath(d), draftStory({ body: '- renamed and noted' }));
+      },
+    );
+    const { code, stdout } = run(dir);
+    expect(code).toBe(0);
+    expect(stdout).toContain(EXEMPT_LINE);
+  });
+
+  test('several stories in one PR are each judged on their own before and after', () => {
+    const other = '.project/stories/SHY-0998-y.md';
+    const dir = makeRepoBase(
+      (d) => {
+        fs.writeFileSync(storyPath(d), draftStory());
+        fs.writeFileSync(path.join(d, other), story('In Review'));
+      },
+      (d) => {
+        fs.writeFileSync(storyPath(d), draftStory({ body: '- scored' }));
+        fs.writeFileSync(path.join(d, other), story('Draft'));
+      },
+    );
+    const { code, stdout, stderr } = run(dir);
+    expect(code).toBe(1);
+    expect(stdout).toContain(EXEMPT_LINE);
+    expect(stderr).toMatch(/SHY-0998-y\.md has status "Draft"/);
   });
 });
