@@ -1,6 +1,6 @@
 ---
 id: SHY-0568
-status: In Review
+status: Done
 owner: claude
 created: 2026-10-12
 priority: P0
@@ -106,8 +106,9 @@ last tested state; the upgrade is SHY-0570.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; CI green by step name; merged to
+- [x] Every AC ticked with its proof; CI green by step name; merged to
       `develop`; the next dev deploy's root install green.
+      _Proof: PR #2291 run 38230725115 on `190c3c5f4c2` green by job name; merged as `2d2f77bc9b2`; dev deploy run 38232961859 from that commit green by every job name, including Dev Smoke Tests and Seed Dev Personas, which install the root packages._
 
 ## Notes
 

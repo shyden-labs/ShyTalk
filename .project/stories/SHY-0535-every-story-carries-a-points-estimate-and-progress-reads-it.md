@@ -181,12 +181,15 @@ is SHY-0536, so this story stays reviewable.
 
 ## Definition of Done
 
-- [ ] All ACs ticked with the test that proves each.
-- [ ] Each new behaviour mutation-checked red, results in Notes.
-- [ ] CI green by step name on the PR head; merged to `develop`; dev deploy
+- [x] All ACs ticked with the test that proves each.
+- [x] Each new behaviour mutation-checked red, results in Notes.
+      _Proof: Notes, "Mutations" (M1 onward, baseline 495/495)._
+- [x] CI green by step name on the PR head; merged to `develop`; dev deploy
       read by job name.
-- [ ] After merge, the sync run on `develop` read: the `Estimate` field exists
+      _Proof: PR #2222 run 38222626573 on `1c1975453a4` green by job name; merged as `a32026e1b02`; dev deploy run 38232961859 (from `2d2f77bc9b2`, which contains it) green by every job name._
+- [x] After merge, the sync run on `develop` read: the `Estimate` field exists
       on the board (read back by name).
+      _Proof: sync run 38224376271 green by step; `board-progress.ts` then read the board's `Estimate` field by name: 33 of 303 open tickets scored (0 before)._
 - [ ] `released_in:` set on the next release cut.
 
 ## Notes
