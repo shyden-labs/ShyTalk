@@ -78,6 +78,12 @@ updates:
       patch-updates:
         update-types:
           - "patch"
+    ignore:
+      # SHY-0568: firebase 13 (#2190) broke the root `npm ci` because
+      # @firebase/rules-unit-testing 5 peers firebase ^12. Both move
+      # together, with their integration runs, in SHY-0570.
+      - dependency-name: "firebase"
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
