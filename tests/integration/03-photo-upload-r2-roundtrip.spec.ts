@@ -1,20 +1,20 @@
 import { test, expect } from "./fixtures/scenarios";
 
 /**
- * Integration test #4 — Photo upload → R2 (MinIO) round-trip.
+ * Integration test #4 — Photo upload → R2 (versitygw) round-trip.
  *
  * Verifies the full multipart-upload pipeline:
  *
  *   1. authenticated POST /api/storage/upload with a multipart PNG
  *   2. multer parses the multipart body
  *   3. imageCompressor (sharp) enforces MIN_DIMENSION + ALLOWED_MIME
- *   4. r2.putObject writes to the MinIO mock bucket
+ *   4. r2.putObject writes to the versitygw mock bucket
  *   5. the returned URL is publicly fetchable and serves the bytes
  *   6. DELETE /api/storage/delete removes the object
  *   7. subsequent GET returns 404
  *
  * What this catches that no unit test can:
- *   - MinIO container actually serving on :9002 with the expected bucket
+ *   - versitygw container actually serving on :9002 with the expected bucket
  *   - sharp pipeline working against real PNG bytes (codec install)
  *   - S3 SDK's PutObject ACL/public-read behaviour (the policy that
  *     makes the URL publicly fetchable without a presigned request)
@@ -29,7 +29,7 @@ const API_BASE = process.env.API_BASE_URL || "http://localhost:3000";
 
 // 100×100 black PNG, ~130 bytes. imageCompressor.js enforces
 // MIN_DIMENSION=100 and rejects smaller PNGs with ImagePolicyError → 400,
-// so anything smaller would silently mask sharp/MinIO failures behind a
+// so anything smaller would silently mask sharp/versitygw failures behind a
 // validation 400. Sharing the same constant verbatim with the smoke
 // suite's TEST_PNG_100X100 (tests/web/dev-smoke.spec.ts:514) — promoting
 // it to a shared helper is deferred until the third consumer arrives,
@@ -69,12 +69,12 @@ test.describe("Integration — Photo upload → R2 round-trip", () => {
     expect(typeof body.url, `body.url shape: ${JSON.stringify(body)}`).toBe(
       "string",
     );
-    // Local stack: URL points at MinIO via http://localhost:9002/<bucket>/<key>.
+    // Local stack: URL points at versitygw via http://localhost:9002/<bucket>/<key>.
     // This is the contract Express's r2.js produces in `isLocal` mode
     // (see express-api/src/utils/r2.js:48). Asserting on the prefix
     // catches a misconfigured CDN_URL or a future change that would
     // hand a non-fetchable URL back to the client.
-    expect(body.url, `URL must point at the local MinIO bucket`).toMatch(
+    expect(body.url, `URL must point at the local versitygw bucket`).toMatch(
       /^http:\/\/localhost:9002\/[^/]+\//,
     );
 
@@ -82,7 +82,7 @@ test.describe("Integration — Photo upload → R2 round-trip", () => {
     // delete the object even if a later assertion throws. The
     // `sender` fixture only tears down Firestore-tagged docs (see
     // fixtures/scenarios.ts) — it has no R2 hook, so a mid-test
-    // failure would otherwise leak one MinIO object per failed run.
+    // failure would otherwise leak one versitygw object per failed run.
     const url = new URL(body.url);
     const pathParts = url.pathname.split("/").filter((p) => p.length > 0);
     expect(
@@ -92,7 +92,7 @@ test.describe("Integration — Photo upload → R2 round-trip", () => {
     const key = pathParts.slice(1).join("/");
 
     try {
-      // Phase 2 — verify the object is publicly fetchable. MinIO is
+      // Phase 2 — verify the object is publicly fetchable. versitygw is
       // strongly consistent for PUT-then-GET so no retry is needed.
       const fetched = await api.get(body.url);
       expect(
@@ -127,7 +127,7 @@ test.describe("Integration — Photo upload → R2 round-trip", () => {
         `delete expected 200, got ${del.status()}: ${await del.text()}`,
       ).toBe(true);
 
-      // Phase 4 — verify the object is actually gone. MinIO does
+      // Phase 4 — verify the object is actually gone. versitygw does
       // NOT sit behind a CDN, so unlike the dev-smoke equivalent we
       // don't need a cache-buster. Strict 404 confirms DELETE
       // actually removed the object from storage (not just from a

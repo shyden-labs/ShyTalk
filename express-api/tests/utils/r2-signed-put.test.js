@@ -5,7 +5,7 @@
  * Oracle VM).
  *
  * Runtime delegates to @aws-sdk/s3-request-presigner. We mock that
- * out so the test doesn't need real R2 / MinIO credentials and so we
+ * out so the test doesn't need real R2 / versitygw credentials and so we
  * can pin the exact arguments passed (bucket, key, content type,
  * expires-in seconds).
  */

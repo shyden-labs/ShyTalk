@@ -27,7 +27,7 @@ _នេះជាការបកប្រែនៃ JOURNEY-RUNNER.md។_
 
 | អ្នកត្រូវការ                     | របៀប                                                                                                                                                 |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** កំពុងដំណើរការ | សម្រាប់ Firebase emulators + LiveKit/MinIO                                                                                                           |
+| **Docker Desktop** កំពុងដំណើរការ | សម្រាប់ Firebase emulators + LiveKit/versitygw                                                                                                       |
 | **stack មូលដ្ឋានដំណើរការ**       | `bash local/start.sh` (ពី root របស់ repo) — ចាប់ផ្តើម Firebase emulators + express-api។ ទុកវាឲ្យដំណើរការ។                                            |
 | **Personas ត្រូវបាន seed**       | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotent; seed ក្រុមតេស្ត P‑02…P‑19 ដោយប្រើ password `localdev123`) |
 | **ទូរស័ព្ទមួយត្រូវបានភ្ជាប់**    | `adb devices` ត្រូវតែបង្ហាញមួយ (ខ្សែ USB **ឬ** `adb` ឥតខ្សែ)។ Android emulator ក៏ដំណើរការដែរ។                                                        |

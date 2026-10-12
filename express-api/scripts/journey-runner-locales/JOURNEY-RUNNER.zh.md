@@ -24,7 +24,7 @@ _这是 JOURNEY-RUNNER.md 的译文。_
 
 | 你需要                      | 如何                                                                                                                                |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| 运行中的 **Docker Desktop** | 用于 Firebase 模拟器 + LiveKit/MinIO                                                                                                |
+| 运行中的 **Docker Desktop** | 用于 Firebase 模拟器 + LiveKit/versitygw                                                                                            |
 | **本地栈已启动**            | `bash local/start.sh`（从仓库根目录）—— 启动 Firebase 模拟器 + express-api。让它保持运行。                                          |
 | **已植入 personas**         | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js`（幂等；以密码 `localdev123` 植入 P‑02…P‑19 测试阵容） |
 | **一部已连接的手机**        | `adb devices` 必须列出一部（USB 数据线**或**无线 `adb`）。Android 模拟器也可以。                                                    |

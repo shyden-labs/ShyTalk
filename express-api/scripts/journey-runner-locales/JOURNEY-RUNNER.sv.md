@@ -27,7 +27,7 @@ Det är en **hybrid**-körare. Varje resa kan kontrollera tre lager samtidigt:
 
 | Du behöver                   | Hur                                                                                                                                                         |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** igång     | för Firebase-emulatorerna + LiveKit/MinIO                                                                                                                   |
+| **Docker Desktop** igång     | för Firebase-emulatorerna + LiveKit/versitygw                                                                                                               |
 | **Den lokala stacken uppe**  | `bash local/start.sh` (från repots rot) — startar Firebase-emulatorerna + express-api. Låt den fortsätta köra.                                              |
 | **Personas seedade**         | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotent; seedar testuppsättningen P‑02…P‑19 med lösenordet `localdev123`) |
 | **En ansluten telefon**      | `adb devices` måste lista en (USB-kabel **eller** trådlös `adb`). En Android-emulator fungerar också.                                                       |

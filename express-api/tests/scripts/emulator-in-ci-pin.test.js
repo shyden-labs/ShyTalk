@@ -14,11 +14,12 @@ const WORKFLOWS = path.resolve(__dirname, '../../../.github/workflows');
 const read = (file) => fs.readFileSync(path.join(WORKFLOWS, file), 'utf8');
 
 const EMULATOR_ACTION = './.github/actions/start-firebase-emulators';
-// EPIC-0003 / SHY-0120: the cron Jest tests also need REAL R2 (MinIO) +
+// EPIC-0003 / SHY-0120: the cron Jest tests also need REAL R2 (S3 stand-in) +
 // email (Mailpit), provisioned by this action. A future edit dropping it
 // would fail those suites in CI's beforeAll with a connection refusal.
 const LOCAL_SERVICES_ACTION = './.github/actions/start-local-services';
-const MINIO_HEALTH = 'http://localhost:9002/minio/health/live';
+// SHY-0544: versitygw's health path (its --health flag), mapped to 9002.
+const S3_HEALTH = 'http://localhost:9002/health';
 const MAILPIT_HEALTH = 'http://localhost:8025/api/v1/messages';
 const JEST_INVOCATION = 'node_modules/.bin/jest';
 // SHY-0162: assert setup-java is SHA-PINNED (version-agnostic), not frozen to a
@@ -56,17 +57,17 @@ describe('SHY-0109 — test-backend.yml provisions emulators before Jest', () =>
     expect(yml).toMatch(/timeout-minutes:\s*15/);
   });
 
-  test('provisions the REAL R2 (MinIO) + email (Mailpit) services via start-local-services, before Jest', () => {
+  test('provisions the REAL R2 (S3 stand-in) + email (Mailpit) services via start-local-services, before Jest', () => {
     const svc = yml.indexOf(LOCAL_SERVICES_ACTION);
     const jest = yml.indexOf(JEST_INVOCATION);
     expect(svc).toBeGreaterThan(-1);
     expect(svc).toBeLessThan(jest);
   });
 
-  test('waits for MinIO + Mailpit readiness before Jest', () => {
-    expect(yml).toContain(MINIO_HEALTH);
+  test('waits for S3 stand-in + Mailpit readiness before Jest', () => {
+    expect(yml).toContain(S3_HEALTH);
     expect(yml).toContain(MAILPIT_HEALTH);
-    expect(yml.indexOf(MINIO_HEALTH)).toBeLessThan(yml.indexOf(JEST_INVOCATION));
+    expect(yml.indexOf(S3_HEALTH)).toBeLessThan(yml.indexOf(JEST_INVOCATION));
   });
 });
 
@@ -95,16 +96,16 @@ describe('SHY-0109 — sonarcloud.yml provisions emulators before Jest', () => {
     expect(jdk).toBeLessThan(emu);
   });
 
-  test('provisions the REAL R2 (MinIO) + email (Mailpit) services via start-local-services, before Jest', () => {
+  test('provisions the REAL R2 (S3 stand-in) + email (Mailpit) services via start-local-services, before Jest', () => {
     const svc = yml.indexOf(LOCAL_SERVICES_ACTION);
     const jest = yml.indexOf(JEST_INVOCATION);
     expect(svc).toBeGreaterThan(-1);
     expect(svc).toBeLessThan(jest);
   });
 
-  test('waits for MinIO + Mailpit readiness before Jest', () => {
-    expect(yml).toContain(MINIO_HEALTH);
+  test('waits for S3 stand-in + Mailpit readiness before Jest', () => {
+    expect(yml).toContain(S3_HEALTH);
     expect(yml).toContain(MAILPIT_HEALTH);
-    expect(yml.indexOf(MINIO_HEALTH)).toBeLessThan(yml.indexOf(JEST_INVOCATION));
+    expect(yml.indexOf(S3_HEALTH)).toBeLessThan(yml.indexOf(JEST_INVOCATION));
   });
 });

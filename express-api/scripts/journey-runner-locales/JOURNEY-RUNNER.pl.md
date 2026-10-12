@@ -30,7 +30,7 @@ jednocześnie:
 
 | Potrzebujesz                      | Jak                                                                                                                                                   |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Działającego **Docker Desktop**   | dla emulatorów Firebase + LiveKit/MinIO                                                                                                               |
+| Działającego **Docker Desktop**   | dla emulatorów Firebase + LiveKit/versitygw                                                                                                           |
 | **Uruchomionego lokalnego stosu** | `bash local/start.sh` (z katalogu głównego repo) — uruchamia emulatory Firebase + express-api. Zostaw je działające.                                  |
 | **Zaseedowanych person**          | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotentne; seeduje obsadę testową P‑02…P‑19 z hasłem `localdev123`) |
 | **Podłączonego telefonu**         | `adb devices` musi wyświetlić jeden (kabel USB **lub** bezprzewodowe `adb`). Emulator Androida również działa.                                        |

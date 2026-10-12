@@ -82,9 +82,9 @@ fi
 echo "  All required ports are free."
 
 # =============================================================================
-# Step 1: Docker Compose up (LiveKit + MinIO + Mailpit)
+# Step 1: Docker Compose up (LiveKit + S3 stand-in + Mailpit)
 # =============================================================================
-echo "==> Step 1/8: Starting Docker containers (LiveKit, MinIO, Mailpit)..."
+echo "==> Step 1/8: Starting Docker containers (LiveKit, S3 stand-in, Mailpit)..."
 
 # LiveKit advertises NODE_IP to clients as its ICE candidate address
 # (SHY-0273). Without it, it advertises the Docker bridge address
@@ -108,7 +108,7 @@ echo "==> Step 1/8: Starting Docker containers (LiveKit, MinIO, Mailpit)..."
 # The chooser asks the attached phone and prints the evidence for its answer.
 # `LIVEKIT_NODE_IP=<addr> bash local/start.sh` still overrides it outright.
 # The same address has to reach two other settings, and those live in
-# express-api/.env.local rather than in this shell: MINIO_ENDPOINT, which signed
+# express-api/.env.local rather than in this shell: LOCAL_S3_ENDPOINT, which signed
 # upload URLs are minted against, and CDN_URL, which attachments are served
 # from. They were hand-written, and a DHCP lease is not a constant -- on
 # 2026-08-24 they still named a machine this laptop had stopped being, so every
@@ -196,9 +196,9 @@ env JAVA_TOOL_OPTIONS="-Xmx1g" npx firebase emulators:start \
 FIREBASE_PID=$!
 
 # =============================================================================
-# Step 3: Wait for readiness (emulators + MinIO)
+# Step 3: Wait for readiness (emulators + S3 stand-in)
 # =============================================================================
-echo "==> Step 3/8: Waiting for emulators and MinIO..."
+echo "==> Step 3/8: Waiting for emulators and the S3 stand-in..."
 
 echo "  Waiting for Firebase Emulators (localhost:4000)..."
 MAX_WAIT=120; WAITED=0
@@ -212,23 +212,31 @@ until curl -s http://localhost:4000 > /dev/null 2>&1; do
 done
 echo "  Firebase Emulators ready."
 
-echo "  Waiting for MinIO (localhost:9002)..."
+echo "  Waiting for the S3 stand-in, versitygw (localhost:9002)..."
 MAX_WAIT=120; WAITED=0
-until curl -s http://localhost:9002/minio/health/live > /dev/null 2>&1; do
+until curl -sf http://localhost:9002/health > /dev/null 2>&1; do
   sleep 1; WAITED=$((WAITED+1))
   if [ $WAITED -ge $MAX_WAIT ]; then
-    echo "ERROR: MinIO did not start within ${MAX_WAIT}s"
+    echo "ERROR: the S3 stand-in (compose service s3) did not answer /health within ${MAX_WAIT}s. Last log lines:"
+    docker compose -f "$SCRIPT_DIR/docker-compose.yml" logs --tail 50 s3 || true
     cleanup
     exit 1
   fi
 done
-echo "  MinIO ready."
+echo "  S3 stand-in ready: $(docker compose -f "$SCRIPT_DIR/docker-compose.yml" exec -T s3 versitygw --version | head -1)"
 
 # =============================================================================
-# Step 4: Seed data (Firestore + MinIO bucket)
+# Step 4: Seed data (Firestore + S3 bucket)
 # =============================================================================
 echo "==> Step 4/8: Seeding data..."
-(cd "$PROJECT_ROOT/express-api" && NODE_PATH=./node_modules node ../local/seed.js)
+# A failed seed stops the stack. Under `set -e` a bare failure would exit here
+# and leave the containers and emulators running, and a stack whose bucket or
+# users are missing only fails later, on a device, far from the cause (SHY-0544).
+if ! (cd "$PROJECT_ROOT/express-api" && NODE_PATH=./node_modules node ../local/seed.js); then
+  echo "ERROR: seeding failed (the reason is printed above). Stopping the stack." >&2
+  cleanup
+  exit 1
+fi
 
 # =============================================================================
 # Step 4b: Provision journey-runner test personas (P-02..P-19)
@@ -367,7 +375,7 @@ if adb devices 2>/dev/null | grep -q "device$"; then
   # (pinned equal by livekit-local-node-ip.test.js) — a device that reaches
   # the stack under one harness and not another is the drift this prevents.
   # 3000 Express · 7880 LiveKit signalling · 7881 LiveKit TCP media
-  # · 8080 Firestore · 8888 web serve · 9000 RTDB · 9002 MinIO · 9099 Auth
+  # · 8080 Firestore · 8888 web serve · 9000 RTDB · 9002 S3 stand-in · 9099 Auth
   echo "  Tunnelling stack ports into $DEVICE_NAME..."
   for p in 3000 7880 7881 8080 8888 9000 9002 9099; do
     adb reverse "tcp:$p" "tcp:$p" >/dev/null 2>&1 \
@@ -393,13 +401,12 @@ echo "  Services:"
 echo "    Firebase UI:    http://localhost:4000"
 echo "    Express API:    http://localhost:3000"
 echo "    Mailpit UI:     http://localhost:8025"
-echo "    MinIO Console:  http://localhost:9001"
 echo "    LiveKit:        localhost:7880"
 echo ""
 echo "  Credentials:"
 echo "    Test admin:     claude-test@shytalk.dev / localdev123"
 echo "    Test user:      user@test.com / localdev123"
-echo "    MinIO:          minioadmin / minioadmin"
+echo "    S3 stand-in:    localadmin / localsecret (versitygw, http://localhost:9002, no console)"
 echo ""
 echo "  Android:"
 echo "    APK path:       $APK_PATH"
@@ -417,7 +424,7 @@ echo "Press Ctrl+C to stop..."
 # code on natural Firebase termination. On a Firebase crash (non-zero
 # exit), the unguarded `wait` would abort the shell via set -e BEFORE
 # reaching the cleanup() call below — leaving Docker containers
-# (LiveKit, MinIO, Mailpit) running indefinitely. The existing INT/TERM
+# (LiveKit, S3 stand-in, Mailpit) running indefinitely. The existing INT/TERM
 # trap covers Ctrl+C, not set-e-induced exits. `|| true` makes the
 # wait fall through to the cleanup line regardless of Firebase's
 # exit code. Pinned by tests/scripts/local-stack-resource-diet.test.js.

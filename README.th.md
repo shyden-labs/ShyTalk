@@ -192,7 +192,7 @@ ShyTalk/
 - **Android Studio** Ladybug หรือใหม่กว่า
 - **JDK 21+**
 - **Node.js 24+**
-- **Docker** (สำหรับ LiveKit voice server, MinIO storage, Mailpit email)
+- **Docker** (สำหรับ LiveKit voice server, versitygw storage, Mailpit email)
 - **Firebase CLI** (`npm install -g firebase-tools`)
 
 ไม่จำเป็นต้องมีบัญชี cloud เพื่อเริ่มต้น -- สภาพแวดล้อมท้องถิ่นทำงานออนไลน์โดยสิ้นเชิง
@@ -221,9 +221,9 @@ ShyTalk/
    ```
 
    This single command:
-   - Starts Docker containers (LiveKit voice server, MinIO storage, Mailpit email)
+   - Starts Docker containers (LiveKit voice server, versitygw storage, Mailpit email)
    - Starts Firebase Emulators (Firestore, Auth, RTDB)
-   - Seeds test data and creates the MinIO storage bucket
+   - Seeds test data and creates the versitygw storage bucket
    - Starts the Express API
    - Builds and installs the Android app (if a device is connected)
 
@@ -235,13 +235,12 @@ ShyTalk/
        Firebase UI:    http://localhost:4000
        Express API:    http://localhost:3000
        Mailpit UI:     http://localhost:8025
-       MinIO Console:  http://localhost:9001
        LiveKit:        localhost:7880
 
      Credentials:
        Test admin:     claude-test@shytalk.dev / localdev123
        Test user:      user@test.com / localdev123
-       MinIO:          minioadmin / minioadmin
+       versitygw:      localadmin / localsecret
    ```
 
 3. **ลงชื่อเข้าใช้**
@@ -284,7 +283,7 @@ ShyTalk/
    adb reverse tcp:9099 tcp:9099   # Auth emulator
    adb reverse tcp:9000 tcp:9000   # RTDB emulator
    adb reverse tcp:7880 tcp:7880   # LiveKit
-   adb reverse tcp:9002 tcp:9002   # MinIO (image storage)
+   adb reverse tcp:9002 tcp:9002   # versitygw (image storage)
    adb reverse tcp:8025 tcp:8025   # Mailpit UI
    ```
    ด้วย `adb reverse` ที่อยู่ `10.0.2.2` เริ่มต้นในรสชาติท้องถิ่นจะทำงานบนอุปกรณ์จริงได้เช่นกัน -- ไม่จำเป็นต้องเปลี่ยนการตั้งค่าการสร้าง
@@ -311,7 +310,6 @@ ShyTalk/
 | Express API | http://localhost:3000 | Backend API |
 | Health check | http://localhost:3000/api/health | ตรวจสอบว่า API กำลังทำงาน |
 | Mailpit | http://localhost:8025 | ดูอีเมลและรหัส OTP ที่จับได้ |
-| MinIO Console | http://localhost:9001 | เรียกดูรูปภาพและไฟล์ที่อัปโหลด |
 
 ### บริการเสริม
 
@@ -424,10 +422,10 @@ npx playwright test
 - **Firebase emulators fail to start**: ต้องใช้ Java 21+ ตรวจสอบด้วย `java -version`
 - **Android build fails**: ตรวจสอบว่าติดตั้ง JDK 21+ และ Android SDK แล้ว ลองใช้ `./gradlew clean`
 - **adb device not detected**: เปิดใช้งาน USB debugging เรียกใช้ `adb devices` เพื่อตรวจสอบ
-- **Images not loading**: MinIO bucket อาจไม่ได้สร้าง เรียกใช้ `cd express-api && NODE_ENV=local node ../local/seed.js` สำหรับอุปกรณ์จริง ให้เรียกใช้ `adb reverse tcp:9002 tcp:9002`
+- **Images not loading**: versitygw bucket อาจไม่ได้สร้าง เรียกใช้ `cd express-api && NODE_ENV=local node ../local/seed.js` สำหรับอุปกรณ์จริง ให้เรียกใช้ `adb reverse tcp:9002 tcp:9002`
 - **OTP not arriving**: ตรวจสอบเอาต์พุตคอนโซลหาเส้น `[OTP-LOCAL]` ยังตรวจสอบ Mailpit UI ที่ http://localhost:8025
 - **Reset emulator data**: ลบไดเรกทอรี `local/firebase-emulator-data/` และเริ่มต้นใหม่
-- **Reset MinIO data**: เรียกใช้ `docker compose -f local/docker-compose.yml down -v` เพื่อลบปริมาณ
+- **Reset versitygw data**: เรียกใช้ `docker compose -f local/docker-compose.yml down -v` เพื่อลบปริมาณ
 
 ## การปรับใช้
 

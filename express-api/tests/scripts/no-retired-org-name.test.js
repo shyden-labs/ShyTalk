@@ -72,7 +72,10 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // Measured 2026-10-12 on a clean worktree of develop: files under ROOTS
 // with a KINDS extension, plus the ROOT_FILES. Equality, so a file added or
 // lost is seen and this figure re-measured.
-const FILES_READ_FLOOR = 1976;
+// 1976 -> 1980 merging develop 9b3259c34fd (SHY-0544): +5 under ROOTS
+// (no-minio-image, s3-stand-in-pin, seed-steps test and script, the S3
+// integration spec), -1 (seed-minio.test.js).
+const FILES_READ_FLOOR = 1980;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

@@ -21,6 +21,7 @@ const {
   CreateBucketCommand,
   PutBucketPolicyCommand,
 } = require("@aws-sdk/client-s3");
+const { seedPublicReadBucket, seedAuthUser } = require("./seed-steps");
 
 // Point at emulators
 process.env.FIRESTORE_EMULATOR_HOST =
@@ -45,29 +46,6 @@ async function seedIfMissing(path, data) {
   } else {
     console.log(`  Exists:  ${path}`);
   }
-}
-
-async function seedAuthUser(email, password, displayName, customClaims) {
-  let uid;
-  try {
-    const existing = await auth.getUserByEmail(email);
-    console.log(`  Exists:  Auth user ${email}`);
-    uid = existing.uid;
-  } catch (_err) {
-    const created = await auth.createUser({
-      email,
-      password,
-      displayName,
-      emailVerified: true,
-    });
-    console.log(`  Created: Auth user ${email}`);
-    uid = created.uid;
-  }
-  // Set custom claims (e.g., admin: true) — idempotent
-  if (customClaims) {
-    await auth.setCustomUserClaims(uid, customClaims);
-  }
-  return uid;
 }
 
 async function seed() {
@@ -129,12 +107,13 @@ async function seed() {
 
   // Admin user
   console.log("\nAdmin user:");
-  const adminFirebaseUid = await seedAuthUser(
-    "claude-test@shytalk.dev",
-    "localdev123",
-    "Local Admin",
-    { admin: true },
-  );
+  const adminFirebaseUid = await seedAuthUser({
+    auth,
+    email: "claude-test@shytalk.dev",
+    password: "localdev123",
+    displayName: "Local Admin",
+    customClaims: { admin: true },
+  });
   await seedIfMissing("users/100000001", {
     firebaseUid: adminFirebaseUid,
     uniqueId: 100000001,
@@ -180,11 +159,12 @@ async function seed() {
 
   // Regular user
   console.log("\nRegular user:");
-  const userFirebaseUid = await seedAuthUser(
-    "user@test.com",
-    "localdev123",
-    "Test User",
-  );
+  const userFirebaseUid = await seedAuthUser({
+    auth,
+    email: "user@test.com",
+    password: "localdev123",
+    displayName: "Test User",
+  });
   await seedIfMissing("users/100000002", {
     firebaseUid: userFirebaseUid,
     uniqueId: 100000002,
@@ -337,56 +317,23 @@ async function seed() {
     userId: null,
   });
 
-  // MinIO bucket (only when MinIO is available)
-  const minioEndpoint = process.env.MINIO_ENDPOINT || "http://localhost:9002";
-  try {
-    console.log("\nMinIO bucket:");
-    const minioClient = new S3Client({
-      endpoint: minioEndpoint,
-      region: "us-east-1",
-      credentials: {
-        accessKeyId: process.env.MINIO_ROOT_USER || "minioadmin",
-        secretAccessKey: process.env.MINIO_ROOT_PASSWORD || "minioadmin",
-      },
-      forcePathStyle: true,
-    });
-    const bucket = process.env.R2_BUCKET_NAME || "shytalk-media";
-    try {
-      await minioClient.send(new CreateBucketCommand({ Bucket: bucket }));
-      console.log(`  Created: ${bucket}`);
-    } catch (err) {
-      if (
-        err.name === "BucketAlreadyOwnedByYou" ||
-        err.name === "BucketAlreadyExists"
-      ) {
-        console.log(`  Exists:  ${bucket}`);
-      } else {
-        throw err;
-      }
-    }
-    await minioClient.send(
-      new PutBucketPolicyCommand({
-        Bucket: bucket,
-        Policy: JSON.stringify({
-          Version: "2012-10-17",
-          Statement: [
-            {
-              Effect: "Allow",
-              Principal: "*",
-              Action: ["s3:GetObject"],
-              Resource: [`arn:aws:s3:::${bucket}/*`],
-            },
-          ],
-        }),
-      }),
-    );
-    console.log(`  Policy:  public-read on ${bucket}`);
-  } catch (err) {
-    console.warn(
-      "  MinIO not available, skipping bucket creation:",
-      err.message,
-    );
-  }
+  // S3 stand-in bucket. start.sh has already waited for its /health, so a
+  // failure here is real: it is thrown, and the seed exits 1 (SHY-0544).
+  console.log("\nS3 stand-in bucket:");
+  const s3Client = new S3Client({
+    endpoint: process.env.LOCAL_S3_ENDPOINT || "http://localhost:9002",
+    region: "us-east-1",
+    credentials: {
+      accessKeyId: process.env.LOCAL_S3_ACCESS_KEY || "localadmin",
+      secretAccessKey: process.env.LOCAL_S3_SECRET_KEY || "localsecret",
+    },
+    forcePathStyle: true,
+  });
+  await seedPublicReadBucket({
+    s3Client,
+    bucket: process.env.R2_BUCKET_NAME || "shytalk-media",
+    commands: { CreateBucketCommand, PutBucketPolicyCommand },
+  });
 
   console.log("\nSeed complete.");
   process.exit(0);

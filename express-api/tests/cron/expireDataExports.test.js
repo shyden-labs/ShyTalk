@@ -10,7 +10,7 @@
  *   - REAL Firestore emulator: users are seeded with `db.doc().set()` and the
  *     post-run state is read back and asserted at the value level
  *     (`dataExportStatus: 'expired'`, `dataExportR2Key: null`).
- *   - REAL MinIO (the local R2, NODE_ENV=local → http://localhost:9002): export
+ *   - REAL versitygw (the local R2, NODE_ENV=local → http://localhost:9002): export
  *     objects are PUT for real via `r2.putObject` and their deletion is verified
  *     by listing the bucket — not by a spy on `deleteObjects`.
  *
@@ -26,8 +26,8 @@
  * is verified by the surviving backlog, not by matching the log line).
  *
  * NOT covered here (operator-approved Option-A escape-hatch, EPIC-0003): the
- * per-doc `catch` branch (R2/Firestore failure mid-loop). S3/MinIO DeleteObjects
- * is idempotent (deleting a missing key succeeds), MinIO root creds never deny,
+ * per-doc `catch` branch (R2/Firestore failure mid-loop). S3/versitygw DeleteObjects
+ * is idempotent (deleting a missing key succeeds), versitygw root creds never deny,
  * and the emulator accepts every write — so a single doc's deletion cannot be
  * made to throw without a mock. There is no pure logic to extract, so loop
  * robustness is instead proven by the real multi-doc run below; true-failure
@@ -88,7 +88,7 @@ afterAll(async () => {
   process.env.NODE_ENV = PRIOR_NODE_ENV;
 });
 
-describe('expireDataExports cron (real Firestore emulator + real MinIO)', () => {
+describe('expireDataExports cron (real Firestore emulator + real versitygw)', () => {
   test('deletes the real R2 object AND flips the doc to expired/null key when expiry has passed', async () => {
     const id = '70000001';
     const key = keyFor(id);

@@ -277,9 +277,9 @@ jobs:
         if: always()
         run: |
           docker logs livekit 2>/dev/null || true
-          docker logs minio 2>/dev/null || true
+          docker logs s3 2>/dev/null || true
           docker logs mailpit 2>/dev/null || true
-          docker rm -f livekit minio mailpit 2>/dev/null || true
+          docker rm -f livekit s3 mailpit 2>/dev/null || true
 
       - name: Write environment.properties
         if: always()

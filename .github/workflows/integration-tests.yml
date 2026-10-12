@@ -1,7 +1,7 @@
 name: Integration Tests
 
 # Reusable workflow that brings up the full local stack (Firebase
-# Emulators + LiveKit Docker + MinIO + Mailpit + Express API) and
+# Emulators + LiveKit Docker + S3 stand-in + Mailpit + Express API) and
 # runs the integration test suite at `tests/integration/`.
 #
 # Distinct from `playwright-tests.yml` (browser tests) and
@@ -97,9 +97,9 @@ jobs:
         if: always()
         run: |
           docker logs livekit 2>/dev/null || true
-          docker logs minio 2>/dev/null || true
+          docker logs s3 2>/dev/null || true
           docker logs mailpit 2>/dev/null || true
-          docker rm -f livekit minio mailpit 2>/dev/null || true
+          docker rm -f livekit s3 mailpit 2>/dev/null || true
 
       - name: Write environment.properties
         if: always()
@@ -109,7 +109,7 @@ jobs:
           sed 's/^ *//' > "$DIR/environment.properties" <<'INTEOF'
           tier=Integration
           base_url=localhost:3000
-          stack=Local Emulators (Firestore, Auth, RTDB, MinIO, LiveKit)
+          stack=Local Emulators (Firestore, Auth, RTDB, S3 stand-in, LiveKit)
           INTEOF
 
       - name: Upload Allure results

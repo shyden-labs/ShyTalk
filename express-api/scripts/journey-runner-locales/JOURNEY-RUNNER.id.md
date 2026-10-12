@@ -27,7 +27,7 @@ Ini adalah runner **hybrid**. Setiap journey dapat melakukan assert pada tiga la
 
 | Yang Anda butuhkan          | Cara                                                                                                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Docker Desktop** berjalan | untuk emulator Firebase + LiveKit/MinIO                                                                                                                      |
+| **Docker Desktop** berjalan | untuk emulator Firebase + LiveKit/versitygw                                                                                                                  |
 | **Stack lokal aktif**       | `bash local/start.sh` (dari root repo) — memulai emulator Firebase + express-api. Biarkan tetap berjalan.                                                    |
 | **Persona telah di-seed**   | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempoten; melakukan seed cast uji P‑02…P‑19 dengan kata sandi `localdev123`) |
 | **Sebuah ponsel terhubung** | `adb devices` harus mencantumkan satu (kabel USB **atau** `adb` nirkabel). Emulator Android juga berfungsi.                                                  |

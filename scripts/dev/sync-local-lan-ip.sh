@@ -5,8 +5,8 @@
 # Two settings in .env.local carry the host's LAN address rather than
 # `localhost`, because a real phone cannot reach `localhost`:
 #
-#   MINIO_ENDPOINT   the S3 endpoint signed upload URLs are minted against
-#   CDN_URL          the base URL attachments are served from
+#   LOCAL_S3_ENDPOINT  the S3 endpoint signed upload URLs are minted against
+#   CDN_URL            the base URL attachments are served from
 #
 # Both were hand-written, and a laptop's DHCP lease is not a constant. On
 # 2026-08-24 they still named 192.168.1.9 while the machine had become
@@ -51,7 +51,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 changed=0
-for key in MINIO_ENDPOINT CDN_URL; do
+for key in LOCAL_S3_ENDPOINT CDN_URL; do
   current=$(grep -E "^${key}=" "$ENV_FILE" | head -1 | cut -d= -f2- || true)
   if [ -z "$current" ]; then
     echo "  $key is not set in $(basename "$ENV_FILE") — leaving it alone."

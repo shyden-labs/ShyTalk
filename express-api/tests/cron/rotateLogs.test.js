@@ -7,7 +7,7 @@
  * rows deleted from Firestore are recoverable as valid NDJSON in R2.
  *
  * This suite drives the REAL cron against the live Firestore emulator + real
- * MinIO (NODE_ENV=local → http://localhost:9002):
+ * versitygw (NODE_ENV=local → http://localhost:9002):
  *   - expired `logs` are seeded for real, then after the run the archive object
  *     is READ BACK from R2, parsed line-by-line, and asserted to contain the
  *     rows (with their injected `id`) that vanished from Firestore.
@@ -88,7 +88,7 @@ afterAll(async () => {
   process.env.NODE_ENV = PRIOR_NODE_ENV;
 });
 
-describe('rotateLogs cron (real Firestore emulator + real MinIO)', () => {
+describe('rotateLogs cron (real Firestore emulator + real versitygw)', () => {
   test('archives expired logs to R2 as NDJSON (rows recoverable) and deletes them from Firestore', async () => {
     await seedLog('log-a', {
       level: 'INFO',
