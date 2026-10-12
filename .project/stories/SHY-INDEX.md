@@ -394,6 +394,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0545](SHY-0545-the-story-sync-reaches-the-renamed-organisation.md) | P0 | M | bug | The story sync reaches the renamed organisation, and says so when it cannot | 👀 In Review | — |  |
 | [SHY-0564](SHY-0564-git-hooks-run-in-every-worktree.md) | P0 | M | infra | Git hooks run in every worktree, and a commit made without them is caught in CI | 📝 Draft | — |  |
 | [SHY-0565](SHY-0565-secret-scan-allows-the-local-persona-password.md) | P0 | S | infra | The secret scan allows the local persona password by exact value, and nothing else | 👀 In Review | — |  |
+| [SHY-0566](SHY-0566-shytalk-runs-on-node-26.md) | P1 | L | infra | ShyTalk runs on Node 26, 26.3 or later, everywhere | 📝 Draft | — |  |
 
 ## Done
 
