@@ -5,6 +5,7 @@ owner: unassigned
 created: 2026-08-21
 priority: P1
 effort: M
+estimate: 3
 type: feature
 roadmap_ids: []
 epic: EPIC-0012

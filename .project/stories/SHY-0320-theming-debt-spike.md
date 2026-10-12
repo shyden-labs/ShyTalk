@@ -5,6 +5,7 @@ owner: claude
 created: 2026-08-17
 priority: P1
 effort: S
+estimate: 2
 type: spike
 roadmap_ids: []
 epic: EPIC-0011

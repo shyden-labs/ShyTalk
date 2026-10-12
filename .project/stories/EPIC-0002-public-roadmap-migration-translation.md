@@ -5,7 +5,7 @@ owner: claude
 created: 2026-06-10
 priority: P1
 title: Public roadmap story-migration + lazy translation platform
-child_shys: [SHY-0062, SHY-0072, SHY-0073]
+child_shys: [SHY-0062, SHY-0072, SHY-0073, SHY-0575, SHY-0576, SHY-0577, SHY-0578, SHY-0579, SHY-0580, SHY-0581, SHY-0582]
 ---
 
 # EPIC-0002: Public roadmap story-migration + lazy translation platform
@@ -25,9 +25,17 @@ shytalk.com/roadmap becomes fully story-driven: every entry a tracked SHY, auto-
 
 | SHY | Role | Status |
 |---|---|---|
-| SHY-0062 | Migration meta/tracker | In Progress |
-| SHY-0072 | Lazy translation service | Draft |
-| SHY-0073 | Renderer: lazy i18n + gated story links | Draft |
+| SHY-0062 | Migration meta/tracker | Cancelled (replaced by the eight batches, 2026-10-12) |
+| SHY-0072 | Lazy translation service | Done |
+| SHY-0073 | Renderer: lazy i18n + gated story links | Done |
+| SHY-0575 | Batch 1: Revenue & Status | Draft |
+| SHY-0576 | Batch 2: Support & Feedback | Draft |
+| SHY-0577 | Batch 3: Entertainment | Draft |
+| SHY-0578 | Batch 4: Social & Discovery | Draft |
+| SHY-0579 | Batch 5: Quality of Life | Draft |
+| SHY-0580 | Batch 6: Platform & iOS | Draft |
+| SHY-0581 | Batch 7: Safety & Compliance | Draft |
+| SHY-0582 | Batch 8: Website & Presence | Draft |
 
 ## DoD at Epic Level
 

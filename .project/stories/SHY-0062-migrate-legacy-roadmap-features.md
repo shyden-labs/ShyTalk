@@ -1,6 +1,6 @@
 ---
 id: SHY-0062
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-06-10
 priority: P1
@@ -60,14 +60,14 @@ Reserved since 2026-06-07; operator greenlit FULL migration 2026-06-10 ("Yes, st
 
 | # | Phase | Features | Batch SHY | Status |
 |---|---|---|---|---|
-| 1 | Revenue & Status (pilot) | 3 | TBD at filing | Pending |
-| 2 | Support & Feedback | 6 | TBD | Pending |
-| 3 | Entertainment | 8 | TBD | Pending |
-| 4 | Social & Discovery | 8 | TBD | Pending |
-| 5 | Quality of Life | 11 | TBD | Pending |
-| 6 | Platform & iOS | 17 | TBD | Pending |
-| 7 | Safety & Compliance | 20 | TBD | Pending |
-| 8 | Website & Presence | 22 | TBD | Pending |
+| 1 | Revenue & Status (pilot) | 2 | SHY-0575 | Filed 2026-10-12 |
+| 2 | Support & Feedback | 6 | SHY-0576 | Filed 2026-10-12 |
+| 3 | Entertainment | 8 | SHY-0577 | Filed 2026-10-12 |
+| 4 | Social & Discovery | 8 | SHY-0578 | Filed 2026-10-12 |
+| 5 | Quality of Life | 11 | SHY-0579 | Filed 2026-10-12 |
+| 6 | Platform & iOS | 17 | SHY-0580 | Filed 2026-10-12 |
+| 7 | Safety & Compliance | 20 | SHY-0581 | Filed 2026-10-12 |
+| 8 | Website & Presence | 22 | SHY-0582 | Filed 2026-10-12 |
 
 ## BDD Scenarios
 
@@ -126,3 +126,4 @@ Tracking-only: each batch SHY carries its own Test Plan (validator scan green; s
 
 - 2026-06-10 ~10:25 BST — Meta-story authored after the operator's three-round design session (full migration greenlit; full refinement re-affirmed with the new pickup-review net; translations = web-layer lazy service; stories English-only; gated GitHub links). Filed alongside EPIC-0002 + SHY-0072 + SHY-0073.
 - 2026-06-13 ~00:44 BST — **Embedded the Pre-Merge Testing Protocol** ([[SHY-0091]] pass): meta/tracker → the protocol binds on the 8 BATCH PRs (each a public-web change: Web E2E entry-count parity + render on ALL browsers against the REAL sync-regenerated page), not on this coordinator (whose own merge is `*.md`-only-exempt). No-Stubs ([[feedback-no-stubs-mocks-fakes-real-only]]): the parity "fixture" test is bound to the REAL rendered page off real `roadmap-data.json` — no mocked roadmap payload; the subsection supersedes the older "fixture" wording. DoD gains a per-batch protocol-satisfied bullet. Pickup-fitness: AC current; the hard ordering (gated behind SHY-0072+0073 live) + the smallest-phase-first pilot both stand; no stale cross-refs.
+- **2026-10-12** — **Cancelled: replaced by its eight batch stories**, SHY-0575 to SHY-0582. At 94 entries (measured on `origin/develop` `public/roadmap-data.json`; Revenue & Status lost one to SHY-0359) the tracker was far over the 13-point ceiling, so it could not be scored, and one unscored open story keeps the "by effort" progress line unavailable. Shyden chose "Split into 8" (AskUserQuestion). The batch table above now names each batch story; the conventions in this file remain binding on them.

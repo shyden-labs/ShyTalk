@@ -5,6 +5,7 @@ owner: claude
 created: 2026-06-07
 priority: P1
 effort: S
+estimate: 2
 type: infra
 roadmap_ids: [G012]
 pr:

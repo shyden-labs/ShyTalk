@@ -5,6 +5,7 @@ owner: claude
 created: 2026-07-19
 priority: P0
 effort: M
+estimate: 5
 type: infra
 roadmap_ids: []
 epic: EPIC-0008

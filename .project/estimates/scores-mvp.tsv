@@ -1,0 +1,173 @@
+id	points	status	reason (compared with)
+SHY-0006	3	Draft	3 test files, KMP UI+VM tests; ~SHY-0565 shape x1
+SHY-0007	3	Draft	2 feature files >=8 scenarios + steps
+SHY-0009	5	Draft	spread re-read: nav refactor + intercept tests + 5-scenario feature + 20 locales (was 3)
+SHY-0010	5	Draft	2 VM test files >=50 cases
+SHY-0012	8	Draft	10 VM test files ~100 cases
+SHY-0013	5	Draft	3 test files concurrency-sensitive
+SHY-0014	5	Draft	contract test + fake extraction + 2 platform suites
+SHY-0015	3	Draft	storage/crypto contract tests both platforms
+SHY-0016	3	Draft	sticker storage contract tests both platforms
+SHY-0017	5	Draft	iOS repo impl tests >=20 cases, iOS test set-up risk
+SHY-0018	5	Draft	5 iOS repo test files
+SHY-0019	2	Draft	runner flag + tests
+SHY-0020	2	Draft	workflow_call wiring
+SHY-0022	5	Draft	7 skipped tests + shared seeding
+SHY-0023	3	Draft	4 skipped tests + seed helpers
+SHY-0024	13	Draft	Android nav migration: 48 adapters, delete 979 LOC
+SHY-0025	1	In Review	In Review; key-set locale test
+SHY-0026	3	Draft	2 driver scripts with checks
+SHY-0027	2	Draft	dependabot sweep + CodeQL Kotlin check
+SHY-0028	3	Draft	gradle deprecation sweep + CI gate
+SHY-0030	2	Draft	route audit + missing scenarios
+SHY-0031	3	Draft	split-job + shared concurrency across Pages workflows
+SHY-0042	1	Draft	tracker doc only
+SHY-0043	2	Draft	one cold-start scenario + steps on device
+SHY-0046	2	Draft	state audit + up to 2 scenarios + tags
+SHY-0047	2	Draft	spread re-read: may need seed extension + real-stack run (was 1)
+SHY-0048	2	Draft	detekt 2.0 check/migrate
+SHY-0049	2	Draft	script + jest + wiring; ~SHY-0568
+SHY-0051	1	In Review	In Review; one skip rewrite
+SHY-0052	2	In Review	In Review; 4 tests via viewport
+SHY-0054	1	Draft	one continue-on-error audit; ~SHY-0572
+SHY-0056	1	Draft	doc subsection (CLAUDE.md removed by SHY-0358: target file moved)
+SHY-0057	1	Draft	split one test block
+SHY-0058	1	Draft	skip -> assertion
+SHY-0059	2	Draft	one skip + seed
+SHY-0070	3	Draft	sweep counts + structured logs + tests
+SHY-0071	5	Draft	sync batching + validation batching, byte-identical output
+SHY-0146	8	Draft	iOS integrity detection, real-device proof
+SHY-0196	8	Draft	OS-credential app lock both platforms + i18n
+SHY-0212	13	Draft	test registry + one-command runner + READMEs (35 ACs)
+SHY-0213	13	Draft	a11y on web, Android, iOS
+SHY-0214	13	Draft	perf/load: API, voice, web, cold-start
+SHY-0215	13	Draft	visual regression: web, Compose, device
+SHY-0216	8	Draft	mutation testing JS + Kotlin with floors
+SHY-0217	13	Draft	DAST + Swift SAST + entropy scan + licences
+SHY-0218	13	Draft	OpenAPI spec of every endpoint + provider + consumer checks (filed M)
+SHY-0219	8	Draft	GDPR export/erasure + OSA + age-gating suite
+SHY-0220	8	Draft	public health page + reporting decision
+SHY-0221	5	Draft	property/fuzz JS + Kotlin
+SHY-0223	5	Draft	prod log redaction + feed PII scanner
+SHY-0224	5	Draft	synthetic probes + scheduled workflow
+SHY-0225	8	Draft	chaos: voice, API, network, real failures
+SHY-0271	5	In Review	In Review; translation content checks
+SHY-0272	3	In Review	In Review; mic mute fix + permission matrix
+SHY-0301	2	Draft	reaper sees pending runs; ~SHY-0469
+SHY-0310	5	Draft	UI manifest schema + parser
+SHY-0311	3	Draft	sealed-screen enum + checker script
+SHY-0312	5	Draft	manifest endpoint: ETag, App Check, cohort
+SHY-0313	8	Draft	client manifest tiers: bundled/cache/remote
+SHY-0314	8	Draft	server-driven menus + nav, fail-closed
+SHY-0315	5	Draft	kill-switch client + API 403
+SHY-0316	5	Draft	string overrides x20 locales
+SHY-0317	5	Draft	percent rollout + cohorts + revert
+SHY-0318	5	Draft	manifests in git + validator + deploy
+SHY-0319	8	Draft	admin editor -> App-signed commit
+SHY-0320	2	Draft	spike: count literals
+SHY-0321	5	Draft	App Check on every authenticated route (Android)
+SHY-0322	5	Draft	remove gacha age gate, keep segregation, data decision
+SHY-0323	3	Draft	SDUI declaration rule + validator + backfill tags
+SHY-0324	8	Draft	FCM token API cutover both devices (overlaps SHY-0244)
+SHY-0327	3	Draft	alert triage script + re-measure
+SHY-0335	5	Draft	self-mute stops publishing, real state
+SHY-0336	8	Draft	spread re-read: real-device latency budget asserted in CI + phase instrumentation (was 5)
+SHY-0337	8	Draft	crop/adjust step for photos, both shapes
+SHY-0340	5	Draft	moderator mute enforced server-side
+SHY-0341	5	Draft	deletion without PIN, re-auth
+SHY-0343	5	Draft	privacy declarations x3 + drift check
+SHY-0344	5	Draft	support + deletion pages + listing in repo
+SHY-0349	5	Draft	odds disclosure from server values
+SHY-0352	3	Draft	iOS compile check on PRs, path-scoped
+SHY-0353	2	Draft	story-gate exemption only for story-only PRs
+SHY-0354	5	Draft	follow-list journeys x3 platforms
+SHY-0364	3	Draft	tagline in app + site + translations
+SHY-0373	5	Draft	composer bar above keyboard
+SHY-0376	5	Draft	app proof of origin to own env website
+SHY-0379	3	Draft	hide under-18 entry points (client)
+SHY-0382	2	Draft	room creation surfaces errors
+SHY-0387	5	In Review	In Review; support page with attachments
+SHY-0388	2	Draft	DOB warning copy
+SHY-0389	5	Draft	suspend on false adult DOB
+SHY-0390	1	Draft	localise report reasons
+SHY-0391	5	Draft	spread re-read: server-side enforcement + resumable migration + client setting + 21 locales (was 3)
+SHY-0392	5	Draft	DOB correction flow with ID upload
+SHY-0393	8	Draft	account reset keeping purchases, reversible
+SHY-0395	5	Draft	email auth (SPF/DKIM/DMARC) + inbound
+SHY-0396	3	In Review	In Review; second ticket prompt
+SHY-0397	3	Draft	ticket emails
+SHY-0398	8	Draft	inbound email replies to tickets
+SHY-0399	8	Draft	own tickets list, reply, reopen, close
+SHY-0400	5	Draft	video report evidence both platforms + admin
+SHY-0401	8	Draft	walk 6 upload flows end to end on device
+SHY-0402	5	Draft	money-surface journeys
+SHY-0403	5	Draft	safety/identity journeys
+SHY-0404	8	Draft	translation journeys incl. quota, cache, providers
+SHY-0405	8	Draft	export + deletion journeys incl. cron and corpus scrub
+SHY-0406	5	Draft	app lock + unlink journeys
+SHY-0407	5	Draft	subscription lifecycle journeys
+SHY-0408	5	Draft	group conversation journeys
+SHY-0409	5	Draft	2FA journeys
+SHY-0410	5	Draft	backpack, trial, banner journeys
+SHY-0412	5	Draft	26 cleanup endpoints walked with survivor asserts
+SHY-0413	3	Draft	4 remaining journeys
+SHY-0414	5	Draft	backup/restore/alerts/DOB admin journeys
+SHY-0415	5	Draft	screen reader + font scale walk both platforms
+SHY-0419	3	In Review	In Review; iOS support send reachable
+SHY-0420	8	In Review	In Review; attachment bounds + virus scan + admin view
+SHY-0421	2	In Review	In Review; export includes tickets
+SHY-0422	3	In Review	In Review; remove support email from surfaces
+SHY-0426	3	In Review	In Review; unidentified caller refused
+SHY-0427	2	In Review	In Review; iOS picker delegate
+SHY-0428	1	In Review	In Review; Send above nav bar
+SHY-0429	3	Draft	foreground-service budget
+SHY-0432	3	In Review	In Review; run-scoped journey data
+SHY-0433	5	In Review	In Review; attachment previews
+SHY-0434	3	In Review	In Review; delete removed attachment, key validation
+SHY-0435	3	In Review	In Review; orphan attachment sweep
+SHY-0436	3	In Review	In Review; 7-day closed-ticket deletion
+SHY-0437	5	In Review	In Review; reporting guide with media
+SHY-0438	5	In Review	In Review; ticket -> report conversion
+SHY-0439	2	In Review	In Review; converted ticket closed
+SHY-0440	5	Draft	room reports
+SHY-0441	5	In Review	In Review; tap reachability assertion in driver
+SHY-0442	3	In Review	In Review; bounded retry before error
+SHY-0443	1	In Review	In Review; launch window colour
+SHY-0444	5	In Review	In Review; image placeholder (1352 lines merged)
+SHY-0445	2	In Review	In Review; recorder start/settle
+SHY-0446	5	Draft	8 journeys on iPhone
+SHY-0447	5	In Review	In Review; fast screen reader in journeys
+SHY-0449	3	In Review	In Review; admin sees attachments
+SHY-0450	2	In Review	In Review; upload-on-attach for reports (117 lines)
+SHY-0467	2	Draft	conversation-store tests
+SHY-0477	2	In Review	In Review; drop [skip ci] from sync commit
+SHY-0478	3	In Review	In Review; promotion head-branch refusal
+SHY-0479	3	In Review	In Review; cross-cohort gate on real emulator
+SHY-0480	5	In Review	In Review; invite/seat-request routes on real emulators
+SHY-0481	5	In Review	In Review; seat lifecycle 43 behaviours on real transactions
+SHY-0482	3	In Review	In Review; moderation powers 29 behaviours
+SHY-0483	3	In Review	In Review; membership 26 behaviours
+SHY-0484	2	In Review	In Review; settings 19 behaviours
+SHY-0485	3	In Review	In Review; close room 17 behaviours
+SHY-0487	2	In Review	In Review; move hardening tests
+SHY-0488	5	In Review	In Review; dev leg of release gate
+SHY-0489	2	In Review	In Review; re-seed clears moderation (128 lines)
+SHY-0492	5	In Review	In Review; presence routes on real RTDB (915 lines)
+SHY-0500	8	In Review	In Review; local-first cold start (6773 lines)
+SHY-0501	3	In Review	In Review; download connection leak (196 lines)
+SHY-0502	2	Draft	cyber-bullying translations x5, reviewed
+SHY-0503	3	Draft	dashboard identity check
+SHY-0504	3	Draft	Google/Apple sign-in on dashboard
+SHY-0505	5	Draft	audited admin-role route
+SHY-0512	3	Draft	support links via env resolver
+SHY-0514	5	Draft	locked web views both platforms + embed mode
+SHY-0531	3	Draft	weekday labels x4 locales + short-label audit
+SHY-0523	3	In Review	In Review; guard all 18 iOS listeners + pin test (258 lines)
+SHY-0575	3	Draft	batch 1 (2 planned + parity test); filed 2026-10-12
+SHY-0576	3	Draft	batch 2 (6 planned, mostly absorbed)
+SHY-0577	5	Draft	batch 3 (8 planned)
+SHY-0578	5	Draft	batch 4 (8 planned)
+SHY-0579	5	Draft	batch 5 (11 planned)
+SHY-0580	3	Draft	batch 6 (15 done bookkeeping, 2 planned)
+SHY-0581	8	Draft	batch 7 (6 done, 1 in progress, 13 planned)
+SHY-0582	8	Draft	batch 8 (2 done, 20 planned)

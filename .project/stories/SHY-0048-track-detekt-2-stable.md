@@ -5,6 +5,7 @@ owner: claude
 created: 2026-06-08
 priority: P1
 effort: S
+estimate: 2
 type: chore
 roadmap_ids: [G053]
 pr:
