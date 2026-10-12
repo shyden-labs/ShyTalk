@@ -113,6 +113,19 @@ describe('SHY-0569 — patch and minor updates still merge', () => {
       pairs: ['actions/setup-node 7.1.0 -> 8.0.0'],
     });
   });
+
+  // Ported from the retired dependabot-auto-merge-decision.test.js (SHY-0191),
+  // whose matrix accepted both spellings fetch-metadata has used.
+  test('the hyphenated GitHub Actions ecosystem name keeps the same exception', () => {
+    expect(
+      judge({
+        title: 'Bump actions/checkout from 6.0.0 to 7.0.0',
+        body: '',
+        updateType: MAJOR,
+        ecosystem: 'github-actions',
+      }).merge,
+    ).toBe(true);
+  });
 });
 
 describe('SHY-0569 — anything doubtful stays off', () => {
