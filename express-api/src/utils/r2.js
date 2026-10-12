@@ -76,15 +76,16 @@ const bucketName = process.env.R2_BUCKET_NAME || 'shytalk-media';
 // SHY-0544: MinIO gave way to versitygw and its settings were renamed. A
 // .env.local written before then still names the old keys, and ignoring
 // them would quietly fall back to localhost, which a phone cannot reach.
-const RETIRED_LOCAL_S3_KEYS = {
-  MINIO_ENDPOINT: 'LOCAL_S3_ENDPOINT',
-  MINIO_ROOT_USER: 'LOCAL_S3_ACCESS_KEY',
-  MINIO_ROOT_PASSWORD: 'LOCAL_S3_SECRET_KEY',
-};
+// Pairs of [retired name, current name]; both are env var names, not values.
+const RETIRED_LOCAL_S3_KEYS = [
+  ['MINIO_ENDPOINT', 'LOCAL_S3_ENDPOINT'],
+  ['MINIO_ROOT_USER', 'LOCAL_S3_ACCESS_KEY'],
+  ['MINIO_ROOT_PASSWORD', 'LOCAL_S3_SECRET_KEY'],
+];
 
 let s3;
 if (isLocal) {
-  for (const [retired, current] of Object.entries(RETIRED_LOCAL_S3_KEYS)) {
+  for (const [retired, current] of RETIRED_LOCAL_S3_KEYS) {
     if (process.env[retired] !== undefined) {
       throw new Error(
         `${retired} is set, but that name was retired with MinIO (SHY-0544): rename it to ${current} in express-api/.env.local`,
