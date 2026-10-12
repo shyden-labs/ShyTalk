@@ -8,7 +8,7 @@ const BASE = process.env.WEB_BASE_URL || "http://localhost:8888";
  * Spec: .project/stories/SHY-0038-public-roadmap-gh-project-link.md
  *
  * The link is a permanent footer affordance pointing at
- * https://github.com/orgs/Shyden-Ltd/projects/1 (the public ShyTalk
+ * https://github.com/orgs/shyden-labs/projects/1 (the public ShyTalk
  * Stories Project board). Delivers the cross-surface visibility gap
  * described by the [[feedback-stories-epics-and-two-surface-sync]] rule.
  *
@@ -18,7 +18,7 @@ const BASE = process.env.WEB_BASE_URL || "http://localhost:8888";
  */
 
 test.describe("Roadmap footer — GitHub Project link", () => {
-  const PROJECT_URL = "https://github.com/orgs/Shyden-Ltd/projects/1";
+  const PROJECT_URL = "https://github.com/orgs/shyden-labs/projects/1";
   const SELECTOR = '[data-testid="footer-gh-project-link"]';
 
   test("Link is present with the exact canonical href", async ({ page }) => {

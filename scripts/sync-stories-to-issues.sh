@@ -82,7 +82,7 @@
 #   STORIES_DIR             Story corpus directory. Default
 #                           <repo>/.project/stories. Tests override with a
 #                           fixture directory (SHY-0074).
-#   PROJECT_OWNER           Project v2 owner. Default "Shyden-Ltd".
+#   PROJECT_OWNER           Project v2 owner. Default "shyden-labs".
 #   PROJECT_NUMBER          Project v2 number. Default 1 (ShyTalk Stories).
 #
 # EXIT CODES (also in --help)
@@ -112,7 +112,7 @@ SINGLE_ID=""
 REBUILD=0
 
 GH="${GH:-gh}"
-PROJECT_OWNER="${PROJECT_OWNER:-Shyden-Ltd}"
+PROJECT_OWNER="${PROJECT_OWNER:-shyden-labs}"
 PROJECT_NUMBER="${PROJECT_NUMBER:-1}"
 # SHY-0082 v4: every story → a REAL typed GitHub issue (not a draft). The
 # repo node id + native issue-type ids + `story` label id are resolved once
@@ -211,7 +211,7 @@ ENV VARS
                           project scopes — a PAT is mandatory. Internally
                           re-exported as GH_TOKEN (which gh CLI reads).
   REBUILD_CONFIRM         Must be "yes" for --rebuild's destructive teardown
-  PROJECT_OWNER           Project v2 owner (default Shyden-Ltd)
+  PROJECT_OWNER           Project v2 owner (default shyden-labs)
   PROJECT_NUMBER          Project v2 number (default 1)
   GH                      Path to gh CLI (default "gh"); tests override
 
@@ -1174,7 +1174,7 @@ build_footer() {
   local now sha
   now="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   sha="$(cd "$REPO_ROOT" && git rev-parse HEAD 2>/dev/null || echo "unknown")"
-  printf -- '---\n\n_Source: https://github.com/Shyden-Ltd/ShyTalk/blob/develop/.project/stories/%s.md_\n_Status: %s_\n_Last synced: %s from commit %s body-hash: %s_' \
+  printf -- '---\n\n_Source: https://github.com/shyden-labs/ShyTalk/blob/develop/.project/stories/%s.md_\n_Status: %s_\n_Last synced: %s from commit %s body-hash: %s_' \
     "$slug" "$PS_STATUS" "$now" "$sha" "$hash"
 }
 

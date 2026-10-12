@@ -7,7 +7,7 @@ priority: P0
 effort: M
 type: feature
 roadmap_ids: []
-pr: https://github.com/Shyden-Ltd/ShyTalk/pull/1117
+pr: https://github.com/shyden-labs/ShyTalk/pull/1117
 released_in: v0.97.9
 public: true
 phase: Website & Presence

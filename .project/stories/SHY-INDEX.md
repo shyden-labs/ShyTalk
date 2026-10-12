@@ -392,6 +392,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0561](SHY-0561-pre-push-runs-no-test-suite.md) | P0 | M | infra | The pre-push hook runs no test suite, only quick static checks | 📝 Draft | — |  |
 | [SHY-0562](SHY-0562-mutations-run-in-a-ci-workflow.md) | P0 | M | infra | Mutations run in a CI workflow that reports each one red or green | 📝 Draft | — |  |
 | [SHY-0563](SHY-0563-whole-repo-guards-run-as-their-own-suite.md) | P0 | M | infra | Whole-repo guards run as their own required suite, not as unit tests | 📝 Draft | — |  |
+| [SHY-0545](SHY-0545-the-story-sync-reaches-the-renamed-organisation.md) | P0 | M | bug | The story sync reaches the renamed organisation, and says so when it cannot | 👀 In Review | — |  |
 | [SHY-0564](SHY-0564-git-hooks-run-in-every-worktree.md) | P0 | M | infra | Git hooks run in every worktree, and a commit made without them is caught in CI | 📝 Draft | — |  |
 | [SHY-0565](SHY-0565-secret-scan-allows-the-local-persona-password.md) | P0 | S | infra | The secret scan allows the local persona password by exact value, and nothing else | 👀 In Review | — |  |
 

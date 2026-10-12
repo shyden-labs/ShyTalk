@@ -86,7 +86,7 @@ jobs:
         id: check-existing
         run: |
           # Check gh-pages for a metadata.json with this run ID
-          EXISTING=$(curl -sf "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ inputs.suite_name }}/${{ inputs.report_env }}/latest/metadata.json" 2>/dev/null | grep -o '"runId":"${{ github.run_id }}"' || echo "")
+          EXISTING=$(curl -sf "https://reports.shytalk.shyden.co.uk/${{ inputs.suite_name }}/${{ inputs.report_env }}/latest/metadata.json" 2>/dev/null | grep -o '"runId":"${{ github.run_id }}"' || echo "")
           if [ -n "$EXISTING" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Report already generated for run ${{ github.run_id }} — skipping"
@@ -377,10 +377,10 @@ jobs:
       - name: Post report URL in summary
         if: steps.check-existing.outputs.skip != 'true'
         run: |
-          REPO="${{ github.repository }}"
-          OWNER="${REPO%%/*}"
+          # SHY-0545: the Pages site answers on its custom domain; the
+          # owner's Pages address only redirects there, over plain http.
           {
             echo "## Allure Report (${{ inputs.suite_name }})"
             echo ""
-            echo "[View Report](https://${OWNER}.github.io/${REPO##*/}/${{ inputs.suite_name }}/${{ inputs.report_env }}/latest/)"
+            echo "[View Report](https://reports.shytalk.shyden.co.uk/${{ inputs.suite_name }}/${{ inputs.report_env }}/latest/)"
           } >> "$GITHUB_STEP_SUMMARY"
