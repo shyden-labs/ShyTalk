@@ -192,7 +192,7 @@ ShyTalk/
 - **Android Studio** Ladybug hoặc mới hơn
 - **JDK 21+**
 - **Node.js 24+**
-- **Docker** (cho máy chủ thoại LiveKit, lưu trữ MinIO, email Mailpit)
+- **Docker** (cho máy chủ thoại LiveKit, lưu trữ versitygw, email Mailpit)
 - **Firebase CLI** (`npm install -g firebase-tools`)
 
 Không cần tài khoản đám mây để bắt đầu -- môi trường cục bộ chạy hoàn toàn ngoại tuyến.
@@ -203,7 +203,7 @@ Cách nhanh nhất để bắt đầu. Một lệnh khởi động tất cả --
 
 1. **Sao chép và cài đặt**
    ```bash
-   git clone https://github.com/Shyden-Ltd/ShyTalk.git
+   git clone https://github.com/shyden-labs/ShyTalk.git
    cd ShyTalk
    cd express-api && npm install && cd ..
    ```
@@ -221,9 +221,9 @@ Cách nhanh nhất để bắt đầu. Một lệnh khởi động tất cả --
    ```
 
    Một lệnh này:
-   - Khởi động vùng chứa Docker (máy chủ thoại LiveKit, lưu trữ MinIO, email Mailpit)
+   - Khởi động vùng chứa Docker (máy chủ thoại LiveKit, lưu trữ versitygw, email Mailpit)
    - Khởi động Firebase Emulators (Firestore, Auth, RTDB)
-   - Tạo hạt giống dữ liệu kiểm tra và tạo bộ lưu trữ MinIO
+   - Tạo hạt giống dữ liệu kiểm tra và tạo bộ lưu trữ versitygw
    - Khởi động Express API
    - Xây dựng và cài đặt ứng dụng Android (nếu một thiết bị được kết nối)
 
@@ -235,13 +235,12 @@ Cách nhanh nhất để bắt đầu. Một lệnh khởi động tất cả --
        Firebase UI:    http://localhost:4000
        Express API:    http://localhost:3000
        Mailpit UI:     http://localhost:8025
-       MinIO Console:  http://localhost:9001
        LiveKit:        localhost:7880
 
      Thông tin đăng nhập:
        Quản trị viên kiểm tra:  claude-test@shytalk.dev / localdev123
        Người dùng kiểm tra:     user@test.com / localdev123
-       MinIO:                   minioadmin / minioadmin
+       versitygw:               localadmin / localsecret
    ```
 
 3. **Đăng nhập**
@@ -284,7 +283,7 @@ Cách nhanh nhất để bắt đầu. Một lệnh khởi động tất cả --
    adb reverse tcp:9099 tcp:9099   # Bộ giả lập Auth
    adb reverse tcp:9000 tcp:9000   # Bộ giả lập RTDB
    adb reverse tcp:7880 tcp:7880   # LiveKit
-   adb reverse tcp:9002 tcp:9002   # MinIO (lưu trữ hình ảnh)
+   adb reverse tcp:9002 tcp:9002   # versitygw (lưu trữ hình ảnh)
    adb reverse tcp:8025 tcp:8025   # Mailpit UI
    ```
    Với `adb reverse`, địa chỉ `10.0.2.2` mặc định trong hương vị cục bộ cũng sẽ hoạt động trên thiết bị vật lý -- không cần thay đổi cấu hình xây dựng.
@@ -311,7 +310,6 @@ Cách nhanh nhất để bắt đầu. Một lệnh khởi động tất cả --
 | Express API | http://localhost:3000 | API Backend |
 | Kiểm tra sức khỏe | http://localhost:3000/api/health | Xác minh API đang chạy |
 | Mailpit | http://localhost:8025 | Xem email được ghi lại và mã OTP |
-| Bảng điều khiển MinIO | http://localhost:9001 | Duyệt hình ảnh và tệp đã tải lên |
 
 ### Dịch Vụ Tùy Chọn
 
@@ -424,10 +422,10 @@ Trong CI, kiểm tra Playwright và Android E2E chạy dựa trên cùng một m
 - **Bộ giả lập Firebase không khởi động**: Yêu cầu Java 21+. Kiểm tra với `java -version`.
 - **Bản dựng Android không thành công**: Đảm bảo JDK 21+ và Android SDK được cài đặt. Thử `./gradlew clean`.
 - **Thiết bị adb không được phát hiện**: Bật gỡ lỗi USB. Chạy `adb devices` để kiểm tra.
-- **Hình ảnh không tải**: Xô MinIO có thể không được tạo. Chạy `cd express-api && NODE_ENV=local node ../local/seed.js`. Đối với thiết bị vật lý, hãy chạy `adb reverse tcp:9002 tcp:9002`.
+- **Hình ảnh không tải**: Xô versitygw có thể không được tạo. Chạy `cd express-api && NODE_ENV=local node ../local/seed.js`. Đối với thiết bị vật lý, hãy chạy `adb reverse tcp:9002 tcp:9002`.
 - **OTP không đến**: Kiểm tra đầu ra bảng điều khiển cho các dòng `[OTP-LOCAL]`. Cũng kiểm tra Giao diện Mailpit tại http://localhost:8025.
 - **Đặt lại dữ liệu bộ giả lập**: Xóa thư mục `local/firebase-emulator-data/` và khởi động lại.
-- **Đặt lại dữ liệu MinIO**: Chạy `docker compose -f local/docker-compose.yml down -v` để xóa các tập.
+- **Đặt lại dữ liệu versitygw**: Chạy `docker compose -f local/docker-compose.yml down -v` để xóa các tập.
 
 ## Triển Khai
 

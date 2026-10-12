@@ -602,7 +602,7 @@
 
   function storyHref(shyId, slug) {
     return (
-      'https://github.com/Shyden-Ltd/ShyTalk/blob/main/.project/stories/' +
+      'https://github.com/shyden-labs/ShyTalk/blob/main/.project/stories/' +
       encodeURIComponent(shyId + '-' + slug + '.md')
     );
   }
@@ -1339,7 +1339,7 @@
             '<p>' +
             escapeHtml(t('loadFail')) +
             '</p>' +
-            '<p style="margin-top:12px"><a href="https://github.com/Shyden-Ltd/ShyTalk" data-log="github-fallback">' +
+            '<p style="margin-top:12px"><a href="https://github.com/shyden-labs/ShyTalk" data-log="github-fallback">' +
             'Visit our GitHub</a></p></div>';
         }
       });

@@ -27,7 +27,7 @@ Es un ejecutor **híbrido**. Cada journey puede verificar tres capas a la vez:
 
 | Necesitas                        | Cómo                                                                                                                                                                |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** en ejecución  | para los emuladores de Firebase + LiveKit/MinIO                                                                                                                     |
+| **Docker Desktop** en ejecución  | para los emuladores de Firebase + LiveKit/versitygw                                                                                                                 |
 | **El stack local levantado**     | `bash local/start.sh` (desde la raíz del repo) — arranca los emuladores de Firebase + la express-api. Déjalo en ejecución.                                          |
 | **Personas sembradas**           | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotente; siembra el reparto de prueba P‑02…P‑19 con la contraseña `localdev123`) |
 | **Un teléfono conectado**        | `adb devices` debe listar uno (cable USB **o** `adb` inalámbrico). Un emulador de Android también funciona.                                                         |

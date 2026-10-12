@@ -213,5 +213,5 @@ runs:
         # The reviewer should not have to reconstruct the URL scheme by hand.
         {
           printf '### Report published\n\n'
-          printf '`%s` → https://shyden-ltd.github.io/ShyTalk/%s/\n' "$DESTINATION_DIR" "$DESTINATION_DIR"
+          printf '`%s` → https://reports.shytalk.shyden.co.uk/%s/\n' "$DESTINATION_DIR" "$DESTINATION_DIR"
         } >> "$GITHUB_STEP_SUMMARY"

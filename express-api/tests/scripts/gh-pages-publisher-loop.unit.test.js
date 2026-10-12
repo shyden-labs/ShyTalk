@@ -34,7 +34,7 @@ const path = require('node:path');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const ACTION = path.join(REPO_ROOT, '.github/actions/publish-gh-pages/action.yml');
-const REPO_SLUG = 'Shyden-Ltd/ShyTalk';
+const REPO_SLUG = 'shyden-labs/ShyTalk';
 const CLONE_URL = `https://x-access-token:test-token@github.com/${REPO_SLUG}.git`;
 
 /** Extract the de-indented shell body of the action's push step. */

@@ -12,7 +12,7 @@ $ErrorActionPreference = "SilentlyContinue"
 
 $ScriptDir = $PSScriptRoot
 
-# Stop Docker containers (LiveKit, MinIO, Mailpit)
+# Stop Docker containers (LiveKit, S3 stand-in, Mailpit)
 docker compose -f "$ScriptDir\docker-compose.yml" down 2>$null
 
 # Query all processes once

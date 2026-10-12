@@ -56,8 +56,8 @@ const PROBES: ProbeTarget[] = [
     check: (status) => (status === 200 ? null : `expected 200, got ${status}`),
   },
   {
-    name: "MinIO (R2 mock)",
-    url: "http://localhost:9002/minio/health/live",
+    name: "S3 stand-in, versitygw (R2 mock)",
+    url: "http://localhost:9002/health",
     check: (status) => (status === 200 ? null : `expected 200, got ${status}`),
   },
 ];

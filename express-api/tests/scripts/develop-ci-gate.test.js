@@ -155,12 +155,16 @@ describe('SHY-0242: Dependabot targets develop and auto-merges there', () => {
   describe('dependabot.yml sets target-branch: develop on every ecosystem', () => {
     const blocks = dependabotUpdateBlocks(read('.github/dependabot.yml'));
 
-    test('all four ecosystems are present (gradle, express-api npm, root npm, github-actions)', () => {
-      expect(blocks).toHaveLength(4);
+    // SHY-0544 added docker-compose:/local (the local stack images).
+    test('all five ecosystems are present (gradle, express-api npm, root npm, github-actions, docker-compose)', () => {
       const ids = blocks.map((b) => `${b.ecosystem}:${b.directory}`);
-      expect(ids).toEqual(
-        expect.arrayContaining(['gradle:/', 'npm:/express-api', 'npm:/', 'github-actions:/']),
-      );
+      expect(ids.toSorted()).toEqual([
+        'docker-compose:/local',
+        'github-actions:/',
+        'gradle:/',
+        'npm:/',
+        'npm:/express-api',
+      ]);
     });
 
     // One assertion per block (not a single loop) so a single omission names the

@@ -1212,7 +1212,7 @@
           "epicId": "EPIC-0001",
           "i18n": {},
           "name": "Full bidirectional sync — SHY `.md` files → `public/roadmap-data.json` auto-regen + GitHub Project board link on the public roadmap page",
-          "prUrl": "https://github.com/Shyden-Ltd/ShyTalk/pull/1044",
+          "prUrl": "https://github.com/shyden-labs/ShyTalk/pull/1044",
           "shyId": "SHY-0038",
           "slug": "public-roadmap-gh-project-link",
           "status": "Done"
@@ -1221,7 +1221,7 @@
           "description": null,
           "i18n": {},
           "name": "Roadmap renderer reads SHY-derived `phases[].items[]` with shyId badges",
-          "prUrl": "https://github.com/Shyden-Ltd/ShyTalk/pull/1117",
+          "prUrl": "https://github.com/shyden-labs/ShyTalk/pull/1117",
           "shyId": "SHY-0061",
           "slug": "renderer-reads-shy-items",
           "status": "Done"
@@ -1231,7 +1231,7 @@
           "epicId": "EPIC-0002",
           "i18n": {},
           "name": "Roadmap renderer — lazy item translations + gated GitHub story links",
-          "prUrl": "https://github.com/Shyden-Ltd/ShyTalk/pull/1133",
+          "prUrl": "https://github.com/shyden-labs/ShyTalk/pull/1133",
           "shyId": "SHY-0073",
           "slug": "renderer-lazy-i18n-and-gated-story-links",
           "status": "Done"

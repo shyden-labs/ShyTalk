@@ -10,7 +10,7 @@ roadmap_ids: []
 epic: EPIC-0001
 phase: Website & Presence
 public: true
-pr: https://github.com/Shyden-Ltd/ShyTalk/pull/1044
+pr: https://github.com/shyden-labs/ShyTalk/pull/1044
 released_in: v0.97.8
 ---
 

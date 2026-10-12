@@ -363,7 +363,38 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0532](SHY-0532-agents-act-on-shytalk-under-their-own-least-privilege-github-identity.md) | P0 | L | infra | Agents act on ShyTalk under their own least-privilege GitHub identity | 📝 Draft | — |  |
 | [SHY-0533](SHY-0533-ci-refuses-a-pull-request-that-leaves-the-story-index-out-of-step.md) | P1 | S | infra | CI refuses a pull request that leaves the story index out of step | 📝 Draft | — |  |
 | [SHY-0534](SHY-0534-every-develop-merge-reaches-dev-without-anyone-dispatching-it.md) | P1 | M | infra | Every develop merge reaches dev without anyone dispatching it | 📝 Draft | — |  |
-| [SHY-0535](SHY-0535-every-story-carries-a-points-estimate-and-progress-reads-it.md) | P1 | M | infra | Every story carries a points estimate, and progress is measured from it | 🚧 In Progress | — |  |
+| [SHY-0536](SHY-0536-every-open-mvp-story-is-scored-and-the-scale-is-calibrated.md) | P1 | L | infra | Every open MVP story is scored, and the scale is calibrated against merged work | 📝 Draft | — |  |
+| [SHY-0537](SHY-0537-every-open-non-mvp-story-is-scored.md) | P2 | M | infra | Every open non-MVP story is scored, so effort progress covers the whole backlog | 📝 Draft | — |  |
+| [SHY-0538](SHY-0538-the-short-claude-md-is-committed-and-nothing-cites-a-section-it-lacks.md) | P2 | S | chore | The short CLAUDE.md is committed, and no comment cites a section it does not have | 📝 Draft | — |  |
+| [SHY-0539](SHY-0539-the-board-sync-fails-fast-on-a-stale-read-and-counts-every-setup-failure.md) | P2 | M | infra | The board sync fails fast on a stale read instead of sleeping and retrying, and counts every setup failure | 📝 Draft | — |  |
+| [SHY-0540](SHY-0540-security-fixes-open-against-develop.md) | P0 | M | infra | Security fixes open against develop, and the nightly live jobs run released code only | 📝 Draft | — |  |
+| [SHY-0541](SHY-0541-a-production-workflow-started-off-main-restarts-itself-on-main.md) | P0 | M | infra | A production workflow started off main restarts itself on main | 📝 Draft | — |  |
+| [SHY-0542](SHY-0542-production-keys-live-only-in-environments-only-main-can-reach.md) | P0 | L | infra | Production keys live only in environments that only main can reach | 📝 Draft | — |  |
+| [SHY-0543](SHY-0543-dev-cannot-deploy-the-production-web-site.md) | P0 | M | infra | Dev cannot deploy the production web site | 📝 Draft | — |  |
+| [SHY-0546](SHY-0546-the-unit-suite-starts-no-service.md) | P0 | L | infra | The unit suite starts no service; tests that need one run as integration tests | 📝 Draft | — |  |
+| [SHY-0547](SHY-0547-no-backend-test-is-retried.md) | P0 | M | infra | No backend test is retried, so a failure shows the first time it happens | 📝 Draft | — |  |
+| [SHY-0548](SHY-0548-every-jest-unit-test-runs-in-under-one-second.md) | P0 | XL | infra | Every Jest unit test runs in under one second, and no test raises its own limit | 📝 Draft | — |  |
+| [SHY-0549](SHY-0549-every-kotlin-and-swift-unit-test-runs-in-under-one-second.md) | P0 | L | infra | Every Kotlin and Swift unit test runs in under one second, with its dependencies mocked | 📝 Draft | — |  |
+| [SHY-0550](SHY-0550-production-runs-the-latest-release.md) | P0 | M | infra | Production runs the latest release, so support data is deleted on schedule | 📝 Draft | — |  |
+| [SHY-0551](SHY-0551-a-failing-scheduled-job-opens-an-issue.md) | P0 | S | infra | A failing scheduled job opens an issue instead of failing silently | 📝 Draft | — |  |
+| [SHY-0552](SHY-0552-release-notes-list-the-stories-a-release-ships.md) | P1 | S | bug | Release notes list the stories a release ships | 📝 Draft | — |  |
+| [SHY-0553](SHY-0553-store-apps-catch-up-with-the-v0-99-0-server.md) | P0 | M | bug | The store apps catch up with the v0.99.0 server, so the device lock holds again | 📝 Draft | — |  |
+| [SHY-0554](SHY-0554-local-services-are-ready-before-any-workflow-seeds.md) | P0 | S | bug | Local services are ready before any workflow seeds, and a seed that cannot reach storage fails | 📝 Draft | — |  |
+| [SHY-0555](SHY-0555-the-typescript-test-specs-are-type-checked.md) | P1 | L | infra | The TypeScript test specs are type-checked | 📝 Draft | — |  |
+| [SHY-0556](SHY-0556-absence-guards-check-a-recorded-floor.md) | P0 | M | infra | Absence guards check a floor kept in one recorded file | 📝 Draft | — |  |
+| [SHY-0557](SHY-0557-the-gauntlet-runs-from-a-git-worktree.md) | P0 | XS | bug | The gauntlet runs from a git worktree | 📝 Draft | — |  |
+| [SHY-0558](SHY-0558-actionlint-is-installed-from-a-pinned-source.md) | P0 | S | infra | actionlint is installed from a pinned, verified source | 📝 Draft | — |  |
+| [SHY-0227](SHY-0227-heal-stale-rules-contract-specs.md) | P1 | S | bug | Heal stale Firestore-rules contract specs and the tautological cohort-forging tests | 📝 Draft | — |  |
+| [SHY-0525](SHY-0525-dev-device-runs-bake-the-test-persona-credential-from-one-source.md) | P1 | S | bug | Dev device runs bake the test-persona credential from one source and never reuse an unproven APK | 📝 Draft | — |  |
+| [SHY-0559](SHY-0559-pr-gate-refuses-a-skip-its-flags-did-not-ask-for.md) | P0 | M | infra | The PR Gate refuses a skip that its change flags did not ask for | 📝 Draft | — |  |
+| [SHY-0560](SHY-0560-story-index-status-is-derived-from-the-story-files.md) | P0 | S | infra | The story index shows each story's real status, read from the story file | 📝 Draft | — |  |
+| [SHY-0561](SHY-0561-pre-push-runs-no-test-suite.md) | P0 | M | infra | The pre-push hook runs no test suite, only quick static checks | 📝 Draft | — |  |
+| [SHY-0562](SHY-0562-mutations-run-in-a-ci-workflow.md) | P0 | M | infra | Mutations run in a CI workflow that reports each one red or green | 📝 Draft | — |  |
+| [SHY-0563](SHY-0563-whole-repo-guards-run-as-their-own-suite.md) | P0 | M | infra | Whole-repo guards run as their own required suite, not as unit tests | 📝 Draft | — |  |
+| [SHY-0545](SHY-0545-the-story-sync-reaches-the-renamed-organisation.md) | P0 | M | bug | The story sync reaches the renamed organisation, and says so when it cannot | 👀 In Review | — |  |
+| [SHY-0564](SHY-0564-git-hooks-run-in-every-worktree.md) | P0 | M | infra | Git hooks run in every worktree, and a commit made without them is caught in CI | 📝 Draft | — |  |
+| [SHY-0565](SHY-0565-secret-scan-allows-the-local-persona-password.md) | P0 | S | infra | The secret scan allows the local persona password by exact value, and nothing else | 👀 In Review | — |  |
+| [SHY-0535](SHY-0535-every-story-carries-a-points-estimate-and-progress-reads-it.md) | P1 | M | infra | Every story carries a points estimate, and progress is measured from it | 👀 In Review | — | [#2222](https://github.com/shyden-labs/ShyTalk/pull/2222) |
 
 ## Done
 
@@ -429,6 +460,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0243](SHY-0243-honest-linux-ci-test-harness.md)                     | P0  | S      | bug      | Two test harnesses lie on Linux CI — make the liveness probe and the git-identity probe environm      | ✅ Done | —           | —                                                        |
 | [SHY-0279](SHY-0279-web-auth-checks-decided-by-a-timing-race.md)         | P0  | S      | bug      | Seven web checks are decided by a timing race, so WebKit blocks every PR into develop                 | ✅ Done | —           | —                                                        |
 | [SHY-0284](SHY-0284-action-pins-drift-unseen.md)                         | P2  | S      | infra    | The guard against half-finished action upgrades never runs on the changes that cause them             | ✅ Done | —           | —                                                        |
+| [SHY-0544](SHY-0544-local-and-ci-storage-runs-on-a-maintained-s3-stand-in.md) | P0 | L | infra | Local and CI storage runs on a maintained S3 stand-in, not MinIO | ✅ Done | — | [#2250](https://github.com/shyden-labs/ShyTalk/pull/2250) |
 
 ## Cancelled
 

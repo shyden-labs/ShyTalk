@@ -51,7 +51,7 @@ function extractRunBlock(yaml, stepName) {
 
 function materialize(block) {
   return block
-    .replace(/\$\{\{\s*github\.repository\s*\}\}/g, 'Shyden-Ltd/ShyTalk')
+    .replace(/\$\{\{\s*github\.repository\s*\}\}/g, 'shyden-labs/ShyTalk')
     .replace(/\$\{\{\s*inputs\.suite_name\s*\}\}/g, 'playwright')
     .replace(/\$\{\{\s*inputs\.report_env\s*\}\}/g, 'pr');
 }
@@ -72,7 +72,7 @@ describe('allure-report.yml "Post report URL in summary" — executed block beha
     expect(fs.readFileSync(summaryFile, 'utf8')).toBe(
       '## Allure Report (playwright)\n' +
         '\n' +
-        '[View Report](https://Shyden-Ltd.github.io/ShyTalk/playwright/pr/latest/)\n',
+        '[View Report](https://reports.shytalk.shyden.co.uk/playwright/pr/latest/)\n',
     );
   });
 });

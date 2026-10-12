@@ -1,7 +1,7 @@
 name: Integration Tests
 
 # Reusable workflow that brings up the full local stack (Firebase
-# Emulators + LiveKit Docker + MinIO + Mailpit + Express API) and
+# Emulators + LiveKit Docker + S3 stand-in + Mailpit + Express API) and
 # runs the integration test suite at `tests/integration/`.
 #
 # Distinct from `playwright-tests.yml` (browser tests) and
@@ -97,9 +97,9 @@ jobs:
         if: always()
         run: |
           docker logs livekit 2>/dev/null || true
-          docker logs minio 2>/dev/null || true
+          docker logs s3 2>/dev/null || true
           docker logs mailpit 2>/dev/null || true
-          docker rm -f livekit minio mailpit 2>/dev/null || true
+          docker rm -f livekit s3 mailpit 2>/dev/null || true
 
       - name: Write environment.properties
         if: always()
@@ -109,11 +109,11 @@ jobs:
           sed 's/^ *//' > "$DIR/environment.properties" <<'INTEOF'
           tier=Integration
           base_url=localhost:3000
-          stack=Local Emulators (Firestore, Auth, RTDB, MinIO, LiveKit)
+          stack=Local Emulators (Firestore, Auth, RTDB, S3 stand-in, LiveKit)
           INTEOF
 
       - name: Upload Allure results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: allure-results-integration
@@ -121,7 +121,7 @@ jobs:
           retention-days: 14
 
       - name: Upload failure traces
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: failure()
         with:
           name: integration-failures

@@ -8,7 +8,7 @@
 #     against an unseeded stack — every persona sign-in 400s and each cell
 #     burns its full timeout).
 #
-# Seeds: local/seed.js (admin + base user + Firestore + MinIO bucket) then
+# Seeds: local/seed.js (admin + base user + Firestore + versitygw bucket) then
 # express-api/scripts/seed-personas-local.js (journey personas P-02..P-19).
 #
 # ⚠ PERSONAS_PASSWORD is FORCED to localdev123: the .local app flavour bakes

@@ -192,7 +192,7 @@ ShyTalk/
 - **Android Studio** Ladybug 或更新版本
 - **JDK 21+**
 - **Node.js 24+**
-- **Docker**（用于 LiveKit 语音服务器、MinIO 存储、Mailpit 邮件）
+- **Docker**（用于 LiveKit 语音服务器、versitygw 存储、Mailpit 邮件）
 - **Firebase CLI**（`npm install -g firebase-tools`）
 
 开始前无需任何云账户 -- 本地环境完全离线运行。
@@ -203,7 +203,7 @@ ShyTalk/
 
 1. **克隆并安装**
    ```bash
-   git clone https://github.com/Shyden-Ltd/ShyTalk.git
+   git clone https://github.com/shyden-labs/ShyTalk.git
    cd ShyTalk
    cd express-api && npm install && cd ..
    ```
@@ -221,9 +221,9 @@ ShyTalk/
    ```
 
    该命令将：
-   - 启动 Docker 容器（LiveKit 语音服务器、MinIO 存储、Mailpit 邮件）
+   - 启动 Docker 容器（LiveKit 语音服务器、versitygw 存储、Mailpit 邮件）
    - 启动 Firebase 模拟器（Firestore、Auth、RTDB）
-   - 填充测试数据并创建 MinIO 存储桶
+   - 填充测试数据并创建 versitygw 存储桶
    - 启动 Express API
    - 构建并安装 Android 应用（如已连接设备）
 
@@ -235,13 +235,12 @@ ShyTalk/
        Firebase UI:    http://localhost:4000
        Express API:    http://localhost:3000
        Mailpit UI:     http://localhost:8025
-       MinIO Console:  http://localhost:9001
        LiveKit:        localhost:7880
 
      Credentials:
        Test admin:     claude-test@shytalk.dev / localdev123
        Test user:      user@test.com / localdev123
-       MinIO:          minioadmin / minioadmin
+       versitygw:      localadmin / localsecret
    ```
 
 3. **登录**
@@ -284,7 +283,7 @@ ShyTalk/
    adb reverse tcp:9099 tcp:9099   # Auth emulator
    adb reverse tcp:9000 tcp:9000   # RTDB emulator
    adb reverse tcp:7880 tcp:7880   # LiveKit
-   adb reverse tcp:9002 tcp:9002   # MinIO (image storage)
+   adb reverse tcp:9002 tcp:9002   # versitygw (image storage)
    adb reverse tcp:8025 tcp:8025   # Mailpit UI
    ```
    使用 `adb reverse` 后，local flavor 中默认的 `10.0.2.2` 地址在实体设备上同样有效 -- 无需修改构建配置。
@@ -311,7 +310,6 @@ ShyTalk/
 | Express API | http://localhost:3000 | 后端 API |
 | 健康检查 | http://localhost:3000/api/health | 验证 API 是否运行 |
 | Mailpit | http://localhost:8025 | 查看捕获的邮件和 OTP 验证码 |
-| MinIO Console | http://localhost:9001 | 浏览上传的图片和文件 |
 
 ### 可选服务
 
@@ -424,10 +422,10 @@ npx playwright test
 - **Firebase 模拟器启动失败**：需要 Java 21+。使用 `java -version` 检查。
 - **Android 构建失败**：确保已安装 JDK 21+ 和 Android SDK。尝试 `./gradlew clean`。
 - **未检测到 adb 设备**：启用 USB 调试。运行 `adb devices` 检查。
-- **图片无法加载**：MinIO 存储桶可能未创建。运行 `cd express-api && NODE_ENV=local node ../local/seed.js`。实体设备请运行 `adb reverse tcp:9002 tcp:9002`。
+- **图片无法加载**：versitygw 存储桶可能未创建。运行 `cd express-api && NODE_ENV=local node ../local/seed.js`。实体设备请运行 `adb reverse tcp:9002 tcp:9002`。
 - **OTP 未收到**：检查控制台输出中的 `[OTP-LOCAL]` 行。同时检查 Mailpit UI：http://localhost:8025。
 - **重置模拟器数据**：删除 `local/firebase-emulator-data/` 目录并重启。
-- **重置 MinIO 数据**：运行 `docker compose -f local/docker-compose.yml down -v` 删除卷。
+- **重置 versitygw 数据**：运行 `docker compose -f local/docker-compose.yml down -v` 删除卷。
 
 ## 部署
 

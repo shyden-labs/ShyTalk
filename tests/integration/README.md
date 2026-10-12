@@ -1,7 +1,7 @@
 # Integration Tests
 
 Multi-service integration tests for the ShyTalk Express API + Firebase
-Emulators + LiveKit Docker + MinIO + Mailpit local stack.
+Emulators + LiveKit Docker + versitygw + Mailpit local stack.
 
 ## What this tier covers
 
@@ -14,7 +14,7 @@ Emulators + LiveKit Docker + MinIO + Mailpit local stack.
 
 The integration tier sits between unit (mocked I/O) and E2E (UI-driven).
 Tests here exercise REAL services: Firebase Admin SDK against the
-emulator, Express API against Firestore/RTDB, R2 PUT/GET via MinIO.
+emulator, Express API against Firestore/RTDB, R2 PUT/GET via versitygw.
 
 ## Running locally
 

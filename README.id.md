@@ -192,7 +192,7 @@ ShyTalk/
 - **Android Studio** Ladybug atau lebih baru
 - **JDK 21+**
 - **Node.js 24+**
-- **Docker** (untuk server suara LiveKit, penyimpanan MinIO, email Mailpit)
+- **Docker** (untuk server suara LiveKit, penyimpanan versitygw, email Mailpit)
 - **Firebase CLI** (`npm install -g firebase-tools`)
 
 Tidak perlu akun cloud untuk memulai -- lingkungan lokal berjalan sepenuhnya offline.
@@ -203,7 +203,7 @@ Cara tercepat untuk memulai. Satu perintah memulai semuanya -- Firebase Emulator
 
 1. **Clone dan instal**
    ```bash
-   git clone https://github.com/Shyden-Ltd/ShyTalk.git
+   git clone https://github.com/shyden-labs/ShyTalk.git
    cd ShyTalk
    cd express-api && npm install && cd ..
    ```
@@ -221,9 +221,9 @@ Cara tercepat untuk memulai. Satu perintah memulai semuanya -- Firebase Emulator
    ```
 
    Perintah tunggal ini:
-   - Memulai kontainer Docker (server suara LiveKit, penyimpanan MinIO, email Mailpit)
+   - Memulai kontainer Docker (server suara LiveKit, penyimpanan versitygw, email Mailpit)
    - Memulai Firebase Emulator (Firestore, Auth, RTDB)
-   - Menyemai data tes dan membuat bucket penyimpanan MinIO
+   - Menyemai data tes dan membuat bucket penyimpanan versitygw
    - Memulai Express API
    - Membangun dan menginstal aplikasi Android (jika perangkat terhubung)
 
@@ -235,13 +235,12 @@ Cara tercepat untuk memulai. Satu perintah memulai semuanya -- Firebase Emulator
        Firebase UI:    http://localhost:4000
        Express API:    http://localhost:3000
        Mailpit UI:     http://localhost:8025
-       MinIO Console:  http://localhost:9001
        LiveKit:        localhost:7880
 
      Credentials:
        Test admin:     claude-test@shytalk.dev / localdev123
        Test user:      user@test.com / localdev123
-       MinIO:          minioadmin / minioadmin
+       versitygw:      localadmin / localsecret
    ```
 
 3. **Masuk**
@@ -284,7 +283,7 @@ Cara tercepat untuk memulai. Satu perintah memulai semuanya -- Firebase Emulator
    adb reverse tcp:9099 tcp:9099   # Emulator Auth
    adb reverse tcp:9000 tcp:9000   # Emulator RTDB
    adb reverse tcp:7880 tcp:7880   # LiveKit
-   adb reverse tcp:9002 tcp:9002   # MinIO (penyimpanan gambar)
+   adb reverse tcp:9002 tcp:9002   # versitygw (penyimpanan gambar)
    adb reverse tcp:8025 tcp:8025   # Mailpit UI
    ```
    Dengan `adb reverse`, alamat default `10.0.2.2` di flavor lokal juga akan berfungsi di perangkat fisik -- tidak perlu perubahan konfigurasi build.
@@ -311,7 +310,6 @@ Cara tercepat untuk memulai. Satu perintah memulai semuanya -- Firebase Emulator
 | Express API | http://localhost:3000 | API backend |
 | Health check | http://localhost:3000/api/health | Verifikasi API berjalan |
 | Mailpit | http://localhost:8025 | Lihat email yang ditangkap dan kode OTP |
-| MinIO Console | http://localhost:9001 | Jelajahi gambar dan file yang diunggah |
 
 ### Layanan Opsional
 
@@ -424,10 +422,10 @@ Di CI, tes Playwright dan Android E2E berjalan terhadap lingkungan lokal yang sa
 - **Firebase emulator gagal memulai**: Membutuhkan Java 21+. Periksa dengan `java -version`.
 - **Build Android gagal**: Pastikan JDK 21+ dan Android SDK terinstal. Coba `./gradlew clean`.
 - **Perangkat adb tidak terdeteksi**: Aktifkan debugging USB. Jalankan `adb devices` untuk memeriksa.
-- **Gambar tidak dimuat**: Bucket MinIO mungkin belum dibuat. Jalankan `cd express-api && NODE_ENV=local node ../local/seed.js`. Untuk perangkat fisik, jalankan `adb reverse tcp:9002 tcp:9002`.
+- **Gambar tidak dimuat**: Bucket versitygw mungkin belum dibuat. Jalankan `cd express-api && NODE_ENV=local node ../local/seed.js`. Untuk perangkat fisik, jalankan `adb reverse tcp:9002 tcp:9002`.
 - **OTP tidak tiba**: Periksa output konsol untuk baris `[OTP-LOCAL]`. Juga periksa UI Mailpit di http://localhost:8025.
 - **Reset data emulator**: Hapus direktori `local/firebase-emulator-data/` dan mulai ulang.
-- **Reset data MinIO**: Jalankan `docker compose -f local/docker-compose.yml down -v` untuk menghapus volume.
+- **Reset data versitygw**: Jalankan `docker compose -f local/docker-compose.yml down -v` untuk menghapus volume.
 
 ## Deployment
 
