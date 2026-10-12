@@ -46,14 +46,23 @@ describe('SHY-0544 — every waiter polls the path the stand-in serves', () => {
     expect(action).toMatch(/(^|\s)--health \/health(\s|$)/m);
   });
 
+  // The readiness construct itself, not the bare URL: a failure-path line
+  // naming the URL would otherwise satisfy the check while the wait polled
+  // something else. The character after `/health` rules out `/healthz`.
   test.each([
-    '.github/workflows/test-backend.yml',
-    '.github/workflows/sonarcloud.yml',
-    'local/start.sh',
-    'local/start.ps1',
-    'tests/integration/global-setup.ts',
-  ])('%s waits on http://localhost:9002/health', (rel) => {
-    expect(read(rel)).toContain('http://localhost:9002/health');
+    [
+      '.github/workflows/test-backend.yml',
+      /if curl -sf http:\/\/localhost:9002\/health >\/dev\/null/,
+    ],
+    [
+      '.github/workflows/sonarcloud.yml',
+      /if curl -sf http:\/\/localhost:9002\/health >\/dev\/null/,
+    ],
+    ['local/start.sh', /until curl -sf http:\/\/localhost:9002\/health > \/dev\/null/],
+    ['local/start.ps1', /Invoke-WebRequest -Uri "http:\/\/localhost:9002\/health" /],
+    ['tests/integration/global-setup.ts', /url: "http:\/\/localhost:9002\/health",/],
+  ])('%s waits on http://localhost:9002/health', (rel, construct) => {
+    expect(read(rel)).toMatch(construct);
   });
 });
 
