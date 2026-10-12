@@ -75,7 +75,7 @@ function extractRunBlock(yaml, stepName) {
 function materialize(block) {
   return block
     .replace(/\$\{\{\s*github\.run_id\s*\}\}/g, '123')
-    .replace(/\$\{\{\s*github\.repository\s*\}\}/g, 'Shyden-Ltd/ShyTalk')
+    .replace(/\$\{\{\s*github\.repository\s*\}\}/g, 'shyden-labs/ShyTalk')
     .replace(/\$\{\{\s*inputs\.suite_name\s*\}\}/g, 'playwright')
     .replace(/\$\{\{\s*inputs\.report_env\s*\}\}/g, 'pr');
 }
@@ -183,7 +183,7 @@ describe('allure-report.yml "Write metadata.json" — SHY-0127 grep-count crash 
     expect(m.suite).toBe('playwright');
     expect(m.env).toBe('pr');
     expect(m.runId).toBe('123');
-    expect(m.runUrl).toContain('Shyden-Ltd/ShyTalk');
+    expect(m.runUrl).toContain('shyden-labs/ShyTalk');
     expect(m.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

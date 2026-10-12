@@ -226,7 +226,7 @@ function runCapStep(shimEnv = {}) {
         PATH: `${binDir}:${process.env.PATH}`,
         HOME: dir,
         RUNNER_TEMP: runnerTemp,
-        REPO: 'Shyden-Ltd/ShyTalk',
+        REPO: 'shyden-labs/ShyTalk',
         MAX_GH_PAGES_COMMITS: '25',
         GH_SHIM_CALLS: callsFile,
         GIT_SHIM_CALLS: gitCallsFile,
@@ -504,7 +504,7 @@ describe('the capped branch serves byte-identical content (real git)', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  const CLONE_URL = 'https://x-access-token:test-token@github.com/Shyden-Ltd/ShyTalk.git';
+  const CLONE_URL = 'https://x-access-token:test-token@github.com/shyden-labs/ShyTalk.git';
 
   /**
    * Run the REAL extracted block with real git against `bare`.
@@ -551,7 +551,7 @@ esac
           // declares MAX_GH_PAGES_COMMITS: 25, and letting that through would
           // silently disable the cap for a 5-commit fixture.
           ...extractStepEnv(fs.readFileSync(WORKFLOW, 'utf8'), STEP_NAME),
-          REPO: 'Shyden-Ltd/ShyTalk',
+          REPO: 'shyden-labs/ShyTalk',
           MAX_GH_PAGES_COMMITS: '3',
           GH_TOKEN: 'test-token',
         },

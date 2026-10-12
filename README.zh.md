@@ -203,7 +203,7 @@ ShyTalk/
 
 1. **克隆并安装**
    ```bash
-   git clone https://github.com/Shyden-Ltd/ShyTalk.git
+   git clone https://github.com/shyden-labs/ShyTalk.git
    cd ShyTalk
    cd express-api && npm install && cd ..
    ```

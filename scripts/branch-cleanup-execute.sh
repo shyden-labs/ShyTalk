@@ -5,7 +5,7 @@
 # every branch in the three DELETE buckets via `gh api -X DELETE`.
 #
 # SAFETY:
-# - Hard-coded to operate ONLY on Shyden-Ltd/ShyTalk.
+# - Hard-coded to operate ONLY on shyden-labs/ShyTalk.
 # - Defaults to --dry-run; live execution requires --execute flag AND
 #   explicit operator authorisation (the flag's presence is taken as
 #   that authorisation).
@@ -28,7 +28,7 @@
 #   5 — rate-limit exhausted after retries
 set -euo pipefail
 
-REPO="Shyden-Ltd/ShyTalk"
+REPO="shyden-labs/ShyTalk"
 REPORT=".project/audit/branch-cleanup-report.md"
 DRY_RUN=1
 DELAY_MS=200

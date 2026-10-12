@@ -757,14 +757,14 @@ describe('scripts/sync-shy-to-roadmap-data.mjs', () => {
             public: true,
             phase: 'Safety & Compliance',
             title: 'PR linked',
-            pr: 'https://github.com/Shyden-Ltd/ShyTalk/pull/1044',
+            pr: 'https://github.com/shyden-labs/ShyTalk/pull/1044',
           },
         ],
       });
       runScript(['--stories-dir', storiesDir, '--data-file', dataFile]);
       const data = readJson(dataFile);
       const item = data.phases.find((p) => p.title === 'Safety & Compliance').items[0];
-      expect(item.prUrl).toBe('https://github.com/Shyden-Ltd/ShyTalk/pull/1044');
+      expect(item.prUrl).toBe('https://github.com/shyden-labs/ShyTalk/pull/1044');
     });
 
     test('SHY without pr field → item.prUrl omitted', () => {
