@@ -380,6 +380,11 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0551](SHY-0551-a-failing-scheduled-job-opens-an-issue.md) | P0 | S | infra | A failing scheduled job opens an issue instead of failing silently | 📝 Draft | — |  |
 | [SHY-0552](SHY-0552-release-notes-list-the-stories-a-release-ships.md) | P1 | S | bug | Release notes list the stories a release ships | 📝 Draft | — |  |
 | [SHY-0553](SHY-0553-store-apps-catch-up-with-the-v0-99-0-server.md) | P0 | M | bug | The store apps catch up with the v0.99.0 server, so the device lock holds again | 📝 Draft | — |  |
+| [SHY-0554](SHY-0554-local-services-are-ready-before-any-workflow-seeds.md) | P0 | S | bug | Local services are ready before any workflow seeds, and a seed that cannot reach storage fails | 📝 Draft | — |  |
+| [SHY-0555](SHY-0555-the-typescript-test-specs-are-type-checked.md) | P1 | L | infra | The TypeScript test specs are type-checked | 📝 Draft | — |  |
+| [SHY-0556](SHY-0556-absence-guards-check-a-recorded-floor.md) | P0 | M | infra | Absence guards check a floor kept in one recorded file | 📝 Draft | — |  |
+| [SHY-0557](SHY-0557-the-gauntlet-runs-from-a-git-worktree.md) | P0 | XS | bug | The gauntlet runs from a git worktree | 📝 Draft | — |  |
+| [SHY-0558](SHY-0558-actionlint-is-installed-from-a-pinned-source.md) | P0 | S | infra | actionlint is installed from a pinned, verified source | 📝 Draft | — |  |
 | [SHY-0227](SHY-0227-heal-stale-rules-contract-specs.md) | P1 | S | bug | Heal stale Firestore-rules contract specs and the tautological cohort-forging tests | 📝 Draft | — |  |
 | [SHY-0525](SHY-0525-dev-device-runs-bake-the-test-persona-credential-from-one-source.md) | P1 | S | bug | Dev device runs bake the test-persona credential from one source and never reuse an unproven APK | 📝 Draft | — |  |
 
