@@ -27,7 +27,7 @@ Bu **karma** bir çalıştırıcıdır. Her yolculuk aynı anda üç katmanda do
 
 | İhtiyacınız olan                | Nasıl                                                                                                                                                   |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** çalışıyor    | Firebase emülatörleri + LiveKit/MinIO için                                                                                                              |
+| **Docker Desktop** çalışıyor    | Firebase emülatörleri + LiveKit/versitygw için                                                                                                          |
 | **Yerel yığın çalışır durumda** | `bash local/start.sh` (depo kökünden) — Firebase emülatörlerini + express-api'yi başlatır. Çalışır durumda bırakın.                                     |
 | **Persona'lar tohumlandı**      | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotent; P‑02…P‑19 test kadrosunu `localdev123` parolasıyla tohumlar) |
 | **Bağlı bir telefon**           | `adb devices` bir tane listelemeli (USB kablosu **veya** kablosuz `adb`). Bir Android emülatörü de çalışır.                                             |

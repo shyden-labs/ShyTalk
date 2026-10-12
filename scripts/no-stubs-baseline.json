@@ -172,7 +172,6 @@
     "express-api/tests/utils/r2-signed-put.test.js",
     "express-api/tests/utils/r2.test.js",
     "express-api/tests/utils/roadmap-notify.test.js",
-    "express-api/tests/utils/seed-minio.test.js",
     "express-api/tests/utils/segregation-audit.test.js",
     "express-api/tests/utils/system-pm.test.js",
     "express-api/tests/utils/translation-cache.test.js"
@@ -414,7 +413,6 @@
     "express-api/tests/utils/r2-signed-put.test.js",
     "express-api/tests/utils/r2.test.js",
     "express-api/tests/utils/roadmap-notify.test.js",
-    "express-api/tests/utils/seed-minio.test.js",
     "express-api/tests/utils/segregation-audit.test.js",
     "express-api/tests/utils/stale-room-reap.test.js",
     "express-api/tests/utils/system-pm.test.js",
@@ -609,7 +607,6 @@
     "express-api/tests/utils/r2-signed-put.test.js",
     "express-api/tests/utils/r2.test.js",
     "express-api/tests/utils/roadmap-notify.test.js",
-    "express-api/tests/utils/seed-minio.test.js",
     "express-api/tests/utils/segregation-audit.test.js",
     "express-api/tests/utils/system-pm.test.js",
     "express-api/tests/utils/translation-provider.test.js"

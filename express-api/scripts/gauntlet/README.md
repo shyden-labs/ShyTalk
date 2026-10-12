@@ -25,7 +25,7 @@ bash express-api/scripts/gauntlet/gauntlet.sh
 ```
 
 That runs: prereqs audit → Docker Desktop + full local stack (emulators,
-LiveKit, MinIO, Mailpit, Express API, static web on :8888) → seed + verify →
+LiveKit, versitygw, Mailpit, Express API, static web on :8888) → seed + verify →
 Android device prep (best-effort) → dispatches the journey matrix detached.
 
 Long unattended run? Detach the whole thing (survives closing the terminal,

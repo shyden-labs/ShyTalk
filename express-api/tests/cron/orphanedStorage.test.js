@@ -9,7 +9,7 @@
  * user media, only the real round-trip is trustworthy.
  *
  * This suite drives the REAL cron against the live Firestore emulator + real
- * MinIO (NODE_ENV=local → http://localhost:9002): referencing docs are seeded,
+ * versitygw (NODE_ENV=local → http://localhost:9002): referencing docs are seeded,
  * real objects are PUT in each folder, and after the run object existence is
  * read back from the bucket — referenced kept, orphans gone.
  *
@@ -20,7 +20,7 @@
  * must NOT protect a same-named key) and graceful non-array handling.
  *
  * NOT covered (escape-hatch, EPIC-0003): the per-folder list/delete `catch`
- * branch (a real MinIO list/delete failure is not inducible without a mock).
+ * branch (a real versitygw list/delete failure is not inducible without a mock).
  *
  * KNOWN PRODUCT RISK (flagged for a follow-up SHY, NOT fixed here): the cron
  * collects message/sticker keys for only the first 30 conversations
@@ -104,7 +104,7 @@ afterAll(async () => {
   process.env.NODE_ENV = PRIOR_NODE_ENV;
 });
 
-describe('orphanedStorage cron (real Firestore emulator + real MinIO)', () => {
+describe('orphanedStorage cron (real Firestore emulator + real versitygw)', () => {
   test('keeps every user-referenced photo (all 4 fields, camelCase + snake_case) and deletes orphans', async () => {
     const keep = [
       'profiles/p-camel.jpg',

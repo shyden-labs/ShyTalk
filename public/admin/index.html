@@ -9,7 +9,7 @@
     <!--
       img-src / media-src carry a bare `http:` on purpose.
 
-      Attachments are served from the object store, and locally that is MinIO on
+      Attachments are served from the object store, and locally that is versitygw on
       this machine's LAN address (a phone cannot reach `localhost` — see
       express-api/.env.local.example). Pinning the CSP to `http://localhost:*`
       therefore blocked every local image and video the moment device testing

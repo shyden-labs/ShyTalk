@@ -27,7 +27,7 @@ ogni passaggio a mano.
 
 | Cosa ti serve                    | Come                                                                                                                                                          |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** in esecuzione | per gli emulatori Firebase + LiveKit/MinIO                                                                                                                    |
+| **Docker Desktop** in esecuzione | per gli emulatori Firebase + LiveKit/versitygw                                                                                                                |
 | **Lo stack locale attivo**       | `bash local/start.sh` (dalla root del repo) — avvia gli emulatori Firebase + l'express-api. Lascialo in esecuzione.                                           |
 | **Personas inizializzate**       | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotente; inizializza il cast di test P‑02…P‑19 con password `localdev123`) |
 | **Un telefono collegato**        | `adb devices` deve elencarne uno (cavo USB **oppure** `adb` wireless). Funziona anche un emulatore Android.                                                   |

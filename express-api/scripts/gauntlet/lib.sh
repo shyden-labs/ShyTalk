@@ -11,7 +11,7 @@ GAUNTLET_TMP="${GAUNTLET_TMP:-/tmp/shytalk-gauntlet}"
 
 # TCP ports the local stack owns (same list as local/start.sh step 0).
 # 4000 emulator-UI · 8080 Firestore · 9000 RTDB · 9099 Auth · 3000 Express
-# 7880 LiveKit · 9002 MinIO · 8025 Mailpit · 8888 static web
+# 7880 LiveKit · 9002 versitygw · 8025 Mailpit · 8888 static web
 # shellcheck disable=SC2034  # consumed by the sourcing scripts (10/90)
 STACK_TCP_PORTS=(4000 8080 9000 9099 3000 7880 9002 8025 8888)
 # shellcheck disable=SC2034  # consumed by the sourcing scripts (40/90)

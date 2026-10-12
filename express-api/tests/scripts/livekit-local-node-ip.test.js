@@ -206,12 +206,12 @@ describe('SHY-0273 — the local stack reaches the REAL device it installs on', 
 
   test('the canonical port set is pinned, not just agreed upon', () => {
     // The equality test below only proves the three lists match EACH OTHER, so
-    // a simultaneous identical drop — say every list losing 9002 (MinIO) — would
+    // a simultaneous identical drop — say every list losing 9002 (versitygw) — would
     // pass every other check here while images silently stop loading on device.
     // This pins what the set actually IS.
     //
     // 3000 Express · 7880 LiveKit signalling · 7881 LiveKit TCP media
-    // · 8080 Firestore · 8888 web serve · 9000 RTDB · 9002 MinIO · 9099 Auth
+    // · 8080 Firestore · 8888 web serve · 9000 RTDB · 9002 versitygw · 9099 Auth
     expect([...PORT_LISTS['start.sh']].sort()).toEqual([
       '3000',
       '7880',

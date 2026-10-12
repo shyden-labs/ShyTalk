@@ -28,7 +28,7 @@ tầng cùng lúc:
 
 | Bạn cần                       | Cách làm                                                                                                                                                  |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** đang chạy  | cho các trình giả lập Firebase + LiveKit/MinIO                                                                                                            |
+| **Docker Desktop** đang chạy  | cho các trình giả lập Firebase + LiveKit/versitygw                                                                                                        |
 | **Ngăn xếp cục bộ đã chạy**   | `bash local/start.sh` (từ thư mục gốc của kho) — khởi động các trình giả lập Firebase + express-api. Để nó tiếp tục chạy.                                 |
 | **Đã gieo persona**           | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (lũy đẳng; gieo dàn nhân vật kiểm thử P‑02…P‑19 với mật khẩu `localdev123`) |
 | **Một điện thoại đã kết nối** | `adb devices` phải liệt kê một máy (cáp USB **hoặc** `adb` không dây). Một trình giả lập Android cũng hoạt động được.                                     |

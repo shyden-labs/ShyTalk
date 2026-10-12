@@ -25,7 +25,7 @@ _이 문서는 JOURNEY-RUNNER.md의 번역본입니다._
 
 | 필요한 것                   | 방법                                                                                                                                              |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** 실행     | Firebase 에뮬레이터 + LiveKit/MinIO용                                                                                                             |
+| **Docker Desktop** 실행     | Firebase 에뮬레이터 + LiveKit/versitygw용                                                                                                         |
 | **로컬 스택 가동**          | `bash local/start.sh` (repo 루트에서) — Firebase 에뮬레이터 + express-api를 시작합니다. 계속 실행해 두세요.                                       |
 | **페르소나 시딩**           | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (멱등적; 비밀번호 `localdev123`으로 P‑02…P‑19 테스트 캐스트를 시딩) |
 | **휴대폰 연결**             | `adb devices`가 하나를 표시해야 합니다 (USB 케이블 **또는** 무선 `adb`). Android 에뮬레이터도 동작합니다.                                         |
