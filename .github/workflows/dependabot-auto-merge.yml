@@ -22,30 +22,35 @@ jobs:
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     timeout-minutes: 5
     steps:
+      # SHY-0569: the judge runs from the base branch, never the PR's own code.
+      - name: Check out the base branch (never the PR code)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      # Unreadable metadata must not stop the job before auto-merge is
+      # switched off below; the judge reads an empty type as "no".
       - name: Fetch Dependabot metadata
         id: metadata
+        continue-on-error: true
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v2
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+      # SHY-0569: #2190's metadata said 12.19.0 / semver-minor while its title
+      # and body said 12.18.0 -> 13.0.0, and a major merged by itself. The
+      # judge allows auto-merge only when the metadata AND every version pair
+      # in the PR's title and body are patch or minor (GitHub Actions keep
+      # their SHA-pinned exception). env-bound, never inline ${{ }} in run:.
       - name: Determine if auto-mergeable
         id: check
-        # env-bound (not inline ${{ }} in run:) per the workflow-injection
-        # hygiene convention. The old unused DEP_TYPE binding is gone
-        # (SC2034 — the merge policy never consulted dependency-type).
         env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
           UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
-          PACKAGE_ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
-        run: |
-          # Auto-merge: patch and minor for all ecosystems
-          if [ "$UPDATE_TYPE" = "version-update:semver-patch" ] || [ "$UPDATE_TYPE" = "version-update:semver-minor" ]; then
-            echo "merge=true" >> "$GITHUB_OUTPUT"
-          # Auto-merge: GitHub Actions updates (SHA-pinned, so "major" is just a tag bump)
-          elif [ "$PACKAGE_ECOSYSTEM" = "github_actions" ] || [ "$PACKAGE_ECOSYSTEM" = "github-actions" ]; then
-            echo "merge=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "merge=false" >> "$GITHUB_OUTPUT"
-          fi
+          ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+        run: node scripts/dependabot-update-type.js
 
       - name: Auto-approve
         if: steps.check.outputs.merge == 'true'
@@ -57,6 +62,22 @@ jobs:
       - name: Auto-merge
         if: steps.check.outputs.merge == 'true'
         run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # SHY-0569: a push judged "no" (or a judge that failed) switches off an
+      # auto-merge armed by an earlier push; before, it was left armed.
+      - name: Switch auto-merge off
+        if: always() && steps.check.outputs.merge != 'true'
+        run: |
+          armed=$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null')
+          if [ "$armed" = "true" ]; then
+            gh pr merge --disable-auto "$PR_URL"
+            echo "auto-merge switched off for $PR_URL"
+          else
+            echo "auto-merge was not armed for $PR_URL"
+          fi
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

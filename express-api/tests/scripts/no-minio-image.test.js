@@ -29,8 +29,9 @@ const DEAD_NAMES = [/minio\/minio\b/gi, /minio\/mc\b/gi, /\/minio\/health\b/gi];
 // so a file added or lost under ROOTS is seen and this figure re-measured.
 // 460 -> 461: local/seed-steps.js (01d13590). 461 -> 462:
 // scripts/scan-secrets.js (SHY-0565). 462 -> 463: scripts/story-progress.js
-// (SHY-0535). SHY-0556 moves this figure to the floors record.
-const FILES_READ_FLOOR = 463;
+// (SHY-0535). 463 -> 464: scripts/dependabot-update-type.js (SHY-0569).
+// SHY-0556 moves this figure to the floors record.
+const FILES_READ_FLOOR = 464;
 
 function findDeadNames(text) {
   return DEAD_NAMES.flatMap((re) => text.match(re) ?? []);
