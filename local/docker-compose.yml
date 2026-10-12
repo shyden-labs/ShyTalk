@@ -1,6 +1,6 @@
 services:
   livekit:
-    image: livekit/livekit-server:v1.12.0
+    image: livekit/livekit-server:v1.13.9
     # Resource diet 2026-05-21: cap to 256m. livekit-server is a Go
     # binary, ~50-100MB steady-state. The cap prevents balloon under
     # peer-connection spikes during voice-room test scenarios. Pinned
