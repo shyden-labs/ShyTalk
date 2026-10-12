@@ -391,6 +391,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0560](SHY-0560-story-index-status-is-derived-from-the-story-files.md) | P0 | S | infra | The story index shows each story's real status, read from the story file | 📝 Draft | — |  |
 | [SHY-0561](SHY-0561-pre-push-runs-no-test-suite.md) | P0 | M | infra | The pre-push hook runs no test suite, only quick static checks | 📝 Draft | — |  |
 | [SHY-0562](SHY-0562-mutations-run-in-a-ci-workflow.md) | P0 | M | infra | Mutations run in a CI workflow that reports each one red or green | 📝 Draft | — |  |
+| [SHY-0563](SHY-0563-whole-repo-guards-run-as-their-own-suite.md) | P0 | M | infra | Whole-repo guards run as their own required suite, not as unit tests | 📝 Draft | — |  |
 
 ## Done
 
