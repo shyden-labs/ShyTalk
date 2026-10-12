@@ -200,7 +200,7 @@ const TARGETS = {
     gradleArgs: ['-PlocalHost=localhost'],
     // Device localhost -> Mac, so the on-device app reaches the local stack.
     // 3000 Express · 7880 LiveKit signalling · 7881 LiveKit TCP media
-    // · 8080 Firestore · 8888 web · 9000 RTDB · 9002 MinIO · 9099 Auth.
+    // · 8080 Firestore · 8888 web · 9000 RTDB · 9002 versitygw · 9099 Auth.
     //
     // 7881 is the ONLY media transport a reverse tunnel can carry — `adb
     // reverse` forwards TCP and never UDP (SHY-0273). Kept identical to

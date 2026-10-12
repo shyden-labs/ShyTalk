@@ -27,7 +27,7 @@ em cada etapa manualmente.
 
 | Você precisa                   | Como                                                                                                                                                      |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** em execução | para os emuladores do Firebase + LiveKit/MinIO                                                                                                            |
+| **Docker Desktop** em execução | para os emuladores do Firebase + LiveKit/versitygw                                                                                                        |
 | **A pilha local no ar**        | `bash local/start.sh` (a partir da raiz do repositório) — inicia os emuladores do Firebase + a express-api. Deixe-a em execução.                          |
 | **Personas semeadas**          | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotente; semeia o elenco de teste P‑02…P‑19 com a senha `localdev123`) |
 | **Um telefone conectado**      | `adb devices` deve listar um (cabo USB **ou** `adb` sem fio). Um emulador Android também funciona.                                                        |

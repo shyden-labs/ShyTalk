@@ -28,7 +28,7 @@ controleren:
 
 | Je hebt nodig                 | Hoe                                                                                                                                                  |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** draaiend   | voor de Firebase-emulators + LiveKit/MinIO                                                                                                           |
+| **Docker Desktop** draaiend   | voor de Firebase-emulators + LiveKit/versitygw                                                                                                       |
 | **De lokale stack actief**    | `bash local/start.sh` (vanuit de repo-root) — start de Firebase-emulators + de express-api. Laat het draaien.                                        |
 | **Persona's geseed**          | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotent; seedt de P‑02…P‑19 testcast met wachtwoord `localdev123`) |
 | **Een telefoon aangesloten**  | `adb devices` moet er één tonen (USB-kabel **of** draadloze `adb`). Een Android-emulator werkt ook.                                                  |

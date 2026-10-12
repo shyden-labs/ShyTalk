@@ -519,7 +519,7 @@ test.describe('Admin Banners', () => {
     expect(uploaded).toBeTruthy();
     const imageUrl = uploaded.imageUrl ?? uploaded.image_url;
     expect(imageUrl).toBeTruthy();
-    // In emulator mode, images go to localhost MinIO; in prod, to CDN
+    // In emulator mode, images go to localhost versitygw; in prod, to CDN
     expect(imageUrl.startsWith('http')).toBe(true);
 
     // Cleanup

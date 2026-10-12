@@ -5,7 +5,7 @@
  * attached to them. Mocked query chains can only prove the SHAPE of a delete
  * call; for a garbage collector that removes evidence somebody sent us while
  * asking for help, only the real round trip is worth anything. So: real
- * Firestore emulator, real MinIO, objects PUT and then read back.
+ * Firestore emulator, real versitygw, objects PUT and then read back.
  *
  * The suite exists because of a defect it would have caught immediately.
  * `attachmentKeysOf` read `a.r2Key` while the create route writes a bare list

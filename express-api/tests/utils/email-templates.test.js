@@ -269,7 +269,7 @@ describe('Email Templates', () => {
 // Environment-aware CDN_URL fallback (env-isolation regression)
 //
 // Pre-fix: CDN_URL fell back to PROD images domain unconditionally.
-// Now: prod → prod CDN, local → MinIO, otherwise → dev CDN.
+// Now: prod → prod CDN, local → versitygw, otherwise → dev CDN.
 // ═══════════════════════════════════════════════════════════════
 
 describe('CDN_URL env-isolation fallback', () => {
@@ -302,7 +302,7 @@ describe('CDN_URL env-isolation fallback', () => {
     expect(email.html).not.toContain('dev-images.shytalk.shyden.co.uk');
   });
 
-  it('NODE_ENV=local with no override → localhost MinIO (NOT prod, NOT dev)', () => {
+  it('NODE_ENV=local with no override → localhost versitygw (NOT prod, NOT dev)', () => {
     delete process.env.CDN_URL;
     process.env.NODE_ENV = 'local';
     const { buildOtpEmail } = loadFresh();

@@ -9,19 +9,19 @@
  * injected `id`) from the real object store.
  *
  * This suite drives the REAL cron against the live Firestore emulator + real
- * MinIO (NODE_ENV=local → http://localhost:9002): real collections are seeded,
+ * versitygw (NODE_ENV=local → http://localhost:9002): real collections are seeded,
  * the cron runs, and the backup objects are READ BACK from the bucket, parsed,
  * and asserted to contain the seeded docs (with their injected `id`/`parentId`).
  *
  * Dev vs production scope: backups.js fixes TOP_LEVEL_COLLECTIONS +
- * SUBCOLLECTIONS at module-load time from NODE_ENV. Because r2.js binds to MinIO
+ * SUBCOLLECTIONS at module-load time from NODE_ENV. Because r2.js binds to versitygw
  * ONLY when NODE_ENV=local (and firebase.js routes to the emulator the same
  * way), the file MUST load under NODE_ENV=local — there is no NODE_ENV value
- * that gives both the production collection scope AND real MinIO. So the
+ * that gives both the production collection scope AND real versitygw. So the
  * production-scope tests drive `backups()` with the full collection set injected
  * explicitly (`backups({ topLevelCollections, subcollections })`) using the
  * module's own exported ALL_* constants — exercising the real expanded scope +
- * real subcollection aggregation against the real emulator + MinIO. No test
+ * real subcollection aggregation against the real emulator + versitygw. No test
  * double, no env juggling; just the real cron driven over real seeded data.
  * The runtime NODE_ENV='production' → ALL ternary itself is the one line not
  * exercised here (its sibling — local → DEV subset — IS proven below).
@@ -103,7 +103,7 @@ afterAll(async () => {
   process.env.NODE_ENV = PRIOR_NODE_ENV;
 });
 
-describe('backups cron — local/dev scope (real Firestore emulator + real MinIO)', () => {
+describe('backups cron — local/dev scope (real Firestore emulator + real versitygw)', () => {
   test('selects the dev subset in this (local) env and exposes the full production candidate set', () => {
     // The env-driven selection picked the dev subset here (NODE_ENV=local).
     expect(devBackups.TOP_LEVEL_COLLECTIONS).toEqual(devBackups.DEV_TOP_LEVEL_COLLECTIONS);
@@ -248,8 +248,8 @@ describe('backups cron — local/dev scope (real Firestore emulator + real MinIO
 describe('backups cron — full production scope (ALL collections injected, real stack)', () => {
   // Drive the real cron with the production collection set passed explicitly,
   // so the expanded top-level scope + subcollection aggregation run against the
-  // real emulator + MinIO without forcing NODE_ENV (which would re-route r2 off
-  // MinIO). The injected lists are the module's own exported ALL_* constants.
+  // real emulator + versitygw without forcing NODE_ENV (which would re-route r2 off
+  // versitygw). The injected lists are the module's own exported ALL_* constants.
   const fullScope = {
     topLevelCollections: devBackups.ALL_TOP_LEVEL_COLLECTIONS,
     subcollections: devBackups.ALL_SUBCOLLECTIONS,

@@ -23,7 +23,7 @@ _यह JOURNEY-RUNNER.md का अनुवाद है।_
 
 | आपको चाहिए                  | कैसे                                                                                                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Docker Desktop** चालू     | Firebase एमुलेटर + LiveKit/MinIO के लिए                                                                                                                      |
+| **Docker Desktop** चालू     | Firebase एमुलेटर + LiveKit/versitygw के लिए                                                                                                                  |
 | **लोकल स्टैक चालू**         | `bash local/start.sh` (repo root से) — Firebase एमुलेटर + express-api शुरू करता है। इसे चलता हुआ छोड़ दें।                                                   |
 | **Personas seed किए हुए**   | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotent; पासवर्ड `localdev123` के साथ P‑02…P‑19 test cast को seed करता है) |
 | **एक फ़ोन जुड़ा हुआ**       | `adb devices` में एक सूचीबद्ध होना चाहिए (USB केबल **या** wireless `adb`)। एक Android एमुलेटर भी काम करता है।                                                |

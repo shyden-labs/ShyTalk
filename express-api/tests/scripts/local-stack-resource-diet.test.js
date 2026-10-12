@@ -5,7 +5,7 @@
  *
  * Caps applied (rationale per service in the YAML comments):
  *   - livekit:        256m  (Go binary)
- *   - minio:          512m  (S3-like, small fixture data)
+ *   - s3:             512m  (versitygw S3 stand-in, objects on tmpfs)
  *   - mailpit:        128m  (in-memory SMTP sink)
  *   - emulator JVM:   1g    (firestore + auth fixture sizes)
  *
@@ -28,7 +28,7 @@ const ROOT_LOCKFILE_PATH = path.join(REPO_ROOT, 'package-lock.json');
  * Extract a single service's YAML block from docker-compose.yml so
  * subsequent assertions are scoped to ONE service and can't drift
  * across boundaries (e.g. asserting livekit's cap by accidentally
- * matching minio's). Anchored on the `^  <name>:$` line and stops
+ * matching s3's). Anchored on the `^  <name>:$` line and stops
  * at the next `^  <word>:$` line.
  */
 function extractServiceBlock(yamlText, serviceName) {
@@ -60,13 +60,13 @@ describe('Local-stack resource diet', () => {
   describe('docker-compose.yml — per-service memory caps', () => {
     let yamlText;
     let livekitBlock;
-    let minioBlock;
+    let s3Block;
     let mailpitBlock;
 
     beforeAll(() => {
       yamlText = fs.readFileSync(COMPOSE_PATH, 'utf8');
       livekitBlock = extractServiceBlock(yamlText, 'livekit');
-      minioBlock = extractServiceBlock(yamlText, 'minio');
+      s3Block = extractServiceBlock(yamlText, 's3');
       mailpitBlock = extractServiceBlock(yamlText, 'mailpit');
     });
 
@@ -85,13 +85,14 @@ describe('Local-stack resource diet', () => {
       expect(livekitBlock).toMatch(/^ {4}memswap_limit: 256m$/m);
     });
 
-    // minio — pages recent blocks; 512m is generous for fixture sizes.
-    test('minio has mem_limit 512m', () => {
-      expect(minioBlock).toMatch(/^ {4}mem_limit: 512m$/m);
+    // s3 — versitygw idles at 14 MiB; its objects live on tmpfs, which
+    // counts against the cap, so 512m leaves room for fixture uploads.
+    test('s3 has mem_limit 512m', () => {
+      expect(s3Block).toMatch(/^ {4}mem_limit: 512m$/m);
     });
 
-    test('minio has memswap_limit 512m (swap disabled)', () => {
-      expect(minioBlock).toMatch(/^ {4}memswap_limit: 512m$/m);
+    test('s3 has memswap_limit 512m (swap disabled)', () => {
+      expect(s3Block).toMatch(/^ {4}memswap_limit: 512m$/m);
     });
 
     // mailpit — tiny in-memory SMTP sink, 128m is plenty.
@@ -109,7 +110,7 @@ describe('Local-stack resource diet', () => {
     // silently passing the two independent value tests.
     const memEqualitySpec = [
       ['livekit', () => livekitBlock],
-      ['minio', () => minioBlock],
+      ['s3', () => s3Block],
       ['mailpit', () => mailpitBlock],
     ];
     test.each(memEqualitySpec)('%s mem_limit equals memswap_limit', (_, getBlock) => {
@@ -429,7 +430,7 @@ describe('Local-stack resource diet', () => {
     //   9099  Auth emulator
     //   3000  Express API
     //   7880  LiveKit (Docker)
-    //   9002  MinIO API (Docker; internal 9000 mapped to host 9002)
+    //   9002  S3 stand-in, versitygw (Docker; internal 7070 mapped to host 9002)
     //   8025  Mailpit UI (Docker)
     //   8888  serve-web.js static web server (SHY-0180; was npx serve, PR #947)
     const REQUIRED_PORTS = [4000, 8080, 9000, 9099, 3000, 7880, 9002, 8025, 8888];

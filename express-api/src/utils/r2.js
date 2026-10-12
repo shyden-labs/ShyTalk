@@ -1,7 +1,8 @@
 /**
- * R2 / MinIO storage client via S3-compatible API.
+ * R2 storage client via the S3-compatible API.
  *
- * In local mode (NODE_ENV=local), connects to MinIO.
+ * In local mode (NODE_ENV=local), connects to the local S3 stand-in
+ * (versitygw, local/docker-compose.yml service `s3`).
  * In production/dev, connects to Cloudflare R2.
  * All endpoints configurable via env vars.
  */
@@ -72,15 +73,31 @@ function pipeToResponse(body, res) {
 
 const bucketName = process.env.R2_BUCKET_NAME || 'shytalk-media';
 
+// SHY-0544: MinIO gave way to versitygw and its settings were renamed. A
+// .env.local written before then still names the old keys, and ignoring
+// them would quietly fall back to localhost, which a phone cannot reach.
+const RETIRED_LOCAL_S3_KEYS = {
+  MINIO_ENDPOINT: 'LOCAL_S3_ENDPOINT',
+  MINIO_ROOT_USER: 'LOCAL_S3_ACCESS_KEY',
+  MINIO_ROOT_PASSWORD: 'LOCAL_S3_SECRET_KEY',
+};
+
 let s3;
 if (isLocal) {
-  const minioEndpoint = process.env.MINIO_ENDPOINT || 'http://localhost:9002';
-  const minioUser = process.env.MINIO_ROOT_USER || 'minioadmin';
-  const minioPass = process.env.MINIO_ROOT_PASSWORD || 'minioadmin';
+  for (const [retired, current] of Object.entries(RETIRED_LOCAL_S3_KEYS)) {
+    if (process.env[retired] !== undefined) {
+      throw new Error(
+        `${retired} is set, but that name was retired with MinIO (SHY-0544): rename it to ${current} in express-api/.env.local`,
+      );
+    }
+  }
   s3 = new S3Client({
-    endpoint: minioEndpoint,
+    endpoint: process.env.LOCAL_S3_ENDPOINT || 'http://localhost:9002',
     region: 'us-east-1',
-    credentials: { accessKeyId: minioUser, secretAccessKey: minioPass },
+    credentials: {
+      accessKeyId: process.env.LOCAL_S3_ACCESS_KEY || 'localadmin',
+      secretAccessKey: process.env.LOCAL_S3_SECRET_KEY || 'localsecret',
+    },
     forcePathStyle: true,
     requestHandler: storageRequestHandler(),
   });
@@ -102,14 +119,14 @@ if (isLocal) {
 // local). The prod CDN host is publicly readable so this isn't a
 // credential leak, but URLs returned by routes that consume
 // `CDN_URL` (image responses, etc.) would silently point dev clients
-// at prod-hosted media. Now: prod → prod CDN, local → MinIO,
+// at prod-hosted media. Now: prod → prod CDN, local → the S3 stand-in,
 // otherwise (dev / staging) → dev CDN. See feedback-environment-
 // isolation memory.
 // Single-line ternary kept (prettier-ignore) so the pre-commit URL-
 // isolation guard sees the localhost fallback alongside the prod URL.
 
 // prettier-ignore
-const CDN_URL = process.env.CDN_URL || (isLocal ? `${process.env.MINIO_ENDPOINT || 'http://localhost:9002'}/${bucketName}` : process.env.NODE_ENV === 'production' ? 'https://images.shytalk.shyden.co.uk' : 'https://dev-images.shytalk.shyden.co.uk');
+const CDN_URL = process.env.CDN_URL || (isLocal ? `${process.env.LOCAL_S3_ENDPOINT || 'http://localhost:9002'}/${bucketName}` : process.env.NODE_ENV === 'production' ? 'https://images.shytalk.shyden.co.uk' : 'https://dev-images.shytalk.shyden.co.uk');
 
 async function putObject(key, body, contentType, metadata = {}, options = {}) {
   await s3.send(

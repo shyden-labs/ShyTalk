@@ -25,7 +25,7 @@ _これは JOURNEY-RUNNER.md の翻訳です。_
 
 | 必要なもの                             | 方法                                                                                                                                                        |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** が起動していること  | Firebase エミュレータ + LiveKit/MinIO 用                                                                                                                    |
+| **Docker Desktop** が起動していること  | Firebase エミュレータ + LiveKit/versitygw 用                                                                                                                |
 | **ローカルスタックが起動していること** | `bash local/start.sh`（repo のルートから）— Firebase エミュレータ + express-api を起動します。起動したままにしておいてください。                            |
 | **Personas がシードされていること**    | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js`（冪等。パスワード `localdev123` で P‑02…P‑19 のテストキャストをシードします） |
 | **電話が 1 台接続されていること**      | `adb devices` に 1 台表示される必要があります（USB ケーブル**または**ワイヤレス `adb`）。Android エミュレータでも動作します。                               |

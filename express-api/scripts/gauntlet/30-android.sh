@@ -54,7 +54,7 @@ fi
 
 # --- reverse tunnels --------------------------------------------------------
 # 3000 Express · 7880 LiveKit signalling · 7881 LiveKit TCP media
-# · 8080 Firestore · 8888 web · 9000 RTDB · 9002 MinIO · 9099 Auth. The local
+# · 8080 Firestore · 8888 web · 9000 RTDB · 9002 versitygw · 9099 Auth. The local
 # app hits the emulators directly, so all must be tunnelled (else "Technical
 # Difficulties" in-app).
 #

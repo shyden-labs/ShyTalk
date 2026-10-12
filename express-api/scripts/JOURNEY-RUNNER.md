@@ -25,7 +25,7 @@ It is a **hybrid** runner. Each journey can assert on three layers at once:
 
 | You need                       | How                                                                                                                                                   |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** running     | for the Firebase emulators + LiveKit/MinIO                                                                                                            |
+| **Docker Desktop** running     | for the Firebase emulators + LiveKit/versitygw                                                                                                        |
 | **The local stack up**         | `bash local/start.sh` (from the repo root) — starts Firebase emulators + the express-api. Leave it running.                                           |
 | **Personas seeded**            | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotent; seeds the P‑02…P‑19 test cast with password `localdev123`) |
 | **A phone connected**          | `adb devices` must list one (USB cable **or** wireless `adb`). An Android emulator also works.                                                        |

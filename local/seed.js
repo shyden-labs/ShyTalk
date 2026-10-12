@@ -337,22 +337,22 @@ async function seed() {
     userId: null,
   });
 
-  // MinIO bucket (only when MinIO is available)
-  const minioEndpoint = process.env.MINIO_ENDPOINT || "http://localhost:9002";
+  // S3 stand-in bucket (only when the stand-in is available)
+  const s3Endpoint = process.env.LOCAL_S3_ENDPOINT || "http://localhost:9002";
   try {
-    console.log("\nMinIO bucket:");
-    const minioClient = new S3Client({
-      endpoint: minioEndpoint,
+    console.log("\nS3 stand-in bucket:");
+    const s3Client = new S3Client({
+      endpoint: s3Endpoint,
       region: "us-east-1",
       credentials: {
-        accessKeyId: process.env.MINIO_ROOT_USER || "minioadmin",
-        secretAccessKey: process.env.MINIO_ROOT_PASSWORD || "minioadmin",
+        accessKeyId: process.env.LOCAL_S3_ACCESS_KEY || "localadmin",
+        secretAccessKey: process.env.LOCAL_S3_SECRET_KEY || "localsecret",
       },
       forcePathStyle: true,
     });
     const bucket = process.env.R2_BUCKET_NAME || "shytalk-media";
     try {
-      await minioClient.send(new CreateBucketCommand({ Bucket: bucket }));
+      await s3Client.send(new CreateBucketCommand({ Bucket: bucket }));
       console.log(`  Created: ${bucket}`);
     } catch (err) {
       if (
@@ -364,7 +364,7 @@ async function seed() {
         throw err;
       }
     }
-    await minioClient.send(
+    await s3Client.send(
       new PutBucketPolicyCommand({
         Bucket: bucket,
         Policy: JSON.stringify({
@@ -383,7 +383,7 @@ async function seed() {
     console.log(`  Policy:  public-read on ${bucket}`);
   } catch (err) {
     console.warn(
-      "  MinIO not available, skipping bucket creation:",
+      "  S3 stand-in not available, skipping bucket creation:",
       err.message,
     );
   }

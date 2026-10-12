@@ -419,23 +419,24 @@ describe('exported constants', () => {
 //
 // Pre-fix: r2.js used `isLocal ? local-minio : prod-CDN` — so dev
 // (NODE_ENV=development) leaked through to the prod images domain.
-// Now: prod → prod CDN, local → MinIO, otherwise → dev CDN.
+// Now: prod → prod CDN, local → the S3 stand-in, otherwise → dev CDN.
 // ────────────────────────────────────────────────────────────────────
 
 describe('CDN_URL env-isolation fallback', () => {
   const SAVED = {
     CDN_URL: process.env.CDN_URL,
     NODE_ENV: process.env.NODE_ENV,
-    MINIO_ENDPOINT: process.env.MINIO_ENDPOINT,
+    LOCAL_S3_ENDPOINT: process.env.LOCAL_S3_ENDPOINT,
   };
 
   afterEach(() => {
     delete process.env.CDN_URL;
     delete process.env.NODE_ENV;
-    delete process.env.MINIO_ENDPOINT;
+    delete process.env.LOCAL_S3_ENDPOINT;
     if (SAVED.CDN_URL !== undefined) process.env.CDN_URL = SAVED.CDN_URL;
     if (SAVED.NODE_ENV !== undefined) process.env.NODE_ENV = SAVED.NODE_ENV;
-    if (SAVED.MINIO_ENDPOINT !== undefined) process.env.MINIO_ENDPOINT = SAVED.MINIO_ENDPOINT;
+    if (SAVED.LOCAL_S3_ENDPOINT !== undefined)
+      process.env.LOCAL_S3_ENDPOINT = SAVED.LOCAL_S3_ENDPOINT;
   });
 
   function loadFresh() {
@@ -467,7 +468,7 @@ describe('CDN_URL env-isolation fallback', () => {
     expect(url).toBe('https://images.shytalk.shyden.co.uk');
   });
 
-  it('NODE_ENV=local with no override → MinIO localhost (NOT prod, NOT dev)', () => {
+  it('NODE_ENV=local with no override → S3 stand-in on localhost (NOT prod, NOT dev)', () => {
     delete process.env.CDN_URL;
     process.env.NODE_ENV = 'local';
     const { CDN_URL: url } = loadFresh();

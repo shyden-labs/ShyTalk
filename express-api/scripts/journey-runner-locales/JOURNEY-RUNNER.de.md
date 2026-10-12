@@ -27,7 +27,7 @@ Es ist ein **hybrider** Runner. Jede Journey kann auf drei Ebenen gleichzeitig p
 
 | Du brauchst                           | Wie                                                                                                                                                            |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Desktop** läuft              | für die Firebase-Emulatoren + LiveKit/MinIO                                                                                                                    |
+| **Docker Desktop** läuft              | für die Firebase-Emulatoren + LiveKit/versitygw                                                                                                                |
 | **Der lokale Stack ist hochgefahren** | `bash local/start.sh` (vom Repo-Root) — startet die Firebase-Emulatoren + die express-api. Lass ihn laufen.                                                    |
 | **Personas geseedet**                 | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotent; seedet die P‑02…P‑19-Test-Besetzung mit dem Passwort `localdev123`) |
 | **Ein Telefon verbunden**             | `adb devices` muss eines auflisten (USB-Kabel **oder** drahtloses `adb`). Ein Android-Emulator funktioniert ebenfalls.                                         |

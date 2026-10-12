@@ -96,7 +96,7 @@ if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q livekit; then
   warn "LiveKit container missing after start.sh — re-running docker compose up"
   (cd "$REPO" && docker compose -f local/docker-compose.yml up -d) || die "docker compose up failed"
 fi
-for svc in livekit minio mailpit; do
+for svc in livekit s3 mailpit; do
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -qi "$svc"; then
     ok "container: $svc"
   else

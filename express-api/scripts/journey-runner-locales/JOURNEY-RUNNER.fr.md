@@ -27,7 +27,7 @@ C'est un exécuteur **hybride**. Chaque parcours peut vérifier trois couches à
 
 | Vous avez besoin                        | Comment                                                                                                                                                                  |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Docker Desktop** en cours d'exécution | pour les émulateurs Firebase + LiveKit/MinIO                                                                                                                             |
+| **Docker Desktop** en cours d'exécution | pour les émulateurs Firebase + LiveKit/versitygw                                                                                                                         |
 | **La pile locale démarrée**             | `bash local/start.sh` (depuis la racine du dépôt) — démarre les émulateurs Firebase + l'express-api. Laissez-la tourner.                                                 |
 | **Personas amorcées**                   | `cd express-api && node --env-file=.env.local scripts/seed-personas-local.js` (idempotent ; amorce la distribution de test P‑02…P‑19 avec le mot de passe `localdev123`) |
 | **Un téléphone connecté**               | `adb devices` doit en lister un (câble USB **ou** `adb` sans fil). Un émulateur Android fonctionne aussi.                                                                |

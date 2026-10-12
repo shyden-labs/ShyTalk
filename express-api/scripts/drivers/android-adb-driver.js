@@ -249,7 +249,7 @@ async function createAndroidDriver({ serial: preferred } = {}) {
 
   // Wire reverse port-forwards so wireless devices can reach
   // laptop-hosted local services (Express API, Firebase emulators,
-  // LiveKit, MinIO). Without these, the app on a wireless device hits
+  // LiveKit, versitygw). Without these, the app on a wireless device hits
   // a Technical-Difficulties screen because localhost on the DEVICE
   // is the device itself, not the laptop. Mirrors CLAUDE.md guidance
   // for "Android on physical device".

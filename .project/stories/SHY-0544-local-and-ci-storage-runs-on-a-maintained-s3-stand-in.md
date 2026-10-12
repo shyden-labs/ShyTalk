@@ -1,6 +1,6 @@
 ---
 id: SHY-0544
-status: Draft
+status: In Progress
 owner: claude
 created: 2026-10-07
 priority: P0
@@ -159,5 +159,26 @@ start scripts can wait on.
 - **2026-10-07**: Found when PR #2222's CI failed. Shyden chose "Switch to
   another tool" over our own MinIO build (3 points) and a Quay login
   (Dependabot PRs cannot read normal secrets, so they would stay red).
+- **2026-10-07 spike** (`s3-probe.js`, 14 checks of every operation in Why,
+  same AWS SDK, path-style): versitygw v1.8.0 passed 14/14, idle 14.05 MiB;
+  SeaweedFS 4.48 passed 13/14, idle 86.05 MiB, and FAILED the presigned PUT
+  (400 `BadDigest`, "The Content-Md5 you specified did not match", with no
+  Content-MD5 sent). Presigned uploads are how phones send attachments, so
+  SeaweedFS cannot stand in. Both are Apache-2.0; both served a public-read
+  bucket anonymously and refused a forged signature and a wrong secret.
+- **2026-10-12 choice: versitygw v1.8.0**, pinned
+  `versity/versitygw:v1.8.0@sha256:30292fc2eeacc67a36993b01f7a7a5e3361a19cced0e80c1d71cfa2a4b0a2499`
+  (index digest read from Docker Hub the same day; image label
+  `org.opencontainers.image.licenses: Apache-2.0`). Health: its global
+  `--health /health` flag (`cmd/versitygw/main.go` at `fd04bc1`), answered
+  without credentials. The full backend and integration suites run against
+  it in this story's PR CI: since 2026-10-09 integration runs are CI's only,
+  so the spike's laptop suite runs are replaced by that run.
+- **2026-10-12 env names**: `MINIO_ENDPOINT`, `MINIO_ROOT_USER` and
+  `MINIO_ROOT_PASSWORD` became `LOCAL_S3_ENDPOINT`, `LOCAL_S3_ACCESS_KEY`
+  and `LOCAL_S3_SECRET_KEY`. A local `.env.local` still holding an old name
+  would be ignored and fall back to localhost, which a phone cannot reach,
+  so `r2.js` refuses to load in local mode while any old name is set, and
+  says what to rename it to.
 - Scored 8: two candidates measured against the whole suite, then edits to
   CI, four local stack files and a guard test; larger than SHY-0540 (5).

@@ -12,7 +12,7 @@
  * This suite drives the REAL cron against the full local stack (NODE_ENV=local):
  *   - Firestore emulator (every collection + collectionGroup cascade)
  *   - Firebase Auth emulator (auth.createUser → run → getUser throws user-not-found)
- *   - real MinIO (objects PUT under the user's R2 prefixes, gone after the run)
+ *   - real versitygw (objects PUT under the user's R2 prefixes, gone after the run)
  *   - real Mailpit (the deletion-complete email is read back from the HTTP API)
  * Seeded with the exact field TYPES the cron queries on (numeric uniqueId for
  * array-contains / collectionGroup; string uniqueId for reports/receipts/etc).

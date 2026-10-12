@@ -258,7 +258,7 @@ describe('the admin can actually PLAY what somebody attached', () => {
     // bug returns the next time an origin is added to one and not the other.
     const imgSrc = /img-src([^;]*)/.exec(csp)?.[1] ?? '';
     const mediaSrc = /media-src([^;]*)/.exec(csp)?.[1] ?? '';
-    // `http:` is needed because attachments come from MinIO on this machine's
+    // `http:` is needed because attachments come from versitygw on this machine's
     // LAN address locally — a phone cannot reach `localhost`, so pinning the
     // CSP to `http://localhost:*` blocked every local image and video the
     // moment device testing started working. It costs nothing in production,

@@ -30,9 +30,9 @@ $emulatorProcess = $null
 $apiProcess = $null
 
 # =============================================================================
-# Step 1: Docker Compose up (LiveKit + MinIO + Mailpit)
+# Step 1: Docker Compose up (LiveKit + S3 stand-in + Mailpit)
 # =============================================================================
-Write-Host "==> Step 1/8: Starting Docker containers (LiveKit, MinIO, Mailpit)..."
+Write-Host "==> Step 1/8: Starting Docker containers (LiveKit, S3 stand-in, Mailpit)..."
 docker compose -f "$ScriptDir\docker-compose.yml" up -d
 
 # =============================================================================
@@ -46,9 +46,9 @@ $emulatorProcess = Start-Process -FilePath "cmd.exe" `
     -NoNewWindow
 
 # =============================================================================
-# Step 3: Wait for readiness (emulators + MinIO)
+# Step 3: Wait for readiness (emulators + S3 stand-in)
 # =============================================================================
-Write-Host "==> Step 3/8: Waiting for emulators and MinIO..."
+Write-Host "==> Step 3/8: Waiting for emulators and the S3 stand-in..."
 
 Write-Host "  Waiting for Firebase Emulators (localhost:4000)..."
 $maxAttempts = 120
@@ -73,11 +73,11 @@ if ($attempt -ge $maxAttempts) {
 }
 Write-Host "  Firebase Emulators ready."
 
-Write-Host "  Waiting for MinIO (localhost:9002)..."
+Write-Host "  Waiting for the S3 stand-in, versitygw (localhost:9002)..."
 $attempt = 0
 while ($attempt -lt $maxAttempts) {
     try {
-        $resp = Invoke-WebRequest -Uri "http://localhost:9002/minio/health/live" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+        $resp = Invoke-WebRequest -Uri "http://localhost:9002/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
         if ($resp.StatusCode -eq 200) { break }
     } catch {
         # Not ready yet
@@ -86,17 +86,18 @@ while ($attempt -lt $maxAttempts) {
     Start-Sleep -Seconds 1
 }
 if ($attempt -ge $maxAttempts) {
-    Write-Host "ERROR: MinIO did not start within $maxAttempts seconds." -ForegroundColor Red
+    Write-Host "ERROR: the S3 stand-in (compose service s3) did not answer /health within $maxAttempts seconds. Last log lines:" -ForegroundColor Red
+    docker compose -f "$ScriptDir\docker-compose.yml" logs --tail 50 s3
     if ($emulatorProcess -and -not $emulatorProcess.HasExited) {
         Stop-Process -Id $emulatorProcess.Id -Force -ErrorAction SilentlyContinue
     }
     docker compose -f "$ScriptDir\docker-compose.yml" down 2>$null
     exit 1
 }
-Write-Host "  MinIO ready."
+Write-Host "  S3 stand-in ready: $(docker compose -f "$ScriptDir\docker-compose.yml" exec -T s3 versitygw --version | Select-Object -First 1)"
 
 # =============================================================================
-# Step 4: Seed data (Firestore + MinIO bucket)
+# Step 4: Seed data (Firestore + S3 bucket)
 # =============================================================================
 Write-Host "==> Step 4/8: Seeding data..."
 $expressDir = Join-Path $ProjectRoot "express-api"
@@ -197,13 +198,12 @@ Write-Host "  Services:"
 Write-Host "    Firebase UI:    http://localhost:4000"
 Write-Host "    Express API:    http://localhost:3000"
 Write-Host "    Mailpit UI:     http://localhost:8025"
-Write-Host "    MinIO Console:  http://localhost:9001"
 Write-Host "    LiveKit:        localhost:7880"
 Write-Host ""
 Write-Host "  Credentials:"
 Write-Host "    Test admin:     claude-test@shytalk.dev / localdev123"
 Write-Host "    Test user:      user@test.com / localdev123"
-Write-Host "    MinIO:          minioadmin / minioadmin"
+Write-Host "    S3 stand-in:    localadmin / localsecret (versitygw, http://localhost:9002, no console)"
 Write-Host ""
 Write-Host "  Android:"
 Write-Host "    APK path:       $ApkPath"

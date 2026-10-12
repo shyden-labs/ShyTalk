@@ -134,3 +134,19 @@ updates:
       - "dependencies"
       - "github-actions"
     open-pull-requests-limit: 5
+
+  # SHY-0544: local stack images (versitygw, LiveKit, Mailpit). Dependabot
+  # cannot read the `docker run` lines in .github/actions/start-local-services,
+  # so a bump here moves the compose pin alone and s3-stand-in-pin.test.js
+  # fails until the action's pin is moved in the same PR.
+  - package-ecosystem: "docker-compose"
+    directory: "/local"
+    target-branch: "develop"  # SHY-0242: git-flow — develop, not main
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    labels:
+      - "dependencies"
+    open-pull-requests-limit: 5
