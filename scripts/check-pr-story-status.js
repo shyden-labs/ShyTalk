@@ -164,9 +164,10 @@ function main() {
       // RENAMED story (the implementation case) must still reach In Review, so
       // the SHY-0120 protection is preserved.
       process.stdout.write(`pre-merge-gate: ${file} newly-added Draft — filing exemption OK\n`);
-    } else if (code !== 'A' && status === 'Draft' && statusOf(fileAt(base, from)) === 'Draft') {
-      // SHY-0518 — Draft before and Draft after: backlog maintenance. An
-      // unreadable base reads as null, never as Draft, so it fails closed.
+    } else if (status === 'Draft' && statusOf(fileAt(base, from)) === 'Draft') {
+      // SHY-0518 — Draft before and Draft after: backlog maintenance. Adds were
+      // settled by the branch above. An unreadable base reads as null, never
+      // as Draft, so it fails closed.
       process.stdout.write(
         `pre-merge-gate: ${file} Draft → Draft — backlog maintenance exemption OK\n`,
       );

@@ -252,10 +252,11 @@ describe('SHY-0127 Gates 2+3 — pre-merge-check.sh', () => {
     expect(stderr).toMatch(/unreviewed/i);
   });
 
-  // SHY-0133 — a RENAMED Draft story has change-code R (not A), so it is NOT
-  // filing-exempt; it is gated like any other change. A `git mv` of unchanged
-  // content yields a deterministic R100 in --name-status.
-  test('a RENAMED Draft story is gated, not filing-exempt (rename != add)', () => {
+  // SHY-0133 — a RENAMED story has change-code R (not A), so it is NOT
+  // filing-exempt. SHY-0518 — but a rename that was Draft at the base and is
+  // still Draft is backlog maintenance, judged from the OLD path's base copy. A
+  // `git mv` of unchanged content yields a deterministic R100 in --name-status.
+  test('a RENAMED Draft story that stays Draft is maintenance, not a filing (SHY-0518)', () => {
     const dir = mainThenFeature((d) =>
       fs.writeFileSync(
         path.join(d, '.project/stories/SHY-0997-old.md'),
@@ -264,9 +265,31 @@ describe('SHY-0127 Gates 2+3 — pre-merge-check.sh', () => {
     );
     git(dir, ['mv', '.project/stories/SHY-0997-old.md', '.project/stories/SHY-0997-new.md']); // unchanged content → R100
     commit(dir, 'rename story file');
+    const { code, stdout, stderr } = run(dir);
+    expect(code).toBe(0);
+    expect(stderr).toContain(
+      'backlog maintenance: .project/stories/SHY-0997-new.md Draft → Draft (SHY-0518 parity)',
+    );
+    expect(stderr).not.toMatch(/filing exemption/);
+    expect(stdout).toContain('+ 1 Draft story(ies) maintained, still Draft');
+  });
+
+  test('a RENAMED story that was In Review and is now Draft is still refused', () => {
+    const dir = mainThenFeature((d) =>
+      fs.writeFileSync(
+        path.join(d, '.project/stories/SHY-0997-old.md'),
+        `---\nid: SHY-0997\nstatus: In Review\n---\n\n# SHY-0997\n\n## Notes\n`,
+      ),
+    );
+    git(dir, ['mv', '.project/stories/SHY-0997-old.md', '.project/stories/SHY-0997-new.md']);
+    fs.writeFileSync(
+      path.join(dir, '.project/stories/SHY-0997-new.md'),
+      `---\nid: SHY-0997\nstatus: Draft\n---\n\n# SHY-0997\n\n## Notes\n`,
+    );
+    commit(dir, 'rename and regress');
     const { code, stderr } = run(dir);
-    expect(code).not.toBe(0); // R + Draft is NOT the add-only exemption
-    expect(stderr).toMatch(/In Review/);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/SHY-0997-new\.md status is "Draft" — must be "In Review"/);
   });
 
   test('checks EVERY story marker — refuses if any story has unreviewed commits (multi-story)', () => {
@@ -445,5 +468,63 @@ describe('SHY-0528 Gate 3 — only the branch’s own commits', () => {
     expect(stderr).not.toMatch(/unreviewed commit/);
     expect(stdout).toContain('PRE-MERGE-CHECK: OK');
     expect(code).toBe(0);
+  });
+});
+
+// SHY-0518 — the local twin applies the CI gate's Draft → Draft rule: a story
+// that was Draft at the base and is still Draft is being maintained, needs no
+// Reviewed-up-to marker, and is counted on the status line.
+describe('SHY-0518 — Draft → Draft backlog maintenance (local twin)', () => {
+  const draft = (note) =>
+    `---\nid: SHY-0999\nstatus: Draft\n---\n\n# SHY-0999\n\n## Notes\n${note}\n`;
+  const storyFile = (dir) => path.join(dir, '.project/stories/SHY-0999-x.md');
+
+  test('a note added to a Draft story passes with the maintenance line', () => {
+    const dir = mainThenFeature((d) => fs.writeFileSync(storyFile(d), draft('- filed')));
+    fs.writeFileSync(storyFile(dir), draft('- filed\n- operator reproduction'));
+    commit(dir, 'note on a draft');
+    const { code, stdout, stderr } = run(dir);
+    expect(code).toBe(0);
+    expect(stdout).toContain('PRE-MERGE-CHECK: OK');
+    expect(stderr).toContain(
+      'backlog maintenance: .project/stories/SHY-0999-x.md Draft → Draft (SHY-0518 parity)',
+    );
+    expect(stdout).toContain('+ 1 Draft story(ies) maintained, still Draft');
+  });
+
+  test('a Draft story moved to In Progress is refused', () => {
+    const dir = mainThenFeature((d) => fs.writeFileSync(storyFile(d), draft('- filed')));
+    fs.writeFileSync(
+      storyFile(dir),
+      draft('- started').replace('status: Draft', 'status: In Progress'),
+    );
+    commit(dir, 'start the story');
+    const { code, stderr } = run(dir);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/SHY-0999-x\.md status is "In Progress" — must be "In Review"/);
+    expect(stderr).not.toMatch(/backlog maintenance/);
+  });
+
+  test('a Draft story whose status line is removed is refused', () => {
+    const dir = mainThenFeature((d) => fs.writeFileSync(storyFile(d), draft('- filed')));
+    fs.writeFileSync(storyFile(dir), draft('- filed').replace('status: Draft\n', ''));
+    commit(dir, 'drop the status line');
+    const { code, stderr } = run(dir);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/SHY-0999-x\.md status is "" — must be "In Review"/);
+  });
+
+  test('each story is judged on its own: a maintained Draft beside a regressed one', () => {
+    const other = (d) => path.join(d, '.project/stories/SHY-0998-y.md');
+    const dir = mainThenFeature((d) => {
+      fs.writeFileSync(storyFile(d), draft('- filed'));
+      fs.writeFileSync(other(d), `---\nid: SHY-0998\nstatus: In Review\n---\n\n# SHY-0998\n`);
+    });
+    fs.writeFileSync(storyFile(dir), draft('- filed\n- scored'));
+    fs.writeFileSync(other(dir), `---\nid: SHY-0998\nstatus: Draft\n---\n\n# SHY-0998\n`);
+    commit(dir, 'one maintained, one regressed');
+    const { code, stderr } = run(dir);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/SHY-0998-y\.md status is "Draft" — must be "In Review"/);
   });
 });
