@@ -229,7 +229,14 @@ echo "  S3 stand-in ready: $(docker compose -f "$SCRIPT_DIR/docker-compose.yml" 
 # Step 4: Seed data (Firestore + S3 bucket)
 # =============================================================================
 echo "==> Step 4/8: Seeding data..."
-(cd "$PROJECT_ROOT/express-api" && NODE_PATH=./node_modules node ../local/seed.js)
+# A failed seed stops the stack. Under `set -e` a bare failure would exit here
+# and leave the containers and emulators running, and a stack whose bucket or
+# users are missing only fails later, on a device, far from the cause (SHY-0544).
+if ! (cd "$PROJECT_ROOT/express-api" && NODE_PATH=./node_modules node ../local/seed.js); then
+  echo "ERROR: seeding failed (the reason is printed above). Stopping the stack." >&2
+  cleanup
+  exit 1
+fi
 
 # =============================================================================
 # Step 4b: Provision journey-runner test personas (P-02..P-19)

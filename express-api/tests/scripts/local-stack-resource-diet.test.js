@@ -615,3 +615,33 @@ describe('local/start.sh — emulator data does not compound silently', () => {
     expect(sh).toMatch(/pre-push|admin/i);
   });
 });
+
+/**
+ * SHY-0544: a failed seed stops the stack. The seed used to warn and carry on
+ * when the bucket step failed; now it exits 1, and each start script must act
+ * on that rather than start the API on a stack with no bucket or users. Whole
+ * comment lines are dropped first, so a comment naming the rule cannot pass.
+ */
+describe('local start scripts — a failed seed stops the stack', () => {
+  const START_PS1_PATH = path.join(REPO_ROOT, 'local/start.ps1');
+  const code = (file) =>
+    fs
+      .readFileSync(file, 'utf8')
+      .split('\n')
+      .filter((line) => !/^\s*#/.test(line))
+      .join('\n');
+
+  it('start.sh runs the seed as a condition, then cleans up and exits 1', () => {
+    expect(code(START_SH_PATH)).toMatch(
+      /if ! \([^\n]*node \.\.\/local\/seed\.js\); then\n(?:[^\n]*\n){0,2}?\s*cleanup\n\s*exit 1\nfi/,
+    );
+  });
+
+  it('start.ps1 reads the seed exit code and, when it is not 0, stops the stack and exits 1', () => {
+    const ps1 = code(START_PS1_PATH);
+    expect(ps1).toMatch(/node \.\.\\local\\seed\.js\n\s*\$seedExit = \$LASTEXITCODE/);
+    expect(ps1).toMatch(
+      /if \(\$seedExit -ne 0\) \{[^}]*Stop-Process[^}]*\}\s*docker compose [^\n]* down[^\n]*\n\s*exit 1\n\}/,
+    );
+  });
+});

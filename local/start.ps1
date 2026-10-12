@@ -105,9 +105,20 @@ Push-Location $expressDir
 try {
     $env:NODE_PATH = ".\node_modules"
     node ..\local\seed.js
+    # $ErrorActionPreference does not cover a native command's exit code, so a
+    # failed seed would otherwise go on to start the API (SHY-0544).
+    $seedExit = $LASTEXITCODE
     $env:NODE_PATH = $null
 } finally {
     Pop-Location
+}
+if ($seedExit -ne 0) {
+    Write-Host "ERROR: seeding failed (exit $seedExit; the reason is printed above). Stopping the stack." -ForegroundColor Red
+    if ($emulatorProcess -and -not $emulatorProcess.HasExited) {
+        Stop-Process -Id $emulatorProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+    docker compose -f "$ScriptDir\docker-compose.yml" down 2>$null
+    exit 1
 }
 
 # =============================================================================
