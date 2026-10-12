@@ -5,8 +5,10 @@ owner: claude
 created: 2026-08-28
 priority: P1
 effort: L
+estimate: 8
 type: refactor
 roadmap_ids: []
+mvp: false
 ---
 
 # SHY-0493: Move the iOS Firebase SDK from CocoaPods to Swift Package Manager

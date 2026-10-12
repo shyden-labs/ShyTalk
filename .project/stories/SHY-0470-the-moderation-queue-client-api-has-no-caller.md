@@ -5,6 +5,7 @@ owner: claude
 created: 2026-08-27
 priority: P3
 effort: S
+estimate: 2
 type: chore
 roadmap_ids: []
 mvp: false

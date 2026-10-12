@@ -6,6 +6,7 @@ created: 2026-07-14
 priority: P1
 type: infra
 effort: L
+estimate: 8
 roadmap_ids: []
 epic: EPIC-0003
 mvp: false

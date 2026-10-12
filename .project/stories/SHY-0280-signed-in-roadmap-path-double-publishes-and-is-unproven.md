@@ -5,8 +5,10 @@ owner: claude
 created: 2026-08-05
 priority: P2
 effort: M
+estimate: 3
 type: bug
 roadmap_ids: []
+mvp: false
 ---
 
 # SHY-0280: The signed-in roadmap path publishes twice and has never been exercised by a real sign-in

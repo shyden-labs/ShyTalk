@@ -5,8 +5,10 @@ owner: claude
 created: 2026-08-30
 priority: P0
 effort: S
+estimate: 2
 type: bug
 roadmap_ids: []
+mvp: true
 ---
 
 # SHY-0496: Installation IDs must follow every path the registration token took

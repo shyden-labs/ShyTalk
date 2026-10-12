@@ -5,8 +5,10 @@ owner: claude
 created: 2026-07-25
 priority: P1
 effort: L
+estimate: 8
 type: refactor
 roadmap_ids: []
+mvp: true
 ---
 
 # SHY-0244: Migrate push from FCM registration tokens to V1 Installation-ID registration

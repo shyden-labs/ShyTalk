@@ -5,6 +5,7 @@ owner: unassigned
 created: 2026-08-25
 priority: P3
 effort: M
+estimate: 3
 type: feature
 roadmap_ids: []
 mvp: false

@@ -6,6 +6,7 @@ created: 2026-07-14
 priority: P1
 type: bug
 effort: M
+estimate: 5
 roadmap_ids: []
 epic: EPIC-0004
 mvp: false

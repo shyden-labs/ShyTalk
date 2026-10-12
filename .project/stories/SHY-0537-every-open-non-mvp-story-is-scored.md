@@ -1,6 +1,6 @@
 ---
 id: SHY-0537
-status: Draft
+status: In Review
 owner: claude
 created: 2026-10-07
 priority: P2
@@ -36,43 +36,43 @@ all (18 Draft, 5 In Review).
 
 ### Happy path
 
-- [ ] Every open story without `mvp: true` carries `estimate:` from 1, 2, 3,
+- [x] Every open story without `mvp: true` carries `estimate:` from 1, 2, 3,
       5, 8, 13, scored from its ACs against the calibrated sample SHY-0536
       recorded, never from guessed hours.
 - [ ] After the merge, `node scripts/story-progress.js` prints a real effort
       line (% complete, pace in points, ETA date), quoted in Notes with the
       measured and assumed figures named.
-- [ ] A spread of at least 10 scored stories is re-read in full after the
+- [x] A spread of at least 10 scored stories is re-read in full after the
       first pass and the number corrected is recorded.
 
 ### Error paths
 
-- [ ] A story too thin to score is listed in Notes and a follow-up is filed to
+- [x] A story too thin to score is listed in Notes and a follow-up is filed to
       define it; it is not given a number.
-- [ ] A story larger than 13 is recorded as an epic to split, with the split
+- [x] A story larger than 13 is recorded as an epic to split, with the split
       filed.
 
 ### Edge cases
 
-- [ ] Each of the 23 stories with no `mvp:` field gets an explicit `mvp:`
+- [x] Each of the 23 stories with no `mvp:` field gets an explicit `mvp:`
       value. Where the right value is not plain from the story, the question
       goes to Shyden with AskUserQuestion, one decision per question.
 
 ### Performance
 
-- [ ] Frontmatter-only edits, so the sync takes the SHY-0535 skip path.
+- [x] Frontmatter-only edits, so the sync takes the SHY-0535 skip path.
 
 ### Security
 
-- [ ] Not applicable.
+- [x] Not applicable.
 
 ### UX
 
-- [ ] The PR body states stories scored, points total and corrections made.
+- [x] The PR body states stories scored, points total and corrections made.
 
 ### i18n
 
-- [ ] Not applicable.
+- [x] Not applicable.
 
 ### Observability
 
@@ -117,3 +117,25 @@ all (18 Draft, 5 In Review).
 - **2026-10-07**: Filed with SHY-0536 from the standing backfill task.
 - Scored 5 against SHY-0536 (8): about two thirds of its stories, with the
   calibration already done. A judgement until SHY-0536's duration is known.
+- **2026-10-12** (scored): every open story without `mvp: true` now carries
+  `estimate:`: 103 in this PR (SHY-0518 is scored by its own PR, #2311), against
+  the calibrated sample SHY-0536 recorded (Spearman 0.765, `.project/estimates/`).
+  Table: `.project/estimates/scores-rest.tsv`.
+  - The 24 stories with no `mvp:` field (23 when this story was filed) each
+    gained an explicit value. Shyden approved one rule (AskUserQuestion,
+    23:28Z, "Apply the rule"): MVP if someone using the first release would
+    meet it, or the release cannot safely ship without it; test tooling and
+    admin-only fixes are not. 13 true, 11 false.
+  - Spread re-read of 12 in full (four per band: SHY-0142, 0290, 0469, 0374 ·
+    0175, 0094, 0172, 0292 · 0101, 0114, 0360, 0532): **0 corrected**. Three
+    flagged in the table for pickup: SHY-0469 (PR #2021 merged its workflow
+    change while it stayed Draft; evidence added to SHY-0353, the gate hole
+    that let it through), SHY-0292 (overlaps the merged SHY-0371), SHY-0532
+    (agents already act as the ShyTalk App).
+  - No story too thin to score; none over 13 (SHY-0062, the only one, was MVP
+    and was split under SHY-0536).
+  - Checks: `check-story-frontmatter.sh --scan .project/stories` exit 0; each
+    file's diff is one `+estimate:` line, one `+mvp:` line, or both (80, 1 and
+    23 files), plus the SHY-0353 note. With SHY-0536 and #2311 merged, open
+    stories without an estimate: 0 (checked as a set: only SHY-0062, now
+    Cancelled, and SHY-0518 remain on this branch alone).

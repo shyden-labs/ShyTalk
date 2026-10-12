@@ -8,6 +8,7 @@ effort: S
 estimate: 2
 type: bug
 roadmap_ids: []
+mvp: true
 pr:
 ---
 

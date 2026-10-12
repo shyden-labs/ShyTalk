@@ -5,6 +5,7 @@ owner: claude
 created: 2026-06-17
 priority: P0
 effort: XL
+estimate: 13
 type: refactor
 roadmap_ids: []
 epic: EPIC-0003

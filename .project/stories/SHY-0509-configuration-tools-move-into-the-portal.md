@@ -5,6 +5,7 @@ owner: unassigned
 created: 2026-09-04
 priority: P2
 effort: L
+estimate: 8
 type: refactor
 roadmap_ids: []
 mvp: false

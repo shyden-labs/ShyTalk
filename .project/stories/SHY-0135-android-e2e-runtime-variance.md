@@ -6,6 +6,7 @@ created: 2026-06-20
 type: infra
 priority: P2
 effort: M
+estimate: 5
 roadmap_ids: []
 public: false
 mvp: false

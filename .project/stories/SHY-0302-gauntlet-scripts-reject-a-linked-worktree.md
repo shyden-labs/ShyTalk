@@ -5,8 +5,10 @@ owner: claude
 created: 2026-08-16
 priority: P2
 effort: XS
+estimate: 2
 type: bug
 roadmap_ids: []
+mvp: false
 ---
 
 # SHY-0302: Every gauntlet command refuses to run inside a git worktree

@@ -5,6 +5,7 @@ owner: unassigned
 created: 2026-08-24
 priority: P1
 effort: M
+estimate: 5
 type: bug
 roadmap_ids: []
 mvp: false

@@ -5,8 +5,10 @@ owner: claude
 created: 2026-08-28
 priority: P1
 effort: M
+estimate: 5
 type: bug
 roadmap_ids: []
+mvp: true
 ---
 
 # SHY-0494: One device's push identifier is claimed by every account that signed in on it

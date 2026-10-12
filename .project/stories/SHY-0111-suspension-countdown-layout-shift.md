@@ -5,6 +5,7 @@ owner: claude
 created: 2026-06-17
 priority: P2
 effort: S
+estimate: 2
 type: bug
 roadmap_ids: []
 pr: https://github.com/Shyden-Ltd/ShyTalk/pull/1449

@@ -5,8 +5,10 @@ owner: claude
 created: 2026-08-06
 priority: P1
 effort: M
+estimate: 5
 type: chore
 roadmap_ids: []
+mvp: true
 epic: EPIC-0010
 pr:
 ---
