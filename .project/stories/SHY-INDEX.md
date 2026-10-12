@@ -401,6 +401,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0569](SHY-0569-dependabot-auto-merge-checks-the-real-update.md) | P0 | M | bug | Dependabot auto-merge checks the real update, not only Dependabot's metadata | 👀 In Review | — |  |
 | [SHY-0570](SHY-0570-the-root-moves-to-firebase-13.md) | P2 | M | chore | The root moves to firebase 13 with rules-unit-testing 6, proved by its integration runs | 📝 Draft | — |  |
 | [SHY-0571](SHY-0571-a-root-package-change-installs-the-root-packages.md) | P0 | S | infra | A change to the root packages runs a PR check that installs them | 📝 Draft | — |  |
+| [SHY-0572](SHY-0572-actions-majors-wait-for-a-person.md) | P1 | XS | infra | GitHub Actions majors wait for a person, like every other major | 👀 In Review | — |  |
 
 ## Done
 

@@ -99,7 +99,27 @@ describe('SHY-0569 — patch and minor updates still merge', () => {
     ).toBe(true);
   });
 
-  test('GitHub Actions updates keep their SHA-pinned exception, majors included', () => {
+  test('a GitHub Actions minor update still merges on its own', () => {
+    expect(
+      judge({
+        title: 'Bump actions/setup-node from 7.0.0 to 7.1.0',
+        body: '',
+        updateType: MINOR,
+        ecosystem: 'github_actions',
+      }),
+    ).toEqual({
+      merge: true,
+      reason: 'every pair is a patch or minor change',
+      pairs: ['actions/setup-node 7.0.0 -> 7.1.0'],
+    });
+  });
+});
+
+// SHY-0572 (Shyden, 2026-10-12: "Hold Actions majors"): a SHA pin fixes which
+// code runs, not whether a major release changes how CI behaves, so an
+// Actions major waits for a person like any other major.
+describe('SHY-0572 — GitHub Actions majors wait for a person', () => {
+  test('an Actions major named in the metadata is refused', () => {
     expect(
       judge({
         title: 'Bump actions/setup-node from 7.1.0 to 8.0.0',
@@ -108,15 +128,14 @@ describe('SHY-0569 — patch and minor updates still merge', () => {
         ecosystem: 'github_actions',
       }),
     ).toEqual({
-      merge: true,
-      reason: 'GitHub Actions are SHA-pinned',
+      merge: false,
+      reason: 'the metadata says version-update:semver-major',
       pairs: ['actions/setup-node 7.1.0 -> 8.0.0'],
     });
   });
 
-  // Ported from the retired dependabot-auto-merge-decision.test.js (SHY-0191),
-  // whose matrix accepted both spellings fetch-metadata has used.
-  test('the hyphenated GitHub Actions ecosystem name keeps the same exception', () => {
+  // Both spellings fetch-metadata has used (from the retired SHY-0191 matrix).
+  test('the hyphenated ecosystem name gets no exception either', () => {
     expect(
       judge({
         title: 'Bump actions/checkout from 6.0.0 to 7.0.0',
@@ -124,7 +143,18 @@ describe('SHY-0569 — patch and minor updates still merge', () => {
         updateType: MAJOR,
         ecosystem: 'github-actions',
       }).merge,
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  test('an Actions major hidden under minor metadata is refused by its pair', () => {
+    expect(
+      judge({
+        title: 'Bump actions/setup-node from 6.4.0 to 7.0.0',
+        body: '',
+        updateType: MINOR,
+        ecosystem: 'github_actions',
+      }).reason,
+    ).toBe('actions/setup-node 6.4.0 -> 7.0.0 is a major change');
   });
 });
 

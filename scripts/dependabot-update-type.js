@@ -11,6 +11,10 @@
  * metadata AND every pair agree the update is a patch or minor one. Anything
  * it cannot read says no.
  *
+ * SHY-0572 (Shyden, 2026-10-12: "Hold Actions majors"): GitHub Actions get no
+ * exception. A SHA pin fixes which code runs, not whether a major release
+ * changes how CI behaves, so an Actions major waits for a person too.
+ *
  * CLI (dependabot-auto-merge.yml): reads TITLE, BODY, UPDATE_TYPE, ECOSYSTEM
  * from the environment, prints its reading, and writes merge=true|false to
  * $GITHUB_OUTPUT. It exits 0 either way: "no" is a decision, not an error.
@@ -18,7 +22,6 @@
 const fs = require('fs');
 
 const ALLOWED_TYPES = new Set(['version-update:semver-patch', 'version-update:semver-minor']);
-const ACTIONS = new Set(['github_actions', 'github-actions']);
 
 // One of Dependabot's own sentences, naming a package and a version pair.
 const SENTENCE =
@@ -44,10 +47,10 @@ function isMajor(from, to) {
 }
 
 /**
- * @param {{ title: string, body: string, updateType: string, ecosystem: string }} pr
+ * @param {{ title: string, body: string, updateType: string }} pr
  * @returns {{ merge: boolean, reason: string, pairs: string[] }}
  */
-function judge({ title, body, updateType, ecosystem }) {
+function judge({ title, body, updateType }) {
   const found = [...pairsIn(title), ...pairsIn(body)];
   const shown = [];
   for (const pair of found) {
@@ -62,9 +65,6 @@ function judge({ title, body, updateType, ecosystem }) {
     }
     shown.push(`${pair.name} ${pair.from.replace(/^v/, '')} -> ${pair.to.replace(/^v/, '')}`);
     pair.major = isMajor(from, to);
-  }
-  if (ACTIONS.has(ecosystem) && found.length > 0) {
-    return { merge: true, reason: 'GitHub Actions are SHA-pinned', pairs: shown };
   }
   if (!updateType) return { merge: false, reason: 'the metadata says nothing', pairs: shown };
   if (!ALLOWED_TYPES.has(updateType)) {
