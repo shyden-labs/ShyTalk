@@ -338,6 +338,59 @@ describe('scripts/check-story-frontmatter.sh', () => {
     });
   });
 
+  // ============================================================== SHY-0535: optional estimate: field
+  describe('SHY-0535: optional estimate: field (story points)', () => {
+    const withEstimate = (value) =>
+      VALID_CONTENT.replace(/^effort:.*$/m, (m) => `${m}\nestimate: ${value}`);
+
+    it.each([['1'], ['2'], ['3'], ['5'], ['8'], ['13']])(
+      'accepts estimate: %s (exit 0)',
+      (value) => {
+        const { code, stderr } = runScript([tempStoryFile(withEstimate(value))]);
+        expect(stderr).toBe('');
+        expect(code).toBe(0);
+      },
+    );
+
+    it('treats an absent estimate: field as valid (exit 0)', () => {
+      expect(VALID_CONTENT).not.toMatch(/^estimate:/m);
+      const { code } = runScript([tempStoryFile(VALID_CONTENT)]);
+      expect(code).toBe(0);
+    });
+
+    it('tolerates surrounding whitespace ("estimate:   8  ") (exit 0)', () => {
+      const { code } = runScript([tempStoryFile(withEstimate('  8  '))]);
+      expect(code).toBe(0);
+    });
+
+    // Off the Fibonacci scale, larger than a story, or not a whole number.
+    describe.each([['0'], ['4'], ['21'], ['M'], ['5.0'], ['-3'], ['05'], ['13 points'], ['']])(
+      'rejects estimate: "%s" → exit 11',
+      (value) => {
+        let result;
+        beforeAll(() => {
+          result = runScript([tempStoryFile(withEstimate(value))]);
+        });
+        it('exits 11', () => expect(result.code).toBe(11));
+        it('stderr names the allowed values', () =>
+          expect(result.stderr).toMatch(/estimate must be one of: 1, 2, 3, 5, 8, 13/));
+        it('stderr names the absolute file path', () => expect(result.stderr).toMatch(/^\//m));
+      },
+    );
+
+    it('rejects a bare "estimate:" line → exit 11', () => {
+      const content = VALID_CONTENT.replace(/^effort:.*$/m, (m) => `${m}\nestimate:`);
+      const { code, stderr } = runScript([tempStoryFile(content)]);
+      expect(code).toBe(11);
+      expect(stderr).toMatch(/estimate must be one of/);
+    });
+
+    it('--verbose emits an "optional:estimate" check line', () => {
+      const { stderr } = runScript(['--verbose', tempStoryFile(withEstimate('5'))]);
+      expect(stderr).toMatch(/optional:estimate/);
+    });
+  });
+
   // ============================================================== missing body sections → exit 12
   describe('missing body section → exit 12', () => {
     const REQUIRED_SECTIONS = [

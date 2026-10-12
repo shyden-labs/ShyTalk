@@ -55,6 +55,11 @@ VALID_EPIC="^epic:[[:space:]]*EPIC-[0-9]{4}[[:space:]]*$"
 # set. Optional; absence is equivalent to `false`. SHY-scoped only (the EPIC
 # validator does not learn this field).
 VALID_MVP="^mvp:[[:space:]]*(true|false)[[:space:]]*$"
+# `estimate:` added by SHY-0535: story points on the Fibonacci scale the
+# operator chose (2026-10-04). Anything above 13 is an epic to split, never a
+# story. Optional here; SHY-0536 makes it required on open stories once every
+# open story is scored. The sync carries it to the board's Estimate field.
+VALID_ESTIMATE_VALUES="1|2|3|5|8|13"
 
 # Required `##` body sections (10 — h1 `# Title` is NOT a `## ` section).
 REQ_SECTIONS="User Story|Why|Acceptance Criteria|BDD Scenarios|Test Plan|Out of Scope|Dependencies|Risks & Mitigations|Definition of Done|Notes"
@@ -285,6 +290,13 @@ check_optional_fields() {
     verbose "optional:mvp"
     if ! grep -qE "$VALID_MVP" "$fm"; then
       fail "$abs" "invalid optional field" "mvp must be true or false" "$E_INVALID_VALUE"
+    fi
+  fi
+  # estimate: when present, story points on the Fibonacci scale (SHY-0535)
+  if grep -qE '^estimate:' "$fm"; then
+    verbose "optional:estimate"
+    if ! grep -qE "^estimate:[[:space:]]*(${VALID_ESTIMATE_VALUES})[[:space:]]*\$" "$fm"; then
+      fail "$abs" "invalid optional field" "estimate must be one of: ${VALID_ESTIMATE_VALUES//|/, }" "$E_INVALID_VALUE"
     fi
   fi
 }

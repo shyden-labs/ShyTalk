@@ -395,6 +395,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0564](SHY-0564-git-hooks-run-in-every-worktree.md) | P0 | M | infra | Git hooks run in every worktree, and a commit made without them is caught in CI | 📝 Draft | — |  |
 | [SHY-0565](SHY-0565-secret-scan-allows-the-local-persona-password.md) | P0 | S | infra | The secret scan allows the local persona password by exact value, and nothing else | 👀 In Review | — |  |
 | [SHY-0566](SHY-0566-shytalk-runs-on-node-26.md) | P1 | L | infra | ShyTalk runs on Node 26, 26.3 or later, everywhere | 📝 Draft | — |  |
+| [SHY-0535](SHY-0535-every-story-carries-a-points-estimate-and-progress-reads-it.md) | P1 | M | infra | Every story carries a points estimate, and progress is measured from it | 👀 In Review | — | [#2222](https://github.com/shyden-labs/ShyTalk/pull/2222) |
 
 ## Done
 
