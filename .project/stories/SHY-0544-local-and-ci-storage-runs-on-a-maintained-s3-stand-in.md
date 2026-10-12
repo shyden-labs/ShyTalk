@@ -1,6 +1,6 @@
 ---
 id: SHY-0544
-status: In Review
+status: Done
 owner: claude
 created: 2026-10-07
 priority: P0
@@ -159,8 +159,9 @@ start scripts can wait on.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; CI green by step name; merged to
+- [x] Every AC ticked with its proof; CI green by step name; merged to
       `develop`; dev deploy unaffected (it uses R2).
+      _Proof: PR #2250 run 38201223749 on `cc9ed28d978` green by job name (Pre-Merge Gate, Lint, Test Backend, Build & Test, Integration Tests, SonarCloud, Playwright (chromium), PR Gate); squash-merged as `9b3259c34fd`. Dev deploy run 38210596030 from that commit: backend, web, sanity and Dev Smoke Tests green; the smoke ran 23 of 23 with none skipped, including "R2 image upload: POST /api/storage/upload accepts a PNG, URL is reachable", which exercises the changed `r2.js`._
 
 ## Notes
 

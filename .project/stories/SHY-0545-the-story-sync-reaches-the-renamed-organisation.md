@@ -69,8 +69,9 @@ but not an organisation login in GraphQL, nor org pages, nor `github.io`:
       `https://reports.shytalk.shyden.co.uk/` directly, not the Pages
       address that redirects over plain http.
       _Proof: `sync-stories-alert.test.js` report-link pins (action 1, allure-report 2, no `github.io`); `allure-report-summary-step.test.js` RED then green on the new link._
-- [ ] After merge, the sync on `develop` succeeds, and the stories filed
+- [x] After merge, the sync on `develop` succeeds, and the stories filed
       since 2026-10-07 are on the board (checked by number on the board).
+      _Proof: merged as `adb61e14055`; post-merge sync run 38214350035 passed every step by name (alert job skipped). It created #2273-#2283 (SHY-0545, SHY-0554 to SHY-0563); each one's `projectItems` reads "ShyTalk Stories", with #2238 (SHY-0544) as the known positive. Alert #2252 closed by hand with this proof._
 
 ### Error paths
 

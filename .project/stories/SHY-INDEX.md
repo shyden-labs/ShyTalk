@@ -371,7 +371,6 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0541](SHY-0541-a-production-workflow-started-off-main-restarts-itself-on-main.md) | P0 | M | infra | A production workflow started off main restarts itself on main | 📝 Draft | — |  |
 | [SHY-0542](SHY-0542-production-keys-live-only-in-environments-only-main-can-reach.md) | P0 | L | infra | Production keys live only in environments that only main can reach | 📝 Draft | — |  |
 | [SHY-0543](SHY-0543-dev-cannot-deploy-the-production-web-site.md) | P0 | M | infra | Dev cannot deploy the production web site | 📝 Draft | — |  |
-| [SHY-0544](SHY-0544-local-and-ci-storage-runs-on-a-maintained-s3-stand-in.md) | P0 | L | infra | Local and CI storage runs on a maintained S3 stand-in, not MinIO | 👀 In Review | — | [#2250](https://github.com/shyden-labs/ShyTalk/pull/2250) |
 | [SHY-0546](SHY-0546-the-unit-suite-starts-no-service.md) | P0 | L | infra | The unit suite starts no service; tests that need one run as integration tests | 📝 Draft | — |  |
 | [SHY-0547](SHY-0547-no-backend-test-is-retried.md) | P0 | M | infra | No backend test is retried, so a failure shows the first time it happens | 📝 Draft | — |  |
 | [SHY-0548](SHY-0548-every-jest-unit-test-runs-in-under-one-second.md) | P0 | XL | infra | Every Jest unit test runs in under one second, and no test raises its own limit | 📝 Draft | — |  |
@@ -458,6 +457,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0243](SHY-0243-honest-linux-ci-test-harness.md)                     | P0  | S      | bug      | Two test harnesses lie on Linux CI — make the liveness probe and the git-identity probe environm      | ✅ Done | —           | —                                                        |
 | [SHY-0279](SHY-0279-web-auth-checks-decided-by-a-timing-race.md)         | P0  | S      | bug      | Seven web checks are decided by a timing race, so WebKit blocks every PR into develop                 | ✅ Done | —           | —                                                        |
 | [SHY-0284](SHY-0284-action-pins-drift-unseen.md)                         | P2  | S      | infra    | The guard against half-finished action upgrades never runs on the changes that cause them             | ✅ Done | —           | —                                                        |
+| [SHY-0544](SHY-0544-local-and-ci-storage-runs-on-a-maintained-s3-stand-in.md) | P0 | L | infra | Local and CI storage runs on a maintained S3 stand-in, not MinIO | ✅ Done | — | [#2250](https://github.com/shyden-labs/ShyTalk/pull/2250) |
 
 ## Cancelled
 
