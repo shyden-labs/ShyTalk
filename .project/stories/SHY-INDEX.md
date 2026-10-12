@@ -393,15 +393,11 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0563](SHY-0563-whole-repo-guards-run-as-their-own-suite.md) | P0 | M | infra | Whole-repo guards run as their own required suite, not as unit tests | 📝 Draft | — |  |
 | [SHY-0545](SHY-0545-the-story-sync-reaches-the-renamed-organisation.md) | P0 | M | bug | The story sync reaches the renamed organisation, and says so when it cannot | 👀 In Review | — |  |
 | [SHY-0564](SHY-0564-git-hooks-run-in-every-worktree.md) | P0 | M | infra | Git hooks run in every worktree, and a commit made without them is caught in CI | 📝 Draft | — |  |
-| [SHY-0565](SHY-0565-secret-scan-allows-the-local-persona-password.md) | P0 | S | infra | The secret scan allows the local persona password by exact value, and nothing else | 👀 In Review | — |  |
 | [SHY-0566](SHY-0566-shytalk-runs-on-node-26.md) | P1 | L | infra | ShyTalk runs on Node 26, 26.3 or later, everywhere | 📝 Draft | — |  |
 | [SHY-0535](SHY-0535-every-story-carries-a-points-estimate-and-progress-reads-it.md) | P1 | M | infra | Every story carries a points estimate, and progress is measured from it | 👀 In Review | — | [#2222](https://github.com/shyden-labs/ShyTalk/pull/2222) |
 | [SHY-0567](SHY-0567-the-story-index-is-generated.md) | P1 | M | infra | The story index is generated from the story files, so two PRs never conflict in it | 📝 Draft | — |  |
-| [SHY-0568](SHY-0568-the-root-install-works-again.md) | P0 | S | bug | The root install works again after an unsupported firebase major | 👀 In Review | — |  |
-| [SHY-0569](SHY-0569-dependabot-auto-merge-checks-the-real-update.md) | P0 | M | bug | Dependabot auto-merge checks the real update, not only Dependabot's metadata | 👀 In Review | — |  |
 | [SHY-0570](SHY-0570-the-root-moves-to-firebase-13.md) | P2 | M | chore | The root moves to firebase 13 with rules-unit-testing 6, proved by its integration runs | 📝 Draft | — |  |
 | [SHY-0571](SHY-0571-a-root-package-change-installs-the-root-packages.md) | P0 | S | infra | A change to the root packages runs a PR check that installs them | 📝 Draft | — |  |
-| [SHY-0572](SHY-0572-actions-majors-wait-for-a-person.md) | P1 | XS | infra | GitHub Actions majors wait for a person, like every other major | 👀 In Review | — |  |
 
 ## Done
 
@@ -468,6 +464,10 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0279](SHY-0279-web-auth-checks-decided-by-a-timing-race.md)         | P0  | S      | bug      | Seven web checks are decided by a timing race, so WebKit blocks every PR into develop                 | ✅ Done | —           | —                                                        |
 | [SHY-0284](SHY-0284-action-pins-drift-unseen.md)                         | P2  | S      | infra    | The guard against half-finished action upgrades never runs on the changes that cause them             | ✅ Done | —           | —                                                        |
 | [SHY-0544](SHY-0544-local-and-ci-storage-runs-on-a-maintained-s3-stand-in.md) | P0 | L | infra | Local and CI storage runs on a maintained S3 stand-in, not MinIO | ✅ Done | — | [#2250](https://github.com/shyden-labs/ShyTalk/pull/2250) |
+| [SHY-0565](SHY-0565-secret-scan-allows-the-local-persona-password.md) | P0 | S | infra | The secret scan allows the local persona password by exact value, and nothing else | ✅ Done | — |  |
+| [SHY-0568](SHY-0568-the-root-install-works-again.md) | P0 | S | bug | The root install works again after an unsupported firebase major | ✅ Done | — |  |
+| [SHY-0569](SHY-0569-dependabot-auto-merge-checks-the-real-update.md) | P0 | M | bug | Dependabot auto-merge checks the real update, not only Dependabot's metadata | ✅ Done | — |  |
+| [SHY-0572](SHY-0572-actions-majors-wait-for-a-person.md) | P1 | XS | infra | GitHub Actions majors wait for a person, like every other major | ✅ Done | — |  |
 
 ## Cancelled
 

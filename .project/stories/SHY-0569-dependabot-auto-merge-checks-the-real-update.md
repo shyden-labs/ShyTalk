@@ -1,6 +1,6 @@
 ---
 id: SHY-0569
-status: In Review
+status: Done
 owner: claude
 created: 2026-10-12
 priority: P0
@@ -115,8 +115,9 @@ the time of filing 9 open Dependabot PRs were armed, all minor by title.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; CI green by step name; merged to
+- [x] Every AC ticked with its proof; CI green by step name; merged to
       `develop`.
+      _Proof: PR #2305 run 38236638623 on `38c4c811ae2` green by job name (an earlier run went red on a retired test; fixed and re-run); merged as `21cc257e759`._
 
 ## Notes
 

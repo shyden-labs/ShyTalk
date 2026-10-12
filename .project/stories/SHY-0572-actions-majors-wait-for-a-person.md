@@ -1,6 +1,6 @@
 ---
 id: SHY-0572
-status: In Review
+status: Done
 owner: claude
 created: 2026-10-12
 priority: P1
@@ -99,8 +99,9 @@ Shyden chose (AskUserQuestion, 2026-10-12): "Hold Actions majors".
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; CI green by step name; merged to
+- [x] Every AC ticked with its proof; CI green by step name; merged to
       `develop`.
+      _Proof: PR #2307 run 38281080559 on `d2d3d0acad3` green by job name; merged as `626b8780da3`._
 
 ## Notes
 

@@ -1,6 +1,6 @@
 ---
 id: SHY-0565
-status: In Review
+status: Done
 owner: claude
 created: 2026-10-12
 priority: P0
@@ -121,8 +121,9 @@ password is still blocked.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; CI green by step name; merged to
+- [x] Every AC ticked with its proof; CI green by step name; merged to
       `develop`.
+      _Proof: PR #2272 run 38218178774 on `c1d145d4dc7` green by job name; merged as `b7c0d708dc4`. Live: #2222's develop merge commit (`d3636a1d262`) carried `local/seed.js`'s persona lines through the real husky hook and passed; the same merge was refused at 06:11Z before this change._
 
 ## Notes
 
