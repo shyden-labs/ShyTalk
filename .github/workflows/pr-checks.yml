@@ -335,7 +335,7 @@ jobs:
         run: ./gradlew assembleLocalDebug
 
       - name: Upload localDebug APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: local-debug-apk
           path: app/build/outputs/apk/local/debug/*.apk
@@ -355,13 +355,13 @@ jobs:
           files: '**/build/test-results/**/TEST-*.xml'
 
       - name: Upload devRelease APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: dev-release-apk
           path: app/build/outputs/apk/dev/release/*.apk
 
       - name: Upload build outputs for SonarCloud
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: build-outputs
@@ -386,7 +386,7 @@ jobs:
       # suite open. An artifact is the hand-off.
       - name: Upload Kotlin report for publishing
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kotlin-report-pages
           retention-days: 1
@@ -448,7 +448,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: kotlin-report-pages
           path: kotlin-report

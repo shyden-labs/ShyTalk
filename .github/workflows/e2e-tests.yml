@@ -290,7 +290,7 @@ jobs:
           ENVEOF
 
       - name: Upload Allure results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: allure-results-android-api${{ matrix.api-level }}-${{ matrix.form-factor }}
@@ -298,7 +298,7 @@ jobs:
           retention-days: 14
 
       - name: Upload test output
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: android-test-output-api${{ matrix.api-level }}-${{ matrix.form-factor }}
