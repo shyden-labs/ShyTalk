@@ -398,6 +398,8 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0567](SHY-0567-the-story-index-is-generated.md) | P1 | M | infra | The story index is generated from the story files, so two PRs never conflict in it | 📝 Draft | — |  |
 | [SHY-0570](SHY-0570-the-root-moves-to-firebase-13.md) | P2 | M | chore | The root moves to firebase 13 with rules-unit-testing 6, proved by its integration runs | 📝 Draft | — |  |
 | [SHY-0571](SHY-0571-a-root-package-change-installs-the-root-packages.md) | P0 | S | infra | A change to the root packages runs a PR check that installs them | 📝 Draft | — |  |
+| [SHY-0573](SHY-0573-every-blocker-is-a-github-blocked-by-link.md) | P0 | L | infra | Every blocker is recorded in the story file and shown as a GitHub "Blocked by" link | 📝 Draft | — |  |
+| [SHY-0574](SHY-0574-a-unit-test-starts-no-process.md) | P0 | XL | infra | A unit test starts no process; tests that need one run in a suite of their own | 📝 Draft | — |  |
 
 ## Done
 
