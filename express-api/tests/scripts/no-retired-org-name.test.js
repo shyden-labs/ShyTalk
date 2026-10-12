@@ -77,8 +77,9 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // integration spec), -1 (seed-minio.test.js).
 // 1980 -> 1982: scripts/scan-secrets.js and its test (SHY-0565).
 // 1982 -> 1984: scripts/story-progress.js and its test (SHY-0535).
-// 1984 -> 1986: scripts/dependabot-update-type.js and its test (SHY-0569).
-const FILES_READ_FLOOR = 1986;
+// 1984 -> 1985: root-firebase-peer.test.js (SHY-0568).
+// 1985 -> 1987: scripts/dependabot-update-type.js and its test (SHY-0569).
+const FILES_READ_FLOOR = 1987;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
