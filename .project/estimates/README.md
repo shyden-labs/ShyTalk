@@ -9,6 +9,7 @@ story an `estimate:` on the Fibonacci scale 1, 2, 3, 5, 8, 13. The board's
 | File | What it is |
 | --- | --- |
 | `scores-mvp.tsv` | Every MVP story scored by SHY-0536: id, points, status, and the reason or merged story it was compared with |
+| `scores-rest.tsv` | Every other open story scored by SHY-0537, in the same columns plus `mvp` |
 | `census.py` | Reads every story's frontmatter and criteria size into JSON |
 | `sizes.py` | Hand-written lines changed per story, summed over every squash-merged PR naming it |
 | `calib.py` | Spearman rank correlation of points against those lines, with every disagreement over one step flagged |
@@ -75,3 +76,23 @@ re-read sample moved up and none moved down.
 SHY-0212 and SHY-0218 sit at the 13 ceiling and should be split at pickup if
 they grow. SHY-0017 waits on the open No-Stubs harness decision its own
 criteria name.
+
+## The rest of the backlog (SHY-0537, 2026-10-12)
+
+SHY-0537 scored the 103 open stories without `mvp: true` against the same
+calibrated sample (`scores-rest.tsv`). The 24 stories with no `mvp:` field each
+gained an explicit value under the rule Shyden approved on 2026-10-12: MVP if
+someone using the first release would meet it, or the release cannot safely
+ship without it; test tooling and admin-only fixes are not (13 true, 11 false).
+
+A spread re-read of 12 in full, four per band, corrected none:
+
+| Band | Stories |
+| --- | --- |
+| 1–2 | SHY-0142, 0290, 0469, 0374 |
+| 3–5 | SHY-0175, 0094, 0172, 0292 |
+| 8–13 | SHY-0101, 0114, 0360, 0532 |
+
+Three are flagged in the table for pickup: SHY-0469 (PR #2021 merged its
+workflow change while the story stayed Draft), SHY-0292 (overlaps the merged
+SHY-0371) and SHY-0532 (agents already act as the ShyTalk App).
