@@ -5,8 +5,10 @@ owner: claude
 created: 2026-08-30
 priority: P1
 effort: M
+estimate: 5
 type: chore
 roadmap_ids: []
+mvp: false
 ---
 
 # SHY-0495: Make the seven local-only journeys assertable on dev

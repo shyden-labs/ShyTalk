@@ -230,3 +230,7 @@ it. The full non-device gauntlet still runs.
   Under today's gate this PR is exempt anyway, because the gate never looks past
   the story. That is the bug. Under the rule proposed here it stays exempt, but
   *deliberately*, and a PR carrying `express-api/src/**` would not.
+- **2026-10-12** (measured during the SHY-0537 scoring pass): a real instance of
+  this hole. PR #2021 added SHY-0469 as a brand-new Draft and, in the same PR,
+  changed `.github/workflows/reap-stuck-runs.yml` (31 lines). The gate passed it
+  as a filing, and SHY-0469 is still Draft with nothing ticked.

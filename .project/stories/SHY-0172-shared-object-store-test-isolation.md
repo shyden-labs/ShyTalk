@@ -5,6 +5,7 @@ owner: claude
 created: 2026-07-10
 priority: P2
 effort: M
+estimate: 5
 type: bug
 roadmap_ids: []
 epic: EPIC-0003

@@ -5,6 +5,7 @@ owner: claude
 created: 2026-08-06
 priority: P2
 effort: S
+estimate: 3
 type: refactor
 roadmap_ids: []
 pr:

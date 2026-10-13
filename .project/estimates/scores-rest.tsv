@@ -1,0 +1,104 @@
+id	points	status	mvp	reason (compared with)
+SHY-0008	5	Draft	false	3 economy feature files, billing scenarios
+SHY-0011	5	Draft	true	3 VM test files >=60 cases
+SHY-0090	5	Draft	false	iOS archive cache, slow CI iteration + measurement
+SHY-0093	3	Draft	false	real-device driver + loud skip
+SHY-0094	5	Draft	false	appium lifecycle in orchestrator
+SHY-0101	8	Draft	false	j11 real-device gaps + build-flavor password bake
+SHY-0111	2	Draft	false	layout jitter fix
+SHY-0113	13	In Progress	false	In Progress; rooms/voice real-service migration + room-creation fix
+SHY-0114	13	Draft	false	auth real-service migration
+SHY-0115	13	Draft	false	androidTest real-emulator harness + 1 domain
+SHY-0116	13	Draft	false	moderation real-service migration
+SHY-0117	8	Draft	false	messaging real-service migration
+SHY-0118	13	Draft	false	economy real-service migration incl. transactions, odds
+SHY-0119	5	Draft	false	cohort real-service migration, rules-bound
+SHY-0121	8	Draft	false	suggestions/roadmap migration; same shape as SHY-0117 (filed XL)
+SHY-0122	8	Draft	false	admin-portal real-service migration
+SHY-0123	8	Draft	false	utils integration migration: Mailpit, MinIO, FCM, export
+SHY-0124	5	Draft	false	6 Playwright e2e off page.route
+SHY-0134	3	Draft	false	owned-group count rule fix + fail-closed cap, both platforms
+SHY-0135	5	Draft	false	android-e2e runtime variance, CI iteration
+SHY-0142	1	Draft	false	4 pin suites to current SHAs; ~SHY-0572
+SHY-0152	3	Draft	false	Sonar gate: 2 bugs + upload envelopes
+SHY-0172	5	Draft	false	suite isolation of object store + mailbox, reproduction
+SHY-0173	3	Draft	false	5 analyzer gaps report-not-guess
+SHY-0175	3	Draft	false	release-cut gate on Open-before-release
+SHY-0176	3	Draft	false	WebKit crash diagnosis on macOS
+SHY-0188	8	Draft	false	K/N test execution + name guard + CI
+SHY-0189	5	Draft	false	lock consequences on voice + notifications, both platforms
+SHY-0204	5	Draft	true	device-local legal acceptance per document
+SHY-0241	5	Draft	false	2 journeys gain live admin->device assertions
+SHY-0244	8	In Review	true	In Review; FID push migration, 2086 lines merged
+SHY-0273	3	In Review	false	In Review; LAN voice on device
+SHY-0276	2	Draft	false	pre-push Playwright removal
+SHY-0280	3	Draft	false	auth dispatch count + real sign-in test
+SHY-0281	3	Draft	false	journey gift fixtures non-destructive
+SHY-0282	2	Draft	true	header sign-in state
+SHY-0283	2	Draft	false	audit-log pagination cursor
+SHY-0285	8	Draft	true	locale-routed build proven on one page
+SHY-0286	8	Draft	true	7 pages to locale routing
+SHY-0287	5	Draft	true	delete old web i18n machinery
+SHY-0288	5	Draft	true	device-language app, migration of choice
+SHY-0289	5	In Review	true	In Review; retire 15 locales (bulk deletions)
+SHY-0290	2	Draft	false	local gate parity with CI
+SHY-0291	3	Draft	false	FCM deprecations, 5 call sites
+SHY-0292	5	Draft	false	firebase-admin 14 migration — NOTE: overlaps SHY-0371 (merged P0, firebase-admin 14 namespaced API); re-measure what is left at pickup
+SHY-0302	2	Draft	false	require_repo in worktrees
+SHY-0307	2	Draft	false	App Check bridge tests
+SHY-0325	2	Draft	false	workflow-only CI decision + proof PR
+SHY-0326	3	Draft	false	worktree-dependent test verdicts, root cause
+SHY-0360	8	Draft	false	board <-> story file two-way sync + generated index
+SHY-0361	3	Draft	false	tester notes name tickets
+SHY-0367	3	Draft	false	cache Playwright browsers in 2 workflows
+SHY-0374	1	Draft	false	guard enumerates tracked files; ~SHY-0572
+SHY-0375	2	Draft	false	shared multer helper
+SHY-0377	1	Draft	false	challenge page legible
+SHY-0381	2	Draft	false	admin search helper wait
+SHY-0383	1	Draft	false	default local host
+SHY-0386	1	Draft	false	remove unmounted health route
+SHY-0394	3	Draft	false	spec-only Draft refinement declaration in gate
+SHY-0411	5	Draft	false	dispute + unban journeys
+SHY-0417	2	Draft	false	ban notice on strict routes
+SHY-0423	1	Draft	false	recompute cohort after DOB
+SHY-0424	1	In Review	false	In Review; real open count
+SHY-0430	1	In Review	false	In Review; overlay placement
+SHY-0431	1	In Review	false	In Review; iOS strip
+SHY-0448	2	In Review	false	In Review; lint public JS (bulk reformat)
+SHY-0451	5	In Review	false	In Review; iPhone stall, fail-fast reconnect
+SHY-0453	3	Draft	false	status page off-infrastructure
+SHY-0462	3	In Review	false	In Review; dialog testTags + guard (246 lines)
+SHY-0469	2	Draft	false	reaper error reporting — NOTE: #2021 merged 31 lines of reap-stuck-runs.yml with this story while it stayed Draft (the SHY-0353 hole); re-read what is left at pickup
+SHY-0470	2	In Review	false	In Review; remove dead client API (847 lines, deletions)
+SHY-0475	3	Draft	false	4 room instrumentation tests on device
+SHY-0486	2	In Review	false	In Review; gate allows running-log append (163 lines)
+SHY-0490	1	In Review	false	In Review; target-aware purchase product (55 lines)
+SHY-0491	2	In Review	false	In Review; picker wait (90 lines)
+SHY-0493	8	Draft	false	iOS Firebase CocoaPods -> SwiftPM, real-device proof
+SHY-0494	5	In Review	true	In Review; device push id per account (369 lines)
+SHY-0495	5	Draft	false	7 local-only journeys assertable on dev
+SHY-0496	2	In Review	true	In Review; FIDs follow token paths (153 lines)
+SHY-0497	3	In Review	true	In Review; sign-out returns Home race (227 lines)
+SHY-0498	5	Draft	false	image-failure telemetry + admin view
+SHY-0499	5	Draft	false	one escaper + sink rule + baseline
+SHY-0506	5	Draft	false	server portal-access resolver + registry
+SHY-0507	8	Draft	false	portal shell loading allowed modules
+SHY-0508	8	Draft	false	5 safety tools move to portal
+SHY-0509	8	Draft	false	5 config tools move to portal
+SHY-0510	8	Draft	false	6 ops tools move to portal
+SHY-0511	3	Draft	false	retire admin page + redirects
+SHY-0513	2	Draft	false	reconciler insert via temp file (measured 2026-10-12: 103-line script, no test, 11 ACs)
+SHY-0515	5	Draft	false	connectivity observer both platforms + reconfirm
+SHY-0516	3	Draft	false	cached force-update verdict both platforms
+SHY-0517	3	Draft	false	pre-push diff per ref
+SHY-0519	1	Draft	false	dev deploy regenerates roadmap data
+SHY-0520	3	Draft	false	retarget Dependabot PRs to develop
+SHY-0521	1	In Review	false	In Review; lockfile qs bump (147 lines)
+SHY-0524	3	Draft	false	sleeps -> pollUntil across 6 files
+SHY-0526	2	In Review	false	In Review; iOS debug bypass (220 lines)
+SHY-0527	3	In Review	false	In Review; reward dialog by tag (437 lines)
+SHY-0528	1	In Review	false	In Review; gate counts branch commits only (131 lines)
+SHY-0530	5	Draft	false	sweep source-text guards, filesystem-derived, mutations
+SHY-0532	8	Draft	false	census + identity choice + App migration — NOTE: agents already act as the ShyTalk App via gh_route.py; re-read which ACs remain at pickup
+SHY-0533	2	Draft	false	CI index reconciler both directions
+SHY-0534	5	Draft	false	auto dev deploy on develop push + daily

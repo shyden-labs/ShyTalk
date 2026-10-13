@@ -6,6 +6,7 @@ created: 2026-06-20
 priority: P2
 type: bug
 effort: S
+estimate: 3
 roadmap_ids: []
 public: false
 mvp: false

@@ -5,8 +5,10 @@ owner: claude
 created: 2026-08-30
 priority: P2
 effort: M
+estimate: 3
 type: bug
 roadmap_ids: []
+mvp: true
 ---
 
 # SHY-0497: The app returns to Home after sign-out has reached the SignIn screen

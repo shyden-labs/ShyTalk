@@ -5,8 +5,10 @@ owner: claude
 created: 2026-07-11
 priority: P2
 effort: S
+estimate: 3
 type: infra
 roadmap_ids: []
+mvp: false
 ---
 
 # SHY-0176: Playwright WebKit engine crashes abort full-suite serial runs on macOS

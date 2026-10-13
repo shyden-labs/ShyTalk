@@ -5,6 +5,7 @@ owner: unassigned
 created: 2026-08-20
 priority: P3
 effort: XS
+estimate: 2
 type: chore
 roadmap_ids: []
 mvp: false

@@ -5,8 +5,10 @@ owner: claude
 created: 2026-08-17
 priority: P2
 effort: S
+estimate: 2
 type: bug
 roadmap_ids: []
+mvp: false
 ---
 
 # SHY-0307: The App Check bridge has no behavioural test, and its own diagnostic has no caller
