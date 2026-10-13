@@ -5,6 +5,7 @@ owner: claude
 created: 2026-08-22
 priority: P1
 effort: S
+estimate: 2
 type: feature
 roadmap_ids: []
 mvp: true

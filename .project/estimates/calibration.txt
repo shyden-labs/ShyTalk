@@ -1,0 +1,27 @@
+skip (Draft, partial code): SHY-0495
+n=25 spearman=0.765
+SHY-0535 pts= 5 lines= 1145 implied~ 8 prior
+SHY-0565 pts= 3 lines=  298 implied~ 5 prior
+SHY-0568 pts= 2 lines=   84 implied~ 1 prior
+SHY-0572 pts= 1 lines=   60 implied~ 1 prior
+SHY-0544 pts= 8 lines= 1422 implied~ 8 prior
+SHY-0545 pts= 5 lines=  448 implied~ 5 prior
+SHY-0527 pts= 3 lines=  437 implied~ 5 this pass
+SHY-0526 pts= 2 lines=  220 implied~ 3 this pass
+SHY-0500 pts= 8 lines= 6773 implied~13 this pass
+SHY-0528 pts= 1 lines=  131 implied~ 2 this pass
+SHY-0523 pts= 3 lines=  258 implied~ 3 this pass
+SHY-0521 pts= 1 lines=  147 implied~ 2 this pass
+SHY-0289 pts= 5 lines= 9578 implied~13 this pass <-- >1 step
+SHY-0501 pts= 3 lines=  196 implied~ 2 this pass
+SHY-0448 pts= 2 lines=10078 implied~13 this pass <-- >1 step
+SHY-0497 pts= 3 lines=  227 implied~ 3 this pass
+SHY-0444 pts= 5 lines= 1352 implied~ 8 this pass
+SHY-0470 pts= 2 lines=  847 implied~ 8 this pass <-- >1 step
+SHY-0450 pts= 2 lines=  117 implied~ 1 this pass
+SHY-0462 pts= 3 lines=  246 implied~ 3 this pass
+SHY-0496 pts= 2 lines=  153 implied~ 2 this pass
+SHY-0491 pts= 2 lines=   90 implied~ 1 this pass
+SHY-0494 pts= 5 lines=  369 implied~ 5 this pass
+SHY-0244 pts= 8 lines= 2086 implied~13 this pass
+SHY-0490 pts= 1 lines=   55 implied~ 1 this pass

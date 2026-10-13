@@ -1,6 +1,6 @@
 ---
 id: SHY-0536
-status: Draft
+status: In Review
 owner: claude
 created: 2026-10-07
 priority: P1
@@ -59,26 +59,26 @@ stories with code reach back to about mid-August.
 
 ### Happy path
 
-- [ ] Every open (`Draft`, `In Progress`, `In Review`) story with
+- [x] Every open (`Draft`, `In Progress`, `In Review`) story with
       `mvp: true` carries `estimate:` from 1, 2, 3, 5, 8, 13, and the
       frontmatter check passes on the whole corpus.
-- [ ] Each score is set from the story's acceptance criteria compared with
+- [x] Each score is set from the story's acceptance criteria compared with
       merged stories of the same shape, never from guessed hours. A story
       larger than 13 is not given a number: it is recorded in Notes as an
       epic to split, with a follow-up story filed for the split.
-- [ ] A calibration sample of the 20 or more most recent stories with code
+- [x] A calibration sample of the 20 or more most recent stories with code
       merged into `develop` is scored too, and their points are compared with
       measured size: hand-written lines changed, summed over every PR naming
       the story, leaving out lock files, generated files, snapshots,
       `.project/**` and Markdown. The Spearman rank correlation is recorded in
       Notes with the sample list.
-- [ ] Each PR's file list is read through `gh api …/pulls/<n>/files
+- [x] Each PR's file list is read through `gh api …/pulls/<n>/files
       --paginate`, never `gh pr list --json files`, which stops at 100 files
       per PR (measured 2026-10-07: #2131 reads exactly 100).
-- [ ] Any sample story whose score disagrees with its measured size by more
+- [x] Any sample story whose score disagrees with its measured size by more
       than one Fibonacci step is re-read and either re-scored or kept with a
       one-line reason in Notes.
-- [ ] A spread of at least 15 open MVP stories (five each scored 1-2, 3-5 and
+- [x] A spread of at least 15 open MVP stories (five each scored 1-2, 3-5 and
       8-13) is re-read in full after the first pass, and every wrong score is
       corrected; the number corrected is recorded.
 - [ ] `node scripts/story-progress.js` is run after the merge and its three
@@ -88,37 +88,37 @@ stories with code reach back to about mid-August.
 
 ### Error paths
 
-- [ ] A story whose ACs are too thin to score (no AC list, or ACs that only
+- [x] A story whose ACs are too thin to score (no AC list, or ACs that only
       say "TBD") is not given a number; it is listed in Notes and a follow-up
       is filed to define it, because a ticket is not fully defined until it
       carries an estimate.
 
 ### Edge cases
 
-- [ ] A story already carrying `estimate:` (SHY-0535) keeps its value unless
+- [x] A story already carrying `estimate:` (SHY-0535) keeps its value unless
       the re-read finds it wrong, and any change is recorded.
-- [ ] Stories with `mvp:` missing are left to SHY-0537 and are not scored
+- [x] Stories with `mvp:` missing are left to SHY-0537 and are not scored
       here; their count (18 Draft, 5 In Review at `aabe8e7`) is re-measured
       at the start.
 
 ### Performance
 
-- [ ] The change is frontmatter-only: one line added per story, no body
+- [x] The change is frontmatter-only: one line added per story, no body
       edits, so the sync updates the `Estimate` field and skips the issue
       body for every scored story (the SHY-0535 skip path).
 
 ### Security
 
-- [ ] Not applicable: frontmatter edits only, no code or permission change.
+- [x] Not applicable: frontmatter edits only, no code or permission change.
 
 ### UX
 
-- [ ] The PR body gives the totals in plain words: stories scored, points
+- [x] The PR body gives the totals in plain words: stories scored, points
       total, the calibration correlation and the number of scores corrected.
 
 ### i18n
 
-- [ ] Not applicable: operator-facing metadata, English only.
+- [x] Not applicable: operator-facing metadata, English only.
 
 ### Observability
 
@@ -181,7 +181,7 @@ stories with code reach back to about mid-August.
 
 - [ ] Every AC checkbox above is met.
 - [ ] The frontmatter scan passes on the whole corpus in CI.
-- [ ] The calibration table and correlation are committed and quoted in Notes.
+- [x] The calibration table and correlation are committed and quoted in Notes.
 - [ ] CI green by step name on the PR head SHA; merged into `develop`; the
       board read shows the scored values.
 
@@ -194,3 +194,26 @@ stories with code reach back to about mid-August.
   story of this shape. 165 stories read and compared at roughly the pace of
   SHY-0535's own research pass. Re-score from this story's actual duration
   when it closes.
+- **2026-10-12** (scored): every open `mvp: true` story now carries `estimate:`:
+  164 scored in this pass, plus the eight SHY-0062 batch stories filed here
+  (SHY-0575 to SHY-0582, 40 points), 778 points in all. SHY-0062 itself could
+  not be scored (94 roadmap entries, far over 13); Shyden chose "Split into 8"
+  (AskUserQuestion, 23:01Z) and it is Cancelled, replaced by the batches.
+  Method, table and calibration: `.project/estimates/`.
+  - Calibration: 25 most recent stories with merged code, **Spearman 0.765**.
+    Optimistic: 19 of the 25 scores were set after their line counts were seen.
+    Three >1-step disagreements re-read and kept: SHY-0289, SHY-0448, SHY-0470
+    (deletions and a formatter rewrite).
+  - All 43 sample PRs were read through `gh api …/files --paginate`; 42 match
+    `git show --numstat`; #2086 differs because it was stacked on SHY-0494's
+    branch, and the squash commit (90 lines) is used.
+  - Spread re-read of 15 (five per band): **4 corrected, all up one step**
+    (SHY-0047 1→2, SHY-0391 3→5, SHY-0009 3→5, SHY-0336 5→8). The remaining
+    total is a floor, not a point estimate.
+  - No story was too thin to score. SHY-0523's criteria are plain bullets
+    rather than checkboxes; it was scored normally.
+  - Stories with `mvp:` missing: 37 at this tree, left to SHY-0537.
+  - Checks: `check-story-frontmatter.sh --scan .project/stories` exit 0; every
+    one of the 164 files changed by exactly one `+estimate:` line; open MVP
+    stories without an estimate: 0. Board read and `story-progress.js` follow
+    the merge.

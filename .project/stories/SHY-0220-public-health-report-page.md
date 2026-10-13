@@ -6,6 +6,7 @@ created: 2026-07-19
 priority: P0
 type: feature
 effort: L
+estimate: 8
 roadmap_ids: []
 epic: EPIC-0008
 mvp: true
