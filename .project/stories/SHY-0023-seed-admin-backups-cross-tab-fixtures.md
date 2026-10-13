@@ -5,6 +5,7 @@ owner: claude
 created: 2026-06-07
 priority: P2
 effort: S
+estimate: 3
 type: bug
 roadmap_ids: [G033]
 pr:

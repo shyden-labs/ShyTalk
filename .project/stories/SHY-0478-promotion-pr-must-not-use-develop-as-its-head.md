@@ -5,6 +5,7 @@ owner: unassigned
 created: 2026-08-27
 priority: P0
 effort: M
+estimate: 3
 type: infra
 roadmap_ids: []
 mvp: true

@@ -56,12 +56,14 @@ STATUS_LINES=$(git diff --name-status --diff-filter=ACMR "${BASE_REF}...HEAD")
 
 # Validate each changed story: status In Review + a REAL Reviewed-up-to commit —
 # EXCEPT a newly-ADDED Draft (a spec filing), which is exempt to match the CI gate
-# (scripts/check-pr-story-status.js, SHY-0131). The exemption is add-only AND
-# Draft-only: a story MODIFIED to Draft, a non-Draft add, or a Done/Cancelled
-# story all still refuse (the local gate stays stricter than CI on terminals).
+# (scripts/check-pr-story-status.js, SHY-0131), and a story that was Draft at the
+# base and is still Draft (backlog maintenance, SHY-0518). A story MOVED to Draft
+# from another status, a non-Draft add, or a Done/Cancelled story all still
+# refuse (the local gate stays stricter than CI on terminals).
 MARKERS=""
 FOUND_STORY=false
 FILINGS=0
+MAINTAINED=0
 while IFS= read -r line; do
   [ -z "$line" ] && continue
   code=${line%%$'\t'*} # first tab-field (e.g. A, M, R100)
@@ -74,6 +76,21 @@ while IFS= read -r line; do
     printf '  filing exemption: %s newly-added Draft (SHY-0131 parity)\n' "$story" >&2
     FILINGS=$((FILINGS + 1))
     continue
+  fi
+  # SHY-0518 parity with check-pr-story-status.js: a story that was Draft at the
+  # base and is still Draft is backlog maintenance (a note, a score, an epic:
+  # link), not implementation. The base copy is read from the OLD path of a
+  # rename (the second tab-field); an unreadable base gives an empty status,
+  # never Draft, so it fails closed.
+  if [ "$status" = "Draft" ]; then
+    from=$(printf '%s\n' "$line" | cut -f2)
+    base_status=$(git show "${BASE_REF}:${from}" 2>/dev/null | grep -m1 '^status:' |
+      sed 's/^status:[[:space:]]*//' | tr -d '\r')
+    if [ "$base_status" = "Draft" ]; then
+      printf '  backlog maintenance: %s Draft → Draft (SHY-0518 parity)\n' "$story" >&2
+      MAINTAINED=$((MAINTAINED + 1))
+      continue
+    fi
   fi
   # Release-bookkeeping exemption (SHY-0297). Flipping a released story to Done
   # is the ONE legitimate way a Done story reaches a PR: the lifecycle says a
@@ -148,6 +165,7 @@ fi
 
 STATUS_LINE="each changed story In Review"
 [ "$FILINGS" -gt 0 ] && STATUS_LINE="$STATUS_LINE (+ $FILINGS newly-added Draft filing(s) exempt — SHY-0131 parity)"
+[ "$MAINTAINED" -gt 0 ] && STATUS_LINE="$STATUS_LINE (+ $MAINTAINED Draft story(ies) maintained, still Draft — SHY-0518 parity)"
 
 cat <<EOF
 ── Pre-merge gate (SHY-0127) ──

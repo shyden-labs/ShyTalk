@@ -12,6 +12,11 @@
  * brand-new backlog story is legitimately Draft). The exemption is add-only: a
  * MODIFIED/RENAMED story (the implementation case) must still reach In Review.
  *
+ * SHY-0518 — a MODIFIED/RENAMED story that was `Draft` at the base and is still
+ * `Draft` is EXEMPT: it is being maintained (a note, a score, an `epic:` link),
+ * not implemented. Moving OUT of Draft is what implementation does, and that
+ * move is still refused until the story reaches In Review.
+ *
  * Read-only: never executes scanned files; spawns `git` with an arg array (no
  * shell); no network, no credentials.
  *
@@ -59,6 +64,12 @@ function acceptanceCriteriaOf(text) {
   return next === -1 ? rest : rest.slice(0, next);
 }
 
+/** The frontmatter `status:` value, or null when the text or the field is absent. */
+function statusOf(text) {
+  const m = text === null ? null : text.match(/^status:\s*(.+?)\s*$/m);
+  return m ? m[1] : null;
+}
+
 /** The file as it was at `ref`, or null when it did not exist there. */
 function fileAt(ref, file) {
   try {
@@ -95,9 +106,10 @@ function main() {
       .map((line) => {
         // "A\tpath" | "M\tpath" | "R100\told\tnew" | "C75\told\tnew".
         // First field's first char is the change code; the LAST tab-field is
-        // the (new) path — correct for renames/copies too.
+        // the (new) path — correct for renames/copies too. `from` is the path
+        // the file had at the base (the old path of a rename or copy).
         const parts = line.split('\t');
-        return { code: parts[0][0], file: parts[parts.length - 1] };
+        return { code: parts[0][0], file: parts[parts.length - 1], from: parts[1] };
       });
   } catch (err) {
     fail(`pre-merge-gate: git diff ${base}...${head} failed: ${err.message}`);
@@ -111,7 +123,7 @@ function main() {
   }
 
   let bad = 0;
-  for (const { code, file } of stories) {
+  for (const { code, file, from } of stories) {
     let content;
     try {
       content = fs.readFileSync(path.resolve(process.cwd(), file), 'utf8');
@@ -120,8 +132,7 @@ function main() {
       bad += 1;
       continue;
     }
-    const match = content.match(/^status:\s*(.+?)\s*$/m);
-    const status = match ? match[1] : '(no status: field)';
+    const status = statusOf(content) ?? '(no status: field)';
     if (ALLOWED.has(status)) {
       process.stdout.write(`pre-merge-gate: ${file} status "${status}" OK\n`);
     } else if (status === 'In Progress' && code === 'M') {
@@ -153,6 +164,13 @@ function main() {
       // RENAMED story (the implementation case) must still reach In Review, so
       // the SHY-0120 protection is preserved.
       process.stdout.write(`pre-merge-gate: ${file} newly-added Draft — filing exemption OK\n`);
+    } else if (status === 'Draft' && statusOf(fileAt(base, from)) === 'Draft') {
+      // SHY-0518 — Draft before and Draft after: backlog maintenance. Adds were
+      // settled by the branch above. An unreadable base reads as null, never
+      // as Draft, so it fails closed.
+      process.stdout.write(
+        `pre-merge-gate: ${file} Draft → Draft — backlog maintenance exemption OK\n`,
+      );
     } else {
       fail(
         `pre-merge-gate: ${file} has status "${status}" — it must be "In Review" ` +

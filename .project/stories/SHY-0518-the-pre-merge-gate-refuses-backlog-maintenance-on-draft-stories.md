@@ -1,10 +1,11 @@
 ---
 id: SHY-0518
-status: Draft
-owner: unassigned
+status: In Review
+owner: claude
 created: 2026-09-04
-priority: P2
+priority: P1
 effort: XS
+estimate: 2
 type: infra
 roadmap_ids: []
 mvp: false
@@ -49,52 +50,52 @@ Draft, and that transition is exactly what the gate still guards.
 
 ### Happy path
 
-- [ ] A modified story whose status was `Draft` before the PR and is `Draft`
+- [x] A modified story whose status was `Draft` before the PR and is `Draft`
       after it passes the gate with the line
       `pre-merge-gate: <file> Draft → Draft — backlog maintenance exemption OK`.
-- [ ] The existing rules are unchanged: a story moving out of Draft in the
+- [x] The existing rules are unchanged: a story moving out of Draft in the
       diff, or an `In Progress` story with frontmatter or Acceptance Criteria
       changes, still fails with today's messages.
-- [ ] `scripts/pre-merge-check.sh` (the local twin) applies the same rule.
+- [x] `scripts/pre-merge-check.sh` (the local twin) applies the same rule.
 
 ### Error paths
 
-- [ ] Draft → `In Progress` in the same PR fails (implementation started, not
+- [x] Draft → `In Progress` in the same PR fails (implementation started, not
       finished).
-- [ ] A Draft story whose `status:` line is removed fails with the existing
+- [x] A Draft story whose `status:` line is removed fails with the existing
       `(no status: field)` message.
-- [ ] The base version cannot be read (shallow clone): fail closed with the
+- [x] The base version cannot be read (shallow clone): fail closed with the
       existing `git diff` failure message, never exempt by default.
 
 ### Edge cases
 
-- [ ] A renamed Draft story (`R` code) with unchanged status passes — the new
+- [x] A renamed Draft story (`R` code) with unchanged status passes — the new
       path is read from the last tab field as today.
-- [ ] A Draft story whose only change is the `epic:` field passes.
-- [ ] Several stories in one PR are each judged on their own before/after
+- [x] A Draft story whose only change is the `epic:` field passes.
+- [x] Several stories in one PR are each judged on their own before/after
       status.
 
 ### Performance
 
-- [ ] One extra `git show base:path` per modified Draft story, the same call
+- [x] One extra `git show base:path` per modified Draft story, the same call
       the In Progress exemption already makes.
 
 ### Security
 
-- [ ] N/A — a CI gate over Markdown files; the exemption cannot admit code.
+- [x] N/A — a CI gate over Markdown files; the exemption cannot admit code.
 
 ### UX
 
-- [ ] The pass and fail lines name the file, both statuses and the rule, so a
+- [x] The pass and fail lines name the file, both statuses and the rule, so a
       reader of the job log sees why without opening the script.
 
 ### i18n
 
-- [ ] N/A — CI tooling, English only.
+- [x] N/A — CI tooling, English only.
 
 ### Observability
 
-- [ ] Exit codes unchanged (0 pass, 1 blocked, 2 tooling failure); the new
+- [x] Exit codes unchanged (0 pass, 1 blocked, 2 tooling failure); the new
       exemption line is asserted by the test.
 
 ## BDD Scenarios
@@ -169,3 +170,24 @@ Draft, and that transition is exactly what the gate still guards.
   which failed on SHY-0376 (notes append) and SHY-0417 (epic adoption). Both
   edits were reverted to get the filing merged; this story restores the ability
   to make them.
+
+- **2026-10-12** (Shyden, AskUserQuestion 23:04Z): raised to P1 and done FIRST,
+  ahead of SHY-0556, because the scoring backfill (SHY-0536/0537, 268 stories,
+  233 of them Draft) cannot merge while a Draft edit fails the gate. Scored 2
+  from the 2026-10-12 measurement.
+- **2026-10-12** (built): `check-pr-story-status.js` passes a modified or
+  renamed story that is Draft at the base and at the head, reading the base
+  from the rename's OLD path; `pre-merge-check.sh` applies the same rule and
+  counts it on its status line. Tests: 7 new or changed cases in
+  `pre-merge-gate.test.js`, 6 in `pre-merge-check.test.js`; 56 of 56 green.
+  Red first: 4 and 2 failures, exactly the passes. Mutations, whole file each:
+  ignore the base status (3 red in each file), read the base from the new path
+  (1 red in each), drop the twin's counter (2 red). A fourth mutation, dropping
+  `code !== 'A'` in the CI gate, stayed green: adds are settled by the filing
+  branch above it, so the condition was dead and was removed.
+  The shallow-clone AC needs no new code: `git diff` failing still exits 2, and
+  a base that cannot be read gives `statusOf(null) === null`, never Draft.
+  These tests start `git` and `node` processes, like every other case in both
+  files; SHY-0574 moves them out of the unit tier.
+
+Reviewed-up-to: f73fb62f3cd70afd712d9b8fe141ab2c86db37f1
