@@ -376,3 +376,72 @@ describe('SHY-0518 — a Draft story may be maintained without leaving Draft', (
     expect(stderr).toMatch(/SHY-0998-y\.md has status "Draft"/);
   });
 });
+
+/**
+ * SHY-0583 — an In Progress story nobody is working goes back to the backlog.
+ * Shyden 2026-10-13: an In Progress story with no branch or PR "should be returned
+ * to the backlog". The move is allowed only in a PR that changes nothing outside
+ * .project/, so an implementation PR cannot dodge In Review by sending its story back.
+ */
+const RETURNED_LINE = 'In Progress → Draft — returned to the backlog OK';
+
+describe('SHY-0583 — an abandoned In Progress story may go back to Draft', () => {
+  test('In Progress → Draft with its score added passes in a .project-only PR', () => {
+    const dir = makeRepoBase(
+      (d) => fs.writeFileSync(storyPath(d), inProgressStory('- log')),
+      (d) =>
+        fs.writeFileSync(
+          storyPath(d),
+          inProgressStory('- log\n- returned to the backlog')
+            .replace('status: In Progress', 'status: Draft')
+            .replace('effort: S', 'effort: S\nestimate: 13'),
+        ),
+    );
+    const { code, stdout } = run(dir);
+    expect(code).toBe(0);
+    expect(stdout).toContain(`SHY-0999-x.md ${RETURNED_LINE}`);
+  });
+
+  test('the same move is refused when the PR also changes code', () => {
+    const dir = makeRepoBase(
+      (d) => fs.writeFileSync(storyPath(d), inProgressStory('- log')),
+      (d) => {
+        fs.writeFileSync(
+          storyPath(d),
+          inProgressStory('- log').replace('status: In Progress', 'status: Draft'),
+        );
+        fs.writeFileSync(path.join(d, 'README.md'), 'changed\n');
+      },
+    );
+    const { code, stdout, stderr } = run(dir);
+    expect(code).toBe(1);
+    expect(stdout).not.toContain(RETURNED_LINE);
+    expect(stderr).toMatch(/SHY-0999-x\.md has status "Draft" — it must be "In Review"/);
+  });
+
+  test('a deleted code file counts as a change outside .project/', () => {
+    const dir = makeRepoBase(
+      (d) => fs.writeFileSync(storyPath(d), inProgressStory('- log')),
+      (d) => {
+        fs.writeFileSync(
+          storyPath(d),
+          inProgressStory('- log').replace('status: In Progress', 'status: Draft'),
+        );
+        fs.unlinkSync(path.join(d, 'README.md'));
+      },
+    );
+    const { code, stderr } = run(dir);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/SHY-0999-x\.md has status "Draft" — it must be "In Review"/);
+  });
+
+  test('In Review → Draft is still refused in a .project-only PR', () => {
+    const dir = makeRepoBase(
+      (d) => fs.writeFileSync(storyPath(d), story('In Review')),
+      (d) => fs.writeFileSync(storyPath(d), story('Draft')),
+    );
+    const { code, stdout } = run(dir);
+    expect(code).toBe(1);
+    expect(stdout).not.toContain(RETURNED_LINE);
+  });
+});
