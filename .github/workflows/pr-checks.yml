@@ -639,6 +639,13 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: node scripts/check-pr-story-status.js
+      # SHY-0583: an In Progress story with no open PR and no branch naming it is an
+      # orphan; it blocks every merge until a PR returns it to the backlog (Draft).
+      - name: No In Progress story is orphaned
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node scripts/check-orphaned-stories.js
 
   gate:
     name: PR Gate

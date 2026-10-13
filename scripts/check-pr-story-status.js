@@ -43,10 +43,13 @@ const ALLOWED = new Set(['In Review', 'Done', 'Cancelled']);
 /**
  * The two parts of a story an In Progress edit may NOT touch (SHY-0486).
  *
- * An umbrella deliberately sits at `In Progress` while its slices land, and its
- * running log is the place that records them. This gate refused any edit to it,
- * so the only ways to record progress were to lie about the status or to keep
- * the record somewhere the story does not point at. Neither is acceptable.
+ * A story being worked records its progress in its running log. This gate
+ * refused any edit to an In Progress story, so the only ways to record progress
+ * were to lie about the status or to keep the record somewhere the story does not
+ * point at. Neither is acceptable. (A story is In Progress only while a branch or
+ * an open PR is working it; an "umbrella" is not kept In Progress between its
+ * child stories. Shyden 2026-10-13: "if a ticket is not in progress then it
+ * should not be marked as in progress"; enforced by check-orphaned-stories.js.)
  *
  * So a body-only change to an In Progress story is allowed, and "body-only" is
  * defined by what did NOT change: the frontmatter and the Acceptance Criteria
@@ -156,7 +159,7 @@ function main() {
     if (ALLOWED.has(status)) {
       process.stdout.write(`pre-merge-gate: ${file} status "${status}" OK\n`);
     } else if (status === 'In Progress' && code === 'M') {
-      // SHY-0486 — a running-log append on a story that is deliberately open.
+      // SHY-0486 — a running-log append on a story that is being worked.
       const beforeText = fileAt(base, file);
       const fmSame = beforeText !== null && frontmatterOf(beforeText) === frontmatterOf(content);
       const acSame =

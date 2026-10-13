@@ -3,7 +3,8 @@
  * check-orphaned-stories.js — SHY-0583.
  *
  * Fails while any story is `In Progress` and nothing is working it: no open
- * pull request (by title or head branch) and no remote branch names its id.
+ * pull request (by title or head branch) names its id, and no remote branch names
+ * it that has no closed pull request (a branch counts until its PR closes).
  * Shyden, 2026-10-13: an In Progress story with no branch or PR is an error and
  * "should be returned to the backlog ... these must be fixed right away". It
  * runs in the required Pre-Merge Gate on every pull request, against that PR's
@@ -46,11 +47,17 @@ function names(text, id) {
 }
 
 /** The stories that no open PR (title or head branch) and no remote branch names. */
-function findOrphans(stories, openPrs, branches) {
+/**
+ * The stories nothing claims. An open PR naming the id always claims it; a remote
+ * branch naming it claims it only while that branch has no closed PR, merged or
+ * not (`closedHeads`; Shyden 2026-10-13: "Branch counts until its PR closes"), so
+ * a leftover branch cannot hide an abandoned story.
+ */
+function findOrphans(stories, openPrs, branches, closedHeads) {
   return stories.filter(
     ({ id }) =>
       !openPrs.some((pr) => names(pr.title, id) || names(pr.headRefName, id)) &&
-      !branches.some((b) => names(b, id)),
+      !branches.some((b) => names(b, id) && !closedHeads.includes(b)),
   );
 }
 
@@ -67,7 +74,7 @@ function parseHeads(output) {
 }
 
 function main() {
-  let stories, openPrs, branches;
+  let stories, openPrs, branches, closedHeads;
   try {
     const files = fs
       .readdirSync(STORY_DIR)
@@ -106,11 +113,29 @@ function main() {
     branches = parseHeads(
       execFileSync('git', ['ls-remote', '--heads', 'origin'], { encoding: 'utf8' }),
     );
+    // A branch counts only while it has no closed PR: ask for each branch that names a story.
+    const candidates = branches.filter((b) => stories.some(({ id }) => names(b, id)));
+    closedHeads = candidates.filter((b) => {
+      const closed = JSON.parse(
+        execFileSync(
+          'gh',
+          ['pr', 'list', '--state', 'closed', '--head', b, '--limit', '1', '--json', 'number'],
+          {
+            encoding: 'utf8',
+          },
+        ),
+      );
+      if (!Array.isArray(closed)) throw new Error(`gh pr list --head ${b} did not print a list`);
+      return closed.length > 0;
+    });
+    process.stdout.write(
+      `orphan-check: ${closedHeads.length} of ${candidates.length} candidate branches have a closed PR\n`,
+    );
   } catch (err) {
     process.stderr.write(`::error::orphan-check: could not look: ${err.message}\n`);
     return 2;
   }
-  const orphans = findOrphans(stories, openPrs, branches);
+  const orphans = findOrphans(stories, openPrs, branches, closedHeads);
   process.stdout.write(
     `orphan-check: ${openPrs.length} open PRs and ${branches.length} branches searched\n`,
   );
