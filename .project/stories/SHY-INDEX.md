@@ -408,6 +408,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0581](SHY-0581-roadmap-batch-7-safety-and-compliance.md) | P1 | L | chore | Roadmap batch: the 20 "Safety & Compliance" entries become tracked stories | 📝 Draft | — |  |
 | [SHY-0582](SHY-0582-roadmap-batch-8-website-and-presence.md) | P1 | L | chore | Roadmap batch: the 22 "Website & Presence" entries become tracked stories | 📝 Draft | — |  |
 | [SHY-0583](SHY-0583-an-orphaned-in-progress-story-returns-to-the-backlog.md) | P0 | M | infra | An In Progress story with no branch or pull request goes back to the backlog, and the gate lets it | 👀 In Review | — |  |
+| [SHY-0584](SHY-0584-the-board-id-map-rides-inside-the-pull-request.md) | P1 | M | infra | The board id-map rides inside the pull request, so develop never moves under an open PR | 📝 Draft | — |  |
 
 ## Done
 

@@ -47,7 +47,7 @@ describe('findOrphans', () => {
   const stories = [{ id: 'SHY-0113', file: '.project/stories/SHY-0113-x.md' }];
 
   test('a story nothing names is an orphan', () => {
-    expect(findOrphans(stories, [], ['develop', 'main'])).toEqual(stories);
+    expect(findOrphans(stories, [], ['develop', 'main'], [])).toEqual(stories);
   });
 
   test('an open pull request whose title names the id claims it', () => {
@@ -56,18 +56,19 @@ describe('findOrphans', () => {
         stories,
         [{ title: 'SHY-0113: rooms on real services', headRefName: 'fix/rooms' }],
         [],
+        [],
       ),
     ).toEqual([]);
   });
 
   test('an open pull request whose head branch names the id claims it', () => {
     expect(
-      findOrphans(stories, [{ title: 'rooms', headRefName: 'story/SHY-0113-rooms' }], []),
+      findOrphans(stories, [{ title: 'rooms', headRefName: 'story/SHY-0113-rooms' }], [], []),
     ).toEqual([]);
   });
 
   test('a remote branch naming the id claims it, in any case and without the hyphen', () => {
-    expect(findOrphans(stories, [], ['chore/shy0113-slice'])).toEqual([]);
+    expect(findOrphans(stories, [], ['chore/shy0113-slice'], [])).toEqual([]);
   });
 
   test('a longer number that contains the id does not claim it', () => {
@@ -76,8 +77,27 @@ describe('findOrphans', () => {
         stories,
         [{ title: 'SHY-01130 x', headRefName: 'story/SHY-01131-y' }],
         ['story/shy-101130'],
+        [],
       ),
     ).toEqual(stories);
+  });
+
+  // Shyden 2026-10-13: "Branch counts until its PR closes".
+  test('a remote branch whose pull request was closed does not claim it', () => {
+    expect(findOrphans(stories, [], ['story/SHY-0113-rooms'], ['story/SHY-0113-rooms'])).toEqual(
+      stories,
+    );
+  });
+
+  test('an open pull request still claims it after an older branch had its pull request closed', () => {
+    expect(
+      findOrphans(
+        stories,
+        [{ title: 'rooms', headRefName: 'story/SHY-0113-rooms-2' }],
+        ['story/SHY-0113-rooms'],
+        ['story/SHY-0113-rooms'],
+      ),
+    ).toEqual([]);
   });
 });
 

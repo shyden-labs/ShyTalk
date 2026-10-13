@@ -30,8 +30,8 @@ Measured the same day: of 506 story files on develop, one was In Progress, SHY-0
 
 - [x] `scripts/check-pr-story-status.js` passes a story that was In Progress at the base and is Draft at the head ("returned to the backlog"), whatever else changed in it, when the pull request changes nothing outside `.project/`.
 - [x] A new `scripts/check-orphaned-stories.js` fails, naming each one, while any story file is In Progress and no open pull request (title or head branch) and no remote branch names its id. The decision is a pure function, unit-tested in-process with no git, network or child process.
-- [ ] It runs in the required Pre-Merge Gate job on every pull request, against the PR's own tree, with the workflow token.
-- [ ] SHY-0113 goes back to Draft with its score (13) and a running-log note saying why.
+- [x] It runs in the required Pre-Merge Gate job on every pull request, against the PR's own tree, with the workflow token (step "No In Progress story is orphaned").
+- [x] SHY-0113 goes back to Draft with its score (13) and a running-log note saying why (PR #2323; its Pre-Merge Gate printed "In Progress → Draft — returned to the backlog OK").
 
 ### Error paths
 
@@ -41,6 +41,7 @@ Measured the same day: of 506 story files on develop, one was In Progress, SHY-0
 
 - [x] The scope is read from the unfiltered diff, so a deleted code file counts as a change outside `.project/`.
 - [x] An id inside a longer number (SHY-01130) does not claim SHY-0113; `shy0113` and `SHY-0113` both do.
+- [x] A branch claims a story only while it has no closed pull request, merged or not; an open pull request always claims it (Shyden 2026-10-13: "Branch counts until its PR closes"). `gh pr list --state closed` includes merged PRs (checked against #2314).
 
 ### Performance
 
@@ -111,3 +112,5 @@ All criteria ticked; the backlog-return line seen in a real PR's Pre-Merge Gate 
 
 - **2026-10-13**: Filed and implemented in one PR at P0 on Shyden's instruction ("must be fixed right away"). Unblocks PR #2323 (SHY-0537), which scores SHY-0113.
 - **Order (three PRs, forced by the rule itself):** this PR changes code, so by its own scope rule it cannot return SHY-0113; and wiring the orphan check now would fail on SHY-0113 until it is returned. So: (1) this PR, the gate exemption and the orphan-check script, not yet wired; (2) PR #2323 (SHY-0537, `.project/` only) returns SHY-0113 to Draft with its score, the first real use of the exemption; (3) a follow-up PR wires the orphan check into the Pre-Merge Gate, green because no orphan is left.
+- **2026-10-13 (part 1 merged as #2324; #2323 merged with SHY-0113 returned)**: Shyden on "umbrella" stories: *"if a ticket is not in progress then it should not be marked as in progress"*, so an umbrella goes back to Draft between child stories; the SHY-0486 comment in the gate now says so. On leftover branches: *"Branch counts until its PR closes"*. The rule is global for every project (*"every project, so update the template too"*): repo-template #10 / PR #11; yawelo-idle, shyden.co.uk (#747) and steadyhand (#317) swept their boards and ticketed their checks.
+- **Part 2 (this PR)**: wires the check into the Pre-Merge Gate, adds the closed-PR rule, rewrites the umbrella comment.
