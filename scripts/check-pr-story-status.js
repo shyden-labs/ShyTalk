@@ -17,6 +17,13 @@
  * not implemented. Moving OUT of Draft is what implementation does, and that
  * move is still refused until the story reaches In Review.
  *
+ * SHY-0583 — a story that was `In Progress` at the base and is `Draft` at the
+ * head has been returned to the backlog (Shyden 2026-10-13: an In Progress story
+ * with no branch or PR "should be returned to the backlog"). It passes only in a
+ * PR that changes nothing outside `.project/`, read from the UNFILTERED diff so a
+ * deleted file counts: an implementation PR cannot send its story back to dodge
+ * In Review.
+ *
  * Read-only: never executes scanned files; spawns `git` with an arg array (no
  * shell); no network, no credentials.
  *
@@ -116,6 +123,19 @@ function main() {
     return 2;
   }
 
+  let onlyProject;
+  try {
+    onlyProject = execFileSync('git', ['diff', '--name-only', `${base}...${head}`], {
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter(Boolean)
+      .every((p) => p.startsWith('.project/'));
+  } catch (err) {
+    fail(`pre-merge-gate: git diff --name-only ${base}...${head} failed: ${err.message}`);
+    return 2;
+  }
+
   const stories = entries.filter((e) => STORY_RE.test(e.file));
   if (stories.length === 0) {
     process.stdout.write('pre-merge-gate: no story .md in the diff — not applicable, skipping\n');
@@ -138,11 +158,9 @@ function main() {
     } else if (status === 'In Progress' && code === 'M') {
       // SHY-0486 — a running-log append on a story that is deliberately open.
       const beforeText = fileAt(base, file);
-      const fmSame =
-        beforeText !== null && frontmatterOf(beforeText) === frontmatterOf(content);
+      const fmSame = beforeText !== null && frontmatterOf(beforeText) === frontmatterOf(content);
       const acSame =
-        beforeText !== null &&
-        acceptanceCriteriaOf(beforeText) === acceptanceCriteriaOf(content);
+        beforeText !== null && acceptanceCriteriaOf(beforeText) === acceptanceCriteriaOf(content);
       if (fmSame && acSame) {
         process.stdout.write(
           `pre-merge-gate: ${file} is In Progress, but the change is body-only ` +
@@ -170,6 +188,15 @@ function main() {
       // as Draft, so it fails closed.
       process.stdout.write(
         `pre-merge-gate: ${file} Draft → Draft — backlog maintenance exemption OK\n`,
+      );
+    } else if (
+      status === 'Draft' &&
+      onlyProject &&
+      statusOf(fileAt(base, from)) === 'In Progress'
+    ) {
+      // SHY-0583 — an abandoned story goes back to the backlog, in a .project-only PR.
+      process.stdout.write(
+        `pre-merge-gate: ${file} In Progress → Draft — returned to the backlog OK\n`,
       );
     } else {
       fail(
