@@ -23,69 +23,14 @@
  *   BUNDLE_ID — defaults to com.shyden.shytalk
  */
 
-const crypto = require('node:crypto');
-const fs = require('node:fs');
+const { clientFromEnv } = require('./app-store-connect.js');
 
-const KEY_ID = process.env.APP_STORE_CONNECT_KEY_ID;
-const ISSUER_ID = process.env.APP_STORE_CONNECT_ISSUER_ID;
-// Resolve .p8 path: explicit env > $RUNNER_TEMP (current setup-ios-signing)
-// > legacy $HOME (pre Phase-0 #63). Pick whichever exists.
-const explicitPath = process.env.APP_STORE_CONNECT_KEY_PATH;
-const runnerTempPath = process.env.RUNNER_TEMP
-  ? `${process.env.RUNNER_TEMP}/private_keys/AuthKey_${KEY_ID}.p8`
-  : null;
-const homePath = `${process.env.HOME}/private_keys/AuthKey_${KEY_ID}.p8`;
-const KEY_PATH =
-  explicitPath ||
-  (runnerTempPath && fs.existsSync(runnerTempPath) ? runnerTempPath : homePath);
 const BUNDLE_ID = process.env.BUNDLE_ID || 'com.shyden.shytalk';
 
-if (!KEY_ID || !ISSUER_ID) {
-  console.error('::error::APP_STORE_CONNECT_KEY_ID and APP_STORE_CONNECT_ISSUER_ID required');
-  process.exit(1);
-}
-if (!fs.existsSync(KEY_PATH)) {
-  console.error(`::error::App Store Connect API key not found at ${KEY_PATH}`);
-  process.exit(1);
-}
-
-function generateJwt() {
-  const key = fs.readFileSync(KEY_PATH, 'utf8');
-  const header = { alg: 'ES256', kid: KEY_ID, typ: 'JWT' };
-  const now = Math.floor(Date.now() / 1000);
-  // Apple rejects tokens with exp > 20 min in the future
-  const payload = { iss: ISSUER_ID, iat: now, exp: now + 1200, aud: 'appstoreconnect-v1' };
-  const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url');
-  const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signingInput = `${headerB64}.${payloadB64}`;
-  const sig = crypto
-    .createSign('SHA256')
-    .update(signingInput)
-    .sign({ key, dsaEncoding: 'ieee-p1363' })
-    .toString('base64url');
-  return `${signingInput}.${sig}`;
-}
-
-async function asc(method, path, body) {
-  const jwt = generateJwt();
-  const res = await fetch(`https://api.appstoreconnect.apple.com${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`ASC API ${method} ${path} → ${res.status}: ${text}`);
-  }
-  // 204 No Content on PATCH success
-  if (res.status === 204) return null;
-  return res.json();
-}
-
 (async () => {
+  // SHY-0361: the client (key lookup, JWT, errors) is shared with
+  // set-testflight-whats-new.js in app-store-connect.js.
+  const asc = clientFromEnv();
   console.log(`Looking up app for bundle ID: ${BUNDLE_ID}`);
   const apps = await asc('GET', `/v1/apps?filter[bundleId]=${BUNDLE_ID}`);
   if (!apps.data || apps.data.length === 0) {
@@ -99,7 +44,9 @@ async function asc(method, path, body) {
   const groups = await asc('GET', `/v1/apps/${app.id}/betaGroups?limit=200`);
   const internalGroups = (groups.data || []).filter((g) => g.attributes.isInternalGroup);
   if (internalGroups.length === 0) {
-    console.warn('::warning::No internal beta groups found. Create one in App Store Connect → TestFlight → Internal Group.');
+    console.warn(
+      '::warning::No internal beta groups found. Create one in App Store Connect → TestFlight → Internal Group.',
+    );
     return;
   }
   console.log(`Found ${internalGroups.length} internal group(s):`);

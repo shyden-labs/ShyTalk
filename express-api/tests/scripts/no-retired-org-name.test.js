@@ -82,7 +82,10 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 1987 -> 1986: dependabot-auto-merge-decision.test.js retired (SHY-0569;
 // its matrix now runs in-process in dependabot-update-type.test.js).
 // 1986 -> 1988: scripts/check-orphaned-stories.js and its test (SHY-0583).
-const FILES_READ_FLOOR = 1988;
+// 1988 -> 1997: scripts/tester-notes.js, list-build-changes.js,
+// app-store-connect.js, set-testflight-whats-new.js, their four tests and
+// deploy-dev-tester-notes.test.js (SHY-0361).
+const FILES_READ_FLOOR = 1997;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

@@ -1,9 +1,9 @@
 ---
 id: SHY-0361
-status: Draft
-owner: unassigned
+status: In Review
+owner: claude
 created: 2026-08-20
-priority: P2
+priority: P1
 effort: S
 estimate: 3
 type: infra
@@ -133,7 +133,7 @@ fails against the current workflow.
 
 | Risk | Mitigation |
 | --- | --- |
-| Notes generation breaks a deploy | Generation is best-effort with a documented fallback; the deploy never fails on notes. |
+| Notes generation breaks a deploy | A gap we can explain (no baseline, a ticket with no story file) gives a plain note and passes. A real fault (a bug in the note code, App Store Connect refusing the text, the build not listed within 15 min) fails that app's job red, naming the cause: Shyden, 2026-10-14, superseding "the deploy never fails on notes". |
 | Internal detail leaks to testers | Notes are built from story title + summary only, never PR bodies or paths; asserted in test. |
 | A stale ticket is named on a config-only deploy | The no-ticket case is an explicit tested branch. |
 
@@ -153,3 +153,26 @@ fails against the current workflow.
   no ticket. As an interim measure the SHY-0358 dev deploy (run 32289832760) was
   dispatched with hand-written notes naming the ticket, proving the shape the
   default should produce.
+- **2026-10-14**: Raised to P1 and started, ahead of SHY-0556. Shyden ruled
+  that a merge into `develop` deploys to dev on its own (SHY-0534), and chose
+  "Now, both": this story first, since every automatic build would otherwise
+  reach testers with no ticket in its notes. Two answers the same day
+  (AskUserQuestion):
+  - A real notes fault fails the app's deploy job red (see Risks); an
+    explicable gap still gives a plain note.
+  - The TestFlight build lookup checks every 30 s and fails at 15 min.
+- **Design.** `list-build-changes` (its own job, so a fault cannot flip the
+  fail-safe scope job) lists each first-parent commit since the scope job's
+  baseline with the areas `scripts/deploy-scope.sh` says it touches.
+  `scripts/tester-notes.js` builds each app's note from the commits touching
+  the backend or that app, so a docs commit that files a ticket is never "what
+  to test". `scripts/set-testflight-whats-new.js` writes the iOS note to
+  "What to Test"; the App Store Connect client moved to
+  `scripts/app-store-connect.js`, shared with
+  `ensure-testflight-auto-distribution.js`.
+- **Assumed, not documented:** neither Firebase App Distribution nor
+  TestFlight publishes a tester-note length limit (searched 2026-10-14). Notes
+  are capped at 4000, App Store's documented limit for its own "What's New".
+- **Not classified as a deploy area:** the four new scripts change only what
+  testers read, so `deploy-scope.sh` does not list them; their first real run
+  is this story's own dev deploy (DoD).
