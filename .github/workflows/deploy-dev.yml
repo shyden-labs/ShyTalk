@@ -152,6 +152,36 @@ jobs:
             echo "| ios | ${{ inputs.ios-testers }} | ${{ steps.scope.outputs.ios }} | ${{ inputs.ios-testers && steps.scope.outputs.ios == 'true' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # ═══════════════════════════════════════════════════════════════════
+  # What does this deploy carry? (SHY-0361 — tester notes name the ticket)
+  # ═══════════════════════════════════════════════════════════════════
+  #
+  # Lists each first-parent commit since the same baseline the scope job used,
+  # with the areas scripts/deploy-scope.sh says that commit touches (the one
+  # classifier; no second list of paths). The app jobs turn it into the note
+  # testers read. Its own job, not a step in detect-deploy-scope: that job
+  # fails SAFE, and a fault here must instead turn the app jobs red (Shyden,
+  # 2026-10-14: a real notes fault fails the deploy). Backend and web do not
+  # wait on it.
+  list-build-changes:
+    name: List Build Changes
+    needs: detect-deploy-scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changes: ${{ steps.list.outputs.changes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: List the commits since the last dev deploy
+        id: list
+        env:
+          BASELINE: ${{ needs.detect-deploy-scope.outputs.baseline }}
+        run: node scripts/list-build-changes.js >> "$GITHUB_OUTPUT"
+
   deploy-backend-dev:
     name: Deploy Backend to Dev
     needs: detect-deploy-scope
@@ -420,13 +450,14 @@ jobs:
     # talk to dev-api and break if the backend deploy didn't succeed.
     # Pushing a build to internal testers that's guaranteed to error
     # on the first sign-in attempt wastes their day.
-    needs: [deploy-backend-dev, detect-deploy-scope]
+    needs: [deploy-backend-dev, detect-deploy-scope, list-build-changes]
     # See deploy-web-dev for `success || skipped` rationale (preserves
     # `inputs.backend=false` Android-only hotfix path).
     # See deploy-web-dev `always()` + allowlist rationale (run 25280868804).
     if: |
       always() &&
       inputs.android-testers && needs.detect-deploy-scope.outputs.android == 'true' &&
+      needs.list-build-changes.result == 'success' &&
       (needs.deploy-backend-dev.result == 'success' || needs.deploy-backend-dev.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -545,6 +576,33 @@ jobs:
           echo "apk_path=${apks[0]}" >> "$GITHUB_OUTPUT"
           echo "Found APK: ${apks[0]}"
 
+      # SHY-0361 — the note names the ticket(s) this build carries and says
+      # where it was built from. A hand-written `release-notes` input still
+      # wins. Echoed here so a failed distribution can be diagnosed from the
+      # log; a fault fails the job (Shyden, 2026-10-14).
+      - name: Write tester notes
+        id: notes
+        env:
+          CHANGES: ${{ needs.list-build-changes.outputs.changes }}
+          DEPLOY_REF: ${{ inputs.ref != '' && inputs.ref || github.ref_name }}
+          DEPLOY_TRIGGER: ${{ github.event_name }}
+          RELEASE_NOTES_INPUT: ${{ inputs.release-notes }}
+          DEPLOY_SHA: ${{ steps.deployed-sha.outputs.sha }}
+        run: |
+          set -euo pipefail
+          notes_file="$RUNNER_TEMP/tester-notes.txt"
+          node scripts/tester-notes.js android > "$notes_file"
+          echo "Tester notes:"
+          cat "$notes_file"
+          delimiter="NOTES_$(openssl rand -hex 16)"
+          {
+            echo "file=$notes_file"
+            echo "text<<$delimiter"
+            cat "$notes_file"
+            echo
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Upload to Firebase App Distribution
         if: steps.find-apk.outputs.found == 'true'
         uses: wzieba/Firebase-Distribution-Github-Action@bd494989dd4bec0343f78adee87fe66e48279ad6 # v1
@@ -553,7 +611,7 @@ jobs:
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}
           groups: internal-testers
           file: ${{ steps.find-apk.outputs.apk_path }}
-          releaseNotes: ${{ inputs.release-notes != '' && inputs.release-notes || format('Dev build from {0} ({1})', (inputs.ref != '' && inputs.ref || github.ref_name), steps.deployed-sha.outputs.sha) }}
+          releaseNotes: ${{ steps.notes.outputs.text }}
 
   distribute-ios:
     name: Distribute iOS to TestFlight
@@ -562,13 +620,14 @@ jobs:
     # deploy didn't succeed. TestFlight build numbers are also a finite
     # resource (Apple-rate-limited per session); skipping a doomed
     # build saves a slot and keeps testers on the last known-good IPA.
-    needs: [deploy-backend-dev, detect-deploy-scope]
+    needs: [deploy-backend-dev, detect-deploy-scope, list-build-changes]
     # See deploy-web-dev for `success || skipped` rationale (preserves
     # `inputs.backend=false` iOS-only hotfix path).
     # See deploy-web-dev `always()` + allowlist rationale (run 25280868804).
     if: |
       always() &&
       inputs.ios-testers && needs.detect-deploy-scope.outputs.ios == 'true' &&
+      needs.list-build-changes.result == 'success' &&
       (needs.deploy-backend-dev.result == 'success' || needs.deploy-backend-dev.result == 'skipped')
     # Migrated 2026-05-20 from self-hosted Mac (shytalk-mac) to GitHub-hosted
     # macos-latest per the no-self-hosted-runners policy. The self-hosted Mac
@@ -849,6 +908,7 @@ jobs:
       # frees the runner to run cleanup and surfaces a clear "this step
       # timed out" signal instead of the opaque outer-job timeout.
       - name: Build, archive, and export iOS app
+        id: archive
         timeout-minutes: 50
         env:
           # SHY-0416 — the same credential `distribute-android` passes. Without
@@ -906,6 +966,9 @@ jobs:
           # and iOS uses CURRENT_PROJECT_VERSION=1 from project.pbxproj
           # — both fine for non-distributed local builds.
           echo "Setting CFBundleVersion=${BUILD_NUMBER} MARKETING_VERSION=${VERSION_NAME}"
+          # SHY-0361 — set-testflight-whats-new.js finds the build by both.
+          echo "build_number=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "marketing_version=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
           cd iosApp
           # The app's Release config is manual-signed for App Store distribution
           # PER-TARGET in project.pbxproj (CODE_SIGN_STYLE=Manual + "Apple
@@ -983,6 +1046,32 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      # SHY-0361 — the note names the ticket(s) this build carries and says
+      # where it was built from. A hand-written `release-notes` input still
+      # wins. Echoed here so a failed distribution can be diagnosed from the
+      # log; a fault fails the job (Shyden, 2026-10-14).
+      - name: Write tester notes
+        id: notes
+        env:
+          CHANGES: ${{ needs.list-build-changes.outputs.changes }}
+          DEPLOY_REF: ${{ inputs.ref != '' && inputs.ref || github.ref_name }}
+          DEPLOY_TRIGGER: ${{ github.event_name }}
+          RELEASE_NOTES_INPUT: ${{ inputs.release-notes }}
+        run: |
+          set -euo pipefail
+          notes_file="$RUNNER_TEMP/tester-notes.txt"
+          DEPLOY_SHA="$(git rev-parse HEAD)" node scripts/tester-notes.js ios > "$notes_file"
+          echo "Tester notes:"
+          cat "$notes_file"
+          delimiter="NOTES_$(openssl rand -hex 16)"
+          {
+            echo "file=$notes_file"
+            echo "text<<$delimiter"
+            cat "$notes_file"
+            echo
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Upload to TestFlight
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -1024,6 +1113,20 @@ jobs:
         # for the implementation. Idempotent: silently no-ops when groups
         # already have hasAccessToAllBuilds=true.
         run: node scripts/ensure-testflight-auto-distribution.js
+
+      # SHY-0361 — the same note on TestFlight's "What to Test". App Store
+      # Connect lists the build some minutes after upload: the script looks
+      # every 30 s and fails at 15 min naming the build (Shyden, 2026-10-14).
+      # The step cap sits just above that ceiling.
+      - name: Set TestFlight What to Test
+        timeout-minutes: 17
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          TESTER_NOTES_FILE: ${{ steps.notes.outputs.file }}
+          BUILD_NUMBER: ${{ steps.archive.outputs.build_number }}
+          MARKETING_VERSION: ${{ steps.archive.outputs.marketing_version }}
+        run: node scripts/set-testflight-whats-new.js
 
       - name: Clean up signing material
         if: always()
