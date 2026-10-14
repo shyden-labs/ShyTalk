@@ -85,7 +85,9 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 1988 -> 1997: scripts/tester-notes.js, list-build-changes.js,
 // app-store-connect.js, set-testflight-whats-new.js, their four tests and
 // deploy-dev-tester-notes.test.js (SHY-0361).
-const FILES_READ_FLOOR = 1997;
+// 1997 -> 2002: scripts/deploy-plan.js, deploy-failure-issue.js, their two
+// tests and deploy-dev-on-merge.test.js (SHY-0534).
+const FILES_READ_FLOOR = 2002;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

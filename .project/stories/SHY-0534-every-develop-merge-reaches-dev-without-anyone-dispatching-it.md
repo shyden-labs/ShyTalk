@@ -1,7 +1,7 @@
 ---
 id: SHY-0534
-status: Draft
-owner: unassigned
+status: In Progress
+owner: claude
 created: 2026-09-19
 priority: P1
 effort: M
@@ -84,7 +84,8 @@ missed. Two options were declined:
 
 ### Edge cases
 
-- [ ] **The default branch is `main`.** GitHub runs a `schedule:` trigger from
+- [ ] **(Obsolete since 2026-10-07: `develop` is the default branch, read
+      2026-10-14, so the schedule runs `develop`'s copy.) The default branch is `main`.** GitHub runs a `schedule:` trigger from
       the default branch's copy of the workflow, and checks out that branch
       unless told otherwise. The daily run must name `develop` explicitly,
       following the pattern in `playwright-nightly.yml:49`
@@ -301,3 +302,25 @@ fails against it.
   - Shyden chose every merge plus a daily net, via AskUserQuestion, over a
     daily batch only and over server per merge with apps daily.
   - Placed in EPIC-0001, beside its sibling SHY-0519.
+- **2026-10-14**: Started. Shyden ruled again, relayed from the shyden.co.uk
+  session: *"[Everything] but only if something is touched in every area. be
+  sensible and only deploy what's got changes to it. ShyTalk already has this
+  logic to ensure that only the right things are deployed"*. He chose to run
+  SHY-0361 first (merged as #2328), then this, ahead of SHY-0556.
+  - **One decision point.** `scripts/deploy-plan.js`: an area deploys when
+    it is requested AND changed. "Changed" is `deploy-scope.sh`, unchanged.
+    "Requested" is the dispatch box on a hand-started run, and everything on
+    a push or the daily run. Every deploy job reads only the plan's outputs. On
+    a push every `inputs.*` is null, so the old `inputs.backend && ...` would
+    have skipped everything, and `inputs.seed-personas != false` is false
+    for null in GitHub's expressions.
+  - **One sha per run.** Every checkout is `inputs.ref || github.sha`, not
+    `github.ref`, so a merge landing mid-run cannot make the scope job, the
+    change list and the deploy jobs see different commits.
+  - **Sanity checks** now run only when the backend or web actually
+    deployed (before, an Android-only run checked unchanged pages).
+  - **Failure report.** `scripts/deploy-failure-issue.js`: one issue
+    "Automatic dev deploy is failing", assigned to ShydenMcM; push and
+    schedule runs only.
+  - The "default branch is main" edge case is obsolete: `develop` has been
+    the default since 2026-10-07, so the schedule is live once this merges.
