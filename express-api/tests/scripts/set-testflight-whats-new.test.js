@@ -7,7 +7,8 @@
  * build's TestFlight "What to Test" text. The build only appears in App Store
  * Connect some minutes after upload, so the script waits for it, checking every
  * 30 s, and fails at 15 min naming the build (Shyden, 2026-10-14). Loaded
- * in-process with a stand-in client and clock: no network, no real waiting.
+ * in-process with a stand-in client and Jest's fake clock: no network, no real
+ * waiting.
  */
 
 const {
@@ -30,19 +31,23 @@ function fakeAsc(replies) {
   return { asc, calls };
 }
 
-/** A clock that only moves when the script waits. */
-function fakeClock() {
-  let now = 0;
-  const waits = [];
-  return {
-    now: () => now,
-    wait: async (ms) => {
-      waits.push(ms);
-      now += ms;
-    },
-    waits,
-  };
+/**
+ * Settle `promise`, advancing Jest's fake clock through every pause it
+ * schedules, and return its outcome. The wait runs through pollUntil, the
+ * repository's one sanctioned poll (SHY-0245), on the real timer API; the fake
+ * clock makes 15 minutes of looking take no time.
+ */
+async function settle(promise) {
+  const outcome = promise.then(
+    (value) => ({ value }),
+    (error) => ({ error }),
+  );
+  await jest.runAllTimersAsync();
+  return outcome;
 }
+
+beforeEach(() => jest.useFakeTimers({ now: 0 }));
+afterEach(() => jest.useRealTimers());
 
 const target = { appId: 'APP1', buildNumber: '812', marketingVersion: '0.97.1' };
 
@@ -66,7 +71,7 @@ describe('appIdFor', () => {
 describe('findBuild', () => {
   test('asks for exactly this build number in this marketing version', async () => {
     const { asc, calls } = fakeAsc([{ data: [{ id: 'B1' }] }]);
-    await findBuild(asc, target, fakeClock());
+    await settle(findBuild(asc, target));
     expect(calls[0]).toEqual({
       method: 'GET',
       path: '/v1/builds?filter[app]=APP1&filter[version]=812&filter[preReleaseVersion.version]=0.97.1&limit=2',
@@ -75,39 +80,38 @@ describe('findBuild', () => {
   });
 
   test('a build already there is returned without waiting', async () => {
-    const clock = fakeClock();
     const { asc } = fakeAsc([{ data: [{ id: 'B1' }] }]);
-    await expect(findBuild(asc, target, clock)).resolves.toBe('B1');
-    expect(clock.waits).toEqual([]);
+    expect(await settle(findBuild(asc, target))).toEqual({ value: 'B1' });
+    expect(Date.now()).toBe(0);
   });
 
   test('a build that appears on the third look is returned after two 30 s waits', async () => {
-    const clock = fakeClock();
     const { asc } = fakeAsc([{ data: [] }, { data: [] }, { data: [{ id: 'B3' }] }]);
-    await expect(findBuild(asc, target, clock)).resolves.toBe('B3');
-    expect(clock.waits).toEqual([30_000, 30_000]);
+    expect(await settle(findBuild(asc, target))).toEqual({ value: 'B3' });
+    expect(Date.now()).toBe(60_000);
   });
 
   test('a build that never appears fails at 15 min, naming it', async () => {
-    const clock = fakeClock();
     const { asc, calls } = fakeAsc(Array.from({ length: 40 }, () => ({ data: [] })));
-    await expect(findBuild(asc, target, clock)).rejects.toThrow(
+    const { error } = await settle(findBuild(asc, target));
+    expect(error.message).toMatch(
       /build 812 \(0\.97\.1\) did not appear in App Store Connect within 15 min/,
     );
-    expect(clock.now()).toBe(900_000);
+    expect(Date.now()).toBe(900_000);
     expect(calls).toHaveLength(31);
   });
 
   test('two builds with the same number and version is a fault, not a guess', async () => {
     const { asc } = fakeAsc([{ data: [{ id: 'B1' }, { id: 'B2' }] }]);
-    await expect(findBuild(asc, target, fakeClock())).rejects.toThrow(/2 builds.*812/);
+    const { error } = await settle(findBuild(asc, target));
+    expect(error.message).toMatch(/2 builds.*812/);
   });
 
   test('an API refusal is not waited out', async () => {
-    const clock = fakeClock();
-    const { asc } = fakeAsc([new Error('ASC API GET /v1/builds → 401: unauthorised')]);
-    await expect(findBuild(asc, target, clock)).rejects.toThrow(/401/);
-    expect(clock.waits).toEqual([]);
+    const { asc, calls } = fakeAsc([new Error('ASC API GET /v1/builds → 401: unauthorised')]);
+    const { error } = await settle(findBuild(asc, target));
+    expect(error.message).toMatch(/401/);
+    expect([Date.now(), calls.length]).toEqual([0, 1]);
   });
 });
 
