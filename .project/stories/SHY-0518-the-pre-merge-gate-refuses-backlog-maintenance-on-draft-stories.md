@@ -1,6 +1,6 @@
 ---
 id: SHY-0518
-status: In Review
+status: Done
 owner: claude
 created: 2026-09-04
 priority: P1
@@ -160,8 +160,8 @@ Draft, and that transition is exactly what the gate still guards.
 
 ## Definition of Done
 
-- [ ] Merged to `develop`, all checks green.
-- [ ] The first Draft-maintenance PR after it merges passes the gate with the
+- [x] Merged to `develop`, all checks green.
+- [x] The first Draft-maintenance PR after it merges passes the gate with the
       new line; recorded in Notes.
 
 ## Notes
@@ -191,3 +191,8 @@ Draft, and that transition is exactly what the gate still guards.
   files; SHY-0574 moves them out of the unit tier.
 
 Reviewed-up-to: f73fb62f3cd70afd712d9b8fe141ab2c86db37f1
+- **2026-10-15 (Done)**: merged as #2311 (2026-10-12 23:49Z), `PR Gate`
+  success on its head. The first Draft-maintenance PR after it, #2314
+  (SHY-0536, adding `estimate:` to 164 Draft stories), merged 2026-10-13
+  00:20Z with `PR Gate` and `Story status must be In Review before merge`
+  both success on its head; #2323 (SHY-0537) followed, also green.

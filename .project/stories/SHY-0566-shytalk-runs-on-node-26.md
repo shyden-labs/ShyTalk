@@ -10,6 +10,7 @@ type: infra
 roadmap_ids: []
 mvp: false
 epic: EPIC-0001
+blocked_by: [SHY-0595]
 ---
 
 # SHY-0566: ShyTalk runs on Node 26, 26.3 or later, everywhere
@@ -118,3 +119,6 @@ Node 26.3.0 wedged the full Jest suite on 2026-06-09.
   fixed worktree, refused Node 26. Scored 8 from measurement: seven
   workflows, two package files, the guard and its test, a pin test, and a
   per-test CPU comparison across two runtimes.
+- **2026-10-15**: Blocked by SHY-0595. On Node 26 (npm 11.20) `npm ci`
+  warns about 5 undecided install scripts (`bcrypt` among them); warnings
+  are build failures, so CI on Node 26 needs those decisions first.
