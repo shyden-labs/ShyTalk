@@ -411,6 +411,13 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0584](SHY-0584-the-board-id-map-rides-inside-the-pull-request.md) | P1 | M | infra | The board id-map rides inside the pull request, so develop never moves under an open PR | 📝 Draft | — |  |
 | [SHY-0585](SHY-0585-the-deploy-and-tooling-scripts-are-never-linted.md) | P2 | S | bug | The deploy and tooling scripts are never linted | 📝 Draft | — |  |
 | [SHY-0586](SHY-0586-free-text-workflow-inputs-are-pasted-into-scripts.md) | P2 | S | bug | Free-text workflow inputs are pasted straight into scripts | 📝 Draft | — |  |
+| [SHY-0587](SHY-0587-private-swagger-docs-foundation.md) | P2 | L | infra | Private Swagger docs: the page, the sign-in gate and the "Try it out" rule | 📝 Draft | — |  |
+| [SHY-0588](SHY-0588-admin-api-private-swagger.md) | P2 | M | infra | The admin API has a private Swagger page | 📝 Draft | — |  |
+| [SHY-0589](SHY-0589-app-api-private-swagger.md) | P2 | M | infra | The app API has a private Swagger page | 📝 Draft | — |  |
+| [SHY-0590](SHY-0590-roadmap-api-private-swagger.md) | P2 | XS | infra | The roadmap API has a private Swagger page | 📝 Draft | — |  |
+| [SHY-0591](SHY-0591-system-api-spec-and-private-swagger.md) | P2 | S | infra | The system API has a hand-written spec, contract tests and a private Swagger page | 📝 Draft | — |  |
+| [SHY-0592](SHY-0592-apple-webhook-spec-and-private-swagger.md) | P2 | S | infra | The Apple notifications webhook has a hand-written spec, contract tests and a private Swagger page | 📝 Draft | — |  |
+| [SHY-0593](SHY-0593-test-helpers-spec-and-private-swagger.md) | P2 | S | infra | The test-helper API has a hand-written spec, contract tests and a dev-only private Swagger page | 📝 Draft | — |  |
 
 ## Done
 
