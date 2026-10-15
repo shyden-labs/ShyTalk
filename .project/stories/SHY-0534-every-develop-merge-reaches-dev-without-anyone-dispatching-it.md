@@ -350,3 +350,10 @@ fails against it.
   - Defect found: the scope summary's "will deploy" column read `true` for
     the persona seed and sanity checks while both were skipped. New AC under
     Observability.
+- **2026-10-15**: A docs-only merge deploys nothing, as designed. #2347's
+  merge `eae8f036f33` started Deploy To Dev run 38704243335 (event `push`,
+  attempt 1, success, 43 s, head sha matches the merge). By job name: Detect
+  Deploy Scope, List Build Changes, Seed Personas Report and Report
+  Automatic Deploy ran; Deploy Backend, Deploy Web, Seed Dev Personas, Dev
+  Smoke Tests, Dev Sanity Check, Distribute Android and Distribute iOS were
+  skipped. Read back 2026-10-16.
