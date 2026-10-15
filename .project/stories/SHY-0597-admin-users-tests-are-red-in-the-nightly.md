@@ -1,7 +1,7 @@
 ---
 id: SHY-0597
-status: Draft
-owner: unassigned
+status: In Progress
+owner: claude
 created: 2026-10-15
 priority: P0
 effort: M
@@ -146,3 +146,42 @@ Found 2026-10-15 while reading develop's runs. Shyden ruled it a real bug
 
 - **2026-10-15**: Filed from nightly runs 38371063072, 38524881531 and
   38694041358 on develop. Shyden ruled it a real bug.
+- **2026-10-16, the two failures have different causes.** Evidence: the
+  2026-10-15 nightly's chromium failure traces and Allure results (run
+  38694041358, artifacts `playwright-failures-chromium`,
+  `allure-results-playwright-chromium`). Every chromium test ran on one
+  worker, so every admin spec shared user 100000005.
+- **Cause 1, "Suspended Account" (a product bug).** No suspend path checked
+  for a user already suspended. A second suspension saved the mask
+  "Suspended Account" as the real name, so unsuspend restored the mask for
+  good. The order on 2026-10-15: `admin-appeals.spec.ts` beforeAll suspends
+  (real name saved); test 3 approves (restored); test 4 suspends again (real
+  name saved); test 5 denies (stays suspended); test 6's `reseedAppeal`
+  suspends the suspended user (mask saved); afterAll unsuspends (mask
+  restored). From 06:56:09 every read of the user returns
+  `isSuspended: false`, `displayName: "Suspended Account"`,
+  `preSuspensionDisplayName: null`. Chromium hid it because the DOB failure
+  restarted the worker with a fresh user before `admin-users-profile.spec.ts`
+  ran (07:03:45); firefox, webkit and mobile-safari did not restart there,
+  so they read the mask. The cause is in the product, not the test.
+- **Fix for cause 1 (Shyden ruled 2026-10-16: a second suspension updates
+  the suspension and keeps the real name).** One helper,
+  `suspensionStartedProfileFields` in `express-api/src/utils/suspension.js`,
+  now writes the save-and-mask fields at all four masking sites
+  (`admin-users.js` suspend; `reports.js` resolve, bulk resolve, admin
+  suspend). 10 unit tests on the helper; one route test per site. RED
+  proof: with the old route files restored, exactly the 4 new route tests
+  fail (4 failed, 198 passed); 3 mutants of the helper's rules each killed.
+- **Filed from cause 1:** SHY-0604 (P0, live accounts already hit; Shyden
+  ruled a ticket), SHY-0605 (bio and avatar wiped for good), SHY-0606
+  (identity-graph suspend/unsuspend skip the lifecycle and never restore the
+  profile).
+- **Cause 2, DOB "Saved" missing on chromium (under investigation).** Not
+  leaked state: the retry ran on a fresh user (100000007, DOB `null`) and
+  failed the same way. In both attempts the browser sent no PATCH after the
+  fill and logged nothing; no "Saving" or "failed" feedback appeared, so
+  `autoSaveField` returned before `showFieldFeedback('saving')`. A minimal
+  page in the same Playwright 1.64.0 and Chromium 156.0.8078.4 does fire the
+  document blur listener for `datetime-local` after `fill()` + `blur()`, so
+  the cause is in the admin page. Next: reproduce the single spec on the
+  local stack with a trace.
