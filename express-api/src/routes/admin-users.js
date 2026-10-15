@@ -34,7 +34,11 @@ const { computeDisplayScore } = require('../utils/gcs');
 const { sendSystemPm } = require('../utils/system-pm');
 const { getDoc } = require('../utils/firestore-helpers');
 const log = require('../utils/log');
-const { suspensionEndedFields, SUSPENSION_STARTED_RESET } = require('../utils/suspension');
+const {
+  suspensionEndedFields,
+  SUSPENSION_STARTED_RESET,
+  suspensionStartedProfileFields,
+} = require('../utils/suspension');
 const { sendEmail } = require('../utils/email');
 const { buildDeletionScheduledEmail } = require('../utils/email-templates');
 const { sendPushToUser } = require('../utils/fcm');
@@ -1120,15 +1124,7 @@ router.post('/user/:uniqueId/suspend', async (req, res) => {
         suspensionCanAppeal: body.canAppeal,
         ...SUSPENSION_STARTED_RESET,
         suspendedBy: req.auth.uid,
-        preSuspensionDisplayName: user.displayName ?? user.display_name ?? null,
-        preSuspensionProfilePhotoUrl: user.profilePhotoUrl ?? user.profile_photo_url ?? null,
-        preSuspensionCoverPhotoUrl: user.coverPhotoUrl ?? user.cover_photo_url ?? null,
-        displayName: 'Suspended Account',
-        profilePhotoUrl: null,
-        coverPhotoUrl: null,
-        avatarUrl: null,
-        description: null,
-        currentRoomId: null,
+        ...suspensionStartedProfileFields(user),
       }),
       db.doc(`adminAuditLog/${generateId()}`).set({
         adminId: req.auth.uid,

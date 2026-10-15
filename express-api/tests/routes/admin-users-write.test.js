@@ -1485,4 +1485,36 @@ describe('POST /api/user/:uniqueId/suspend --- cache invalidation', () => {
   });
 });
 
+describe('POST /api/user/:uniqueId/suspend --- already suspended (SHY-0597)', () => {
+  let app;
+  beforeEach(() => {
+    app = createApp();
+    jest.clearAllMocks();
+  });
+  it('keeps the saved real name when an already-suspended user is suspended again', async () => {
+    mockDocGet.mockResolvedValue({
+      exists: true,
+      id: 'u',
+      data: () => ({
+        isSuspended: true,
+        displayName: 'Suspended Account',
+        preSuspensionDisplayName: 'Original Name',
+        gcsScore: 0,
+      }),
+    });
+    const res = await request(app)
+      .post('/api/user/u/suspend')
+      .send({ reason: 'Again', canAppeal: true });
+    await flushPromises();
+    expect(res.status).toBe(200);
+    expect(mockDocUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isSuspended: true,
+        displayName: 'Suspended Account',
+        preSuspensionDisplayName: 'Original Name',
+      }),
+    );
+  });
+});
+
 // --- GET /api/conversations/:id/messages ------------------------------------

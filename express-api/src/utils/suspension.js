@@ -52,4 +52,56 @@ function suspensionEndedFields(restore = {}) {
  */
 const SUSPENSION_STARTED_RESET = Object.freeze({ suspensionAppealStatus: null });
 
-module.exports = { suspensionEndedFields, SUSPENSION_STARTED_RESET };
+/** The display name every suspended account shows in place of its own. */
+const SUSPENDED_DISPLAY_NAME = 'Suspended Account';
+
+/**
+ * The profile fields that begin a suspension: save the profile, then mask it.
+ *
+ * Unsuspend puts the saved profile back (`suspensionEndedFields`). A user who
+ * is already suspended keeps the profile saved by the first suspension (SHY-0597):
+ * saving again would save the mask as the "real" name, and unsuspend would then
+ * restore the mask for good. Where nothing was saved (identity-graph suspend-all
+ * marks a user suspended without masking), the current profile is saved instead,
+ * but never the mask itself.
+ *
+ * @param {object} user the user document as read before the write
+ */
+function suspensionStartedProfileFields(user) {
+  const alreadySuspended = (user.isSuspended ?? user.is_suspended) === true;
+  const keep = (saved, current) => {
+    if (alreadySuspended && saved !== null && saved !== undefined) return saved;
+    return current ?? null;
+  };
+
+  const savedName = keep(
+    user.preSuspensionDisplayName ?? user.pre_suspension_display_name,
+    user.displayName ?? user.display_name,
+  );
+
+  return {
+    preSuspensionDisplayName:
+      alreadySuspended && savedName === SUSPENDED_DISPLAY_NAME ? null : savedName,
+    preSuspensionProfilePhotoUrl: keep(
+      user.preSuspensionProfilePhotoUrl ?? user.pre_suspension_profile_photo_url,
+      user.profilePhotoUrl ?? user.profile_photo_url,
+    ),
+    preSuspensionCoverPhotoUrl: keep(
+      user.preSuspensionCoverPhotoUrl ?? user.pre_suspension_cover_photo_url,
+      user.coverPhotoUrl ?? user.cover_photo_url,
+    ),
+    displayName: SUSPENDED_DISPLAY_NAME,
+    profilePhotoUrl: null,
+    coverPhotoUrl: null,
+    avatarUrl: null,
+    description: null,
+    currentRoomId: null,
+  };
+}
+
+module.exports = {
+  suspensionEndedFields,
+  SUSPENSION_STARTED_RESET,
+  SUSPENDED_DISPLAY_NAME,
+  suspensionStartedProfileFields,
+};

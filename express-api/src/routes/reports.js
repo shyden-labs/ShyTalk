@@ -27,7 +27,11 @@ const { getDoc, queryDocs } = require('../utils/firestore-helpers');
 const { sendFcmToIdentifiers } = require('../utils/fcm');
 const log = require('../utils/log');
 const { findPendingAppeal, createAppeal } = require('../utils/appeals');
-const { suspensionEndedFields, SUSPENSION_STARTED_RESET } = require('../utils/suspension');
+const {
+  suspensionEndedFields,
+  SUSPENSION_STARTED_RESET,
+  suspensionStartedProfileFields,
+} = require('../utils/suspension');
 const { createWarning } = require('./admin-users');
 const { MAX_ATTACHMENTS } = require('../utils/attachment-limits');
 const {
@@ -617,17 +621,7 @@ router.post('/reports/:id/resolve', async (req, res) => {
           suspensionCanAppeal: canAppeal,
           ...SUSPENSION_STARTED_RESET,
           suspendedBy: req.auth.uid,
-          preSuspensionDisplayName: reportedUser?.displayName ?? reportedUser?.display_name ?? null,
-          preSuspensionProfilePhotoUrl:
-            reportedUser?.profilePhotoUrl ?? reportedUser?.profile_photo_url ?? null,
-          preSuspensionCoverPhotoUrl:
-            reportedUser?.coverPhotoUrl ?? reportedUser?.cover_photo_url ?? null,
-          displayName: 'Suspended Account',
-          profilePhotoUrl: null,
-          coverPhotoUrl: null,
-          avatarUrl: null,
-          description: null,
-          currentRoomId: null,
+          ...suspensionStartedProfileFields(reportedUser ?? {}),
         });
         clearSuspensionCache(Number(reportedUniqueId)); // Phase 2H finding #1
 
@@ -875,17 +869,7 @@ router.post('/reports/resolve-all/:userId', async (req, res) => {
           suspensionCanAppeal: canAppeal,
           ...SUSPENSION_STARTED_RESET,
           suspendedBy: req.auth.uid,
-          preSuspensionDisplayName: reportedUser?.displayName ?? reportedUser?.display_name ?? null,
-          preSuspensionProfilePhotoUrl:
-            reportedUser?.profilePhotoUrl ?? reportedUser?.profile_photo_url ?? null,
-          preSuspensionCoverPhotoUrl:
-            reportedUser?.coverPhotoUrl ?? reportedUser?.cover_photo_url ?? null,
-          displayName: 'Suspended Account',
-          profilePhotoUrl: null,
-          coverPhotoUrl: null,
-          avatarUrl: null,
-          description: null,
-          currentRoomId: null,
+          ...suspensionStartedProfileFields(reportedUser ?? {}),
         });
         clearSuspensionCache(Number(reportedUniqueId));
 
@@ -1287,15 +1271,7 @@ router.post('/admin/users/:uniqueId/suspend', async (req, res) => {
         suspensionCanAppeal: body.canAppeal,
         ...SUSPENSION_STARTED_RESET,
         suspendedBy: req.auth.uid,
-        preSuspensionDisplayName: user.displayName ?? user.display_name ?? null,
-        preSuspensionProfilePhotoUrl: user.profilePhotoUrl ?? user.profile_photo_url ?? null,
-        preSuspensionCoverPhotoUrl: user.coverPhotoUrl ?? user.cover_photo_url ?? null,
-        displayName: 'Suspended Account',
-        profilePhotoUrl: null,
-        coverPhotoUrl: null,
-        avatarUrl: null,
-        description: null,
-        currentRoomId: null,
+        ...suspensionStartedProfileFields(user),
       }),
       db.doc(`adminAuditLog/${generateId()}`).set(
         {
