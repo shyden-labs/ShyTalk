@@ -9,6 +9,7 @@ estimate: 5
 type: bug
 roadmap_ids: []
 mvp: true
+blocked_by: [SHY-0605, SHY-0608]
 ---
 
 # SHY-0606: Identity-graph suspensions skip the suspension lifecycle
@@ -39,17 +40,29 @@ Found 2026-10-16 while working SHY-0597, reading
 - Both catch a failed user write, log a warning and still answer success.
 - The 2026-10-15 nightly (38694041358, chromium) called `suspend-all` twice
   then `unsuspend-all` on one test user.
+- The dialog's length (1, 3, 7, 30 days or permanent, sent as a bare `"1"`)
+  is stored only on the graph document and never as an end date, so every
+  identity suspension has acted as permanent until an admin lifted it.
+- The dialog's "Suggestions only" scope is stored and never read: no route
+  enforces a suggestions-only restriction, so it fully suspended the user.
+- The dialog has no "can appeal" choice and the route stores none.
 
 ## Acceptance Criteria
 
 ### Happy path
 
-- [ ] `suspend-all` writes the same suspension fields as the admin suspend
-      route, including `SUSPENSION_STARTED_RESET` and
-      `suspensionStartedProfileFields`, with a test.
-- [ ] `unsuspend-all` and the per-node unsuspend write
-      `suspensionEndedFields` with the saved profile restored, with a test
+- [ ] `suspend-all` starts the suspension through SHY-0608's
+      `startSuspension`, with a test.
+- [ ] `unsuspend-all`, and the per-node unsuspend when the node is the
+      user's account, end it through SHY-0605's `endSuspension`, with a test
       each.
+- [ ] The chosen length becomes `suspensionEndDate` (permanent: none), so a
+      timed identity suspension ends by itself, with a test per length.
+- [ ] The dialog offers full suspension only: "Suggestions only" is removed
+      until SHY-0609 builds it (Shyden 2026-10-16, "Remove it for now").
+- [ ] The dialog has a "Can appeal" box and the route refuses a request
+      without `canAppeal`, like the other suspend screens (Shyden
+      2026-10-16), with a browser test of the dialog.
 
 ### Error paths
 
@@ -101,7 +114,7 @@ Found 2026-10-16 while working SHY-0597, reading
 
 ## Dependencies
 
-- None blocking.
+- SHY-0605 (`endSuspension`) and SHY-0608 (`startSuspension`).
 
 ## Risks & Mitigations
 
@@ -116,3 +129,4 @@ Found 2026-10-16 while working SHY-0597, reading
 ## Notes
 
 - **2026-10-16**: Filed from SHY-0597.
+- **2026-10-16**: Shyden's rulings (AskUserQuestion): remove "Suggestions only" for now (SHY-0609 builds it); add a required "Can appeal" box; every suspension starts and ends through one shared step (SHY-0608, SHY-0605), so this story now wires the graph routes and the dialog to them. Users already stuck under a lapsed identity suspension are SHY-0604's.
