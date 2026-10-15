@@ -133,3 +133,8 @@ Three tests pin the hook today: `actionlint-shellcheck-invocation.test.js`,
 - **2026-10-15**: SHY-0534's push printed `.husky/pre-push: line 154: echo:
   write error: Broken pipe` and the same at line 230; the push still passed.
   Added the stderr AC above.
+- **2026-10-16**: SHY-0597's push ran the whole Playwright chromium suite
+  inside `git push` because the local stack was up (lines 236-255 of
+  `.husky/pre-push` run it when localhost:3000 and :8888 answer); the push
+  was stopped and retried with the stack down. `echo: write error: Broken
+  pipe` printed at lines 116, 154 and 230.

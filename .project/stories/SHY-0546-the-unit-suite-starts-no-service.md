@@ -196,3 +196,11 @@ files that spawn shell scripts). The first AC measures them.
   Operator order: SHY-0544 first, then these.
 - Scored 8: 63 files to classify and move or rewrite, a new Jest project and
   CI step, two local scripts, one guard with eight planted forms.
+- **2026-10-16**: Laptop run of express-api `npm test` with no emulators
+  (SHY-0597's branch): 66 of 560 suites failed, 1,008 of 15,946 tests.
+  1,017 failure messages in 63 suites named the unreachable emulator. In 14
+  suites (cron and firestore-rules among them) a Firestore gRPC call with no
+  emulator failed after Jest had torn the environment down, and
+  `google-gax` crashed the worker reading protobuf's `json.options`
+  (seen after `tests/routes/livekit-cohort.test.js`). So `npm test` is not
+  a unit run until this lands.
