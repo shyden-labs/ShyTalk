@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures/admin';
 import { adminLogin, navigateToTab, searchUser, switchUserSubtab } from './helpers/admin-auth';
+import { waitForAutoSave } from './helpers/admin-autosave';
 
 /**
  * Helper: navigate back to the economy subtab after a page reload.
@@ -15,14 +16,9 @@ async function reloadAndNavigateToEconomy(
   await switchUserSubtab(page, 'economy');
 }
 
-/**
- * Helper: trigger auto-save for the pity counter by blurring, then wait for
- * the "Saved" feedback.  The eco-pity input fires autoSaveEconomyField on blur.
- */
+/** Leave the pity counter and wait for "Saved" (autoSaveEconomyField on blur). */
 async function waitForPityAutoSave(page: import('@playwright/test').Page): Promise<void> {
-  await page.locator('#eco-pity').evaluate(el => el.blur());
-  const container = page.locator('#eco-pity').locator('..');
-  await expect(container.locator('.field-feedback.saved')).toBeVisible();
+  await waitForAutoSave(page, '#eco-pity');
 }
 
 test.describe('Admin Users - Economy Subtab', () => {

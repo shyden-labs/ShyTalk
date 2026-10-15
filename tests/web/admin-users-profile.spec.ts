@@ -1,17 +1,10 @@
 import { test, expect } from './fixtures/admin';
 import { adminLogin, navigateToTab, searchUser, switchUserSubtab } from './helpers/admin-auth';
+import { waitForAutoSave as waitForSharedAutoSave } from './helpers/admin-autosave';
 
-/**
- * Helper: trigger auto-save by blurring the active element, then wait for
- * the "Saved" feedback to appear next to the field.  Auto-save fires on blur
- * for text inputs and on change for selects/checkboxes.
- */
+/** Leave the field and wait for "Saved", keeping this file's 15 s wait. */
 async function waitForAutoSave(page: import('@playwright/test').Page, fieldSelector: string): Promise<void> {
-  // Blur triggers auto-save for text fields
-  await page.locator(fieldSelector).evaluate(el => el.blur());
-  // Wait for the PATCH request to complete — look for the green "Saved" feedback
-  const container = page.locator(fieldSelector).locator('..');
-  await expect(container.locator('.field-feedback.saved')).toBeVisible({ timeout: 15_000 });
+  await waitForSharedAutoSave(page, fieldSelector, 15_000);
 }
 
 /**

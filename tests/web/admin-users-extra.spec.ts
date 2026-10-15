@@ -1,16 +1,7 @@
 import { test, expect } from './fixtures/admin';
 import { adminLogin, navigateToTab, searchUser, switchUserSubtab } from './helpers/admin-auth';
+import { leaveField, waitForAutoSave } from './helpers/admin-autosave';
 import type { Page } from '@playwright/test';
-
-/**
- * Helper: trigger auto-save by blurring the active element, then wait for
- * the "Saved" feedback to appear next to the field.
- */
-async function waitForAutoSave(page: Page, fieldSelector: string): Promise<void> {
-  await page.locator(fieldSelector).evaluate(el => el.blur());
-  const container = page.locator(fieldSelector).locator('..');
-  await expect(container.locator('.field-feedback.saved')).toBeVisible();
-}
 
 /**
  * Helper: trigger auto-save for checkbox/select (fires on 'change' event).
@@ -79,6 +70,27 @@ test.describe('Admin Users - Extra Profile Fields', () => {
 
     const cleared = await testData.api.get(userPath);
     expect(cleared.dateOfBirth || '').toBeFalsy();
+  });
+
+  // ── Test 1b: a failed save shows the error, never nothing (SHY-0597) ──
+  test('date of birth save that the server refuses shows "Save failed"', async ({ page, testData }) => {
+    // A user of this test's own, deleted after it is opened, as when another
+    // admin deletes the account mid-edit: the PATCH then fails for real.
+    const { testRunId, users } = await testData.api.testSetup({
+      users: [{ name: `e2e-${testData.prefix}-gone`.slice(0, 20) }],
+    });
+    const goneUid = String(users[0].uniqueId);
+    await searchUser(page, goneUid);
+    await testData.api.testTeardown(testRunId);
+
+    const dob = '[data-field="dateOfBirth"]';
+    await page.locator(dob).fill('2000-06-15T00:00');
+    await leaveField(page, dob);
+
+    const failed = page.locator(dob).locator('..').locator('.field-feedback.failed');
+    await expect(failed).toBeVisible();
+    await expect(failed).toHaveText('✗ Save failed');
+    await expect(page.locator(dob).locator('..').locator('.field-feedback.saved')).toHaveCount(0);
   });
 
   // ── Test 2: Profile photo URL edit persists ──

@@ -1,16 +1,6 @@
 import { test, expect } from './fixtures/admin';
 import { adminLogin, navigateToTab, searchUser, switchUserSubtab } from './helpers/admin-auth';
-import type { Page } from '@playwright/test';
-
-/**
- * Helper: trigger auto-save by blurring the active element, then wait for
- * the "Saved" feedback to appear next to the field.
- */
-async function waitForAutoSave(page: Page, fieldSelector: string): Promise<void> {
-  await page.locator(fieldSelector).evaluate(el => el.blur());
-  const container = page.locator(fieldSelector).locator('..');
-  await expect(container.locator('.field-feedback.saved')).toBeVisible();
-}
+import { leaveField, waitForAutoSave } from './helpers/admin-autosave';
 
 test.describe('Admin Validation', () => {
   test.describe.configure({ mode: 'serial' });
@@ -28,7 +18,7 @@ test.describe('Admin Validation', () => {
 
     // Clear the display name
     await displayNameInput.fill('');
-    await displayNameInput.evaluate(el => el.blur());
+    await leaveField(page, '[data-field="displayName"]');
 
     // Wait briefly for any validation to fire
     await page.waitForTimeout(2_000);
@@ -145,7 +135,7 @@ test.describe('Admin Validation', () => {
 
     // Enter a non-URL value
     await profileUrlInput.fill('not-a-url');
-    await profileUrlInput.evaluate(el => el.blur());
+    await leaveField(page, '[data-field="profilePhotoUrl"]');
 
     // Wait for auto-save attempt
     await page.waitForTimeout(2_000);
@@ -315,7 +305,7 @@ test.describe('Admin Validation', () => {
     }
 
     // Blur to trigger save
-    await displayNameInput.evaluate(el => el.blur());
+    await leaveField(page, '[data-field="displayName"]');
 
     // Wait for save to complete
     await page.waitForTimeout(3_000);
