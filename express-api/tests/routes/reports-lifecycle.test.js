@@ -297,6 +297,35 @@ describe('POST /api/reports/:id/resolve (admin resolve)', () => {
     );
   });
 
+  it('keeps the saved real name when a report suspends an already-suspended user (SHY-0597)', async () => {
+    getDoc.mockResolvedValueOnce({
+      id: 'report-1',
+      reportedUserId: 'target-user',
+      reportedUserUniqueId: 'target-unique-1',
+      reporterId: 'reporter-user',
+      reason: 'severe violation',
+    });
+    getDoc.mockResolvedValueOnce({
+      id: 'target-unique-1',
+      isSuspended: true,
+      displayName: 'Suspended Account',
+      preSuspensionDisplayName: 'Bad User',
+    });
+
+    const res = await request(app)
+      .post('/api/reports/report-1/resolve')
+      .send({ action: 'suspended' });
+
+    expect(res.status).toBe(200);
+    expect(mockDocUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isSuspended: true,
+        displayName: 'Suspended Account',
+        preSuspensionDisplayName: 'Bad User',
+      }),
+    );
+  });
+
   it('normaliseAction: resolves action "warn" as "warned"', async () => {
     const { createWarning } = require('../../src/routes/admin-users');
     getDoc.mockResolvedValueOnce({

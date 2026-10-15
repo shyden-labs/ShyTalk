@@ -665,6 +665,35 @@ describe('POST /api/reports/resolve-all/:userId - warn + suspend', () => {
     );
   });
 
+  it('keeps the saved real name when bulk resolve suspends an already-suspended user (SHY-0597)', async () => {
+    queryDocs.mockResolvedValueOnce([
+      {
+        id: 'r1',
+        reportedUserId: 'target',
+        reportedUserUniqueId: 'ut',
+        reporterId: 'rep1',
+        status: 'pending',
+      },
+    ]);
+    getDoc.mockResolvedValueOnce({
+      id: 'ut',
+      isSuspended: true,
+      displayName: 'Suspended Account',
+      preSuspensionDisplayName: 'Bad User',
+    });
+    const res = await request(app)
+      .post('/api/reports/resolve-all/target')
+      .send({ action: 'suspended', canAppeal: true, suspensionDays: 30 });
+    expect(res.status).toBe(200);
+    expect(mockDocUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isSuspended: true,
+        displayName: 'Suspended Account',
+        preSuspensionDisplayName: 'Bad User',
+      }),
+    );
+  });
+
   it('suspends permanently (0 days)', async () => {
     queryDocs.mockResolvedValueOnce([
       {

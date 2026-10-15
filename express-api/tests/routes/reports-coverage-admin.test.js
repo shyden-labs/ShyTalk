@@ -204,6 +204,26 @@ describe('POST /api/admin/users/:uniqueId/suspend', () => {
     );
   });
 
+  it('keeps the saved real name when an already-suspended user is suspended again (SHY-0597)', async () => {
+    getDoc.mockResolvedValueOnce({
+      id: 'u1',
+      isSuspended: true,
+      displayName: 'Suspended Account',
+      preSuspensionDisplayName: 'Bad',
+    });
+    const res = await request(app)
+      .post('/api/admin/users/u1/suspend')
+      .send({ reason: 'Severe', canAppeal: false });
+    expect(res.status).toBe(200);
+    expect(mockDocUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isSuspended: true,
+        displayName: 'Suspended Account',
+        preSuspensionDisplayName: 'Bad',
+      }),
+    );
+  });
+
   it('returns 200 with endDate', async () => {
     getDoc.mockResolvedValueOnce({ id: 'u1', displayName: 'User' });
     const future = new Date(Date.now() + 86400000 * 30).toISOString();
