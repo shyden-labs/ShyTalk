@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">91.79% </span>
+                <span class="strong">91.76% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>638/695</span>
+                <span class='fraction'>635/692</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">85.84% </span>
+                <span class="strong">85.61% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>376/438</span>
+                <span class='fraction'>375/438</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">92.85% </span>
+                <span class="strong">92.82% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>585/630</span>
+                <span class='fraction'>582/627</span>
             </div>
         
             
@@ -1882,14 +1882,7 @@
 <a name='L1817'></a><a href='#L1817'>1817</a>
 <a name='L1818'></a><a href='#L1818'>1818</a>
 <a name='L1819'></a><a href='#L1819'>1819</a>
-<a name='L1820'></a><a href='#L1820'>1820</a>
-<a name='L1821'></a><a href='#L1821'>1821</a>
-<a name='L1822'></a><a href='#L1822'>1822</a>
-<a name='L1823'></a><a href='#L1823'>1823</a>
-<a name='L1824'></a><a href='#L1824'>1824</a>
-<a name='L1825'></a><a href='#L1825'>1825</a>
-<a name='L1826'></a><a href='#L1826'>1826</a>
-<a name='L1827'></a><a href='#L1827'>1827</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L1820'></a><a href='#L1820'>1820</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -2081,16 +2074,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">118x</span>
-<span class="cline-any cline-yes">118x</span>
+<span class="cline-any cline-yes">115x</span>
+<span class="cline-any cline-yes">115x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">116x</span>
+<span class="cline-any cline-yes">113x</span>
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">102x</span>
+<span class="cline-any cline-yes">99x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -3158,24 +3151,17 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -4989,20 +4975,13 @@ router.post('/users/:uniqueId/lift-suspension', async (req, res) =&gt; {
 &nbsp;
     const uniqueId = req.params.uniqueId;
     const user = await getDoc(`users/${uniqueId}`);
-    const isSuspended = user?.isSuspended ?? user?.is_suspended ?? <span class="branch-2 cbranch-no" title="branch not covered" >false;</span>
+    const isSuspended = user?.isSuspended ?? <span class="branch-1 cbranch-no" title="branch not covered" >user?.is_suspended </span>?? <span class="branch-2 cbranch-no" title="branch not covered" >false;</span>
     if (!user || !isSuspended) {
       return res.status(400).json({ error: 'User is not suspended' });
     }
 &nbsp;
-    // No end date means permanent, as the apps read it (`User.isActivelySuspended`).
-    // This route is open to suspended users so that a timed suspension can end
-    // itself; a permanent one ends only by an admin or an upheld appeal (SHY-0611).
     const suspensionEndDate = user.suspensionEndDate ?? user.suspension_end_date ?? null;
-    if (suspensionEndDate === null) {
-      log.warn('users', 'Refused self-lift of a permanent suspension', { uniqueId });
-      return res.status(400).json({ error: 'Suspension is permanent' });
-    }
-    if (suspensionEndDate &gt; now()) {
+    if (suspensionEndDate &amp;&amp; suspensionEndDate &gt; now()) {
       return res.status(400).json({ error: 'Suspension has not expired yet' });
     }
 &nbsp;
@@ -5548,7 +5527,7 @@ module.exports = router;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-15T23:28:01.084Z
+                at 2026-10-15T23:30:27.081Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
