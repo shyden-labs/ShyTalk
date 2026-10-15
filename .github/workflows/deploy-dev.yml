@@ -2,6 +2,16 @@ name: Deploy To Dev
 # Deploy to dev environment and distribute to testers
 
 on:
+  # SHY-0534 — Shyden, 2026-10-14: a merge into develop deploys to dev on its
+  # own, and only what it changed. scripts/deploy-plan.js makes that decision.
+  push:
+    branches: [develop]
+  # The daily catch-up (Shyden, 2026-09-19): deploys whatever a push missed (a
+  # merge whose run failed, or one GitHub started no run for), and nothing when
+  # dev already holds develop's head. develop is the default branch, so this
+  # runs develop's copy of this file.
+  schedule:
+    - cron: "17 5 * * *"
   workflow_dispatch:
     inputs:
       ref:
@@ -41,6 +51,7 @@ on:
 permissions:
   contents: write # needed by playwright-tests.yml allure-report (gh-pages deploy)
   actions: read
+  issues: write # SHY-0534: the failed-automatic-deploy tracking issue
 
 # Dev deploys must serialize. Parallel dev deploys can race on the
 # London Express VM (scp tarball + pm2 restart), on Firebase App
@@ -78,23 +89,41 @@ jobs:
     name: Detect Deploy Scope
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # SHY-0534 — each output is a DECISION (requested AND changed), made once
+    # by scripts/deploy-plan.js. No job below reads a dispatch input: on a push
+    # or the daily run every input is null, so `inputs.backend && ...` would
+    # skip everything.
     outputs:
       backend: ${{ steps.scope.outputs.backend }}
       web: ${{ steps.scope.outputs.web }}
       android: ${{ steps.scope.outputs.android }}
       ios: ${{ steps.scope.outputs.ios }}
+      seed: ${{ steps.scope.outputs.seed }}
+      checks: ${{ steps.scope.outputs.checks }}
+      changed_backend: ${{ steps.scope.outputs.changed_backend }}
+      changed_web: ${{ steps.scope.outputs.changed_web }}
+      changed_android: ${{ steps.scope.outputs.changed_android }}
+      changed_ios: ${{ steps.scope.outputs.changed_ios }}
       baseline: ${{ steps.scope.outputs.baseline }}
       reason: ${{ steps.scope.outputs.reason }}
+      trigger: ${{ steps.scope.outputs.trigger }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 0
 
       - name: Resolve baseline and classify the change set
         id: scope
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          INPUT_BACKEND: ${{ inputs.backend }}
+          INPUT_WEB: ${{ inputs.web }}
+          INPUT_ANDROID_TESTERS: ${{ inputs.android-testers }}
+          INPUT_IOS_TESTERS: ${{ inputs.ios-testers }}
+          INPUT_SEED_PERSONAS: ${{ inputs.seed-personas }}
+          INPUT_PLAYWRIGHT: ${{ inputs.playwright }}
         run: |
           # NOTE: deliberately NOT `set -e`. Three uncertainty cases are handled
           # explicitly below, but an UNANTICIPATED failure here would abort the
@@ -103,10 +132,14 @@ jobs:
           # is the exact direction this story exists to prevent, so the step
           # traps instead and emits the all-true fallback.
           set -uo pipefail
+          # The fail-safe deploys every area, even one a dispatch left unticked:
+          # deploying too much costs minutes, deploying too little ships nothing.
           emit_failsafe() {
             {
-              echo "backend=true"; echo "web=true"; echo "android=true"; echo "ios=true"
+              for area in backend web android ios; do echo "$area=true"; echo "changed_$area=true"; done
+              echo "seed=true"; echo "checks=true"
               echo "reason=detection-failed-failing-safe"
+              echo "trigger=$EVENT"
               echo "baseline=unresolved"
             } >> "$GITHUB_OUTPUT"
             echo "::warning::deploy-scope detection failed; deploying everything (fail-safe)"
@@ -132,24 +165,36 @@ jobs:
           if [ -z "$BASE" ]; then
             # No baseline: hand the classifier nothing, which it reads as
             # "could not work out what changed" and fails safe to all-true.
-            printf '' | bash scripts/deploy-scope.sh >> "$GITHUB_OUTPUT"
+            SCOPE="$(printf '' | bash scripts/deploy-scope.sh)"
           else
-            git diff --name-only "$BASE" HEAD | bash scripts/deploy-scope.sh >> "$GITHUB_OUTPUT"
+            SCOPE="$(git diff --name-only "$BASE" HEAD | bash scripts/deploy-scope.sh)"
           fi
+          # SHY-0534: what changed, combined with what was asked for (the
+          # dispatch boxes, or everything on a push and the daily run).
+          SCOPE="$SCOPE" BASELINE="${BASE:-unresolved}" HEAD_SHA="$(git rev-parse HEAD)" \
+            node scripts/deploy-plan.js >> "$GITHUB_OUTPUT"
 
       - name: Summarise
         run: |
           {
             echo "### Deploy scope"
             echo ""
+            echo "trigger: \`${{ steps.scope.outputs.trigger }}\`"
             echo "baseline: \`${{ steps.scope.outputs.baseline }}\` (${{ steps.scope.outputs.reason }})"
+            echo "head: \`${{ github.sha }}\`"
             echo ""
-            echo "| area | requested | changed | will deploy |"
-            echo "| --- | --- | --- | --- |"
-            echo "| backend | ${{ inputs.backend }} | ${{ steps.scope.outputs.backend }} | ${{ inputs.backend && steps.scope.outputs.backend == 'true' }} |"
-            echo "| web | ${{ inputs.web }} | ${{ steps.scope.outputs.web }} | ${{ inputs.web && steps.scope.outputs.web == 'true' }} |"
-            echo "| android | ${{ inputs.android-testers }} | ${{ steps.scope.outputs.android }} | ${{ inputs.android-testers && steps.scope.outputs.android == 'true' }} |"
-            echo "| ios | ${{ inputs.ios-testers }} | ${{ steps.scope.outputs.ios }} | ${{ inputs.ios-testers && steps.scope.outputs.ios == 'true' }} |"
+            if [ "${{ steps.scope.outputs.reason }}" = "dev-current" ]; then
+              echo "dev already at \`${{ github.sha }}\`: nothing to deploy."
+              echo ""
+            fi
+            echo "| area | changed | will deploy |"
+            echo "| --- | --- | --- |"
+            echo "| backend | ${{ steps.scope.outputs.changed_backend }} | ${{ steps.scope.outputs.backend }} |"
+            echo "| web | ${{ steps.scope.outputs.changed_web }} | ${{ steps.scope.outputs.web }} |"
+            echo "| android | ${{ steps.scope.outputs.changed_android }} | ${{ steps.scope.outputs.android }} |"
+            echo "| ios | ${{ steps.scope.outputs.changed_ios }} | ${{ steps.scope.outputs.ios }} |"
+            echo "| persona seed | — | ${{ steps.scope.outputs.seed }} |"
+            echo "| sanity checks | — | ${{ steps.scope.outputs.checks }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ═══════════════════════════════════════════════════════════════════
@@ -173,7 +218,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 0
 
       - name: List the commits since the last dev deploy
@@ -185,8 +230,8 @@ jobs:
   deploy-backend-dev:
     name: Deploy Backend to Dev
     needs: detect-deploy-scope
-    # SHY-0347 — the operator asked for it AND the diff touches it.
-    if: inputs.backend && needs.detect-deploy-scope.outputs.backend == 'true'
+    # SHY-0347 / SHY-0534 — the plan's decision: requested AND changed.
+    if: needs.detect-deploy-scope.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -197,7 +242,7 @@ jobs:
           # back to the workflow_dispatch ref dropdown when unset (which
           # supports branches and tags but not commits — hence the
           # explicit input).
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           # `actions/checkout` defaults to fetch-depth: 1 which only
           # includes the tip of the named ref. A commit-SHA `inputs.ref`
           # may NOT be at the tip of any branch/tag, in which case
@@ -313,8 +358,8 @@ jobs:
   # Opt-out via workflow_dispatch input `seed-personas=false`.
   seed-dev-personas:
     name: Seed Dev Personas
-    needs: deploy-backend-dev
-    if: needs.deploy-backend-dev.result == 'success' && inputs.seed-personas != false
+    needs: [deploy-backend-dev, detect-deploy-scope]
+    if: needs.deploy-backend-dev.result == 'success' && needs.detect-deploy-scope.outputs.seed == 'true'
     uses: ./.github/workflows/seed-dev-personas.yml
     secrets: inherit
 
@@ -326,7 +371,7 @@ jobs:
   # personas) rather than just a status word.
   seed-personas-report:
     name: Seed Personas Report
-    needs: seed-dev-personas
+    needs: [seed-dev-personas, detect-deploy-scope]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -334,7 +379,7 @@ jobs:
       - name: Summarise seed outcome
         env:
           SEED_RESULT: ${{ needs.seed-dev-personas.result }}
-          SEED_REQUESTED: ${{ inputs.seed-personas }}
+          SEED_REQUESTED: ${{ needs.detect-deploy-scope.outputs.seed }}
         run: |
           set -euo pipefail
           {
@@ -391,7 +436,7 @@ jobs:
     # of running with no gate. Defence in depth on top of `always()`.
     if: |
       always() &&
-      inputs.web && needs.detect-deploy-scope.outputs.web == 'true' &&
+      needs.detect-deploy-scope.outputs.web == 'true' &&
       (needs.deploy-backend-dev.result == 'success' || needs.deploy-backend-dev.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -403,7 +448,7 @@ jobs:
           # back to the workflow_dispatch ref dropdown when unset (which
           # supports branches and tags but not commits — hence the
           # explicit input).
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           # `actions/checkout` defaults to fetch-depth: 1 which only
           # includes the tip of the named ref. A commit-SHA `inputs.ref`
           # may NOT be at the tip of any branch/tag, in which case
@@ -456,7 +501,7 @@ jobs:
     # See deploy-web-dev `always()` + allowlist rationale (run 25280868804).
     if: |
       always() &&
-      inputs.android-testers && needs.detect-deploy-scope.outputs.android == 'true' &&
+      needs.detect-deploy-scope.outputs.android == 'true' &&
       needs.list-build-changes.result == 'success' &&
       (needs.deploy-backend-dev.result == 'success' || needs.deploy-backend-dev.result == 'skipped')
     runs-on: ubuntu-latest
@@ -469,7 +514,7 @@ jobs:
           # back to the workflow_dispatch ref dropdown when unset (which
           # supports branches and tags but not commits — hence the
           # explicit input).
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           # `actions/checkout` defaults to fetch-depth: 1 which only
           # includes the tip of the named ref. A commit-SHA `inputs.ref`
           # may NOT be at the tip of any branch/tag, in which case
@@ -626,7 +671,7 @@ jobs:
     # See deploy-web-dev `always()` + allowlist rationale (run 25280868804).
     if: |
       always() &&
-      inputs.ios-testers && needs.detect-deploy-scope.outputs.ios == 'true' &&
+      needs.detect-deploy-scope.outputs.ios == 'true' &&
       needs.list-build-changes.result == 'success' &&
       (needs.deploy-backend-dev.result == 'success' || needs.deploy-backend-dev.result == 'skipped')
     # Migrated 2026-05-20 from self-hosted Mac (shytalk-mac) to GitHub-hosted
@@ -658,7 +703,7 @@ jobs:
           # back to the workflow_dispatch ref dropdown when unset (which
           # supports branches and tags but not commits — hence the
           # explicit input).
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           # `actions/checkout` defaults to fetch-depth: 1 which only
           # includes the tip of the named ref. A commit-SHA `inputs.ref`
           # may NOT be at the tip of any branch/tag, in which case
@@ -1150,10 +1195,13 @@ jobs:
 
   sanity-check:
     name: Dev Sanity Check
-    needs: [deploy-backend-dev, deploy-web-dev]
+    needs: [deploy-backend-dev, deploy-web-dev, detect-deploy-scope]
+    # SHY-0534 — only after something these checks look at was deployed: a
+    # merge that changed only an app has no new pages or API to check.
     if: |
       always() &&
-      inputs.playwright &&
+      needs.detect-deploy-scope.outputs.checks == 'true' &&
+      (needs.deploy-backend-dev.result == 'success' || needs.deploy-web-dev.result == 'success') &&
       (needs.deploy-backend-dev.result == 'success' || needs.deploy-backend-dev.result == 'skipped') &&
       (needs.deploy-web-dev.result == 'success' || needs.deploy-web-dev.result == 'skipped')
     runs-on: ubuntu-latest
@@ -1178,7 +1226,7 @@ jobs:
           # back to the workflow_dispatch ref dropdown when unset (which
           # supports branches and tags but not commits — hence the
           # explicit input).
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           # `actions/checkout` defaults to fetch-depth: 1 which only
           # includes the tip of the named ref. A commit-SHA `inputs.ref`
           # may NOT be at the tip of any branch/tag, in which case
@@ -1245,10 +1293,10 @@ jobs:
     # Gating: depends on sanity-check (page-load tier) so we don't
     # waste a smoke run on an obviously-broken deploy. The deploy
     # job itself is RED on smoke failure — see `feedback-tests-always-block`.
-    needs: [deploy-backend-dev, sanity-check]
+    needs: [deploy-backend-dev, sanity-check, detect-deploy-scope]
     if: |
       always() &&
-      inputs.playwright &&
+      needs.detect-deploy-scope.outputs.checks == 'true' &&
       needs.deploy-backend-dev.result == 'success' &&
       needs.sanity-check.result == 'success'
     runs-on: ubuntu-latest
@@ -1264,7 +1312,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           fetch-depth: ${{ inputs.ref != '' && '0' || '1' }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -1336,3 +1384,42 @@ jobs:
           # Smoke spec only hits API + Firebase Auth REST. No web
           # surface, so DEV_BASIC_AUTH_PASSWORD is not required here.
         run: npx playwright test tests/web/dev-smoke.spec.ts --project=chromium --reporter=list
+
+  # ═══════════════════════════════════════════════════════════════════
+  # A failed automatic deploy reaches someone (SHY-0534)
+  # ═══════════════════════════════════════════════════════════════════
+  #
+  # A push or the daily run has nobody watching it. One tracking issue,
+  # assigned to Shyden, opens on the first failure, takes a comment while it
+  # stays open, and closes on the next automatic run that succeeds. A hand
+  # dispatch has someone watching, so it is not reported here.
+  report-automatic-deploy:
+    name: Report Automatic Deploy
+    needs:
+      - detect-deploy-scope
+      - list-build-changes
+      - deploy-backend-dev
+      - seed-dev-personas
+      - seed-personas-report
+      - deploy-web-dev
+      - distribute-android
+      - distribute-ios
+      - sanity-check
+      - smoke-tests
+    if: always() && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Open, update or close the tracking issue
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_SHA: ${{ github.sha }}
+          TRIGGER: ${{ github.event_name }}
+        run: node scripts/deploy-failure-issue.js

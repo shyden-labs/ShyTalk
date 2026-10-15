@@ -79,15 +79,19 @@ describe('deploy-dev.yml — seed-dev-personas job (reusable workflow caller)', 
     const seedJobIdx = DEPLOY_DEV.indexOf('seed-dev-personas:\n');
     expect(seedJobIdx).toBeGreaterThan(-1);
     const jobBlock = DEPLOY_DEV.slice(seedJobIdx, seedJobIdx + 400);
-    expect(jobBlock).toMatch(/needs:\s*deploy-backend-dev/);
+    expect(jobBlock).toMatch(/needs:\s*\[?deploy-backend-dev\b/);
   });
 
-  test('seed-dev-personas job is gated on `inputs.seed-personas != false` (operator opt-out)', () => {
+  test("seed-dev-personas job is gated on the plan's seed decision (operator opt-out)", () => {
     // The toggle still applies — `gh workflow run deploy-dev.yml -f
-    // seed-personas=false` skips the seed job entirely.
+    // seed-personas=false` skips the seed job entirely. SHY-0534 moved the
+    // reading of that input into scripts/deploy-plan.js (deploy-plan.test.js):
+    // on a push the input is null, and `null != false` is false in GitHub's
+    // expressions, so the old condition would never have seeded.
     const seedJobIdx = DEPLOY_DEV.indexOf('seed-dev-personas:\n');
     const jobBlock = DEPLOY_DEV.slice(seedJobIdx, seedJobIdx + 400);
-    expect(jobBlock).toMatch(/if:.*inputs\.seed-personas\s*!=\s*false/);
+    expect(jobBlock).toMatch(/if:.*needs\.detect-deploy-scope\.outputs\.seed\s*==\s*'true'/);
+    expect(jobBlock).not.toMatch(/inputs\.seed-personas/);
   });
 
   test('seed-dev-personas job inherits secrets (so the reusable workflow can read FIREBASE_SERVICE_ACCOUNT_DEV / PERSONAS_PASSWORD_DEV)', () => {
