@@ -349,7 +349,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0515](SHY-0515-an-offline-cold-start-confirms-the-session-when-the-network-returns.md) | P2 | M | feature | An offline cold start confirms the session when the network returns | 📝 Draft | — |  |
 | [SHY-0516](SHY-0516-a-mandatory-update-is-drawn-first-from-a-cached-verdict.md) | P2 | S | feature | A mandatory update is drawn first, from a verdict the app already has | 📝 Draft | — |  |
 | [SHY-0517](SHY-0517-the-pre-push-hook-tests-the-wrong-diff.md) | P2 | S | infra | The pre-push hook tests the wrong diff | 📝 Draft | — |  |
-| [SHY-0518](SHY-0518-the-pre-merge-gate-refuses-backlog-maintenance-on-draft-stories.md) | P1 | XS | infra | The pre-merge gate refuses backlog maintenance on Draft stories | 👀 In Review | — |  |
+| [SHY-0518](SHY-0518-the-pre-merge-gate-refuses-backlog-maintenance-on-draft-stories.md) | P1 | XS | infra | The pre-merge gate refuses backlog maintenance on Draft stories | ✅ Done | — |  |
 | [SHY-0519](SHY-0519-the-dev-roadmap-page-lags-develop-until-a-promotion.md) | P2 | XS | infra | The dev roadmap page lags develop until a promotion | 📝 Draft | — |  |
 | [SHY-0523](SHY-0523-ios-aborts-when-a-firestore-listener-errors-after-the-session-is-revoked.md) | P0 | S | bug | iOS aborts when a Firestore listener errors after the session is revoked | 👀 In Review | — |  |
 | [SHY-0524](SHY-0524-fixed-duration-waits-still-hide-behind-sleep-helpers-in-the-journey-tooling.md) | P2 | M | refactor | Fixed-duration waits still hide behind `sleep` helpers in the journey tooling | 📝 Draft | — |  |
@@ -362,8 +362,8 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0532](SHY-0532-agents-act-on-shytalk-under-their-own-least-privilege-github-identity.md) | P0 | L | infra | Agents act on ShyTalk under their own least-privilege GitHub identity | 📝 Draft | — |  |
 | [SHY-0533](SHY-0533-ci-refuses-a-pull-request-that-leaves-the-story-index-out-of-step.md) | P1 | S | infra | CI refuses a pull request that leaves the story index out of step | 📝 Draft | — |  |
 | [SHY-0534](SHY-0534-every-develop-merge-reaches-dev-without-anyone-dispatching-it.md) | P1 | M | infra | Every develop merge reaches dev without anyone dispatching it | 👀 In Review | — |  |
-| [SHY-0536](SHY-0536-every-open-mvp-story-is-scored-and-the-scale-is-calibrated.md) | P1 | L | infra | Every open MVP story is scored, and the scale is calibrated against merged work | 👀 In Review | — |  |
-| [SHY-0537](SHY-0537-every-open-non-mvp-story-is-scored.md) | P2 | M | infra | Every open non-MVP story is scored, so effort progress covers the whole backlog | 👀 In Review | — |  |
+| [SHY-0536](SHY-0536-every-open-mvp-story-is-scored-and-the-scale-is-calibrated.md) | P1 | L | infra | Every open MVP story is scored, and the scale is calibrated against merged work | ✅ Done | — |  |
+| [SHY-0537](SHY-0537-every-open-non-mvp-story-is-scored.md) | P2 | M | infra | Every open non-MVP story is scored, so effort progress covers the whole backlog | ✅ Done | — |  |
 | [SHY-0538](SHY-0538-the-short-claude-md-is-committed-and-nothing-cites-a-section-it-lacks.md) | P2 | S | chore | The short CLAUDE.md is committed, and no comment cites a section it does not have | 📝 Draft | — |  |
 | [SHY-0539](SHY-0539-the-board-sync-fails-fast-on-a-stale-read-and-counts-every-setup-failure.md) | P2 | M | infra | The board sync fails fast on a stale read instead of sleeping and retrying, and counts every setup failure | 📝 Draft | — |  |
 | [SHY-0540](SHY-0540-security-fixes-open-against-develop.md) | P0 | M | infra | Security fixes open against develop, and the nightly live jobs run released code only | 📝 Draft | — |  |
@@ -407,7 +407,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0580](SHY-0580-roadmap-batch-6-platform-and-ios.md) | P1 | S | chore | Roadmap batch: the 17 "Platform & iOS" entries become tracked stories | 📝 Draft | — |  |
 | [SHY-0581](SHY-0581-roadmap-batch-7-safety-and-compliance.md) | P1 | L | chore | Roadmap batch: the 20 "Safety & Compliance" entries become tracked stories | 📝 Draft | — |  |
 | [SHY-0582](SHY-0582-roadmap-batch-8-website-and-presence.md) | P1 | L | chore | Roadmap batch: the 22 "Website & Presence" entries become tracked stories | 📝 Draft | — |  |
-| [SHY-0583](SHY-0583-an-orphaned-in-progress-story-returns-to-the-backlog.md) | P0 | M | infra | An In Progress story with no branch or pull request goes back to the backlog, and the gate lets it | 👀 In Review | — |  |
+| [SHY-0583](SHY-0583-an-orphaned-in-progress-story-returns-to-the-backlog.md) | P0 | M | infra | An In Progress story with no branch or pull request goes back to the backlog, and the gate lets it | ✅ Done | — |  |
 | [SHY-0584](SHY-0584-the-board-id-map-rides-inside-the-pull-request.md) | P1 | M | infra | The board id-map rides inside the pull request, so develop never moves under an open PR | 📝 Draft | — |  |
 | [SHY-0585](SHY-0585-the-deploy-and-tooling-scripts-are-never-linted.md) | P2 | S | bug | The deploy and tooling scripts are never linted | 📝 Draft | — |  |
 | [SHY-0586](SHY-0586-free-text-workflow-inputs-are-pasted-into-scripts.md) | P2 | S | bug | Free-text workflow inputs are pasted straight into scripts | 📝 Draft | — |  |
@@ -418,6 +418,8 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0591](SHY-0591-system-api-spec-and-private-swagger.md) | P2 | S | infra | The system API has a hand-written spec, contract tests and a private Swagger page | 📝 Draft | — |  |
 | [SHY-0592](SHY-0592-apple-webhook-spec-and-private-swagger.md) | P2 | S | infra | The Apple notifications webhook has a hand-written spec, contract tests and a private Swagger page | 📝 Draft | — |  |
 | [SHY-0593](SHY-0593-test-helpers-spec-and-private-swagger.md) | P2 | S | infra | The test-helper API has a hand-written spec, contract tests and a dev-only private Swagger page | 📝 Draft | — |  |
+| [SHY-0594](SHY-0594-the-effort-line-reports-points-remaining-never-a-percentage.md) | P2 | S | bug | The effort line reports points remaining, never a percentage | 📝 Draft | — |  |
+| [SHY-0595](SHY-0595-every-package-install-script-is-approved-or-refused-on-purpose.md) | P1 | S | infra | Every package install script is approved or refused on purpose | 📝 Draft | — |  |
 
 ## Done
 

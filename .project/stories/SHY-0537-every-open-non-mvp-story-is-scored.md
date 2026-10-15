@@ -1,6 +1,6 @@
 ---
 id: SHY-0537
-status: In Review
+status: Done
 owner: claude
 created: 2026-10-07
 priority: P2
@@ -39,7 +39,7 @@ all (18 Draft, 5 In Review).
 - [x] Every open story without `mvp: true` carries `estimate:` from 1, 2, 3,
       5, 8, 13, scored from its ACs against the calibrated sample SHY-0536
       recorded, never from guessed hours.
-- [ ] After the merge, `node scripts/story-progress.js` prints a real effort
+- [x] After the merge, `node scripts/story-progress.js` prints a real effort
       line (% complete, pace in points, ETA date), quoted in Notes with the
       measured and assumed figures named.
 - [x] A spread of at least 10 scored stories is re-read in full after the
@@ -76,7 +76,7 @@ all (18 Draft, 5 In Review).
 
 ### Observability
 
-- [ ] One board read after the sync shows every open card with an `Estimate`;
+- [x] One board read after the sync shows every open card with an `Estimate`;
       the count of open cards without one is 0.
 
 ## BDD Scenarios
@@ -108,8 +108,8 @@ all (18 Draft, 5 In Review).
 
 ## Definition of Done
 
-- [ ] Every AC checkbox above is met.
-- [ ] CI green by step name on the PR head SHA; merged into `develop`; the
+- [x] Every AC checkbox above is met.
+- [x] CI green by step name on the PR head SHA; merged into `develop`; the
       board read shows no open card without an estimate.
 
 ## Notes
@@ -139,3 +139,14 @@ all (18 Draft, 5 In Review).
     23 files), plus the SHY-0353 note. With SHY-0536 and #2311 merged, open
     stories without an estimate: 0 (checked as a set: only SHY-0062, now
     Cancelled, and SHY-0518 remain on this branch alone).
+- **2026-10-15 (Done)**: merged as #2323, `PR Gate` success on its head.
+  `node scripts/story-progress.js` on `origin/develop` 0cdfac0ecb1:
+  ```
+  By tickets: 36% complete (180 of 504 stories Done; 13 cancelled left out). Measured pace 0.71 a day over the last 7 days (0, 0, 0, 1, 4, 0, 0). ETA at that pace: 2028-01-12, before outside waits.
+  By effort: 32% complete (684 of 2145 points Done; 175 Done stories unscored, counted at the scored mean of 3.8 points (assumed)). Measured pace 2.71 points a day over the last 7 days (0, 0, 0, 8, 11, 0, 0). ETA at that pace: 2028-04-06, before outside waits.
+  MVP subset (worked first): 27% complete (69 of 254 stories Done). Measured pace 0.00 a day over the last 7 days (0, 0, 0, 0, 0, 0, 0). ETA unavailable at the measured pace: nothing closed in the last 30 days.
+  ```
+  Measured: every open story's points (1461 remaining), the 7-day pace.
+  Assumed: the 175 Done stories with no estimate, counted at the scored mean
+  of 3.8 points, which only the percentage uses. Board read: one GraphQL read of ShyTalk Stories (title asserted): 521 items, 324 open cards, every one a SHY story, 0 without an `Estimate`; board sum 1461 equals the story files' sum of 1461, 0 per-story mismatches. The one card that had no estimate, #1653, was a placeholder retired the same day (Shyden's ruling).
+  Reporting effort as points remaining instead of a percentage: SHY-0594.
