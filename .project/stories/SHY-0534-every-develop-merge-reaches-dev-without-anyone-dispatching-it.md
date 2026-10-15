@@ -182,6 +182,12 @@ missed. Two options were declined:
 
   `deploy-dev.yml:145` already writes the baseline and its reason; the trigger
   is new.
+- [ ] **The summary's "will deploy" column says what will run.** The persona
+      seed and sanity-check rows show `true` only when their job can run (the
+      seed needs a backend deploy; the checks need a backend or web deploy),
+      and otherwise say why not. Found on run 38702533832 (2026-10-15): both
+      rows read `true` while both jobs were skipped. A test pins each row
+      against the plan.
 
 ## BDD Scenarios
 
@@ -330,3 +336,17 @@ fails against it.
     schedule runs only.
   - The "default branch is main" edge case is obsolete: `develop` has been
     the default since 2026-10-07, so the schedule is live once this merges.
+- **2026-10-15**: Merged as #2341 (`951bf376521`, required checks green on
+  head `11d290a8918`). Its own push started Deploy To Dev run 38702533832
+  (event `push`, attempt 1, success, 46 s) with no session action: the
+  trigger works. Nothing changed in any area (the four commits since baseline
+  `661f0ae5722` were workflow, scripts, tests, stories and the board sync),
+  so by job name: Detect Deploy Scope, List Build Changes, Seed Personas
+  Report and Report Automatic Deploy ran; the backend, web, Android, iOS,
+  seed, smoke and sanity jobs were skipped. The seed report said so plainly.
+  - Not yet proven: a push that deploys an area (the first DoD item needs a
+    merge touching backend, web or an app), the daily run, and the
+    dependabot measurement.
+  - Defect found: the scope summary's "will deploy" column read `true` for
+    the persona seed and sanity checks while both were skipped. New AC under
+    Observability.
