@@ -1,6 +1,6 @@
 ---
 id: SHY-0534
-status: In Progress
+status: In Review
 owner: claude
 created: 2026-09-19
 priority: P1
@@ -60,22 +60,22 @@ missed. Two options were declined:
 
 ### Happy path
 
-- [ ] A push to `develop` starts Deploy To Dev with no session action.
-- [ ] That run deploys exactly the areas `scripts/deploy-scope.sh` derives from
+- [x] A push to `develop` starts Deploy To Dev with no session action.
+- [x] That run deploys exactly the areas `scripts/deploy-scope.sh` derives from
       the diff since the last successful dev deploy. The classification stays
       in that one script: no `paths:` filter on the trigger duplicates it.
-- [ ] Once a day, a scheduled run deploys `develop`'s head **only if** it differs
+- [x] Once a day, a scheduled run deploys `develop`'s head **only if** it differs
       from the last successful dev deploy's SHA.
-- [ ] `workflow_dispatch` works unchanged, with its `ref` and `release-notes`
+- [x] `workflow_dispatch` works unchanged, with its `ref` and `release-notes`
       inputs. Hand-written notes and deploying a specific SHA stay possible.
 
 ### Error paths
 
-- [ ] When the baseline cannot be resolved, both new triggers keep the existing
+- [x] When the baseline cannot be resolved, both new triggers keep the existing
       fail-safe and deploy everything (`deploy-dev.yml:74`).
-- [ ] A failed automatic deploy leaves the baseline where it was, so the next
+- [x] A failed automatic deploy leaves the baseline where it was, so the next
       push or daily run deploys the same changes again. A test pins this.
-- [ ] A failed automatic deploy is reported without anyone watching Actions:
+- [x] A failed automatic deploy is reported without anyone watching Actions:
   - The run opens one tracking issue naming the run, the SHA and the failed
     jobs, or comments on that issue if it is already open.
   - The next green automatic run closes the tracking issue.
@@ -91,7 +91,9 @@ missed. Two options were declined:
       following the pattern in `playwright-nightly.yml:49`
       (`ref: ${{ inputs.ref || 'develop' }}`). A test fails if the scheduled
       path could deploy `main`.
-- [ ] **The daily net only takes effect after the next promotion.** Until
+- [ ] **(Obsolete since 2026-10-07: `develop` is the default branch, so the
+      schedule runs `develop`'s copy and the daily net is live on merge.) The
+      daily net only takes effect after the next promotion.** Until
       `deploy-dev.yml` reaches `main`, the schedule does nothing. The push
       trigger works as soon as this story merges to `develop`. Say so in the
       PR, rather than implying the net is live on merge.
@@ -110,7 +112,7 @@ missed. Two options were declined:
   - Record the result in Notes. If dependabot merges do not fire the trigger,
     the daily net is what delivers them. Changing the identity the auto-merge
     runs as is then its own story, raised with Shyden.
-- [ ] **A burst of merges loses nothing.** Dependabot's weekly batch landed five
+- [x] **A burst of merges loses nothing.** Dependabot's weekly batch landed five
       app bumps on 09-07.
   - The `deploy-dev` concurrency group keeps `cancel-in-progress: false`, pinned
     by `express-api/tests/scripts/deploy-dev-concurrency.test.js`.
@@ -125,51 +127,55 @@ missed. Two options were declined:
     baseline past a change that never deployed.
   - Asserted from the workflow's `needs`/`if` graph in a test, and read on one
     real run.
-- [ ] **A push with nothing to deploy stays quiet.** This covers the release
+- [x] **A push with nothing to deploy stays quiet.** This covers the release
       bot's `board-items.json` sync, docs and story files (4 of the 15 measured
       commits). The push runs the scope job only: nothing is built and no tester
       is notified.
-- [ ] **A daily run that finds dev current does nothing.** Its summary says so
+- [x] **A daily run that finds dev current does nothing.** Its summary says so
       (`dev already at <sha>`), and no build job starts.
-- [ ] **A push during a manual dispatch waits.** It queues behind the dispatch
+- [x] **A push during a manual dispatch waits.** It queues behind the dispatch
       in the same concurrency group rather than running alongside it.
 
 ### Performance
 
-- [ ] A push that touches no app code starts no macOS or Android build. The
+- [x] A push that touches no app code starts no macOS or Android build. The
       scope gating already does this.
 - [ ] A daily run where `develop` has not moved finishes in under 2 minutes.
 
 ### Security
 
-- [ ] The push trigger lists `develop` only. No `main`, no tags, no pull-request
+- [x] The push trigger lists `develop` only. No `main`, no tags, no pull-request
       heads, and no `pull_request_target`. An automatic run executes only code
       already merged to `develop`, so a dependabot PR cannot reach deploy
       secrets before it merges.
-- [ ] Triggering adds no new secret, token or permission. In particular, no
-      personal access token is used to route around the `GITHUB_TOKEN` rule.
+- [x] Triggering adds no new secret or token, and one permission only:
+      `issues: write`, which the failure report above needs (amended
+      2026-10-15: the two ACs conflicted as first written). The report uses the
+      built-in `github.token`; no personal access token is used to route around
+      the `GITHUB_TOKEN` rule.
 
 ### UX
 
-- [ ] Tester notes belong to **SHY-0361**. An automatic run has no human to pass
+- [x] Tester notes belong to **SHY-0361**. An automatic run has no human to pass
       `release-notes`, so until SHY-0361 lands:
   - The Android note falls back to `Dev build from develop (<sha>)`.
   - The iOS build carries no "What to Test" text at all. Its Upload to
     TestFlight step runs only `xcrun altool --upload-app`.
 
-  See Dependencies for the ordering this forces.
-- [ ] An automatic build's note says it is an automatic deploy of `develop` and
+  See Dependencies for the ordering this forces. SHY-0361 landed first
+  (#2328, #2340), so automatic runs carry its notes.
+- [x] An automatic build's note says it is an automatic deploy of `develop` and
       names the trigger (push or daily). A tester can tell it from a
       hand-dispatched build.
 
 ### i18n
 
-- [ ] N/A: there are no user-facing strings. Tester notes are English, matching
+- [x] N/A: there are no user-facing strings. Tester notes are English, matching
       SHY-0361.
 
 ### Observability
 
-- [ ] Every run's summary states:
+- [x] Every run's summary states:
   - the trigger (push, schedule or dispatch);
   - the baseline SHA and the target SHA;
   - the scope decision.
