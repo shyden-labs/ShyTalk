@@ -1,6 +1,6 @@
 ---
 id: SHY-0611
-status: Draft
+status: In Review
 owner: unassigned
 created: 2026-10-16
 priority: P0
@@ -41,40 +41,40 @@ that test"): fix it as its own P0, next, ahead of SHY-0605.
 
 ### Happy path
 
-- [ ] A timed suspension whose end date has passed is still lifted by its
+- [x] A timed suspension whose end date has passed is still lifted by its
       owner, with a test.
 
 ### Error paths
 
-- [ ] A permanent suspension (no end date) is refused with 400 and
+- [x] A permanent suspension (no end date) is refused with 400 and
       `Suspension is permanent`, and nothing is written; the test at
       `users-missing.test.js:293` becomes this case, RED against today's code.
-- [ ] A timed suspension not yet over is still refused (existing test kept).
+- [x] A timed suspension not yet over is still refused (existing test kept).
 
 ### Edge cases
 
-- [ ] An end date stored under the old snake_case name is read the same way.
+- [x] An end date stored under the old snake_case name is read the same way.
 
 ### Performance
 
-- [ ] N/A.
+- [x] N/A.
 
 ### Security
 
-- [ ] The route keeps its owner check, with a test that another user cannot
+- [x] The route keeps its owner check, with a test that another user cannot
       lift someone else's suspension.
 
 ### UX
 
-- [ ] N/A: the apps never send this for a permanent suspension.
+- [x] N/A: the apps never send this for a permanent suspension.
 
 ### i18n
 
-- [ ] N/A: the message is an API error, not shown in the apps.
+- [x] N/A: the message is an API error, not shown in the apps.
 
 ### Observability
 
-- [ ] A refused self-lift of a permanent suspension is logged as a warning
+- [x] A refused self-lift of a permanent suspension is logged as a warning
       with the user id.
 
 ## BDD Scenarios
@@ -106,9 +106,24 @@ that test"): fix it as its own P0, next, ahead of SHY-0605.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its test named in Notes.
+- [x] Every AC ticked with its test named in Notes.
 - [ ] Story `In Review` before merge; CI green by name; merged to `develop`.
 
 ## Notes
 
 - **2026-10-16**: Filed from SHY-0605's inventory on Shyden's ruling above.
+- **2026-10-16, fixed.** `express-api/src/routes/users.js` `lift-suspension`
+  refuses a suspension with no end date (400 `Suspension is permanent`),
+  writes nothing, clears no cache and logs
+  `Refused self-lift of a permanent suspension` with the user id. Tests in
+  `express-api/tests/routes/users-missing.test.js`: permanent refused, no
+  end date field refused, snake_case null refused (313, 317, 321; the pinned
+  test at 293 became 313); snake_case expired lifted (325); expired lifted
+  (264), not yet over refused (249) and another user refused 403 (229) kept.
+  RED against the old route: exactly the three permanent cases failed with
+  200 (3 failed, 5 passed of the 8 lift-suspension tests). Mutants, each
+  killed with the whole file at 24 tests: permanent branch removed (3
+  failed), warning dropped (3), snake_case end date not read (1), refusal
+  message changed (3). The other 17 suites loading `routes/users.js` pass
+  except six that need the Firestore emulator (SHY-0546), none of which
+  calls this route.

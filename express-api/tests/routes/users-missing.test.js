@@ -290,19 +290,53 @@ describe('POST /api/users/:uniqueId/lift-suspension', () => {
     expect(clearSuspensionCache).toHaveBeenCalledWith(10000001);
   });
 
-  it('returns 200 and lifts a permanent (null endDate) expired suspension', async () => {
-    // Permanent suspensions have a null endDate — they should always be liftable by the user
+  // SHY-0611: a suspension with no end date is permanent (the apps read it so:
+  // `User.isActivelySuspended`). This route is open to suspended users so a
+  // timed suspension can end itself; it must never end a permanent one.
+  async function expectPermanentRefused(userDoc) {
+    getDoc.mockResolvedValueOnce(userDoc);
+    const { clearSuspensionCache } = require('../../src/middleware/auth');
+    const log = require('../../src/utils/log');
+
+    const app = createApp('uid-A', 10000001);
+    const res = await request(app).post('/api/users/10000001/lift-suspension').send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Suspension is permanent');
+    expect(mockDocUpdate).not.toHaveBeenCalled();
+    expect(clearSuspensionCache).not.toHaveBeenCalled();
+    expect(log.warn).toHaveBeenCalledWith('users', 'Refused self-lift of a permanent suspension', {
+      uniqueId: '10000001',
+    });
+  }
+
+  it('refuses to lift a permanent suspension (null end date) and writes nothing', async () => {
+    await expectPermanentRefused({ id: '10000001', isSuspended: true, suspensionEndDate: null });
+  });
+
+  it('refuses to lift a permanent suspension stored with no end date field', async () => {
+    await expectPermanentRefused({ id: '10000001', isSuspended: true });
+  });
+
+  it('refuses to lift a permanent suspension whose snake_case end date is null', async () => {
+    await expectPermanentRefused({ id: '10000001', is_suspended: true, suspension_end_date: null });
+  });
+
+  it('lifts an expired suspension whose end date is stored in snake_case', async () => {
     getDoc.mockResolvedValueOnce({
       id: '10000001',
-      isSuspended: true,
-      suspensionEndDate: null,
+      is_suspended: true,
+      suspension_end_date: 1709913600000 - 86400000, // now - 1 day
     });
 
     const app = createApp('uid-A', 10000001);
     const res = await request(app).post('/api/users/10000001/lift-suspension').send({});
 
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
+    expect(mockDocUpdate).toHaveBeenCalledWith(
+      'users/10000001',
+      expect.objectContaining({ isSuspended: false }),
+    );
   });
 });
 

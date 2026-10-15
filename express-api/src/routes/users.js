@@ -1277,8 +1277,15 @@ router.post('/users/:uniqueId/lift-suspension', async (req, res) => {
       return res.status(400).json({ error: 'User is not suspended' });
     }
 
+    // No end date means permanent, as the apps read it (`User.isActivelySuspended`).
+    // This route is open to suspended users so that a timed suspension can end
+    // itself; a permanent one ends only by an admin or an upheld appeal (SHY-0611).
     const suspensionEndDate = user.suspensionEndDate ?? user.suspension_end_date ?? null;
-    if (suspensionEndDate && suspensionEndDate > now()) {
+    if (suspensionEndDate === null) {
+      log.warn('users', 'Refused self-lift of a permanent suspension', { uniqueId });
+      return res.status(400).json({ error: 'Suspension is permanent' });
+    }
+    if (suspensionEndDate > now()) {
       return res.status(400).json({ error: 'Suspension has not expired yet' });
     }
 
