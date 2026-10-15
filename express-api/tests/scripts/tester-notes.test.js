@@ -19,7 +19,7 @@ const {
   parseChanges,
   ticketIds,
   summarise,
-  storyTitle,
+  storyInfo,
   buildNotes,
 } = require('../../../scripts/tester-notes.js');
 
@@ -33,9 +33,26 @@ const base = {
   ref: 'develop',
   sha: '56651692a793b83f66c6ff856e1bb2603b803d01',
   trigger: 'workflow_dispatch',
-  titles: new Map([
-    ['SHY-0583', 'An orphaned In Progress story returns to the backlog'],
-    ['SHY-0518', 'A Draft story can be maintained without leaving Draft'],
+  stories: new Map([
+    [
+      'SHY-0583',
+      {
+        title: 'An orphaned In Progress story returns to the backlog',
+        status: 'In Review',
+        scenarios: [
+          'An abandoned story goes back to the backlog',
+          'An implementation PR cannot hide behind the backlog',
+        ],
+      },
+    ],
+    [
+      'SHY-0518',
+      {
+        title: 'A Draft story can be maintained without leaving Draft',
+        status: 'Done',
+        scenarios: ['A Draft story can be edited'],
+      },
+    ],
   ]),
   override: '',
 };
@@ -75,6 +92,10 @@ describe('parseChanges', () => {
 
   test('refuses a commit line with too few fields, quoting it', () => {
     expect(() => parseChanges('#baseline 1\naaa\tios')).toThrow(/malformed.*aaa/);
+  });
+
+  test('reads the docs marker for a commit that touched only story paperwork', () => {
+    expect(resolved(line('aaa', 'docs', 'docs: x')).changes[0].areas).toEqual(['docs']);
   });
 
   test('refuses an area the classifier never writes', () => {
@@ -163,19 +184,48 @@ describe('summarise', () => {
   });
 });
 
-describe('storyTitle', () => {
-  test('reads the title from the story heading', () => {
-    expect(
-      storyTitle('---\nid: SHY-0583\n---\n\n# SHY-0583: An orphan returns\n', 'SHY-0583'),
-    ).toBe('An orphan returns');
+describe('storyInfo', () => {
+  const story = [
+    '---',
+    'id: SHY-0583',
+    'status: In Review',
+    '---',
+    '',
+    '# SHY-0583: An orphan returns',
+    '',
+    '## BDD Scenarios',
+    '',
+    '**Scenario: An abandoned story goes back to the backlog**',
+    '',
+    '- **Given** x',
+    '',
+    '**Scenario: An implementation PR cannot hide behind the backlog**',
+    '',
+    'status: Draft',
+    '',
+  ].join('\n');
+
+  test('reads the title, the frontmatter status and every scenario, in order', () => {
+    expect(storyInfo(story, 'SHY-0583')).toEqual({
+      title: 'An orphan returns',
+      status: 'In Review',
+      scenarios: [
+        'An abandoned story goes back to the backlog',
+        'An implementation PR cannot hide behind the backlog',
+      ],
+    });
   });
 
   test("a heading for a different id is not this story's title", () => {
-    expect(storyTitle('# SHY-0584: Another\n', 'SHY-0583')).toBeNull();
+    expect(storyInfo('# SHY-0584: Another\n', 'SHY-0583').title).toBeNull();
   });
 
-  test('a story with no heading has no title', () => {
-    expect(storyTitle('---\nid: SHY-0583\n---\nbody\n', 'SHY-0583')).toBeNull();
+  test('a story with no scenarios has none', () => {
+    expect(storyInfo('---\nstatus: Done\n---\n# SHY-0583: x\n', 'SHY-0583').scenarios).toEqual([]);
+  });
+
+  test('a story with no frontmatter has no status', () => {
+    expect(storyInfo('# SHY-0583: x\n', 'SHY-0583').status).toBeNull();
   });
 });
 
@@ -203,6 +253,35 @@ describe('buildNotes — the first line answers "what do I test?"', () => {
     );
   });
 
+  test('the newest ticket with something to test leads, not a newer paperwork-only one', () => {
+    const notes = buildNotes({
+      ...base,
+      ...resolved(
+        line('a', 'docs', 'docs: SHY-0518 Done (#3)'),
+        line('b', 'android', 'SHY-0583: the orphan check runs (#2)'),
+      ),
+    });
+    expect(notes.split('\n')[0]).toBe(
+      'What to test: SHY-0583 An orphaned In Progress story returns to the backlog (+1 more below)',
+    );
+  });
+
+  test('a Draft ticket named only by paperwork: nothing new, but still listed', () => {
+    const notes = buildNotes({
+      ...base,
+      stories: new Map([
+        ['SHY-0585', { title: 'Scripts are never linted', status: 'Draft', scenarios: [] }],
+      ]),
+      ...resolved(line('a', 'docs', 'docs: file SHY-0585 (#2329)')),
+    });
+    expect(notes.split('\n')[0]).toBe(
+      'What to test: nothing new for this app since the last dev build',
+    );
+    expect(notes).toContain(
+      '- SHY-0585 Scripts are never linted\n  Filed, not built yet: nothing to test.\n',
+    );
+  });
+
   test('no ticket, other app changes: says so instead of naming an old ticket', () => {
     const notes = buildNotes({
       ...base,
@@ -213,10 +292,10 @@ describe('buildNotes — the first line answers "what do I test?"', () => {
     );
   });
 
-  test('nothing for this app: says so', () => {
+  test('no ticket and nothing for this app: says so', () => {
     const notes = buildNotes({
       ...base,
-      ...resolved(line('a', 'web', 'SHY-0583: the roadmap page (#1)')),
+      ...resolved(line('a', 'web', 'chore(web): tidy the footer (#1)')),
     });
     expect(notes.split('\n')[0]).toBe(
       'What to test: nothing new for this app since the last dev build',
@@ -231,7 +310,7 @@ describe('buildNotes — the first line answers "what do I test?"', () => {
   });
 });
 
-describe('buildNotes — the body', () => {
+describe('buildNotes — every ticket since the last build', () => {
   const two = () =>
     buildNotes({
       ...base,
@@ -243,11 +322,15 @@ describe('buildNotes — the body', () => {
       ),
     });
 
-  test('lists every ticket newest first, each with its title and newest summary', () => {
+  test('names each ticket newest first, with its title, what changed and what to test', () => {
     expect(two()).toContain(
-      'Tickets, newest first:\n' +
-        '- SHY-0583 An orphaned In Progress story returns to the backlog: the orphan check runs in the gate\n' +
-        '- SHY-0518 A Draft story can be maintained without leaving Draft: a Draft story can be edited\n',
+      'Tickets since the last build, newest first:\n' +
+        '- SHY-0583 An orphaned In Progress story returns to the backlog\n' +
+        '  What changed: the orphan check runs in the gate\n' +
+        '  What to test: An abandoned story goes back to the backlog; An implementation PR cannot hide behind the backlog\n' +
+        '- SHY-0518 A Draft story can be maintained without leaving Draft\n' +
+        '  What changed: a Draft story can be edited\n' +
+        '  What to test: A Draft story can be edited\n',
     );
   });
 
@@ -255,33 +338,109 @@ describe('buildNotes — the body', () => {
     expect(two()).toContain('Other changes:\n- bump express from 5.1.0 to 5.2.0\n');
   });
 
-  test('a commit naming two tickets lists both', () => {
+  test('a ticket that touched only the other app is still named', () => {
+    const notes = buildNotes({ ...base, ...resolved(line('a', 'ios', 'SHY-0583: x (#1)')) });
+    expect(notes).toContain('- SHY-0583 An orphaned In Progress story returns to the backlog\n');
+  });
+
+  test('a ticket that touched no deployed area at all is still named', () => {
     const notes = buildNotes({
       ...base,
-      titles: new Map(),
-      ...resolved(line('a', 'android', 'SHY-0461 + SHY-0463: a suspended person is told (#2017)')),
+      ...resolved(line('a', '-', 'SHY-0518: tooling only (#1)')),
+    });
+    expect(notes).toContain('- SHY-0518 A Draft story can be maintained without leaving Draft\n');
+  });
+
+  test('a ticket only filed, not built, is named as such with nothing to test', () => {
+    const notes = buildNotes({
+      ...base,
+      stories: new Map([
+        [
+          'SHY-0585',
+          { title: 'Scripts are never linted', status: 'Draft', scenarios: ['A defect is caught'] },
+        ],
+      ]),
+      ...resolved(line('a', '-', 'docs: file SHY-0585 (#2329)')),
     });
     expect(notes).toContain(
-      '- SHY-0461: a suspended person is told\n- SHY-0463: a suspended person is told\n',
+      '- SHY-0585 Scripts are never linted\n  Filed, not built yet: nothing to test.\n',
+    );
+    expect(notes.split('\n')[0]).toBe(
+      'What to test: nothing new for this app since the last dev build',
     );
   });
 
-  test('a ticket with no story file still shows its id and summary', () => {
+  test('a ticket whose story was only updated in this build has nothing new to test', () => {
     const notes = buildNotes({
       ...base,
-      titles: new Map(),
+      ...resolved(line('a', 'docs', 'docs: SHY-0518 Done; SHY-0535 DoD ticked (#2308)')),
+    });
+    expect(notes).toContain(
+      '- SHY-0518 A Draft story can be maintained without leaving Draft\n' +
+        '  Story updated only in this build: nothing new to test.\n',
+    );
+  });
+
+  test('what changed comes from the code commit, not a later paperwork commit', () => {
+    const notes = buildNotes({
+      ...base,
+      ...resolved(
+        line('a', 'docs', 'docs: SHY-0583 Done (#3)'),
+        line('b', 'android', 'SHY-0583: the orphan check runs in the gate (#2)'),
+      ),
+    });
+    expect(notes).toContain(
+      '- SHY-0583 An orphaned In Progress story returns to the backlog\n' +
+        '  What changed: the orphan check runs in the gate\n',
+    );
+  });
+
+  test('a paperwork-only change with no ticket is in neither note', () => {
+    const notes = buildNotes({ ...base, ...resolved(line('a', 'docs', 'chore(board): sync ids')) });
+    expect(notes.split('\n')[0]).toBe(
+      'What to test: nothing new for this app since the last dev build',
+    );
+  });
+
+  test('a commit naming two tickets names both', () => {
+    const notes = buildNotes({
+      ...base,
+      stories: new Map(),
+      ...resolved(line('a', 'android', 'SHY-0461 + SHY-0463: a suspended person is told (#2017)')),
+    });
+    expect(notes).toContain(
+      '- SHY-0461\n  What changed: a suspended person is told\n  What to test: not written down (no story file)\n' +
+        '- SHY-0463\n  What changed: a suspended person is told\n  What to test: not written down (no story file)\n',
+    );
+  });
+
+  test('a ticket with no story file still shows its id and what changed', () => {
+    const notes = buildNotes({
+      ...base,
+      stories: new Map(),
       ...resolved(line('a', 'android', 'SHY-0999: something changed (#1)')),
     });
     expect(notes.split('\n')[0]).toBe('What to test: SHY-0999 something changed');
   });
 
-  test('a ticket with neither title nor usable summary shows its id alone', () => {
+  test('a ticket with neither story nor usable summary shows its id alone', () => {
     const notes = buildNotes({
       ...base,
-      titles: new Map(),
+      stories: new Map(),
       ...resolved(line('a', 'android', 'SHY-0999: edit deploy-dev.yml (#1)')),
     });
-    expect(notes).toContain('Tickets, newest first:\n- SHY-0999\n');
+    expect(notes).toContain(
+      'Tickets since the last build, newest first:\n- SHY-0999\n  What to test: not written down (no story file)\n',
+    );
+  });
+
+  test('a story with no scenarios says what to test was not written', () => {
+    const notes = buildNotes({
+      ...base,
+      stories: new Map([['SHY-0700', { title: 'A thing', status: 'Done', scenarios: [] }]]),
+      ...resolved(line('a', 'android', 'SHY-0700: a thing (#1)')),
+    });
+    expect(notes).toContain('- SHY-0700 A thing\n  What to test: not written in the story\n');
   });
 
   test('a summary that repeats the title is not repeated', () => {
@@ -291,33 +450,41 @@ describe('buildNotes — the body', () => {
         line('a', 'android', 'SHY-0583: An orphaned In Progress story returns to the backlog (#1)'),
       ),
     });
-    expect(notes).toContain('- SHY-0583 An orphaned In Progress story returns to the backlog\n');
+    expect(notes).toContain(
+      '- SHY-0583 An orphaned In Progress story returns to the backlog\n  What to test: ',
+    );
   });
 
-  test('the Android note leaves out an iOS-only commit', () => {
+  test('the Android note leaves out an iOS-only change with no ticket', () => {
     const notes = buildNotes({
       ...base,
-      ...resolved(line('a', 'ios', 'SHY-0583: x (#1)'), line('b', 'android', 'SHY-0518: y (#2)')),
+      ...resolved(
+        line('a', 'ios', 'build(deps): bump pods (#1)'),
+        line('b', 'android', 'SHY-0518: y (#2)'),
+      ),
     });
-    expect(notes).not.toContain('SHY-0583');
+    expect(notes).not.toContain('bump pods');
   });
 
-  test('the iOS note leaves out an Android-only commit', () => {
-    const notes = buildNotes({
-      ...base,
-      platform: 'ios',
-      ...resolved(line('a', 'ios', 'SHY-0583: x (#1)'), line('b', 'android', 'SHY-0518: y (#2)')),
-    });
-    expect(notes).not.toContain('SHY-0518');
-  });
-
-  test("a backend change reaches both apps' notes", () => {
+  test('the iOS note leaves out an Android-only change with no ticket', () => {
     const notes = buildNotes({
       ...base,
       platform: 'ios',
-      ...resolved(line('a', 'backend', 'SHY-0518: y (#2)')),
+      ...resolved(
+        line('a', 'android', 'build(deps): bump agp (#1)'),
+        line('b', 'ios', 'SHY-0583: x (#2)'),
+      ),
     });
-    expect(notes).toContain('SHY-0518');
+    expect(notes).not.toContain('bump agp');
+  });
+
+  test("a backend change with no ticket reaches both apps' notes", () => {
+    const notes = buildNotes({
+      ...base,
+      platform: 'ios',
+      ...resolved(line('a', 'backend', 'build(deps): bump express (#2)')),
+    });
+    expect(notes).toContain('- bump express');
   });
 
   test('refuses a platform it does not know', () => {
@@ -394,7 +561,7 @@ describe('buildNotes — hand-written notes and length', () => {
   test('a long title is cut, keeping the id', () => {
     const notes = buildNotes({
       ...base,
-      titles: new Map([['SHY-0583', 'w '.repeat(400)]]),
+      stories: new Map([['SHY-0583', { title: 'w '.repeat(400), status: 'Done', scenarios: [] }]]),
       ...resolved(line('a', 'android', 'SHY-0583: x (#1)')),
     });
     const entry = notes.split('\n').find((l) => l.startsWith('- SHY-0583'));
@@ -410,10 +577,10 @@ describe('buildNotes — hand-written notes and length', () => {
         `SHY-${String(1000 + i).padStart(4, '0')}: ${'z'.repeat(60)} (#${i})`,
       ),
     );
-    const notes = buildNotes({ ...base, titles: new Map(), ...resolved(...many) });
+    const notes = buildNotes({ ...base, stories: new Map(), ...resolved(...many) });
     expect(notes.length).toBeLessThanOrEqual(NOTES_LIMIT);
-    expect(notes).toContain('- SHY-1000:');
-    expect(notes).not.toContain('- SHY-1199:');
+    expect(notes).toContain('- SHY-1000\n');
+    expect(notes).not.toContain('- SHY-1199\n');
     expect(notes).toMatch(/\n- …and \d+ more\n/);
     expect(notes).toMatch(/\nDeploy from develop at 56651692a79, started by hand\.$/);
   });

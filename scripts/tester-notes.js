@@ -14,12 +14,23 @@
  *   <sha>\t<areas>\t<subject>             one line per first-parent commit,
  *                                         newest first; <areas> is the comma
  *                                         list scripts/deploy-scope.sh set
- *                                         true for that commit, or `-`
+ *                                         true for that commit, `-`, or `docs`
+ *                                         for a commit touching only story
+ *                                         paperwork under .project/
  *
- * Which commits an app's note lists comes from that classifier (one home for
- * "what does this change touch"): a commit reaches the Android note when it
- * touches the backend or Android, and the iOS note likewise. A docs commit that
- * files a ticket therefore never appears as something to test.
+ * Shyden, 2026-10-14, after the first real build named no ticket: "it needs
+ * to name ALL tickets since the last build. not just the ticket name but it
+ * must include the summary name and what to test". So every ticket a commit
+ * since the last build names is listed in both apps' notes, whatever it
+ * touched, each with its story title, what changed (the merge's summary) and
+ * what to test (the story's BDD scenario titles). A ticket whose story is still
+ * Draft was only filed, so it is named with nothing to test. A ticket named
+ * only by paperwork commits (its story marked Done, say) is named as updated
+ * with nothing new to test, and "what changed" always comes from the newest
+ * commit that changed code. The first line names the newest ticket with
+ * something to test. Changes with no
+ * ticket are filtered by deploy-scope.sh's areas: one reaches the Android note
+ * when it touches the backend or Android, and the iOS note likewise.
  *
  * A gap we can explain (no baseline, a ticket with no story file) gives a note
  * that says so plainly. A fault (malformed input, an unknown platform) throws:
@@ -43,8 +54,8 @@ const NOTES_LIMIT = 4000;
 /** One entry line, so a single long title cannot crowd the others out. */
 const LINE_LIMIT = 200;
 
-/** Every area scripts/deploy-scope.sh writes. */
-const AREAS = new Set(['backend', 'web', 'android', 'ios']);
+/** Every area scripts/deploy-scope.sh writes, and list-build-changes' paperwork marker. */
+const AREAS = new Set(['backend', 'web', 'android', 'ios', 'docs']);
 
 /** Which commits each app's note lists: its own area, plus the API it calls. */
 const PLATFORM_AREAS = {
@@ -109,19 +120,42 @@ function summarise(subject) {
   return s;
 }
 
-/** The title from a story file's `# SHY-XXXX: Title` heading, or null. */
-function storyTitle(text, id) {
-  const m = new RegExp(`^# ${id}: (.+)$`, 'm').exec(text);
-  return m ? m[1].trim() : null;
+/**
+ * What a tester needs from a story: its title (the `# SHY-XXXX: Title`
+ * heading), its frontmatter status, and the title of every BDD scenario, which
+ * is what to test.
+ */
+function storyInfo(text, id) {
+  const heading = new RegExp(`^# ${id}: (.+)$`, 'm').exec(text);
+  const front = /^---\n([\s\S]*?)\n---/.exec(text);
+  const status = front ? /^status: (.+)$/m.exec(front[1]) : null;
+  const scenarios = [...text.matchAll(/^\*\*Scenario: (.+?)\*\*\s*$/gm)].map((m) => m[1].trim());
+  return {
+    title: heading ? heading[1].trim() : null,
+    status: status ? status[1].trim() : null,
+    scenarios,
+  };
 }
 
 const clip = (s, n) => (s.length <= n ? s : `${s.slice(0, n - 1)}…`);
 
-function entryLine(id, title, summary) {
-  let text = id;
-  if (title) text += ` ${title}`;
-  if (summary && summary.toLowerCase() !== (title ?? '').toLowerCase()) text += `: ${summary}`;
-  return clip(`- ${text}`, LINE_LIMIT);
+/** One ticket's lines: id and title, what changed, what to test. */
+function entryBlock(id, story, { summary, code }) {
+  const title = story?.title ?? null;
+  const lines = [`- ${id}${title ? ` ${title}` : ''}`];
+  if (story?.status === 'Draft') {
+    lines.push('  Filed, not built yet: nothing to test.');
+  } else if (!code) {
+    lines.push('  Story updated only in this build: nothing new to test.');
+  } else {
+    if (summary && summary.toLowerCase() !== (title ?? '').toLowerCase()) {
+      lines.push(`  What changed: ${summary}`);
+    }
+    if (!story) lines.push('  What to test: not written down (no story file)');
+    else if (story.scenarios.length === 0) lines.push('  What to test: not written in the story');
+    else lines.push(`  What to test: ${story.scenarios.join('; ')}`);
+  }
+  return lines.map((l) => clip(l, LINE_LIMIT)).join('\n');
 }
 
 /** The lines that fit `budget` characters; the rest are counted, never silently dropped. */
@@ -142,7 +176,7 @@ function fitting(lines, budget) {
 }
 
 /** The whole note for one app's build. */
-function buildNotes({ platform, resolved, changes, titles, ref, sha, trigger, override }) {
+function buildNotes({ platform, resolved, changes, stories, ref, sha, trigger, override }) {
   if (override && override.trim() !== '') return override.slice(0, NOTES_LIMIT);
   const areas = PLATFORM_AREAS[platform];
   if (!areas) throw new Error(`unknown platform "${platform}" (expected android or ios)`);
@@ -159,25 +193,32 @@ function buildNotes({ platform, resolved, changes, titles, ref, sha, trigger, ov
     ].join('\n');
   }
 
-  const relevant = changes.filter((c) => c.areas.some((a) => areas.includes(a)));
-  const tickets = new Map(); // id -> summary of its newest commit, newest ticket first
+  // id -> { summary of its newest code commit, whether any code commit named it },
+  // newest ticket first. A paperwork commit lists a ticket but never supplies its summary.
+  const tickets = new Map();
   const others = [];
-  for (const c of relevant) {
+  for (const c of changes) {
     const ids = ticketIds(c.subject);
     if (ids.length === 0) {
+      if (!c.areas.some((a) => areas.includes(a))) continue;
       const s = summarise(c.subject);
       others.push(s ? clip(`- ${s}`, LINE_LIMIT) : '- a change with no ticket');
       continue;
     }
+    const code = !c.areas.includes('docs');
     for (const id of ids) {
-      if (!tickets.has(id)) tickets.set(id, summarise(c.subject));
+      const seen = tickets.get(id);
+      if (!seen) tickets.set(id, { summary: code ? summarise(c.subject) : null, code });
+      else if (code && !seen.code) tickets.set(id, { summary: summarise(c.subject), code });
     }
   }
 
+  const testable = [...tickets].find(([id, t]) => t.code && stories.get(id)?.status !== 'Draft');
+
   let first;
-  if (tickets.size > 0) {
-    const [id, s] = [...tickets][0];
-    const name = titles.get(id) ?? s;
+  if (testable) {
+    const [id, { summary: s }] = testable;
+    const name = stories.get(id)?.title ?? s;
     const more = tickets.size > 1 ? ` (+${tickets.size - 1} more below)` : '';
     first = clip(`What to test: ${id}${name ? ` ${name}` : ''}`, LINE_LIMIT) + more;
   } else if (others.length > 0) {
@@ -190,8 +231,8 @@ function buildNotes({ platform, resolved, changes, titles, ref, sha, trigger, ov
   const sections = [];
   let budget = NOTES_LIMIT - first.length - provenance.length - 4;
   if (tickets.size > 0) {
-    const heading = 'Tickets, newest first:';
-    const lines = [...tickets].map(([id, s]) => entryLine(id, titles.get(id) ?? null, s));
+    const heading = 'Tickets since the last build, newest first:';
+    const lines = [...tickets].map(([id, t]) => entryBlock(id, stories.get(id), t));
     const section = [heading, ...fitting(lines, budget - heading.length - 3)].join('\n');
     sections.push(section);
     budget -= section.length + 2;
@@ -206,29 +247,28 @@ function buildNotes({ platform, resolved, changes, titles, ref, sha, trigger, ov
   return [first, '', ...sections.flatMap((s) => [s, '']), provenance].join('\n');
 }
 
-/** Titles for the ids named, read from the story files' headings. */
-function readTitles(ids, storiesDir) {
+/** What each named ticket's story file says, read from .project/stories/. */
+function readStories(ids, storiesDir) {
   const files = fs.readdirSync(storiesDir);
-  const titles = new Map();
+  const stories = new Map();
   for (const id of new Set(ids)) {
     const file = files.find((f) => f.startsWith(`${id}-`) && f.endsWith('.md'));
     if (!file) continue;
-    const title = storyTitle(fs.readFileSync(path.join(storiesDir, file), 'utf8'), id);
-    if (title) titles.set(id, title);
+    stories.set(id, storyInfo(fs.readFileSync(path.join(storiesDir, file), 'utf8'), id));
   }
-  return titles;
+  return stories;
 }
 
 function main() {
   const env = process.env;
   const parsed = parseChanges(env.CHANGES ?? '');
   const ids = parsed.changes.flatMap((c) => ticketIds(c.subject));
-  const titles = readTitles(ids, path.join(__dirname, '..', '.project', 'stories'));
+  const stories = readStories(ids, path.join(__dirname, '..', '.project', 'stories'));
   process.stdout.write(
     buildNotes({
       platform: process.argv[2],
       ...parsed,
-      titles,
+      stories,
       ref: env.DEPLOY_REF,
       sha: env.DEPLOY_SHA,
       trigger: env.DEPLOY_TRIGGER,
@@ -252,7 +292,7 @@ module.exports = {
   parseChanges,
   ticketIds,
   summarise,
-  storyTitle,
+  storyInfo,
   buildNotes,
-  readTitles,
+  readStories,
 };

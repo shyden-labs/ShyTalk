@@ -62,6 +62,18 @@ carry the ticket.
       rather than naming only one and implying it is the whole build.
 - [ ] A deploy with no ticket-bearing commits (a config-only deploy) says that,
       rather than naming a stale earlier ticket.
+- [ ] **Every** ticket named by any commit since the last dev build is listed in
+      both apps' notes, whatever it touched, each with its story title, what
+      changed (the merge's summary) and what to test (the story's BDD scenario
+      titles) (Shyden, 2026-10-14).
+- [ ] A ticket whose story is still Draft is listed as filed, with nothing to
+      test.
+- [ ] A ticket named only by commits that touch story paperwork (`.project/`)
+      is listed as updated with nothing new to test, and "what changed" always
+      comes from the newest commit that changed code.
+- [ ] The first line names the newest ticket with something to test (named by a
+      code commit, story not Draft); with none it says nothing is new for that
+      app, or counts that app's other changes.
 - [ ] An explicit `release-notes` input still wins — the hand-written path is not
       removed.
 - [ ] Notes stay within Firebase App Distribution's length limit; long titles are
@@ -105,6 +117,18 @@ carry the ticket.
 - **Given** a build contains no ticket changes
 - **When** the tester reads the build notes
 - **Then** the notes say so rather than naming an unrelated ticket
+
+**Scenario: A tester sees every ticket since the last build and what to test in each**
+
+- **Given** several tickets were merged since the last dev build
+- **When** the tester reads the build notes
+- **Then** each ticket is listed, newest first, with its title, what changed and what to test
+
+**Scenario: A story only marked done is not presented as new work**
+
+- **Given** a ticket's only change in this build is its story being updated
+- **When** the tester reads the build notes
+- **Then** that ticket says there is nothing new to test, and the first line names a ticket that has something to test
 
 ## Test Plan
 
@@ -176,3 +200,19 @@ fails against the current workflow.
 - **Not classified as a deploy area:** the four new scripts change only what
   testers read, so `deploy-scope.sh` does not list them; their first real run
   is this story's own dev deploy (DoD).
+- **2026-10-14, after the first real build (PR #2328, run 38507535828 on
+  `661f0ae5722`, succeeded).** Android note: "What to test: no ticket in this
+  build; 2 other changes below" (ktor, livekit). iOS note: "What to test:
+  SHY-0361 Tester build notes do not say what changed". Both ended "Deploy from
+  develop at 661f0ae5722, started by hand." TestFlight: "What to Test created
+  on build 288 (0.99.0)", the build listed on the first look (0 waits). Shyden:
+  *"it needs to name ALL tickets since the last build. not just the ticket name
+  but it must include the summary name and what to test"*. This supersedes the
+  design note above: every ticket is listed in both apps' notes, whatever it
+  touched. A real-data check of that deploy's commits then showed a second
+  defect: tickets named only by a docs merge got "What changed: Done; SHY-0535
+  DoD ticked to release". `list-build-changes` now marks a commit touching only
+  `.project/` as `docs`; such a ticket says "Story updated only in this build:
+  nothing new to test", and the first line names the newest ticket with
+  something to test (added 2026-10-15). Mutation-verified: 9 mutants, each run
+  against both whole test files, all red.
