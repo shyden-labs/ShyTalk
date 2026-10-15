@@ -38,5 +38,6 @@ export async function waitForAutoSave(
   await leaveField(page, fieldSelector);
   const saved = page.locator(fieldSelector).locator("..").locator(".field-feedback.saved");
   await expect(saved).toBeVisible({ timeout });
-  await expect(saved).toContainText("Saved");
+  // The feedback is the tick text, then an "Undo" link when there is one.
+  await expect(saved.locator("span").first()).toHaveText("✓ Saved");
 }
