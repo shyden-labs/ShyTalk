@@ -88,7 +88,8 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 1997 -> 2002: scripts/deploy-plan.js, deploy-failure-issue.js, their two
 // tests and deploy-dev-on-merge.test.js (SHY-0534).
 // 2002 -> 2003: tests/utils/suspension.test.js (SHY-0597).
-const FILES_READ_FLOOR = 2003;
+// 2003 -> 2004: tests/web/helpers/admin-autosave.ts (SHY-0597).
+const FILES_READ_FLOOR = 2004;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
