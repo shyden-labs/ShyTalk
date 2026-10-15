@@ -10,7 +10,9 @@
  *
  * <areas> is what scripts/deploy-scope.sh (SHY-0347) says that one commit
  * touches: the same classifier the deploy jobs use, never a second list of
- * paths. `-` means none.
+ * paths. `-` means none. `docs` means the commit touched only story paperwork
+ * under .project/ (a story marked Done, a ticket filed): the tester notes
+ * still name its tickets, but never take "what changed" from it.
  *
  * Unlike the scope job, nothing here fails safe: deploy-dev.yml runs this in
  * its own job, and a fault turns the app jobs red (Shyden, 2026-10-14).
@@ -47,7 +49,10 @@ function listChanges({ baseline, git, classify }) {
   let out = `#baseline ${baseline}\n`;
   for (const sha of lines(git(['log', '--first-parent', '--format=%H', `${baseline}..HEAD`]))) {
     const paths = lines(git(['diff', '--name-only', `${sha}^1`, sha]));
-    const areas = paths.length === 0 ? [] : classify(paths);
+    const paperwork = paths.length > 0 && paths.every((p) => p.startsWith('.project/'));
+    let areas = [];
+    if (paperwork) areas = ['docs'];
+    else if (paths.length > 0) areas = classify(paths);
     const subject = git(['log', '-1', '--format=%s', sha]).trim();
     out += `${sha}\t${areas.join(',') || '-'}\t${subject}\n`;
   }

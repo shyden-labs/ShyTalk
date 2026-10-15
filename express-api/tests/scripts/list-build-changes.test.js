@@ -73,7 +73,7 @@ describe('listChanges', () => {
     });
     const classify = (paths) => (paths[0].startsWith('app/') ? ['backend', 'android'] : []);
     expect(listChanges({ baseline: 'base1', git, classify })).toBe(
-      '#baseline base1\nc2\tbackend,android\tSHY-0583: x (#2)\nc1\t-\tdocs: file SHY-0583 (#1)\n',
+      '#baseline base1\nc2\tbackend,android\tSHY-0583: x (#2)\nc1\tdocs\tdocs: file SHY-0583 (#1)\n',
     );
   });
 
@@ -98,6 +98,31 @@ describe('listChanges', () => {
       throw new Error('must not classify an empty change');
     };
     expect(listChanges({ baseline: 'b', git, classify })).toBe('#baseline b\nc1\t-\tempty\n');
+  });
+
+  test('a commit touching only .project/ is marked docs and not classified', () => {
+    const { git } = fakeGit({
+      'log --first-parent --format=%H b..HEAD': 'c1\n',
+      'diff --name-only c1^1 c1': '.project/stories/SHY-0565-x.md\n.project/board-items.json\n',
+      'log -1 --format=%s c1': 'docs: SHY-0565 Done (#1)\n',
+    });
+    const classify = () => {
+      throw new Error('must not classify story paperwork');
+    };
+    expect(listChanges({ baseline: 'b', git, classify })).toBe(
+      '#baseline b\nc1\tdocs\tdocs: SHY-0565 Done (#1)\n',
+    );
+  });
+
+  test('a commit touching .project/ and code is classified as code', () => {
+    const { git } = fakeGit({
+      'log --first-parent --format=%H b..HEAD': 'c1\n',
+      'diff --name-only c1^1 c1': '.project/stories/SHY-0583-x.md\nscripts/x.js\n',
+      'log -1 --format=%s c1': 'SHY-0583: x (#1)\n',
+    });
+    expect(listChanges({ baseline: 'b', git, classify: () => [] })).toBe(
+      '#baseline b\nc1\t-\tSHY-0583: x (#1)\n',
+    );
   });
 
   test('no commits since the baseline is a resolved, empty list', () => {
