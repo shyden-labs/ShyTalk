@@ -420,6 +420,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0593](SHY-0593-test-helpers-spec-and-private-swagger.md) | P2 | S | infra | The test-helper API has a hand-written spec, contract tests and a dev-only private Swagger page | 📝 Draft | — |  |
 | [SHY-0594](SHY-0594-the-effort-line-reports-points-remaining-never-a-percentage.md) | P2 | S | bug | The effort line reports points remaining, never a percentage | 📝 Draft | — |  |
 | [SHY-0595](SHY-0595-every-package-install-script-is-approved-or-refused-on-purpose.md) | P1 | S | infra | Every package install script is approved or refused on purpose | 📝 Draft | — |  |
+| [SHY-0596](SHY-0596-the-board-names-its-priority-field-so-the-next-ticket-can-be-picked.md) | P1 | S | bug | The board names its priority field Priority, so the next ticket can be picked from it | 📝 Draft | — |  |
 
 ## Done
 
