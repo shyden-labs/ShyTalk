@@ -1,6 +1,6 @@
 ---
 id: SHY-0536
-status: In Review
+status: Done
 owner: claude
 created: 2026-10-07
 priority: P1
@@ -81,7 +81,7 @@ stories with code reach back to about mid-August.
 - [x] A spread of at least 15 open MVP stories (five each scored 1-2, 3-5 and
       8-13) is re-read in full after the first pass, and every wrong score is
       corrected; the number corrected is recorded.
-- [ ] `node scripts/story-progress.js` is run after the merge and its three
+- [x] `node scripts/story-progress.js` is run after the merge and its three
       lines are quoted in Notes; the MVP line still reports by tickets, and
       the effort line still reads `unavailable` until SHY-0537 lands, with the
       scored count moved from 1 to at least 166.
@@ -122,7 +122,7 @@ stories with code reach back to about mid-August.
 
 ### Observability
 
-- [ ] After the merge and the board sync, one GraphQL read of the board
+- [x] After the merge and the board sync, one GraphQL read of the board
       shows an `Estimate` value on every scored card, and the sum matches the
       sum from the story files.
 
@@ -179,10 +179,10 @@ stories with code reach back to about mid-August.
 
 ## Definition of Done
 
-- [ ] Every AC checkbox above is met.
-- [ ] The frontmatter scan passes on the whole corpus in CI.
+- [x] Every AC checkbox above is met.
+- [x] The frontmatter scan passes on the whole corpus in CI.
 - [x] The calibration table and correlation are committed and quoted in Notes.
-- [ ] CI green by step name on the PR head SHA; merged into `develop`; the
+- [x] CI green by step name on the PR head SHA; merged into `develop`; the
       board read shows the scored values.
 
 ## Notes
@@ -217,3 +217,16 @@ stories with code reach back to about mid-August.
     one of the 164 files changed by exactly one `+estimate:` line; open MVP
     stories without an estimate: 0. Board read and `story-progress.js` follow
     the merge.
+- **2026-10-15 (Done)**: merged as #2314; on its head `PR Gate`,
+  `Validate SHY story frontmatter` and `Story status must be In Review before
+  merge` all success. SHY-0537 has since landed, so the effort line is no
+  longer `unavailable`; `node scripts/story-progress.js` on `origin/develop`
+  0cdfac0ecb1:
+  ```
+  By tickets: 36% complete (180 of 504 stories Done; 13 cancelled left out). Measured pace 0.71 a day over the last 7 days (0, 0, 0, 1, 4, 0, 0). ETA at that pace: 2028-01-12, before outside waits.
+  By effort: 32% complete (684 of 2145 points Done; 175 Done stories unscored, counted at the scored mean of 3.8 points (assumed)). Measured pace 2.71 points a day over the last 7 days (0, 0, 0, 8, 11, 0, 0). ETA at that pace: 2028-04-06, before outside waits.
+  MVP subset (worked first): 27% complete (69 of 254 stories Done). Measured pace 0.00 a day over the last 7 days (0, 0, 0, 0, 0, 0, 0). ETA unavailable at the measured pace: nothing closed in the last 30 days.
+  ```
+  Board read after the sync: one GraphQL read of ShyTalk Stories (title asserted): 521 items, 324 open cards, every one a SHY story, 0 without an `Estimate`; board sum 1461 equals the story files' sum of 1461, 0 per-story mismatches. The one card that had no estimate, #1653, was a placeholder retired the same day (Shyden's ruling). The effort line still gives a
+  percentage, against Shyden's 2026-10-12 rule (points remaining, never a %):
+  SHY-0594.

@@ -82,6 +82,12 @@ Three tests pin the hook today: `actionlint-shellcheck-invocation.test.js`,
 
 - [ ] The hook prints no "skipping Playwright" or "skipping Sonar" line
       that reads as if a check happened.
+- [ ] The hook writes nothing to stderr on a clean push. Today
+      `echo "$CHANGED" | grep -qE ...` (`.husky/pre-push` lines 116, 154
+      and 230) prints `echo: write error: Broken pipe` when the changed-file
+      list is long, because `grep -q` exits on its first match. Line 116
+      (the workflow-file check) survives this story, so it is fixed here
+      too, e.g. with a here-string.
 
 ## BDD Scenarios
 
@@ -124,3 +130,6 @@ Three tests pin the hook today: `actionlint-shellcheck-invocation.test.js`,
   one new pin, and a decision on the Sonar gate's home.
 - **Question for Shyden at start**: where does the main-push Sonar quality
   gate go (a CI job on the develop→main PR or push, or dropped)?
+- **2026-10-15**: SHY-0534's push printed `.husky/pre-push: line 154: echo:
+  write error: Broken pipe` and the same at line 230; the push still passed.
+  Added the stderr AC above.

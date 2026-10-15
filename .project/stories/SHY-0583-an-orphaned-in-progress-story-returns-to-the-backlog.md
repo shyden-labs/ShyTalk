@@ -1,6 +1,6 @@
 ---
 id: SHY-0583
-status: In Review
+status: Done
 owner: claude
 created: 2026-10-13
 priority: P0
@@ -114,3 +114,5 @@ All criteria ticked; the backlog-return line seen in a real PR's Pre-Merge Gate 
 - **Order (three PRs, forced by the rule itself):** this PR changes code, so by its own scope rule it cannot return SHY-0113; and wiring the orphan check now would fail on SHY-0113 until it is returned. So: (1) this PR, the gate exemption and the orphan-check script, not yet wired; (2) PR #2323 (SHY-0537, `.project/` only) returns SHY-0113 to Draft with its score, the first real use of the exemption; (3) a follow-up PR wires the orphan check into the Pre-Merge Gate, green because no orphan is left.
 - **2026-10-13 (part 1 merged as #2324; #2323 merged with SHY-0113 returned)**: Shyden on "umbrella" stories: *"if a ticket is not in progress then it should not be marked as in progress"*, so an umbrella goes back to Draft between child stories; the SHY-0486 comment in the gate now says so. On leftover branches: *"Branch counts until its PR closes"*. The rule is global for every project (*"every project, so update the template too"*): repo-template #10 / PR #11; yawelo-idle, shyden.co.uk (#747) and steadyhand (#317) swept their boards and ticketed their checks.
 - **Part 2 (this PR)**: wires the check into the Pre-Merge Gate, adds the closed-PR rule, rewrites the umbrella comment.
+- **2026-10-15 (Done)**: part 1 merged as #2324 and part 2 as #2326, `PR
+  Gate` success on both heads; every AC was ticked in part 2.
