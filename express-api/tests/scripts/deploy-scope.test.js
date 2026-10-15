@@ -203,22 +203,16 @@ describe('SHY-0347 — every deploy job consults the detection', () => {
     ['deploy-web-dev', 'web', 'web'],
     ['distribute-android', 'android', 'android-testers'],
     ['distribute-ios', 'ios', 'ios-testers'],
-  ])('%s requires the input AND the detected scope, joined by &&', (job, area, input) => {
-    // Rewritten after review. The first version asserted only that
-    // `needs.detect-deploy-scope.outputs.<area> == 'true'` APPEARED in the
-    // block. Swapping the joining `&&` for `||` — which would deploy whenever
-    // EITHER the operator asked OR the scope matched, defeating the whole
-    // "requires both" property — left that substring untouched and the test
-    // green. It proved "is referenced somewhere in", not "is gated on".
-    //
-    // This anchors both clauses as ONE contiguous sequence with `&&` between
-    // them, so the operator-swap regression reddens.
+  ])("%s runs on the plan's %s decision and reads no %s input", (job, area, input) => {
+    // SHY-0534 moved "requested AND changed" into scripts/deploy-plan.js,
+    // where deploy-plan.test.js pins the AND (an OR would deploy whenever
+    // either held). On a push every dispatch input is null, so a job that
+    // still read `inputs.<area> && ...` would never deploy anything.
     const block = jobBlock(job);
     expect(block).toMatch(
-      new RegExp(
-        `inputs\\.${input}\\s*&&\\s*needs\\.detect-deploy-scope\\.outputs\\.${area}\\s*==\\s*'true'`,
-      ),
+      new RegExp(`needs\\.detect-deploy-scope\\.outputs\\.${area}\\s*==\\s*'true'`),
     );
+    expect(block).not.toMatch(new RegExp(`inputs\\.${input}\\b`));
     expect(block).toMatch(/needs:.*detect-deploy-scope|needs: \[[^\]]*detect-deploy-scope/s);
   });
 
