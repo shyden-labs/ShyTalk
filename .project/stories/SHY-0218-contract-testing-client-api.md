@@ -27,7 +27,8 @@ The audit confirmed **no contract testing** (no Pact/OpenAPI/dredd). This gap is
 
 ### Happy path
 
-- [ ] A maintained **OpenAPI 3.1 spec** (`express-api/openapi.yaml`) describes every client-facing endpoint: auth/OTP, users, rooms, messaging, payments/wallet, moderation/reporting, admin — request + response schemas, status codes, error shapes.
+- [ ] Hand-written **OpenAPI 3.1 specs**, one file per API, never generated from code: `express-api/openapi/app.yaml` (the apps' API: auth/OTP, users, rooms, messaging, payments/wallet, reporting), `express-api/openapi/admin.yaml` (admin + portal) and `express-api/openapi/roadmap.yaml` (suggestions, votes, roadmap sign-in) — request + response schemas, status codes, error shapes. One file per API so each private Swagger page (SHY-0587 to SHY-0590) loads only its own API.
+- [ ] Every route the Express API serves sits in exactly one spec file, these three or SHY-0591 to SHY-0593's (system, Apple webhook, test helpers): `check-openapi-in-sync` reads every file under `express-api/openapi/` and fails a route in none or in two. Measured 2026-10-15 on `origin/develop` 661f0ae5722: 326 router routes + `/api/health` (app 116 + health, admin 182, roadmap 12, system 4, webhook 1, test helpers 11).
 - [ ] **Provider verification (real responses conform):** the real Jest integration suite (against the real local stack) asserts each endpoint's ACTUAL response satisfies the spec via `jest-openapi` `toSatisfyApiSpec()` (or `express-openapi-validator` response validation). Registered `contract-provider` (`stack`, `publicArea: Cross-cutting`).
 - [ ] **Consumer verification (clients match the spec):** the client DTOs are checked against the same spec — Kotlin `@Serializable` models (`shared/**`), Swift `Codable` models (`iosApp/**`), and web TS types — so a server field rename/removal breaks a consumer contract test. Registered `contract-consumer` (`host`, `publicArea: Cross-cutting`).
 - [ ] Both register into `scripts/test/framework-registry.mjs`, emit normalized `metadata.json` (SHY-0212 contract), and `docs/testing/contract.md` explains in plain language what "the apps and server agree" means and how to run each side.
@@ -120,7 +121,7 @@ The audit confirmed **no contract testing** (no Pact/OpenAPI/dredd). This gap is
 
 ### Green — implement
 
-1. Author `express-api/openapi.yaml` covering all client-facing endpoints (request/response/errors/enums).
+1. Author `express-api/openapi/{app,admin,roadmap}.yaml` by hand, covering all client-facing endpoints (request/response/errors/enums).
 2. Add `jest-openapi`; wire `toSatisfyApiSpec()` into the real integration suite as `contract-provider`.
 3. Add `contract-consumer` model checks (Kotlin/Swift/TS vs spec) + `check-openapi-in-sync.mjs`.
 4. Register both; write `docs/testing/contract.md`; wire the sync gate into `lint.yml`.
@@ -154,7 +155,7 @@ Touches backend (`express-api/**`) + client models (`shared/**`, `iosApp/**`, we
 ## Definition of Done
 
 - [ ] All AC boxes across the 8 dimensions checked.
-- [ ] `express-api/openapi.yaml` covers all client-facing endpoints; `contract-provider` (real responses) + `contract-consumer` (Kotlin/Swift/TS models) green; `check-openapi-in-sync` wired into `lint.yml`.
+- [ ] `express-api/openapi/{app,admin,roadmap}.yaml` cover all client-facing endpoints; `contract-provider` (real responses) + `contract-consumer` (Kotlin/Swift/TS models) green; `check-openapi-in-sync` wired into `lint.yml`.
 - [ ] Both registered; `docs/testing/contract.md` present + plain-language; `metadata.json` emitted.
 - [ ] Every real drift surfaced is reconciled across spec/clients/server.
 - [ ] `code-reviewer` 100% clean; `Reviewed-up-to:` recorded; status `In Review`; `pre-merge-check.sh` OK.
@@ -163,3 +164,5 @@ Touches backend (`express-api/**`) + client models (`shared/**`, `iosApp/**`, we
 ## Notes
 
 - 2026-07-19 — Created as an EPIC-0008 child (operator listed contract testing implicitly via "anything else"; it is high-value given the API-only architecture). Design ruling: **OpenAPI 3.1 as the single shared contract**, verified from both sides against the REAL API — chosen over Pact for polyglot (Kotlin/Swift/TS) friendliness and $0. Directly hardens the [[feedback-no-direct-backend-all-via-api]] chokepoint. Codegen deferred; this story verifies existing models.
+
+- 2026-10-15 — Global Swagger rule (Shyden): a hand-written OpenAPI spec per API is the contract and tests fail when the real API answers differently; never generated from code. Shyden ruled every ShyTalk API private the same day. This story's single `openapi.yaml` becomes one file per API (app, admin, roadmap) so each private Swagger page serves only its own API; the Swagger pages are SHY-0587 (foundation) and SHY-0588 to SHY-0590, which wait on this story. System, Apple webhook and test-helper specs are SHY-0591 to SHY-0593.
