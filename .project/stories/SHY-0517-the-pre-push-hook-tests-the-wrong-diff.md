@@ -75,6 +75,12 @@ land there — and is not changed.
       skipping silently.
 - [ ] A hook step that fails still blocks the push with the step named, as
       today.
+- [ ] Every `echo "$CHANGED" | grep -q` in `.husky/pre-push` (3 sites on
+      `2700e783604`: lines 116, 154, 230) reads the list with no broken pipe
+      and nothing on stderr; a test feeds a list long enough to fill the
+      pipe and asserts stderr is empty. Seen 2026-10-16: two of them printed
+      `echo: write error: Broken pipe` on a push, because `grep -q` exits on
+      its first match while `echo` is still writing.
 
 ### Edge cases
 

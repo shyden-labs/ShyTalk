@@ -1,6 +1,6 @@
 ---
 id: SHY-0597
-status: In Review
+status: Done
 owner: claude
 created: 2026-10-15
 priority: P0
@@ -140,7 +140,11 @@ Found 2026-10-15 while reading develop's runs. Shyden ruled it a real bug
 
 - [x] A nightly with both tests green on all five browsers and `0 flaky`,
       quoted in Notes.
-- [ ] Story `In Review` before merge; CI green by name; merged to `develop`.
+- [x] Story `In Review` before merge; CI green by name; merged to `develop`.
+      _Proof: PR #2364 PR Checks run 38825150073 on `2b84d944970` green by
+      job name (Test Backend, Lint, SonarCloud, PR Gate; Build & Test and
+      the device suites skipped by change detection, express-api only);
+      merged as `fc95f6b5fd0` on 2026-10-16._
 
 ## Notes
 

@@ -421,13 +421,23 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0594](SHY-0594-the-effort-line-reports-points-remaining-never-a-percentage.md) | P2 | S | bug | The effort line reports points remaining, never a percentage | 📝 Draft | — |  |
 | [SHY-0595](SHY-0595-every-package-install-script-is-approved-or-refused-on-purpose.md) | P1 | S | infra | Every package install script is approved or refused on purpose | 📝 Draft | — |  |
 | [SHY-0596](SHY-0596-the-board-names-its-priority-field-so-the-next-ticket-can-be-picked.md) | P1 | S | bug | The board names its priority field Priority, so the next ticket can be picked from it | 📝 Draft | — |  |
-| [SHY-0597](SHY-0597-admin-users-tests-are-red-in-the-nightly.md) | P0 | M | bug | Two admin Users tests are red in the nightly on every browser | 📝 Draft | — |  |
+| [SHY-0597](SHY-0597-admin-users-tests-are-red-in-the-nightly.md) | P0 | M | bug | Two admin Users tests are red in the nightly on every browser | ✅ Done | — |  |
 | [SHY-0598](SHY-0598-playwright-runs-each-test-once.md) | P0 | S | bug | Playwright runs each test once, so a flaky test is red | 📝 Draft | — |  |
 | [SHY-0599](SHY-0599-the-board-carries-every-ticket-field.md) | P1 | M | infra | The board carries every field a story file carries | 📝 Draft | — |  |
 | [SHY-0600](SHY-0600-one-issue-form-and-a-ticket-check-replace-the-story-gate.md) | P1 | M | infra | One issue form and a ticket check replace the story gate | 📝 Draft | — |  |
 | [SHY-0601](SHY-0601-every-issue-matches-its-story-file-before-the-switch.md) | P1 | S | infra | Every issue matches its story file before the switch | 📝 Draft | — |  |
 | [SHY-0602](SHY-0602-the-roadmap-reads-the-board-live.md) | P1 | L | feature | The roadmap reads the board live, on dev and live | 📝 Draft | — |  |
 | [SHY-0603](SHY-0603-shytalk-stops-using-story-files.md) | P1 | L | infra | ShyTalk stops using story files; the issues are the tickets | 📝 Draft | — |  |
+
+| [SHY-0604](SHY-0604-find-live-accounts-whose-real-name-a-double-suspension-erased.md) | P0 | M | bug | Find live accounts a suspension left worse off | 📝 Draft | — |  |
+| [SHY-0605](SHY-0605-a-suspension-wipes-a-users-bio-and-avatar-for-good.md) | P0 | M | bug | Ending a suspension puts everything back | 📝 Draft | — |  |
+| [SHY-0606](SHY-0606-identity-graph-suspensions-skip-the-suspension-lifecycle.md) | P0 | M | bug | Identity-graph suspensions skip the suspension lifecycle | 📝 Draft | — |  |
+| [SHY-0607](SHY-0607-two-admin-validation-tests-pass-whatever-happens.md) | P0 | S | bug | Two admin validation tests pass whatever happens | 📝 Draft | — |  |
+| [SHY-0608](SHY-0608-every-suspension-starts-the-same-way.md) | P0 | M | bug | Every suspension starts the same way | 📝 Draft | — |  |
+| [SHY-0609](SHY-0609-a-suggestions-only-suspension.md) | P2 | M | feature | A suggestions-only suspension | 📝 Draft | — |  |
+| [SHY-0610](SHY-0610-forty-five-backend-tests-have-only-a-comment-for-a-body.md) | P0 | M | bug | Forty-five backend tests have only a comment for a body | 📝 Draft | — |  |
+| [SHY-0611](SHY-0611-a-permanently-suspended-user-can-lift-their-own-suspension.md) | P0 | S | bug | A permanently suspended user can lift their own suspension | ✅ Done | — |  |
+| [SHY-0612](SHY-0612-alert-issues-stay-off-the-board.md) | P1 | S | infra | Alert issues stay off the ShyTalk Stories board | 📝 Draft | — |  |
 
 ## Done
 
