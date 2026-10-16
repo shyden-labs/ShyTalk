@@ -1,6 +1,6 @@
 ---
 id: SHY-0611
-status: In Review
+status: Done
 owner: unassigned
 created: 2026-10-16
 priority: P0
@@ -107,7 +107,11 @@ that test"): fix it as its own P0, next, ahead of SHY-0605.
 ## Definition of Done
 
 - [x] Every AC ticked with its test named in Notes.
-- [ ] Story `In Review` before merge; CI green by name; merged to `develop`.
+- [x] Story `In Review` before merge; CI green by name; merged to `develop`.
+      _Proof: PR #2363 PR Checks run 38829196434 on `8e512afd949` green by
+      job name (Build & Test, Test Backend, Integration Tests, Playwright
+      chromium, SonarCloud, PR Gate); merged as `2700e783604` on
+      2026-10-16._
 
 ## Notes
 

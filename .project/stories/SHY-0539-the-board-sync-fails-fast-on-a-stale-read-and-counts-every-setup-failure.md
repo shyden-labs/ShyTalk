@@ -40,6 +40,12 @@ Found while building SHY-0535, at `aabe8e7`:
    create the `Type` field is dropped without a count or a message. SHY-0535
    gave the `Estimate` field the counted form
    (`emit … ; N_FAILED=$((N_FAILED + 1))`); `Type` was left behind.
+   **Measured 2026-10-16: the create can never succeed.** GitHub reserves
+   the name `Type` for the native issue type (`Name cannot have a reserved
+   value`), so it fails on every run, green ones included, and the
+   per-item Type write never runs. Counting it the way `Estimate` is
+   counted would turn every sync red. The fix is to retire the field;
+   the story's type already reaches GitHub as the native issue type.
 3. The test pinning the retry,
    `the SHY-0078 items-map empty-read retry is retained`
    (`sync-stories-to-issues-board-fields.test.js`), matches
@@ -66,8 +72,13 @@ Found while building SHY-0535, at `aabe8e7`:
       exit code, documented in `--help`.
 - [ ] When both the read and the sidecar are empty, the run goes on as a
       first sync of an empty board, as today.
-- [ ] A failed `Type` field creation is reported (`emit … "type-field" …`)
-      and counted in `N_FAILED`, exactly as the `Estimate` field is.
+- [ ] The board-level `Type` field is retired: `ensure_project_type_field`,
+      its call in `setup_pre_sync`, the per-item Type write and their
+      tests are removed. The story's type reaches GitHub only as the
+      native issue type, which a test pins on the create and update paths.
+- [ ] No setup step in `setup_pre_sync` ends in `|| true`
+      (`load_project_cache || true` is the other one today); each failure
+      is counted in `N_FAILED` or stops the run, by name.
 
 ### Error paths
 
@@ -102,7 +113,9 @@ Found while building SHY-0535, at `aabe8e7`:
 
 ### Observability
 
-- [ ] The run summary counts a `Type` field failure in its failure total.
+- [ ] A green sync prints no `[gh-error]` line; the mock-gh happy path
+      asserts it, and the first green develop run after merge is read
+      for it.
 
 ## BDD Scenarios
 
@@ -121,11 +134,12 @@ Found while building SHY-0535, at `aabe8e7`:
 - **When** the sync runs
 - **Then** every story takes the create path
 
-**Scenario: a Type field that cannot be created fails the run**
+**Scenario: the sync never asks for a Type field**
 
-- **Given** the board has no Type field and the create mutation fails
+- **Given** the board has no Type field
 - **When** the sync runs
-- **Then** the failure is reported by name and the run exits 40
+- **Then** it makes no `createProjectV2Field` call for `Type`
+- **And** it prints no `[gh-error]` line
 
 ## Test Plan
 
@@ -135,7 +149,8 @@ Found while building SHY-0535, at `aabe8e7`:
 - The raw-text retry test is replaced by these behavioural tests, not
   re-pointed at stripped text.
 - Mutations, each predicted first and watched RED: restore the second read;
-  turn the stop into a warning; restore `|| true` on the Type field.
+  turn the stop into a warning; restore the `Type` create call; restore `|| true` on
+  `load_project_cache`.
 
 ## Out of Scope
 
@@ -162,3 +177,12 @@ Found while building SHY-0535, at `aabe8e7`:
 - **2026-10-07**: Filed from findings made while building SHY-0535.
 - Scored 3: smaller than SHY-0535 (5), which added a field path and its tests;
   this removes a path, copies an existing counted form, and replaces one test.
+- **2026-10-16**: The `Type` create fails on every run. Sync runs 38814639984
+  (success), 38822560310 (failure, for another reason) and 38827074868
+  (success) each print `[gh-error] createProjectV2Field Type (exit 1): gh:
+  Name cannot have a reserved value`. The board's fields that day: Title,
+  Assignees, Status, Labels, Linked pull requests, Milestone, Repository,
+  Reviewers, Parent issue, Sub-issues progress, Created, Updated, Closed, Pri,
+  Effort, Roadmap IDs, SHY ID, Epic, Estimate (no Type). The ACs now retire
+  the field instead of counting its failure. The score stays 3: retiring
+  removes a path, as counting would have copied one.
