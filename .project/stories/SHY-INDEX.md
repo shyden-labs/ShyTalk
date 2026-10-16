@@ -438,6 +438,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0610](SHY-0610-forty-five-backend-tests-have-only-a-comment-for-a-body.md) | P0 | M | bug | Forty-five backend tests have only a comment for a body | 📝 Draft | — |  |
 | [SHY-0611](SHY-0611-a-permanently-suspended-user-can-lift-their-own-suspension.md) | P0 | S | bug | A permanently suspended user can lift their own suspension | ✅ Done | — |  |
 | [SHY-0612](SHY-0612-alert-issues-stay-off-the-board.md) | P1 | S | infra | Alert issues stay off the ShyTalk Stories board | 📝 Draft | — |  |
+| [SHY-0613](SHY-0613-logs-and-audit-trails-have-their-own-release-suite.md) | P1 | L | infra | Logs and audit trails have their own test suite, required before every release | 📝 Draft | — |  |
 
 ## Done
 
