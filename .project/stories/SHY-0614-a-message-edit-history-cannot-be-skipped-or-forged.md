@@ -5,21 +5,21 @@ owner: claude
 created: 2026-10-16
 priority: P0
 effort: L
-estimate: 8
+estimate: 13
 type: bug
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
 ---
 
-# SHY-0614: A message's edit history, and a group's moderation log, cannot be skipped or forged
+# SHY-0614: A message's edit history, a group's moderation log and a report's message text cannot be skipped or forged
 
 ## User Story
 
 As a moderator protecting a community that includes minors, I want a
-message's edit history and a group's moderation log to be records nobody can
-leave out or make up, so that what I see is what actually happened when I
-act on a report.
+message's edit history, a group's moderation log and the message text saved
+with a report to be records nobody can leave out or make up, so that what I
+see is what actually happened when I act on a report.
 
 ## Why
 
@@ -44,8 +44,15 @@ Both apps write these directly (`PrivateMessageRepositoryImpl.kt`
 iOS): an atomic batch of the `edits` entry plus the message update. The
 honest app writes the history correctly; the rules do not make it.
 
-Not affected: `routes/reports.js` stores `messageText` with each report, so
-a report keeps the text as the reporter's app sent it.
+- **A report's message text can be made up.** `POST /reports`
+  (`routes/reports.js`) saves `messageText` from the request body, checked
+  only for length, and never reads the real message by `conversationId` and
+  `messageId`. A modified app can report someone for words they never wrote,
+  and the moderator sees the made-up text. (Found by a second side-agent
+  note, checked 2026-10-16 on `2aebea9324b`; the first version of this
+  story wrongly called reports "not affected". The other report and appeal
+  routes take no reported content from the client; `appealText` is the
+  appealing user's own words.)
 
 Related, not duplicated: SHY-0403 (#1927) covers moderators seeing edit
 history and its zero tests today; it does not cover forging or skipping.
@@ -66,6 +73,10 @@ SHY-0613 (#2373) puts these trails in the release suite.
       directly any more.
 - [ ] `mod_log` entries are written by the server from the action itself
       (who, what, whom, when), never from client-supplied fields.
+- [ ] A report naming a message saves that message's text as the server
+      reads it from the stored message (with its edit history at that
+      moment), never the client's `messageText`. Every report path that
+      names a message (private, group and room messages) does this.
 
 ### Error paths
 
@@ -75,6 +86,9 @@ SHY-0613 (#2373) puts these trails in the release suite.
       the first AC is allowed only on its own listed fields.
 - [ ] The route refuses an edit by anyone but the sender, by a banned user,
       or in a conversation flagged `crossCohortAtMigration`.
+- [ ] A report naming a message the reporter cannot read, or one that does
+      not exist, is refused with a clear error; a client `messageText` that
+      differs from the stored text is ignored and the difference logged.
 
 ### Edge cases
 
@@ -124,6 +138,13 @@ SHY-0613 (#2373) puts these trails in the release suite.
 - **When** A's device creates an `edits` entry on that message
 - **Then** Firestore refuses the write
 
+**Scenario: a report cannot put words in someone's mouth**
+
+- **Given** B's message "see you tomorrow"
+- **When** A's device reports it with `messageText` "something abusive"
+- **Then** the report saves "see you tomorrow", read by the server
+- **And** the mismatch is logged
+
 **Scenario: an honest edit keeps its history**
 
 - **Given** a sent message "hello"
@@ -169,6 +190,10 @@ SHY-0613 (#2373) puts these trails in the release suite.
   `firestore.rules` on `origin/develop` `e60d064a6a5`. P0 as a security
   defect (rules let a client forge or drop a moderation record). MVP: launch
   moderation relies on it.
-- Scored 8: one route, rules for three paths, both apps, rules tests and a
+- **2026-10-16**: Reported message text added (second side-agent note,
+  checked in `routes/reports.js`); score raised from 8 to 13 for the
+  report route's server-side read across private, group and room messages
+  and its tests.
+- First scored 8: one route, rules for three paths, both apps, rules tests and a
   journey. Larger than SHY-0612 (3); smaller than SHY-0613 (13), which spans
   thirteen trails.
