@@ -442,6 +442,11 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0614](SHY-0614-a-message-edit-history-cannot-be-skipped-or-forged.md) | P0 | L | bug | A message's edit history, a group's moderation log and a report's message text cannot be skipped or forged | 📝 Draft | — |  |
 | [SHY-0615](SHY-0615-the-android-and-ios-apps-keep-a-log.md) | P3 | L | infra | The Android and iOS apps keep a log, the same way every project does | 📝 Draft | — |  |
 | [SHY-0616](SHY-0616-every-website-page-and-the-dev-gate-keep-a-log.md) | P3 | M | infra | Every website page, the portal and the dev-site gate keep a log | 📝 Draft | — |  |
+| [SHY-0617](SHY-0617-a-guard-keeps-both-phones-on-the-same-tests.md) | P1 | M | infra | A guard keeps Android and iPhone on exactly the same phone tests | 📝 Draft | — |  |
+| [SHY-0618](SHY-0618-the-journey-runner-runs-both-phones-at-once.md) | P1 | L | infra | The journey runner runs every journey on Android and iPhone at once | 📝 Draft | — |  |
+| [SHY-0619](SHY-0619-sign-in-identity-and-safety-tests-run-on-both-phones.md) | P1 | L | infra | The sign-in, identity and safety phone tests run on Android and iPhone | 📝 Draft | — |  |
+| [SHY-0620](SHY-0620-rooms-chat-money-and-profile-tests-run-on-both-phones.md) | P1 | L | infra | The rooms, chat, money and profile phone tests run on Android and iPhone | 📝 Draft | — |  |
+| [SHY-0621](SHY-0621-every-journey-spec-names-the-phone-not-the-platform.md) | P1 | L | infra | Every journey spec is written once for both phones, and the dead Android specs go | 📝 Draft | — |  |
 
 ## Done
 
