@@ -110,7 +110,9 @@ test): under `express-api/tests` (utils `logger`, `loggerInstance`,
 routes `logs`, `admin-logs`, `admin-log-config`, `admin-audit-log-suggestions`;
 middleware `requestLogger`; cron `rotateLogs`, `ageVerificationAuditReconcile`;
 `safety/safety-audit`; the cohort route tests that assert a
-`segregationEvents` row), Kotlin `LoggerTest.kt`, `LogServiceTest.kt`,
+`segregationEvents` row), Kotlin `LoggerTest.kt`, `LogServiceTest.kt`
+(only the defaults of `LogEntry`, `BatchSettings` and `LogConfig`, data
+classes nothing ships; not a trail check, so it does not move),
 `PrivateChatViewModelTest.kt` and the jvmTest
 `IosLoggerReachesTheDeviceLogPinTest.kt`, and web specs `admin-logs`,
 `admin-audit-log`, `logger-idempotency`.
@@ -249,6 +251,14 @@ Not counted as trails (the tools' own run output, not product records):
   trails' forgery gap filed as SHY-0614, from a side agent's note checked
   against `firestore.rules`. Score kept at 13: one more trail of the same
   kind.
+- **2026-10-16 (correction)**: Trail 3 said the Android and iOS apps send
+  their logs to `POST /api/logs` through `LogService.kt`. They never have:
+  `LogService` has no implementation and no caller in shipped code, so the
+  admin Logs screen has only ever shown website and server lines, and a
+  phone's log stays in the device log. Trail 3 now says so; the phones'
+  log is SHY-0615. Score kept at 13: the phone part of trail 3 was only
+  `LogServiceTest.kt`'s data-class defaults; the twelve other trails, the
+  workflows and the production change are unchanged.
 - Scored 13: twelve trails across Jest and Kotlin, a new workflow, a
   production workflow change, a guard and a proof run. That is more than
   SHY-0563 (5, one language, no production workflow). Shyden saw "about 13"
