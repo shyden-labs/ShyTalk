@@ -424,7 +424,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0597](SHY-0597-admin-users-tests-are-red-in-the-nightly.md) | P0 | M | bug | Two admin Users tests are red in the nightly on every browser | ✅ Done | — |  |
 | [SHY-0598](SHY-0598-playwright-runs-each-test-once.md) | P0 | S | bug | Playwright runs each test once, so a flaky test is red | 📝 Draft | — |  |
 | [SHY-0599](SHY-0599-the-board-carries-every-ticket-field.md) | P1 | M | infra | The board carries every field a story file carries | 📝 Draft | — |  |
-| [SHY-0600](SHY-0600-one-issue-form-and-a-ticket-check-replace-the-story-gate.md) | P1 | M | infra | One issue form and a ticket check replace the story gate | 📝 Draft | — |  |
+| [SHY-0600](SHY-0600-one-issue-form-and-a-ticket-check-replace-the-story-gate.md) | P1 | L | infra | One issue form and a ticket check replace the story gate | 📝 Draft | — |  |
 | [SHY-0601](SHY-0601-every-issue-matches-its-story-file-before-the-switch.md) | P1 | S | infra | Every issue matches its story file before the switch | 📝 Draft | — |  |
 | [SHY-0602](SHY-0602-the-roadmap-reads-the-board-live.md) | P1 | L | feature | The roadmap reads the board live, on dev and live | 📝 Draft | — |  |
 | [SHY-0603](SHY-0603-shytalk-stops-using-story-files.md) | P1 | L | infra | ShyTalk stops using story files; the issues are the tickets | 📝 Draft | — |  |
