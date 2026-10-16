@@ -388,7 +388,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0559](SHY-0559-pr-gate-refuses-a-skip-its-flags-did-not-ask-for.md) | P0 | M | infra | The PR Gate refuses a skip that its change flags did not ask for | 📝 Draft | — |  |
 | [SHY-0560](SHY-0560-story-index-status-is-derived-from-the-story-files.md) | P0 | S | infra | The story index shows each story's real status, read from the story file | 📝 Draft | — |  |
 | [SHY-0561](SHY-0561-pre-push-runs-no-test-suite.md) | P0 | M | infra | The pre-push hook runs no test suite, only quick static checks | 📝 Draft | — |  |
-| [SHY-0562](SHY-0562-mutations-run-in-a-ci-workflow.md) | P0 | M | infra | Mutations run in a CI workflow that reports each one red or green | 📝 Draft | — |  |
+| [SHY-0562](SHY-0562-mutations-run-in-a-ci-workflow.md) | P0 | L | infra | Every pull request runs its mutations in a required check | 📝 Draft | — |  |
 | [SHY-0563](SHY-0563-whole-repo-guards-run-as-their-own-suite.md) | P0 | M | infra | Whole-repo guards run as their own required suite, not as unit tests | 📝 Draft | — |  |
 | [SHY-0545](SHY-0545-the-story-sync-reaches-the-renamed-organisation.md) | P0 | M | bug | The story sync reaches the renamed organisation, and says so when it cannot | 👀 In Review | — |  |
 | [SHY-0564](SHY-0564-git-hooks-run-in-every-worktree.md) | P0 | M | infra | Git hooks run in every worktree, and a commit made without them is caught in CI | 📝 Draft | — |  |
