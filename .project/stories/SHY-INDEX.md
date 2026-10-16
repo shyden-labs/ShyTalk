@@ -440,6 +440,8 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0612](SHY-0612-alert-issues-stay-off-the-board.md) | P1 | S | infra | Alert issues stay off the ShyTalk Stories board | 📝 Draft | — |  |
 | [SHY-0613](SHY-0613-logs-and-audit-trails-have-their-own-release-suite.md) | P1 | L | infra | Logs and audit trails have their own test suite, required before every release | 📝 Draft | — |  |
 | [SHY-0614](SHY-0614-a-message-edit-history-cannot-be-skipped-or-forged.md) | P0 | L | bug | A message's edit history, a group's moderation log and a report's message text cannot be skipped or forged | 📝 Draft | — |  |
+| [SHY-0615](SHY-0615-the-android-and-ios-apps-keep-a-log.md) | P3 | L | infra | The Android and iOS apps keep a log, the same way every project does | 📝 Draft | — |  |
+| [SHY-0616](SHY-0616-every-website-page-and-the-dev-gate-keep-a-log.md) | P3 | M | infra | Every website page, the portal and the dev-site gate keep a log | 📝 Draft | — |  |
 
 ## Done
 
