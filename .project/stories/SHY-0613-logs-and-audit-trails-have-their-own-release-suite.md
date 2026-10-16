@@ -92,6 +92,15 @@ Histories users see:
     `EditHistoryDialog.kt`. Suggestions keep an `editHistory` field in
     `routes/suggestions.js` (found while measuring and included as the same
     kind of record).
+13. **Group moderation log** (`conversations/{id}/mod_log`): written from
+    the device by group admins and mods (`firestore.rules` `mod_log`
+    block), read by participants. Missed by the first count; found
+    2026-10-16 reading `firestore.rules`.
+
+Trails 12 and 13 are written by the device, so the rules decide whether a
+modified app can skip or forge them. They can today: SHY-0614 (P0) fixes
+that. The suite here must prove the rules refuse a skipped or forged entry,
+not only that the honest app writes one.
 
 Test files naming these trails today (file level only; AC 1 sorts them per
 test): under `express-api/tests` (utils `logger`, `loggerInstance`,
@@ -120,7 +129,7 @@ Not counted as trails (the tools' own run output, not product records):
 - [ ] The suite exists: `express-api/jest.logs.config.js`, npm script
       `test:logs`, and a Gradle task for the Kotlin checks, each running only
       the sorted tests. It may use the emulators (it is not unit).
-- [ ] Every one of the 12 trails has at least one check in the suite that
+- [ ] Every one of the 13 trails has at least one check in the suite that
       writes or reads the real record, at full depth: field shapes, order,
       the replay or reconcile result, the rotation cap and redaction.
 - [ ] Unit keeps a fast stand-in for every check that moves, held to the
@@ -234,6 +243,10 @@ Not counted as trails (the tools' own run output, not product records):
 - **2026-10-16**: Filed on Shyden's global rule (passed on by the Yawelo
   Idle session; checked in `~/.claude/CLAUDE.md` before acting) and his
   scope ruling above.
+- **2026-10-16**: Trail 13 (`mod_log`) added, and the client-written
+  trails' forgery gap filed as SHY-0614, from a side agent's note checked
+  against `firestore.rules`. Score kept at 13: one more trail of the same
+  kind.
 - Scored 13: twelve trails across Jest and Kotlin, a new workflow, a
   production workflow change, a guard and a proof run. That is more than
   SHY-0563 (5, one language, no production workflow). Shyden saw "about 13"
