@@ -56,10 +56,10 @@ Found 2026-10-15 while reading develop's runs. Shyden ruled it a real bug
 
 - [x] The cause of each failure is found and written in Notes, with the
       evidence (trace, network log or reproduction) that shows it.
-- [ ] An admin who edits a user's date of birth sees "Saved", and the value
+- [x] An admin who edits a user's date of birth sees "Saved", and the value
       survives a reload, on chromium, mobile-chrome, firefox, webkit and
       mobile-safari.
-- [ ] Searching a seeded user shows that user's own display name on every
+- [x] Searching a seeded user shows that user's own display name on every
       browser, whatever an earlier test did to another account.
 
 ### Error paths
@@ -69,18 +69,18 @@ Found 2026-10-15 while reading develop's runs. Shyden ruled it a real bug
 
 ### Edge cases
 
-- [ ] If the cause is state leaking between tests (for example a suspension
+- [x] If the cause is state leaking between tests (for example a suspension
       left on a shared account), each test owns its account or restores it,
       and a test proves the order no longer matters (run the two specs in
       both orders).
 
 ### Performance
 
-- [ ] N/A: no new waits; no timeout is raised.
+- [x] N/A: no new waits; no timeout is raised.
 
 ### Security
 
-- [ ] N/A unless the cause lies in the admin write path; if it does, the
+- [x] N/A unless the cause lies in the admin write path; if it does, the
       fix keeps the endpoint's existing auth checks, with a test.
 
 ### UX
@@ -90,11 +90,11 @@ Found 2026-10-15 while reading develop's runs. Shyden ruled it a real bug
 
 ### i18n
 
-- [ ] N/A: no new copy.
+- [x] N/A: no new copy.
 
 ### Observability
 
-- [ ] N/A: SHY-0551 covers the nightly's failure alert.
+- [x] N/A: SHY-0551 covers the nightly's failure alert.
 
 ## BDD Scenarios
 
@@ -138,7 +138,7 @@ Found 2026-10-15 while reading develop's runs. Shyden ruled it a real bug
 
 ## Definition of Done
 
-- [ ] A nightly with both tests green on all five browsers and `0 flaky`,
+- [x] A nightly with both tests green on all five browsers and `0 flaky`,
       quoted in Notes.
 - [ ] Story `In Review` before merge; CI green by name; merged to `develop`.
 
@@ -213,3 +213,27 @@ Found 2026-10-15 while reading develop's runs. Shyden ruled it a real bug
   1,008 tests in 63 suites on emulator reachability alone, re-run three
   times each by `jest.retryTimes`; both already ticketed (SHY-0546,
   SHY-0547).
+- **2026-10-16, proof (DoD).** Playwright Nightly dispatched on the merge
+  commit `5c43f8761cd`, run 38814672865: all five browsers green, 1 worker
+  each, no `failed` or `flaky` line and no `retry #` marker in the log
+  (chromium 1427 passed, webkit 1406, mobile-chrome 1403, firefox 1408,
+  mobile-safari 1397; skips 37 to 67 by browser). On every browser
+  `admin-users-extra.spec.ts:49` (date of birth persists), `:76` (refused
+  save shows "Save failed") and `admin-users-profile.spec.ts:29` (search
+  shows the seeded user's own name) passed.
+- **Order (edge-case AC).** Cause 1 was state shared between specs on one
+  worker's user. The failing order, `admin-appeals.spec.ts` (tests 1050 to
+  1059) before `admin-users-profile.spec.ts` (1432) on one worker and one
+  user, is the order that run took on all five browsers, and it passed. The
+  reverse order was not run (CI has no spec-order input and the laptop runs
+  no browser suite); it cannot leak a suspension, because the profile spec
+  never suspends anyone (0 mentions of "suspend", against 28 in the
+  appeals spec).
+- **Security AC.** Of the four masking sites changed here, reports resolve,
+  bulk resolve and admin suspend already had a non-admin test;
+  `POST /api/user/:uniqueId/suspend` had none (its test file lets every
+  request through). Added in `admin-users-write.test.js`: a non-admin gets
+  403 with nothing read or written. Mutants, each killed by exactly that
+  test with the file at 59: the admin check removed; its result ignored.
+- **Done** waits for this PR's merge (status flipped in a later docs
+  commit, as recent stories were).
