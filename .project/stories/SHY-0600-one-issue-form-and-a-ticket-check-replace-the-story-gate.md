@@ -5,7 +5,7 @@ owner: unassigned
 created: 2026-10-15
 priority: P1
 effort: L
-estimate: 8
+estimate: 13
 type: infra
 roadmap_ids: []
 mvp: false
@@ -39,11 +39,15 @@ ticket reads the same once story files stop.
   roadmap or release notes, or "nothing" and why) and Definition of done.
 - Asked whether the check accepts the old tickets' shape, Shyden chose,
   verbatim: *"add announce to all. consistency wins"*. No old ticket is
-  exempt.
+  exempt. Told that the story gate also checks Done and Cancelled stories,
+  Shyden ruled, verbatim: *"they ALL get it"*: closed stories too.
 - Measured 2026-10-16 on `origin/develop` `8f20691fc33`: 545 story files,
-  346 open (276 Draft, 70 In Review), 0 with an Announce section. The story
-  gate `scripts/check-story-frontmatter.sh` requires its sections from one
-  list (`REQ_SECTIONS`, line 65); Announce is not in it.
+  346 open (276 Draft, 70 In Review), 199 closed (186 Done, 13 Cancelled),
+  0 with an Announce section. The story gate
+  `scripts/check-story-frontmatter.sh` requires its sections from one list
+  (`REQ_SECTIONS`, line 65); Announce is not in it. It skips no status, and
+  the sync's first step runs it with `--scan` over every story file
+  (`sync-stories-to-issues.yml` line 97).
 
 ## Acceptance Criteria
 
@@ -57,11 +61,13 @@ ticket reads the same once story files stop.
 - [ ] 3. `scripts/file-story.ts` is the template's filer, pointed at the
       ShyTalk Stories board (node id from `app_manifest.py`, title asserted
       before any write), acting as the ShyTalk App.
-- [ ] 4. Every open story file (346 measured) gains an `## Announce` section:
-      what closing it lets us tell people, or "nothing" and why. The sync
-      carries each to its issue.
-- [ ] 5. The story gate's `REQ_SECTIONS` gains `Announce`, so no new story
-      file is filed without it before SHY-0603.
+- [ ] 4. Every story file, open and closed (545 measured), gains an
+      `## Announce` section: what closing it lets (or let) us tell people,
+      or "nothing" and why. The sync carries each to its issue.
+- [ ] 5. The story gate's `REQ_SECTIONS` gains `Announce` in the same commit
+      as the last of AC 4's files, and `--scan .project/stories` is green on
+      that commit, so the sync's validate step never meets a story without
+      it.
 - [ ] 6. A ticket check reads every open issue on the board and fails,
       naming the issue and the part, when one of the five parts, `Priority`
       or `Estimate` is missing. Old story-file headings count as the form's
@@ -127,8 +133,8 @@ Nothing: operator tooling with no learner-facing change.
 2. Floor: the count of issues checked is recorded and asserted, so an empty
    read cannot pass; a planted missing part goes red.
 3. Story gate: a fixture story file without Announce goes red.
-4. After the backfill: open story files with an Announce section equal the
-   open count, read again from the filesystem.
+4. After the backfill: story files with an Announce section equal the
+   story file count, both read again from the filesystem.
 
 ## Out of Scope
 
@@ -146,6 +152,7 @@ Nothing: operator tooling with no learner-facing change.
 | --- | --- |
 | An Announce line is written carelessly to finish the backfill | Each line is written from the story's ACs; any that would announce something not yet built says "nothing yet". |
 | An issue-only edit is overwritten by the sync | The backfill edits story files; the sync carries them. |
+| The gate requires Announce before every file has it, and the sync stops | AC 5: one commit, with a full `--scan` green on it. |
 
 ## Definition of Done
 
@@ -163,3 +170,7 @@ Nothing: operator tooling with no learner-facing change.
   template form exactly) and to Announce on every open ticket (Shyden:
   "consistency wins"). Estimate 8, effort L: the 17-section form shrinks to
   a copy, the filer is a copy, and the 346-file Announce backfill is added.
+- **2026-10-16**: The backfill covers all 545 story files, closed too
+  (Shyden: "they ALL get it"), and the gate change is ordered with it.
+  Estimate 8 -> 13: 199 more Announce sections, each written from a
+  finished story's Notes and release.
