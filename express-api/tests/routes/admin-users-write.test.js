@@ -1517,4 +1517,26 @@ describe('POST /api/user/:uniqueId/suspend --- already suspended (SHY-0597)', ()
   });
 });
 
+describe('POST /api/user/:uniqueId/suspend --- admin check (SHY-0597)', () => {
+  let app;
+  beforeEach(() => {
+    app = createApp();
+    jest.clearAllMocks();
+  });
+  it('refuses a non-admin with 403 before reading or writing the user', async () => {
+    require('../../src/middleware/auth').requireAdmin.mockImplementationOnce((_req, res) => {
+      res.status(403).json({ error: 'Forbidden' });
+      return true;
+    });
+    const res = await request(app)
+      .post('/api/user/u/suspend')
+      .send({ reason: 'Not an admin', canAppeal: true });
+    await flushPromises();
+    expect(res.status).toBe(403);
+    expect(mockDocGet).not.toHaveBeenCalled();
+    expect(mockDocUpdate).not.toHaveBeenCalled();
+    expect(mockDocSet).not.toHaveBeenCalled();
+  });
+});
+
 // --- GET /api/conversations/:id/messages ------------------------------------
