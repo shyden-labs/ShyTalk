@@ -1,6 +1,6 @@
 ---
 id: SHY-0394
-status: Draft
+status: Cancelled
 owner: unassigned
 created: 2026-08-21
 priority: P2
@@ -12,6 +12,14 @@ mvp: false
 ---
 
 # SHY-0394: Refining a Draft story should not need a false status
+
+## CANCELLED — done by SHY-0518
+
+SHY-0518 (#2311, Done) made `scripts/check-pr-story-status.js` exempt a
+story that was Draft at the base and is still Draft, which is the
+spec-only refinement this story asked for.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

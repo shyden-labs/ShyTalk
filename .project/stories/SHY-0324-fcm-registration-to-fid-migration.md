@@ -1,6 +1,6 @@
 ---
 id: SHY-0324
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-08-17
 priority: P1
@@ -12,6 +12,16 @@ mvp: true
 ---
 
 # SHY-0324: Firebase deprecated the FCM token API we target push with, and the build already refuses to compile without it
+
+## CANCELLED — duplicate of SHY-0244, and done
+
+Same six `-Werror` errors from the same Dependabot PR #1519 as SHY-0291;
+both are the migration SHY-0244 owns (filed 2026-07-25). Read on develop
+2026-10-18: firebase-bom is 34.18.0, `ShyTalkMessagingService` implements
+`onRegistered`, `AndroidPushIdentifiers` calls `FirebaseMessaging.register()`,
+no `onNewToken` remains, and #1519 is closed.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

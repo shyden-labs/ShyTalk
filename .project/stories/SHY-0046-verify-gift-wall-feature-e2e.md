@@ -1,6 +1,6 @@
 ---
 id: SHY-0046
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-06-08
 priority: P1
@@ -13,6 +13,16 @@ mvp: true
 ---
 
 # SHY-0046: Verify `gift_wall.feature` covers loading/populated/empty states + GiftWallScreen test tags
+
+## CANCELLED — its target file never runs
+
+SHY-0621 measured on 2026-10-16 that the 46 feature files under
+`app/src/androidTest/assets/features` never run (`ShyTalkTestRunner` is a
+plain `AndroidJUnitRunner`), and it deletes them, first moving into
+`journey-tests` any scenario no journey covers. This story extends `gift_wall.feature` there. The journeys
+already walk the gift wall (5 scenarios across 7 files).
+
+Closed in the 2026-10-18 backlog sweep, on Shyden's decision ("Close all three").
 
 ## User Story
 

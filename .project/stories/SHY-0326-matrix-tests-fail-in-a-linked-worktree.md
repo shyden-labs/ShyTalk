@@ -1,6 +1,6 @@
 ---
 id: SHY-0326
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-08-17
 priority: P2
@@ -12,6 +12,17 @@ mvp: false
 ---
 
 # SHY-0326: Six gauntlet tests pass in one checkout and fail in another, on byte-identical files
+
+## CANCELLED — duplicate of SHY-0302
+
+SHY-0557 measured on 2026-10-12 that the process-identity and
+`50-matrix.sh cmd_stop` suites fail in any linked worktree for one reason:
+`require_repo` (`express-api/scripts/gauntlet/lib.sh:61`) tests for a `.git`
+directory, and a worktree's `.git` is a file. That is SHY-0302. This
+story's own requirement, the same verdict in both checkouts with the
+mutation table killing in both, moves to SHY-0302.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

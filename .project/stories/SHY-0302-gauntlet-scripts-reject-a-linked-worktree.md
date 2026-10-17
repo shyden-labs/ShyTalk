@@ -3,9 +3,9 @@ id: SHY-0302
 status: Draft
 owner: claude
 created: 2026-08-16
-priority: P2
+priority: P0
 effort: XS
-estimate: 2
+estimate: 3
 type: bug
 roadmap_ids: []
 mvp: false
@@ -59,6 +59,11 @@ git commands fail confusingly later. Only its test is wrong.
 - [ ] `require_repo` succeeds in an ordinary checkout, exactly as today.
 - [ ] `require_repo` succeeds in a linked worktree.
 - [ ] `tests/scripts/50-matrix-cmd-stop.test.js` passes from both.
+- [ ] `tests/scripts/runner-process-identity.test.js` passes from both
+      (from SHY-0557).
+- [ ] The process-reaping suites SHY-0326 listed give the same verdict in
+      the main checkout and a linked worktree, and their mutation table
+      kills in both (from SHY-0326).
 
 ### Error paths
 
@@ -201,3 +206,7 @@ FROM a worktree, which is the failure that surfaced this;
 - The diagnostic that settled it was comparing `ls -ld` on both `.git` paths —
   608-byte directory versus 69-byte file. Worth remembering as the fast check
   whenever a suite passes in one checkout and fails in another.
+- **2026-10-18**: Backlog sweep. SHY-0557 (same defect, P0) and SHY-0326
+  (the same cause behind the process-reaping suites) are closed as
+  duplicates of this story; it takes SHY-0557's P0 and both stories'
+  remaining criteria. Estimate 2 → 3 for the added suites.

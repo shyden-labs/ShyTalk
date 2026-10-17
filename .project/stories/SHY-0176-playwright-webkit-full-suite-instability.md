@@ -1,6 +1,6 @@
 ---
 id: SHY-0176
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-07-11
 priority: P2
@@ -12,6 +12,15 @@ mvp: false
 ---
 
 # SHY-0176: Playwright WebKit engine crashes abort full-suite serial runs on macOS
+
+## CANCELLED — the local browser run it fixes no longer happens
+
+This story is about the macOS laptop's local WebKit gauntlet. Since
+2026-10-09 the laptop runs only unit tests, formatters, linters and type
+checks; every browser suite runs in CI, where (this story's own Out of
+Scope) Linux WebKit never showed the crash.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

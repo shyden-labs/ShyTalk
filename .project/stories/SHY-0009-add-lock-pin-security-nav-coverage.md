@@ -1,6 +1,6 @@
 ---
 id: SHY-0009
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-06-07
 priority: P1
@@ -13,6 +13,14 @@ mvp: true
 ---
 
 # SHY-0009: Lock/PinSetup/SecuritySettings navigation coverage
+
+## CANCELLED — superseded by SHY-0196
+
+Shyden decided on 2026-07-16 that App-Lock uses the device's own unlock
+(SHY-0196), replacing the app-managed PIN screens this story was written
+for. SHY-0196 rebuilds the lock flow and carries its own tests.
+
+Closed in the 2026-10-18 backlog sweep, on Shyden's decision ("Close both").
 
 ## User Story
 
