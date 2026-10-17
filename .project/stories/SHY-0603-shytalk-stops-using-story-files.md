@@ -49,8 +49,9 @@ Measured 2026-10-15 on `origin/develop`:
 - [ ] Every script, hook and CI step that reads story files reads the board
       instead (the progress figures, the pre-merge gate, the release notes),
       each listed in Notes with its replacement.
-- [ ] New tickets are plain issue numbers; old ones keep `SHY-NNNN` in the
-      title and the `SHY ID` field.
+- [ ] New tickets are plain issue numbers, filed through SHY-0600's form
+      and filer (the template's); old ones keep `SHY-NNNN` in the title and
+      the `SHY ID` field.
 - [ ] The project CLAUDE.md, the handover template and the ShyTalk memories
       that tell a session to write story files are updated in the same PR.
 - [ ] Each open story below is closed as superseded, with a comment naming

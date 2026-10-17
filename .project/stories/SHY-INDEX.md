@@ -424,7 +424,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0597](SHY-0597-admin-users-tests-are-red-in-the-nightly.md) | P0 | M | bug | Two admin Users tests are red in the nightly on every browser | ✅ Done | — |  |
 | [SHY-0598](SHY-0598-playwright-runs-each-test-once.md) | P0 | S | bug | Playwright runs each test once, so a flaky test is red | 📝 Draft | — |  |
 | [SHY-0599](SHY-0599-the-board-carries-every-ticket-field.md) | P1 | M | infra | The board carries every field a story file carries | 📝 Draft | — |  |
-| [SHY-0600](SHY-0600-one-issue-form-and-a-ticket-check-replace-the-story-gate.md) | P1 | M | infra | One issue form and a ticket check replace the story gate | 📝 Draft | — |  |
+| [SHY-0600](SHY-0600-one-issue-form-and-a-ticket-check-replace-the-story-gate.md) | P1 | L | infra | One issue form and a ticket check replace the story gate | 📝 Draft | — |  |
 | [SHY-0601](SHY-0601-every-issue-matches-its-story-file-before-the-switch.md) | P1 | S | infra | Every issue matches its story file before the switch | 📝 Draft | — |  |
 | [SHY-0602](SHY-0602-the-roadmap-reads-the-board-live.md) | P1 | L | feature | The roadmap reads the board live, on dev and live | 📝 Draft | — |  |
 | [SHY-0603](SHY-0603-shytalk-stops-using-story-files.md) | P1 | L | infra | ShyTalk stops using story files; the issues are the tickets | 📝 Draft | — |  |
@@ -447,6 +447,8 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0619](SHY-0619-sign-in-identity-and-safety-tests-run-on-both-phones.md) | P1 | L | infra | The sign-in, identity and safety phone tests run on Android and iPhone | 📝 Draft | — |  |
 | [SHY-0620](SHY-0620-rooms-chat-money-and-profile-tests-run-on-both-phones.md) | P1 | L | infra | The rooms, chat, money and profile phone tests run on Android and iPhone | 📝 Draft | — |  |
 | [SHY-0621](SHY-0621-every-journey-spec-names-the-phone-not-the-platform.md) | P1 | L | infra | Every journey spec is written once for both phones, and the dead Android specs go | 📝 Draft | — |  |
+| [SHY-0622](SHY-0622-every-moderation-action-shows-in-the-admin-audit-log.md) | P0 | M | bug | Every moderation action shows in the admin audit log | 📝 Draft | — |  |
+| [SHY-0623](SHY-0623-express-api-declares-every-package-it-loads.md) | P0 | S | bug | express-api declares every package it loads | 📝 Draft | — |  |
 
 ## Done
 
