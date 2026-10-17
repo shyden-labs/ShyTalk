@@ -450,7 +450,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0622](SHY-0622-every-moderation-action-shows-in-the-admin-audit-log.md) | P0 | M | bug | Every moderation action shows in the admin audit log | 📝 Draft | — |  |
 | [SHY-0623](SHY-0623-express-api-declares-every-package-it-loads.md) | P0 | S | bug | express-api declares every package it loads | 📝 Draft | — |  |
 | [SHY-0624](SHY-0624-the-web-tests-are-format-checked.md) | P2 | S | chore | The web tests are format-checked | 📝 Draft | — |  |
-| [SHY-0625](SHY-0625-the-sonarcloud-check-fails-when-it-cannot-scan.md) | P0 | S | bug | The SonarCloud check fails when it cannot scan | 📝 Draft | — |  |
+| [SHY-0625](SHY-0625-the-sonarcloud-check-passes-only-when-the-scan-ran-and-passed.md) | P0 | M | bug | The SonarCloud check passes only when the scan ran and the code passed | 📝 Draft | — |  |
 
 ## Done
 
