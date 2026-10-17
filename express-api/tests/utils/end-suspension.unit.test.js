@@ -249,15 +249,121 @@ describe('endSuspension: the suspension warning', () => {
     expect(mockWarningsGet).toHaveBeenCalledWith(WARNINGS_PATH, [['source', '==', 'suspension']]);
   });
 
-  it('reads and revokes no warning when the ending is not an upheld appeal', async () => {
-    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
+  it('revokes none of the suspension’s own warnings when the ending is not an upheld appeal', async () => {
+    storedWarnings(
+      { id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START },
+      {
+        id: 'warn-2',
+        source: 'suspension',
+        revoked: false,
+        createdAt: RUN_START,
+        suspensionRunStartedAt: RUN_START,
+      },
+    );
 
     const result = await endSuspension('10000001', OPTIONS);
 
-    expect(mockWarningsGet).not.toHaveBeenCalled();
     expect(revokeWarning).not.toHaveBeenCalled();
     expect(result.revokedWarnings).toBe(0);
     expect(result.gcsRestored).toBe(0);
+  });
+
+  // A hold is not the suspension's own deduction: it keeps the score at 0
+  // for points an earlier suspension's upheld appeal gave back. However the
+  // suspension ends, they come back (Shyden, 2026-10-18: "Release on any
+  // ending"). What a suspension took itself still needs an upheld appeal.
+  describe('any ending gives back what the suspension held', () => {
+    const HOLD = {
+      id: 'hold-1',
+      source: 'suspension',
+      hold: true,
+      revoked: false,
+      createdAt: RUN_START + 10,
+      suspensionRunStartedAt: RUN_START,
+    };
+
+    it('gives back a hold of this run on an ending that is not an appeal', async () => {
+      storedWarnings(HOLD);
+      revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
+
+      const result = await endSuspension('10000001', OPTIONS);
+
+      expect(revokeWarning).toHaveBeenCalledWith('10000001', 'hold-1', { actor: 'admin-uid' });
+      expect(result).toMatchObject({ alreadyEnded: false, revokedWarnings: 1, gcsRestored: 80 });
+    });
+
+    it('gives back a hold of a run whose start is only in the start date', async () => {
+      storedUser({
+        ...SUSPENDED,
+        suspensionRunStartedAt: undefined,
+        suspensionStartDate: RUN_START,
+      });
+      storedWarnings(HOLD);
+      revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
+
+      await endSuspension('10000001', OPTIONS);
+
+      expect(revokeWarning.mock.calls.map(([, id]) => id)).toStrictEqual(['hold-1']);
+    });
+
+    it('leaves another run’s hold', async () => {
+      storedWarnings({ ...HOLD, suspensionRunStartedAt: RUN_START - 1 });
+
+      await endSuspension('10000001', OPTIONS);
+
+      expect(revokeWarning).not.toHaveBeenCalled();
+    });
+
+    it('skips a hold already given back', async () => {
+      storedWarnings({ ...HOLD, revoked: true });
+
+      await endSuspension('10000001', OPTIONS);
+
+      expect(revokeWarning).not.toHaveBeenCalled();
+    });
+
+    it('gives back the hold before the user is written', async () => {
+      storedWarnings(HOLD);
+      revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
+
+      await endSuspension('10000001', OPTIONS);
+
+      expect(revokeWarning.mock.invocationCallOrder[0]).toBeLessThan(
+        mockCommit.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('fails at the warnings step when a hold cannot be given back, writing nothing', async () => {
+      storedWarnings(HOLD);
+      revokeWarning.mockRejectedValueOnce(new Error('revoke failed'));
+
+      const err = await endSuspension('10000001', OPTIONS).catch((e) => e);
+
+      expect(err).toBeInstanceOf(SuspensionEndError);
+      expect(err.step).toBe('warnings');
+      expect(mockCommit).not.toHaveBeenCalled();
+    });
+
+    it('gives back the hold with the run’s own warning on an upheld appeal of it', async () => {
+      storedWarnings(
+        {
+          id: 'own',
+          source: 'suspension',
+          revoked: false,
+          createdAt: RUN_START,
+          suspensionRunStartedAt: RUN_START,
+        },
+        HOLD,
+      );
+      revokes(
+        { alreadyRevoked: false, deduction: 30, previousGcs: 0, restoredGcs: 30 },
+        { alreadyRevoked: false, deduction: 50, previousGcs: 30, restoredGcs: 80 },
+      );
+
+      await endSuspension('10000001', { ...APPEAL, appeal: { suspensionRunStartedAt: RUN_START } });
+
+      expect(revokeWarning.mock.calls.map(([, id]) => id)).toStrictEqual(['own', 'hold-1']);
+    });
   });
 
   it('revokes a warning made at the run’s first moment', async () => {
@@ -526,6 +632,7 @@ describe('endSuspension: the suspension an upheld appeal answers', () => {
         issuedBy: 'admin-uid',
         issuedByName: null,
         source: 'suspension',
+        hold: true,
         suspensionRunStartedAt: LATER_RUN,
         linkedReportId: null,
         revoked: false,

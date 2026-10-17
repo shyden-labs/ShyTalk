@@ -63,15 +63,46 @@ async function atStep(step, work) {
  */
 async function revokeRunsWarnings(id, runStart, actor) {
   if (runStart === null) return { revokedWarnings: 0, gcsRestored: 0 };
+  return revokeSuspensionWarnings(id, actor, (warning) => {
+    if ((warning.suspensionRunStartedAt ?? null) === null) return warning.createdAt >= runStart;
+    return warning.suspensionRunStartedAt === runStart;
+  });
+}
 
+/**
+ * Give back what one run of suspensions held for an earlier suspension's
+ * upheld appeal (`holdScoreForRunInForce`), on ANY ending.
+ *
+ * A hold is not the suspension's own deduction: the suspension took nothing
+ * of its own, it only kept the score at 0 while in force. So however it ends,
+ * the held points come back (Shyden, 2026-10-18: "Release on any ending").
+ * What a suspension took for itself still needs an upheld appeal.
+ *
+ * @returns {Promise<{ revokedWarnings: number, gcsRestored: number }>}
+ */
+function releaseRunsHolds(id, runStart, actor) {
+  return revokeSuspensionWarnings(
+    id,
+    actor,
+    (warning) => warning.hold === true && (warning.suspensionRunStartedAt ?? null) === runStart,
+  );
+}
+
+/**
+ * Revoke the unrevoked suspension warnings `matches` picks, one at a time.
+ *
+ * @param {string} id
+ * @param {string} actor
+ * @param {(warning: object) => boolean} matches
+ * @returns {Promise<{ revokedWarnings: number, gcsRestored: number }>}
+ */
+async function revokeSuspensionWarnings(id, actor, matches) {
   const warnings = await atStep('warnings', () =>
     db.collection(`users/${id}/warnings`).where('source', '==', 'suspension').get(),
   );
   const open = warnings.docs.filter((d) => {
     const warning = d.data();
-    if (warning.revoked === true) return false;
-    if ((warning.suspensionRunStartedAt ?? null) === null) return warning.createdAt >= runStart;
-    return warning.suspensionRunStartedAt === runStart;
+    return warning.revoked !== true && matches(warning);
   });
   let revokedWarnings = 0;
   let gcsRestored = 0;
@@ -118,6 +149,8 @@ async function holdScoreForRunInForce(id, user, runStartedAt, actor) {
     issuedBy: actor,
     issuedByName: null,
     source: 'suspension',
+    // A hold, not this suspension's own deduction: any ending gives it back.
+    hold: true,
     suspensionRunStartedAt: runStartedAt,
     linkedReportId: null,
     revoked: false,
@@ -177,7 +210,11 @@ async function endSuspension(
     : { runStartedAt: null, inForce: true };
   const { revokedWarnings, gcsRestored } = restoreGcs
     ? await revokeRunsWarnings(id, answered.runStartedAt, actor)
-    : { revokedWarnings: 0, gcsRestored: 0 };
+    : await releaseRunsHolds(
+        id,
+        user.suspensionRunStartedAt ?? user.suspensionStartDate ?? null,
+        actor,
+      );
   if (!answered.inForce) {
     const gcsHeld = suspended
       ? await holdScoreForRunInForce(

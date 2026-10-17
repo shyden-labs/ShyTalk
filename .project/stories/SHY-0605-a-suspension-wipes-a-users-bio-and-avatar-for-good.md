@@ -96,8 +96,10 @@ admin-users suspend writes a `source: 'suspension'` warning.
       back only its own suspension's GCS (Shyden 2026-10-18).
 - [x] Every suspension holds the score at 0 while it is in force: points an
       earlier appeal gives back during a later suspension are taken again on
-      the later run's own warning, and come back if that appeal is upheld
-      too (Shyden 2026-10-18).
+      the later run's own warning, marked as a hold. However the later
+      suspension ends, the hold comes back; what a suspension took for
+      itself still needs an upheld appeal (Shyden 2026-10-18: "Release on
+      any ending").
 - [x] An earlier suspension's pending appeal does not stop the user
       appealing the suspension in force; a second appeal of the same
       suspension is still refused 409.
@@ -278,3 +280,9 @@ photos, bio, standing and access.
     1,424 web tests green; `admin-appeals.spec.ts` test 4 red because the
     spec approved the fixture's appeal, written before its suspension began,
     which now (rightly) ends nothing. The spec now suspends, then appeals.
+- **2026-10-18**: A side note showed held points would be lost if the later
+  suspension ended without an appeal. Shyden chose "Release on any ending":
+  the hold warning carries `hold: true` and every ending gives back its
+  run's holds. Proof: `end-suspension.unit.test.js` "any ending gives back
+  what the suspension held" (7); integration "an admin lift of the later
+  suspension gives back what it held for the earlier appeal".

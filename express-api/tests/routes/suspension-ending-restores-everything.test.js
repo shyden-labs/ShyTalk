@@ -324,6 +324,19 @@ describe('an appeal of an earlier suspension, a later one in force', () => {
     expect(user.suspensionAppealStatus).toBe('pending');
   });
 
+  test('an admin lift of the later suspension gives back what it held for the earlier appeal', async () => {
+    const [earlier] = await twoSuspensions();
+    expect((await review(earlier, 'approved')).status).toBe(200);
+
+    const res = await request(app()).post(`/api/user/${MEMBER}/unsuspend`).set(admin.headers);
+
+    expect(res.status).toBe(200);
+    const user = await readUser();
+    expect(user.isSuspended).toBe(false);
+    expect(user.gcsScore).toBe(GCS_BEFORE);
+    expect((await suspensionWarnings()).map((w) => w.revoked)).toEqual([true, true]);
+  });
+
   test('upholding both appeals ends the later suspension and gives the whole score back', async () => {
     const [earlier, later] = await twoSuspensions();
 
