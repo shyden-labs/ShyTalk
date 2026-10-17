@@ -27,8 +27,6 @@ const router = require('express').Router();
 const { db, auth, FieldValue } = require('../utils/firebase');
 const { mintClaimsMerging, VALID_COHORTS } = require('../utils/firebase-claims');
 const { requireAdmin, clearSuspensionCache, clearAdminClaimCache } = require('../middleware/auth');
-const { clearBanCache } = require('../utils/bans');
-const { syncBannedClaim } = require('../utils/banned-claim');
 const { generateId, now } = require('../utils/helpers');
 const { computeDisplayScore } = require('../utils/gcs');
 const { sendSystemPm } = require('../utils/system-pm');
@@ -40,6 +38,8 @@ const {
   suspensionStartedProfileFields,
 } = require('../utils/suspension');
 const { sendEmail } = require('../utils/email');
+const { revokeWarning, WarningRevokeError } = require('../utils/warnings');
+const { autoApplyBans, liftAutoAppliedBans } = require('../utils/auto-bans');
 const { buildDeletionScheduledEmail } = require('../utils/email-templates');
 const { sendPushToUser } = require('../utils/fcm');
 
@@ -578,61 +578,19 @@ router.post('/user/:uniqueId/warnings/:warningId/revoke', async (req, res) => {
   try {
     if (await requireAdmin(req, res)) return;
 
-    const uniqueId = req.params.uniqueId;
-    const warningId = req.params.warningId;
-    const timestamp = now();
+    const { uniqueId, warningId } = req.params;
+    const result = await revokeWarning(uniqueId, warningId, { actor: req.auth.uid, audit: true });
+    if (result.alreadyRevoked) return res.status(400).json({ error: 'Warning already revoked' });
 
-    const warningDoc = await getDoc(`users/${uniqueId}/warnings/${warningId}`);
-    if (!warningDoc) return res.status(404).json({ error: 'Warning not found' });
-    if (warningDoc.revoked) return res.status(400).json({ error: 'Warning already revoked' });
-
-    const deduction = warningDoc.gcsDeduction || 0;
-
-    // Read current user GCS
-    const userSnap = await db.doc(`users/${uniqueId}`).get();
-    if (!userSnap.exists) return res.status(404).json({ error: 'User not found' });
-    const user = userSnap.data();
-    const currentGcs = user.gcsScore ?? user.gcs_score ?? 100;
-    const currentCount = user.warningCount ?? user.warning_count ?? 0;
-    const restoredGcs = Math.min(100, currentGcs + deduction);
-
-    log.info('admin-users', 'Revoking warning', {
+    log.info('admin-users', 'Warning revoked', {
       adminId: req.auth.uid,
       targetUniqueId: uniqueId,
       warningId,
-      restored: deduction,
+      restored: result.deduction,
     });
-
-    // Atomic three-write commit. Pre-fix used Promise.all which is
-    // CONCURRENT, not atomic — if the user-doc update failed after
-    // the warning was marked revoked, the warning would be stuck in
-    // a "revoked" state with GCS NOT restored, and the retry path
-    // (line 579 'Warning already revoked' guard) would block the
-    // operator from fixing it. Audit H7 (Phase 2A).
-    //
-    // Pattern matches the warning-CREATION path at line 440 which
-    // already uses db.batch() correctly.
-    const batch = db.batch();
-    batch.update(db.doc(`users/${uniqueId}/warnings/${warningId}`), {
-      revoked: true,
-      revokedAt: timestamp,
-      revokedBy: req.auth.uid,
-    });
-    batch.update(db.doc(`users/${uniqueId}`), {
-      gcsScore: restoredGcs,
-      warningCount: Math.max(0, currentCount - 1),
-    });
-    batch.set(db.doc(`adminAuditLog/${generateId()}`), {
-      adminId: req.auth.uid,
-      action: 'REVOKE_WARNING',
-      targetUserId: uniqueId,
-      details: `Revoked warning ${warningId}, restored ${deduction} GCS (${currentGcs} → ${restoredGcs})`,
-      createdAt: timestamp,
-    });
-    await batch.commit();
-
-    res.json({ success: true, restoredGcs, deduction });
+    res.json({ success: true, restoredGcs: result.restoredGcs, deduction: result.deduction });
   } catch (err) {
+    if (err instanceof WarningRevokeError) return res.status(404).json({ error: err.message });
     log.error('admin-users', 'Revoke warning failed', {
       uniqueId: req.params.uniqueId,
       warningId: req.params.warningId,
@@ -1392,162 +1350,6 @@ router.delete('/report-locks/:uniqueId', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// ══════════════════════════════════════════════════════════════
-// HELPER: Auto-apply device + network bans on suspension
-// ══════════════════════════════════════════════════════════════
-
-/**
- * When a user is suspended, automatically ban all their known devices
- * and their last known IP address. Uses the same duration as the
- * suspension if an endDate is provided, otherwise permanent.
- */
-async function autoApplyBans(uniqueId, endDate) {
-  const timestamp = now();
-
-  // Calculate expiry — match suspension duration or permanent
-  let expiresAt = null;
-  let duration = 'permanent';
-  if (endDate) {
-    expiresAt = new Date(endDate).toISOString();
-    duration = 'suspension-match';
-  }
-
-  // Find all devices bound to this user
-  const bindingsSnap = await db
-    .collection('deviceBindings')
-    .where('uniqueId', '==', uniqueId)
-    .get();
-
-  let lastIp = null;
-  const batch = db.batch();
-
-  for (const doc of bindingsSnap.docs) {
-    const binding = doc.data();
-
-    // Create a device ban for each bound device
-    batch.set(db.doc(`deviceBans/${doc.id}`), {
-      deviceId: doc.id,
-      reason: 'Auto-applied: user suspended',
-      duration,
-      expiresAt,
-      linkedUniqueId: uniqueId,
-      autoApplied: true,
-      createdAt: timestamp,
-      createdBy: 'system',
-    });
-
-    // Track the last known IP from the most recent binding
-    if (binding.lastIp || binding.ip) {
-      lastIp = binding.lastIp || binding.ip;
-    }
-  }
-
-  // Create a network ban for the last known IP
-  if (lastIp) {
-    batch.set(db.doc(`networkBans/${generateId()}`), {
-      type: 'ip',
-      value: lastIp,
-      reason: 'Auto-applied: user suspended',
-      duration,
-      expiresAt,
-      linkedUniqueId: uniqueId,
-      autoApplied: true,
-      createdAt: timestamp,
-      createdBy: 'system',
-    });
-  }
-
-  await batch.commit();
-
-  // Auto-applied bans must bite on the target's next request, exactly
-  // like admin-issued ones (SHY-0149 mid-session AC).
-  clearBanCache();
-
-  // SHY-0150: the auto-bans change the target's claim standing — mint
-  // `banned: true` (+ revoke refresh tokens) through the same chokepoint
-  // the admin ban routes use. AFTER clearBanCache so the recompute reads
-  // the standing this batch just created. This helper runs fire-and-forget
-  // from the suspend route, whose .catch logs any failure here.
-  await syncBannedClaim(uniqueId);
-
-  const deviceCount = bindingsSnap.docs.length;
-  const networkCount = lastIp ? 1 : 0;
-  log.info('admin-users', 'Auto-bans applied', {
-    uniqueId,
-    deviceBans: deviceCount,
-    networkBans: networkCount,
-  });
-}
-
-// ══════════════════════════════════════════════════════════════
-// HELPER: Lift auto-applied bans on unsuspension
-// ══════════════════════════════════════════════════════════════
-
-/**
- * Remove device and network bans that were auto-applied during suspension.
- * Only removes bans with autoApplied === true and linkedUserId === uid.
- * Manually-applied bans are left untouched.
- */
-async function liftAutoAppliedBans(uniqueId, adminUid) {
-  const numericId = Number(uniqueId);
-  const stringId = String(uniqueId);
-
-  const [deviceSnapStr, deviceSnapNum, networkSnapStr, networkSnapNum] = await Promise.all([
-    db
-      .collection('deviceBans')
-      .where('linkedUniqueId', '==', stringId)
-      .where('autoApplied', '==', true)
-      .get(),
-    db
-      .collection('deviceBans')
-      .where('linkedUniqueId', '==', numericId)
-      .where('autoApplied', '==', true)
-      .get(),
-    db
-      .collection('networkBans')
-      .where('linkedUniqueId', '==', stringId)
-      .where('autoApplied', '==', true)
-      .get(),
-    db
-      .collection('networkBans')
-      .where('linkedUniqueId', '==', numericId)
-      .where('autoApplied', '==', true)
-      .get(),
-  ]);
-
-  // Deduplicate by doc id in case both queries match the same doc
-  const seen = new Set();
-  const allDocs = [];
-  for (const snap of [deviceSnapStr, deviceSnapNum, networkSnapStr, networkSnapNum]) {
-    for (const d of snap.docs) {
-      if (!seen.has(d.id)) {
-        seen.add(d.id);
-        allDocs.push(d);
-      }
-    }
-  }
-  if (allDocs.length === 0) return;
-
-  await Promise.all(allDocs.map((d) => d.ref.delete()));
-  // Lifting bans must unblock the gate as promptly as banning engages it.
-  clearBanCache();
-
-  // SHY-0150: RECOMPUTE the claim (never blind-clear) — a manually-issued
-  // ban that survives the auto-ban lift keeps the user's claim standing.
-  await syncBannedClaim(uniqueId);
-
-  // Audit log
-  await db.doc(`adminAuditLog/${generateId()}`).set({
-    adminId: adminUid,
-    action: 'LIFT_AUTO_BANS',
-    targetUserId: uniqueId,
-    details: `Removed ${allDocs.length} auto-applied ban(s) on unsuspension`,
-    createdAt: now(),
-  });
-
-  log.info('admin-users', 'Auto-applied bans lifted', { uniqueId, removed: allDocs.length });
-}
 
 // ══════════════════════════════════════════════════════════════
 // HELPER: Evict suspended user from rooms
