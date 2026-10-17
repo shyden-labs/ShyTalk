@@ -122,6 +122,10 @@ describe('appealedSuspension: the suspension an appeal answers', () => {
     });
   });
 
+  it('places an older appeal with no date in no known run', () => {
+    expect(appealedSuspension(IN_RUN, {})).toStrictEqual({ runStartedAt: null, inForce: false });
+  });
+
   it('places an older appeal in no known run when no suspension is in force', () => {
     expect(appealedSuspension({ isSuspended: false }, { createdAt: RUN })).toStrictEqual({
       runStartedAt: null,

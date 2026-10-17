@@ -411,7 +411,8 @@ describe('endSuspension: the suspension an upheld appeal answers', () => {
   });
 
   it('gives back the GCS of an appealed suspension that already ended, ending nothing', async () => {
-    storedUser({ isSuspended: false, gcsScore: 0 });
+    // The score as the revoke left it: nothing is held for an ended suspension.
+    storedUser({ isSuspended: false, gcsScore: 80 });
     storedWarnings({
       id: 'warn-1',
       source: 'suspension',

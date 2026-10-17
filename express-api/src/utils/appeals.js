@@ -71,7 +71,7 @@ function appealedSuspension(user, appeal) {
   const current = runInForce(user);
   const recorded = appeal.suspensionRunStartedAt ?? null;
   if (recorded !== null) {
-    return { runStartedAt: recorded, inForce: suspended && recorded === current };
+    return { runStartedAt: recorded, inForce: recorded === current };
   }
   if (!suspended) return { runStartedAt: null, inForce: false };
   if (current === null) return { runStartedAt: null, inForce: true };
