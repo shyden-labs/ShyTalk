@@ -99,7 +99,10 @@ suite; SHY-0614 (#2376) is client-forged moderation records.
 
 ### i18n
 
-- [ ] No new copy. The admin panel is English-only today.
+- [ ] Any new admin copy (the entry count, an action's label) goes into all
+      five admin languages in `public/admin/translations.js` (en, id, th,
+      vi, zh), each line read back by Google Cloud Translation before
+      commit, with the writer/reader table in Notes.
 
 ### Observability
 
