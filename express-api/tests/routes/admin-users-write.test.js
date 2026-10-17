@@ -362,6 +362,60 @@ describe('POST /api/user/:uniqueId/suspend — autoApplyBans', () => {
   });
 });
 
+// --- Suspend --- the warning names its suspension (SHY-0605) -----------------
+// An upheld appeal gives back the GCS its own suspension took and no other's
+// (Shyden, 2026-10-17), even after that suspension has ended. So the warning
+// records which run of suspensions it belongs to.
+describe('POST /api/user/:uniqueId/suspend --- the warning names its suspension', () => {
+  let app;
+
+  beforeEach(() => {
+    app = createApp();
+    jest.clearAllMocks();
+  });
+
+  function suspensionWarning() {
+    const call = mockDocSet.mock.calls.find(([data]) => data && data.source === 'suspension');
+    return call && call[0];
+  }
+
+  it('tags a first suspension’s warning with the run it starts', async () => {
+    mockDocGet.mockResolvedValue({
+      exists: true,
+      id: 'user-42',
+      data: () => ({ displayName: 'Ana', gcsScore: 80 }),
+    });
+
+    await request(app).post('/api/user/user-42/suspend').send({ reason: 'Spam', canAppeal: true });
+
+    expect(suspensionWarning()).toMatchObject({
+      gcsDeduction: 80,
+      suspensionRunStartedAt: 1700000000000,
+    });
+  });
+
+  it('tags a re-suspension’s warning with the run already in force', async () => {
+    mockDocGet.mockResolvedValue({
+      exists: true,
+      id: 'user-42',
+      data: () => ({
+        displayName: 'Suspended Account',
+        gcsScore: 40,
+        isSuspended: true,
+        suspensionStartDate: 1699000000000,
+        suspensionRunStartedAt: 1698000000000,
+      }),
+    });
+
+    await request(app).post('/api/user/user-42/suspend').send({ reason: 'Spam', canAppeal: true });
+
+    expect(suspensionWarning()).toMatchObject({
+      gcsDeduction: 40,
+      suspensionRunStartedAt: 1698000000000,
+    });
+  });
+});
+
 // --- Suspend --- validation branches ----------------------------------------
 
 describe('POST /api/user/:uniqueId/suspend --- validation', () => {

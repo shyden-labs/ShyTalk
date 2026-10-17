@@ -20,7 +20,7 @@
 
 const { db } = require('./firebase');
 const { generateId, now } = require('./helpers');
-const { queryDocs } = require('./firestore-helpers');
+const { getDoc, queryDocs } = require('./firestore-helpers');
 
 /** The collection both routes write. */
 const APPEALS_COLLECTION = 'suspensionAppeals';
@@ -71,10 +71,21 @@ async function findPendingAppeal(uniqueId) {
  * `suspensionAppealStatus` is still written — the app renders it and the admin
  * review route updates it — but nothing GATES on it any more. It is a display
  * mirror of the collection, not a second source of truth.
+ *
+ * The appeal also names the run of suspensions it answers
+ * (`suspensionRunStartedAt`, SHY-0605). Upheld, it gives back that run's GCS
+ * and no other's, even when the suspension has ended by then: a timed one can
+ * run out while its appeal waits, and the ending clears the run start from the
+ * user. A user who is not suspended has no run to answer, so it is null.
  */
 async function createAppeal({ uniqueId, appealText }) {
   const userId = toOwnerId(uniqueId);
   const appealId = generateId();
+  const user = (await getDoc(`users/${userId}`)) ?? {};
+  const suspended = (user.isSuspended ?? user.is_suspended) === true;
+  const suspensionRunStartedAt = suspended
+    ? (user.suspensionRunStartedAt ?? user.suspensionStartDate ?? null)
+    : null;
   await Promise.all([
     db.doc(`${APPEALS_COLLECTION}/${appealId}`).set(
       {
@@ -84,6 +95,7 @@ async function createAppeal({ uniqueId, appealText }) {
         reviewedBy: null,
         reviewedAt: null,
         createdAt: now(),
+        suspensionRunStartedAt,
       },
       { merge: true },
     ),

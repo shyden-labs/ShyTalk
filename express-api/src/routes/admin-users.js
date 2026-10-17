@@ -1070,6 +1070,7 @@ router.post('/user/:uniqueId/suspend', async (req, res) => {
     const user = { ...snap.data(), id: snap.id };
 
     const timestamp = now();
+    const started = suspensionStartedProfileFields(user, timestamp);
 
     log.info('admin-users', 'Suspending user', {
       adminId: req.auth.uid,
@@ -1087,7 +1088,7 @@ router.post('/user/:uniqueId/suspend', async (req, res) => {
         suspensionCanAppeal: body.canAppeal,
         ...SUSPENSION_STARTED_RESET,
         suspendedBy: req.auth.uid,
-        ...suspensionStartedProfileFields(user, timestamp),
+        ...started,
       }),
       db.doc(`adminAuditLog/${generateId()}`).set({
         adminId: req.auth.uid,
@@ -1120,6 +1121,9 @@ router.post('/user/:uniqueId/suspend', async (req, res) => {
           issuedBy: req.auth.uid,
           issuedByName: null,
           source: 'suspension',
+          // The run it belongs to: an upheld appeal gives back its own run's
+          // warnings and no other's, even once that run has ended (SHY-0605).
+          suspensionRunStartedAt: started.suspensionRunStartedAt,
           linkedReportId: null,
           revoked: false,
           revokedAt: null,

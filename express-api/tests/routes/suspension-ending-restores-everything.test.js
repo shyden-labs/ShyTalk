@@ -217,3 +217,37 @@ describe.each(END_PATHS)('%s', (_path, givesGcsBack, end) => {
     expect((await endingsRecorded()).size).toBe(1);
   });
 });
+
+// A timed suspension can run out while its appeal waits. The lift clears the
+// run start from the user, so the appeal carries it: upheld later, it still
+// gives back the GCS that suspension took.
+describe('an appeal upheld after its suspension ran out', () => {
+  test('gives back the GCS, revoking the warning, with the one ending recorded', async () => {
+    await request(app())
+      .post(`/api/users/${MEMBER}/appeal`)
+      .set(member.headers)
+      .send({ appealText: 'I was helping a learner, not harassing them.' })
+      .expect(200);
+    await db.doc(`users/${MEMBER}`).update({ suspensionEndDate: Date.now() - 60_000 });
+    clearAuthCaches();
+    await request(app())
+      .post(`/api/users/${MEMBER}/lift-suspension`)
+      .set(member.headers)
+      .expect(200);
+    expect((await readUser()).gcsScore).toBe(0);
+    const appeals = await db.collection('suspensionAppeals').where('userId', '==', MEMBER).get();
+    expect(appeals.size).toBe(1);
+
+    const res = await request(app())
+      .patch(`/api/appeals/${appeals.docs[0].id}`)
+      .set(admin.headers)
+      .send({ status: 'approved' });
+
+    expect(res.status).toBe(200);
+    const user = await readUser();
+    expect(user.isSuspended).toBe(false);
+    expect(user.gcsScore).toBe(GCS_BEFORE);
+    expect((await suspensionWarnings()).map((w) => w.revoked)).toEqual([true]);
+    expect((await endingsRecorded()).size).toBe(1);
+  });
+});

@@ -89,7 +89,11 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // tests and deploy-dev-on-merge.test.js (SHY-0534).
 // 2002 -> 2003: tests/utils/suspension.test.js (SHY-0597).
 // 2003 -> 2004: tests/web/helpers/admin-autosave.ts (SHY-0597).
-const FILES_READ_FLOOR = 2004;
+// 2004 -> 2013: express-api/src/utils/auto-bans.js, end-suspension.js,
+// warnings.js; tests/utils/{auto-bans,end-suspension,warnings,appeals}
+// .unit.test.js; tests/routes/suspension-ending-restores-everything.test.js;
+// tests/scripts/suspension-ends-in-one-place.test.js (SHY-0605).
+const FILES_READ_FLOOR = 2013;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

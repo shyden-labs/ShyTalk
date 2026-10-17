@@ -562,6 +562,7 @@ describe('PATCH /api/appeals/:id (admin review appeal)', () => {
       actor: 'admin-firebase-uid',
       trigger: 'APPEAL_APPROVED',
       restoreGcs: true,
+      appealedRunStartedAt: null,
     });
     // suspensionAppealStatus should be written to user doc
     expect(mockDocUpdate).toHaveBeenCalledWith(

@@ -1458,7 +1458,8 @@ router.patch('/appeals/:id', async (req, res) => {
     });
 
     // An upheld appeal ends the suspension and is the ONLY ending that gives
-    // back the GCS the suspension took (SHY-0605; Shyden, 2026-10-17). A
+    // back the GCS the suspension took (SHY-0605; Shyden, 2026-10-17): the GCS
+    // of the run the appeal answers, even if that run has ended since. A
     // failed ending answers 500 with the appeal already marked: approving it
     // again finishes the job.
     if (status === 'approved') {
@@ -1466,6 +1467,7 @@ router.patch('/appeals/:id', async (req, res) => {
         actor: req.auth.uid,
         trigger: 'APPEAL_APPROVED',
         restoreGcs: true,
+        appealedRunStartedAt: appeal.suspensionRunStartedAt ?? null,
       });
     }
 

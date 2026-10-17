@@ -379,6 +379,96 @@ describe('endSuspension: the suspension warning', () => {
   });
 });
 
+// An appeal records the run it answers (`suspensionRunStartedAt` on the
+// appeal). Upheld, it gives back that run's GCS and no other's, even when the
+// suspension has already ended: a timed suspension can run out while its
+// appeal waits, and the ending clears the run start from the user.
+describe('endSuspension: the suspension an upheld appeal answers', () => {
+  const LATER_RUN = RUN_START + 5000000;
+
+  it('gives back the GCS of an appealed suspension that already ended, ending nothing', async () => {
+    storedUser({ isSuspended: false, gcsScore: 0 });
+    storedWarnings({
+      id: 'warn-1',
+      source: 'suspension',
+      revoked: false,
+      createdAt: RUN_START,
+      suspensionRunStartedAt: RUN_START,
+    });
+    revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
+
+    const result = await endSuspension('10000001', { ...APPEAL, appealedRunStartedAt: RUN_START });
+
+    expect(revokeWarning).toHaveBeenCalledWith('10000001', 'warn-1', { actor: 'admin-uid' });
+    expect(result).toStrictEqual({ alreadyEnded: true, revokedWarnings: 1, gcsRestored: 80 });
+    expect(liftAutoAppliedBans).not.toHaveBeenCalled();
+    expect(unflagUnsuspendedUserSuggestions).not.toHaveBeenCalled();
+    expect(mockCommit).not.toHaveBeenCalled();
+    expect(clearSuspensionCache).not.toHaveBeenCalled();
+  });
+
+  it('gives back nothing for an ended suspension when the appeal named none', async () => {
+    // A start date an older ending left behind is not a run in force.
+    storedUser({ isSuspended: false, suspensionStartDate: RUN_START });
+    storedWarnings({
+      id: 'warn-1',
+      source: 'suspension',
+      revoked: false,
+      createdAt: RUN_START,
+      suspensionRunStartedAt: RUN_START,
+    });
+
+    const result = await endSuspension('10000001', { ...APPEAL, appealedRunStartedAt: null });
+
+    expect(mockWarningsGet).not.toHaveBeenCalled();
+    expect(result).toStrictEqual({ alreadyEnded: true, revokedWarnings: 0, gcsRestored: 0 });
+    expect(mockCommit).not.toHaveBeenCalled();
+  });
+
+  it('gives back only the appealed suspension’s warnings, not a later one’s', async () => {
+    storedUser({ ...SUSPENDED, suspensionRunStartedAt: LATER_RUN });
+    storedWarnings(
+      {
+        id: 'warn-appealed',
+        source: 'suspension',
+        revoked: false,
+        createdAt: RUN_START,
+        suspensionRunStartedAt: RUN_START,
+      },
+      {
+        id: 'warn-later',
+        source: 'suspension',
+        revoked: false,
+        createdAt: LATER_RUN,
+        suspensionRunStartedAt: LATER_RUN,
+      },
+    );
+    revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
+
+    await endSuspension('10000001', { ...APPEAL, appealedRunStartedAt: RUN_START });
+
+    expect(revokeWarning.mock.calls.map(([, id]) => id)).toStrictEqual(['warn-appealed']);
+  });
+
+  it('gives back the run in force when the appeal named none', async () => {
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
+    revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
+
+    await endSuspension('10000001', { ...APPEAL, appealedRunStartedAt: null });
+
+    expect(revokeWarning.mock.calls.map(([, id]) => id)).toStrictEqual(['warn-1']);
+  });
+
+  it('does nothing for a user with no document, appeal or not', async () => {
+    storedUser(undefined);
+
+    const result = await endSuspension('10000001', { ...APPEAL, appealedRunStartedAt: RUN_START });
+
+    expect(result).toStrictEqual({ alreadyEnded: true });
+    expect(mockWarningsGet).not.toHaveBeenCalled();
+  });
+});
+
 describe('endSuspension: bans and suggestions', () => {
   it('lifts the auto-applied bans as the actor', async () => {
     await endSuspension('10000001', OPTIONS);

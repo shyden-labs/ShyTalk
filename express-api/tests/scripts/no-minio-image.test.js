@@ -34,9 +34,11 @@ const DEAD_NAMES = [/minio\/minio\b/gi, /minio\/mc\b/gi, /\/minio\/health\b/gi];
 // scripts/tester-notes.js, list-build-changes.js, app-store-connect.js and
 // set-testflight-whats-new.js (SHY-0361). 469 -> 471: scripts/deploy-plan.js
 // and deploy-failure-issue.js (SHY-0534). 471 -> 472:
-// tests/web/helpers/admin-autosave.ts (SHY-0597).
+// tests/web/helpers/admin-autosave.ts (SHY-0597). 472 -> 475:
+// express-api/src/utils/auto-bans.js, end-suspension.js and warnings.js
+// (SHY-0605).
 // SHY-0556 moves this figure to the floors record.
-const FILES_READ_FLOOR = 472;
+const FILES_READ_FLOOR = 475;
 
 function findDeadNames(text) {
   return DEAD_NAMES.flatMap((re) => text.match(re) ?? []);

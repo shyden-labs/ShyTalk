@@ -296,11 +296,9 @@ describe('POST /api/appeals - snake_case user fields', () => {
   });
 
   it('uses is_suspended and suspension_can_appeal snake_case fields', async () => {
-    getDoc.mockResolvedValueOnce({
-      id: '50990490',
-      is_suspended: true,
-      suspension_can_appeal: true,
-    });
+    const user = { id: '50990490', is_suspended: true, suspension_can_appeal: true };
+    // Read twice: by the route, then by createAppeal for the run it answers.
+    getDoc.mockResolvedValueOnce(user).mockResolvedValueOnce(user);
     queryDocs.mockResolvedValueOnce([]);
     const res = await request(app).post('/api/appeals').send({ appealText: 'Please reconsider' });
     expect(res.status).toBe(200);
@@ -417,7 +415,24 @@ describe('PATCH /api/appeals/:id --- an upheld appeal ends through endSuspension
       actor: 'admin-firebase-uid',
       trigger: 'APPEAL_APPROVED',
       restoreGcs: true,
+      appealedRunStartedAt: null,
     });
+  });
+
+  it('gives back the GCS of the suspension the appeal answers', async () => {
+    getDoc.mockReset().mockResolvedValueOnce({
+      id: 'a1',
+      userId: 'u1',
+      status: 'pending',
+      suspensionRunStartedAt: 1709000000000,
+    });
+
+    await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
+
+    expect(mockEndSuspension).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ restoreGcs: true, appealedRunStartedAt: 1709000000000 }),
+    );
   });
 
   it('ends nothing when the appeal is denied', async () => {
