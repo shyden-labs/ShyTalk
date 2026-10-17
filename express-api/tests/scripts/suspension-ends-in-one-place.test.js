@@ -110,15 +110,46 @@ function useOf(node, parents) {
   return 'other';
 }
 
-/** The references to a const named `name` in this file, or null if it is declared twice. */
+const FUNCTIONS = new Set([
+  'FunctionDeclaration',
+  'FunctionExpression',
+  'ArrowFunctionExpression',
+  'ObjectMethod',
+  'ClassMethod',
+]);
+
+/** Whether `n` names a binding (a declaration, a parameter) rather than using one. */
+function isBinding(n, parent, parents) {
+  if (parent.type === 'VariableDeclarator') return parent.id === n;
+  if (FUNCTIONS.has(parent.type)) return parent.id === n || parent.params.includes(n);
+  if (parent.type === 'ClassDeclaration' || parent.type === 'ClassExpression') {
+    return parent.id === n;
+  }
+  if (parent.type === 'CatchClause') return parent.param === n;
+  if (parent.type === 'AssignmentPattern') return parent.left === n;
+  if (parent.type === 'RestElement' || parent.type === 'ArrayPattern') return true;
+  if (parent.type.startsWith('Import') && parent.type.endsWith('Specifier')) {
+    return parent.local === n;
+  }
+  if (parent.type === 'ObjectProperty' && parent.value === n) {
+    return parents.get(parent).type === 'ObjectPattern';
+  }
+  return false;
+}
+
+/**
+ * The references to a const named `name` in this file, or null when the name
+ * is bound anywhere else in it (another declaration, a parameter, a function
+ * or class name, a catch or import binding): a reader that follows a name
+ * cannot tell two bindings apart, so it fails closed.
+ */
 function referencesTo(name, declarator, nodes, parents) {
-  const declarations = nodes.filter(
-    (n) => n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.id.name === name,
-  );
-  if (declarations.length !== 1 || declarations[0] !== declarator) return null;
-  return nodes.filter((n) => {
-    if (n.type !== 'Identifier' || n.name !== name || n === declarator.id) return false;
+  const named = nodes.filter((n) => n.type === 'Identifier' && n.name === name);
+  const bindings = named.filter((n) => isBinding(n, parents.get(n), parents));
+  if (bindings.length !== 1 || bindings[0] !== declarator.id) return null;
+  return named.filter((n) => {
     const parent = parents.get(n);
+    if (isBinding(n, parent, parents)) return false; // a binding is not a use
     const member = parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression';
     if (member && parent.property === n && !parent.computed) return false;
     // `f.uid` reads one field out; it carries no part of the object anywhere.
@@ -159,8 +190,10 @@ function scanSource(rel, code) {
     if (uses[0] === 'const') {
       const declarator = parents.get(object);
       const refs = referencesTo(declarator.id.name, declarator, nodes, parents);
-      uses = refs === null ? ['other'] : refs.map((ref) => useOf(ref, parents));
-      if (uses.includes('const')) uses = ['other']; // a second binding is not followed
+      // A name bound twice, or bound again, cannot be followed: red for every
+      // value, computed ones included.
+      uses = refs === null ? ['unfollowed'] : refs.map((ref) => useOf(ref, parents));
+      if (uses.includes('const')) uses = ['unfollowed'];
       // A created document's spread copies are judged by the copy's own use.
       if (uses.includes('creation')) {
         uses = refs.map((ref, i) => {
@@ -176,7 +209,7 @@ function scanSource(rel, code) {
       const kind = inHome ? 'home' : use;
       sites.push({ at: at(prop), kind: literal ? kind : `${kind} (computed)` });
       if (inHome) continue;
-      if (use === 'ending' || (literal && use === 'other')) {
+      if (use === 'ending' || use === 'unfollowed' || (literal && use === 'other')) {
         findings.push(`${at(prop)}: isSuspended ${literal ? 'false' : 'computed'} reaches ${use}`);
       }
     }
@@ -350,6 +383,22 @@ describe('SHY-0605 — the reader sees every form an ending is written in', () =
       `const u = { isSuspended: false }; list.push({ ...u });`,
     ],
     ['a const declared twice', `const f = { isSuspended: false }; { const f = 1; } ref.set(f);`],
+    [
+      'a copy excused by a created document of the same name elsewhere',
+      `const f = { isSuspended: false }; list.push({ ...f }); function g() { const f = { a: 1 }; ref.set(f); }`,
+    ],
+    [
+      'a computed value under a name a parameter shadows',
+      `const f = { isSuspended: flag }; res.json(f); function g(f) {}`,
+    ],
+    [
+      'a computed value bound again',
+      `const f = { isSuspended: flag }; const h = f; other.update(h);`,
+    ],
+    [
+      'a copy excused by a parameter of the same name',
+      `const f = { isSuspended: false }; list.push({ ...f }); function g(f) { ref.set(f); }`,
+    ],
     ['a computed value reaching .update', `ref.update({ isSuspended: req.body.flag });`],
     ['a computed value reaching batch.update', `batch.update(ref, { isSuspended: flag });`],
     ['suspensionEndedFields called', `ref.update(suspensionEndedFields());`],
