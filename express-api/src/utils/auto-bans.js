@@ -108,6 +108,8 @@ async function autoApplyBans(uniqueId, endDate) {
  * Remove device and network bans that were auto-applied during suspension.
  * Only removes bans with autoApplied === true and linkedUserId === uid.
  * Manually-applied bans are left untouched.
+ *
+ * @returns {Promise<number>} how many bans were lifted (0 when none)
  */
 async function liftAutoAppliedBans(uniqueId, adminUid) {
   const numericId = Number(uniqueId);
@@ -136,18 +138,19 @@ async function liftAutoAppliedBans(uniqueId, adminUid) {
       .get(),
   ]);
 
-  // Deduplicate by doc id in case both queries match the same doc
+  // Deduplicate by path in case both id forms match the same doc. Not by the
+  // bare id: a device ban and a network ban may share one.
   const seen = new Set();
   const allDocs = [];
   for (const snap of [deviceSnapStr, deviceSnapNum, networkSnapStr, networkSnapNum]) {
     for (const d of snap.docs) {
-      if (!seen.has(d.id)) {
-        seen.add(d.id);
+      if (!seen.has(d.ref.path)) {
+        seen.add(d.ref.path);
         allDocs.push(d);
       }
     }
   }
-  if (allDocs.length === 0) return;
+  if (allDocs.length === 0) return 0;
 
   await Promise.all(allDocs.map((d) => d.ref.delete()));
   // Lifting bans must unblock the gate as promptly as banning engages it.
@@ -167,6 +170,7 @@ async function liftAutoAppliedBans(uniqueId, adminUid) {
   });
 
   log.info('admin-users', 'Auto-applied bans lifted', { uniqueId, removed: allDocs.length });
+  return allDocs.length;
 }
 
 module.exports = { autoApplyBans, liftAutoAppliedBans };

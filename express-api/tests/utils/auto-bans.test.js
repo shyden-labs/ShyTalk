@@ -33,8 +33,9 @@ const { clearBanCache } = require('../../src/utils/bans');
 const { syncBannedClaim } = require('../../src/utils/banned-claim');
 const { liftAutoAppliedBans } = require('../../src/utils/auto-bans');
 
-function banDoc(id, del = jest.fn().mockResolvedValue()) {
-  return { id, ref: { delete: del } };
+/** A ban document at `collection/id`, as a query snapshot hands it back. */
+function banDoc(path, del = jest.fn().mockResolvedValue()) {
+  return { id: path.split('/').pop(), ref: { path, delete: del } };
 }
 
 /** Answer each (collection, linkedUniqueId) query with the given docs. */
@@ -65,7 +66,7 @@ describe('liftAutoAppliedBans', () => {
   });
 
   it('deletes the device bans linked by a string id', async () => {
-    const ban = banDoc('device-s');
+    const ban = banDoc('deviceBans/device-s');
     bans({ 'deviceBans:string': [ban] });
 
     await liftAutoAppliedBans('10000001', 'admin-uid');
@@ -74,7 +75,7 @@ describe('liftAutoAppliedBans', () => {
   });
 
   it('deletes the device bans linked by a numeric id', async () => {
-    const ban = banDoc('device-n');
+    const ban = banDoc('deviceBans/device-n');
     bans({ 'deviceBans:number': [ban] });
 
     await liftAutoAppliedBans('10000001', 'admin-uid');
@@ -83,7 +84,7 @@ describe('liftAutoAppliedBans', () => {
   });
 
   it('deletes the network bans linked by a string id', async () => {
-    const ban = banDoc('network-s');
+    const ban = banDoc('networkBans/network-s');
     bans({ 'networkBans:string': [ban] });
 
     await liftAutoAppliedBans('10000001', 'admin-uid');
@@ -92,7 +93,7 @@ describe('liftAutoAppliedBans', () => {
   });
 
   it('deletes the network bans linked by a numeric id', async () => {
-    const ban = banDoc('network-n');
+    const ban = banDoc('networkBans/network-n');
     bans({ 'networkBans:number': [ban] });
 
     await liftAutoAppliedBans('10000001', 'admin-uid');
@@ -103,8 +104,8 @@ describe('liftAutoAppliedBans', () => {
   it('deletes a ban found by both id forms once', async () => {
     const del = jest.fn().mockResolvedValue();
     bans({
-      'deviceBans:string': [banDoc('device-1', del)],
-      'deviceBans:number': [banDoc('device-1', del)],
+      'deviceBans:string': [banDoc('deviceBans/device-1', del)],
+      'deviceBans:number': [banDoc('deviceBans/device-1', del)],
     });
 
     await liftAutoAppliedBans('10000001', 'admin-uid');
@@ -112,8 +113,35 @@ describe('liftAutoAppliedBans', () => {
     expect(del).toHaveBeenCalledTimes(1);
   });
 
+  it('deletes a device ban and a network ban that share an id, both', async () => {
+    const device = banDoc('deviceBans/same-id');
+    const network = banDoc('networkBans/same-id');
+    bans({ 'deviceBans:string': [device], 'networkBans:string': [network] });
+
+    await liftAutoAppliedBans('10000001', 'admin-uid');
+
+    expect(device.ref.delete).toHaveBeenCalledTimes(1);
+    expect(network.ref.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the number of bans it lifted', async () => {
+    bans({
+      'deviceBans:string': [banDoc('deviceBans/device-1')],
+      'deviceBans:number': [banDoc('deviceBans/device-1')],
+      'networkBans:number': [banDoc('networkBans/network-1')],
+    });
+
+    await expect(liftAutoAppliedBans('10000001', 'admin-uid')).resolves.toBe(2);
+  });
+
+  it('returns 0 when the suspension applied no bans', async () => {
+    bans({});
+
+    await expect(liftAutoAppliedBans('10000001', 'admin-uid')).resolves.toBe(0);
+  });
+
   it('clears the ban cache and recomputes the banned claim after deleting', async () => {
-    const ban = banDoc('device-1');
+    const ban = banDoc('deviceBans/device-1');
     bans({ 'deviceBans:string': [ban] });
 
     await liftAutoAppliedBans('10000001', 'admin-uid');
@@ -127,8 +155,8 @@ describe('liftAutoAppliedBans', () => {
 
   it('writes the lift audit entry as the actor', async () => {
     bans({
-      'deviceBans:string': [banDoc('device-1')],
-      'networkBans:number': [banDoc('network-1')],
+      'deviceBans:string': [banDoc('deviceBans/device-1')],
+      'networkBans:number': [banDoc('networkBans/network-1')],
     });
 
     await liftAutoAppliedBans('10000001', 'admin-uid');
@@ -155,7 +183,7 @@ describe('liftAutoAppliedBans', () => {
   it('fails when a ban cannot be deleted, writing no audit entry', async () => {
     bans({
       'deviceBans:string': [
-        banDoc('device-1', jest.fn().mockRejectedValue(new Error('delete failed'))),
+        banDoc('deviceBans/device-1', jest.fn().mockRejectedValue(new Error('delete failed'))),
       ],
     });
 
@@ -164,7 +192,7 @@ describe('liftAutoAppliedBans', () => {
   });
 
   it('fails when the banned claim cannot be recomputed', async () => {
-    bans({ 'deviceBans:string': [banDoc('device-1')] });
+    bans({ 'deviceBans:string': [banDoc('deviceBans/device-1')] });
     syncBannedClaim.mockRejectedValue(new Error('claims down'));
 
     await expect(liftAutoAppliedBans('10000001', 'admin-uid')).rejects.toThrow('claims down');
