@@ -1,6 +1,6 @@
 ---
 id: SHY-0042
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-06-08
 priority: P0
@@ -13,6 +13,15 @@ mvp: true
 ---
 
 # SHY-0042: G003 ViewModel-coverage tracker (meta — links the 3 implementation SHYs)
+
+## CANCELLED — the roadmap it annotates is gone
+
+This tracker existed to tie row G003 of
+`.project/test-plans/exhaustive/2026-06-05-zero-gap-roadmap.md` to SHY-0010,
+SHY-0011 and SHY-0012. That file no longer exists, and the three stories
+carry the work and stay open.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

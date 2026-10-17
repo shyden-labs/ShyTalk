@@ -1,6 +1,6 @@
 ---
 id: SHY-0056
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-06-08
 priority: P2
@@ -13,6 +13,16 @@ mvp: true
 ---
 
 # SHY-0056: Document App Lock navigation intercept pattern in CLAUDE.md
+
+## CANCELLED — superseded by SHY-0196
+
+Shyden decided on 2026-07-16 that App-Lock uses the device's own unlock
+(SHY-0196), replacing the app-managed PIN screens this story was written
+for. SHY-0196 rebuilds the lock flow and carries its own tests. The pickup note on branch
+`docs/SHY-0056-pickup-blocked-applock-unwired` (2026-07-09) had already
+found this story's premise stale.
+
+Closed in the 2026-10-18 backlog sweep, on Shyden's decision ("Close both").
 
 ## User Story
 

@@ -57,6 +57,10 @@ Three tests pin the hook today: `actionlint-shellcheck-invocation.test.js`,
 ### Edge cases
 
 - [ ] A push with the local stack down behaves exactly as one with it up.
+- [ ] Every check the hook keeps that depends on what changed reads the
+      pushed range (the remote's tip to the pushed commit), not
+      `origin/main...HEAD`, and a branch delete runs none of them (from
+      SHY-0517). The large-file check still compares with `main`.
 - [ ] Each planted runner form (`npx playwright test`, `jest`,
       `./gradlew …Test`, `npm test`, `xcodebuild test`) turns the pin red.
 
@@ -138,3 +142,6 @@ Three tests pin the hook today: `actionlint-shellcheck-invocation.test.js`,
   `.husky/pre-push` run it when localhost:3000 and :8888 answer); the push
   was stopped and retried with the stack down. `echo: write error: Broken
   pipe` printed at lines 116, 154 and 230.
+- **2026-10-18**: Backlog sweep. SHY-0276 is closed as superseded by this
+  story, and SHY-0517 is folded into it: its remaining part is the
+  pushed-range edge case above. Estimate unchanged.

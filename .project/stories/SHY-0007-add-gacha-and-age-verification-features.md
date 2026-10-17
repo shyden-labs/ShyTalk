@@ -1,6 +1,6 @@
 ---
 id: SHY-0007
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-06-07
 priority: P1
@@ -13,6 +13,17 @@ mvp: true
 ---
 
 # SHY-0007: gacha.feature + age_verification.feature (BDD coverage)
+
+## CANCELLED — its target files never run
+
+SHY-0621 measured on 2026-10-16 that the 46 feature files under
+`app/src/androidTest/assets/features` never run (`ShyTalkTestRunner` is a
+plain `AndroidJUnitRunner`), and it deletes them, first moving into
+`journey-tests` any scenario no journey covers. This story would add `gacha.feature` and
+`age_verification.feature` there. The journeys already walk gacha (4
+scenarios across 5 files) and age checks (6 files).
+
+Closed in the 2026-10-18 backlog sweep, on Shyden's decision ("Close all three").
 
 ## User Story
 

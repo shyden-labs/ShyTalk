@@ -1,6 +1,6 @@
 ---
 id: SHY-0520
-status: Draft
+status: Cancelled
 owner: unassigned
 created: 2026-09-04
 priority: P1
@@ -12,6 +12,16 @@ mvp: false
 ---
 
 # SHY-0520: Dependabot security updates open against main and never reach the develop gate
+
+## CANCELLED — the default branch is develop
+
+Read 2026-10-18: `gh api repos/shyden-labs/ShyTalk --jq .default_branch`
+is `develop`, so Dependabot security updates already open against
+`develop` and pass its gate; nothing needs retargeting. The unmerged branch
+`feat/SHY-0520-dependabot-retarget-security-updates` (2 commits, 2026-09-10,
+never opened as a PR) is left in place.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

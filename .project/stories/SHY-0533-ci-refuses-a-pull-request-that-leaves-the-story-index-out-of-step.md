@@ -1,6 +1,6 @@
 ---
 id: SHY-0533
-status: Draft
+status: Cancelled
 owner: unassigned
 created: 2026-09-19
 priority: P1
@@ -13,6 +13,13 @@ epic: EPIC-0001
 ---
 
 # SHY-0533: CI refuses a pull request that leaves the story index out of step
+
+## CANCELLED — superseded by SHY-0603
+
+SHY-0603 retires the story files and this tooling with them; this story
+fixes no live defect (only speed or index tidiness).
+
+Closed in the 2026-10-18 backlog sweep, on Shyden's decision ("Close the cosmetic ones only").
 
 ## User Story
 

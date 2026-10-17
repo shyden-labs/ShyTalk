@@ -1,6 +1,6 @@
 ---
 id: SHY-0360
-status: Draft
+status: Cancelled
 owner: unassigned
 created: 2026-08-20
 priority: P1
@@ -12,6 +12,14 @@ mvp: false
 ---
 
 # SHY-0360: A change on the project board never reaches the roadmap pages
+
+## CANCELLED — superseded by SHY-0602
+
+SHY-0602's Notes: "Supersedes SHY-0360 and SHY-0519". Shyden ruled on
+2026-10-15 that the roadmap reads the board live, so this design will not
+be built.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 
