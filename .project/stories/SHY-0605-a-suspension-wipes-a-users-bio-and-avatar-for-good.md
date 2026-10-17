@@ -1,6 +1,6 @@
 ---
 id: SHY-0605
-status: In Progress
+status: In Review
 owner: unassigned
 created: 2026-10-16
 priority: P0
@@ -61,15 +61,15 @@ admin-users suspend writes a `source: 'suspension'` warning.
 
 ### Happy path
 
-- [ ] One function ends a suspension (`endSuspension` in
+- [x] One function ends a suspension (`endSuspension` in
       `express-api/src/utils/end-suspension.js`, beside the helpers in
       `suspension.js`) and every end path calls it;
       no end path writes `isSuspended: false` itself, with a guard that
       finds a direct write in any route.
-- [ ] Ending restores name, uploaded photo, cover, bio (`description`) and
+- [x] Ending restores name, uploaded photo, cover, bio (`description`) and
       sign-in photo (`avatarUrl`); a suspension saves the last two beside
       the others (Shyden 2026-10-16: "Restore both").
-- [ ] An upheld appeal, and only an upheld appeal, revokes every unrevoked
+- [x] An upheld appeal, and only an upheld appeal, revokes every unrevoked
       warning this suspension created and gives its GCS deduction back,
       capped at 100, keeping the warning in history marked revoked. It gives
       the GCS back like the admin "revoke warning" action but leaves
@@ -77,60 +77,60 @@ admin-users suspend writes a `source: 'suspension'` warning.
       lift, identity-graph lift or timed expiry leaves the GCS and the
       warning as they are (Shyden 2026-10-17: "only successful appeals should
       restore the score").
-- [ ] "This suspension" starts at the first suspend of a run: suspending an
+- [x] "This suspension" starts at the first suspend of a run: suspending an
       already-suspended user keeps the run's start
       (`suspensionRunStartedAt`), so an upheld appeal gives back the first
       warning's deduction too, and never an earlier suspension's.
-- [ ] Ending lifts the device and network bans the suspension applied and
+- [x] Ending lifts the device and network bans the suspension applied and
       unflags the suggestions it flagged, on every end path.
-- [ ] Every end path clears the suspension cache with the numeric user id
+- [x] Every end path clears the suspension cache with the numeric user id
       (found in passing: the identity graph's unsuspend-all never clears
       it, so an unsuspended user stays blocked up to 5 minutes; appeal
       approval passes the raw appeal id).
-- [ ] The admin view of a suspended user shows the saved bio and sign-in
+- [x] The admin view of a suspended user shows the saved bio and sign-in
       photo beside the saved name, photo and cover (found in passing:
       `admin-users.js` shows only those three).
-- [ ] One test per end path per effect, each RED against today's code.
+- [x] One test per end path per effect, each RED against today's code.
 
 ### Error paths
 
-- [ ] A failed step fails the request with an error the admin panel shows;
+- [x] A failed step fails the request with an error the admin panel shows;
       it never answers success with part of the account still taken away.
-- [ ] A user with no bio or sign-in photo saves `null` and restores nothing.
+- [x] A user with no bio or sign-in photo saves `null` and restores nothing.
 
 ### Edge cases
 
-- [ ] Suspending an already-suspended user keeps the first saved bio and
+- [x] Suspending an already-suspended user keeps the first saved bio and
       sign-in photo (SHY-0597's rule).
-- [ ] A warning revoked by hand during the suspension is not revoked twice
+- [x] A warning revoked by hand during the suspension is not revoked twice
       and its GCS is not given back twice.
-- [ ] Ending a suspension of a user who is not suspended changes nothing,
+- [x] Ending a suspension of a user who is not suspended changes nothing,
       on every end path (found in passing: reports.js admin unsuspend has
       no such check and rewrites and audits an unsuspended user).
-- [ ] Revoking a suspension warning by hand leaves `warningCount` alone
+- [x] Revoking a suspension warning by hand leaves `warningCount` alone
       (found in passing: the revoke route decrements it for every warning,
       though a suspension warning never incremented it).
 
 ### Performance
 
-- [ ] N/A: one user per call.
+- [x] N/A: one user per call.
 
 ### Security
 
-- [ ] A restored bio is rendered through the same escaping as any bio.
-- [ ] Every end path keeps its existing admin or owner check, with a test.
+- [x] A restored bio is rendered through the same escaping as any bio.
+- [x] Every end path keeps its existing admin or owner check, with a test.
 
 ### UX
 
-- [ ] N/A: no new screens or copy.
+- [x] N/A: no new screens or copy.
 
 ### i18n
 
-- [ ] N/A: no new copy.
+- [x] N/A: no new copy.
 
 ### Observability
 
-- [ ] Each ending writes one audit entry naming what was put back.
+- [x] Each ending writes one audit entry naming what was put back.
 
 ## Announce
 
@@ -186,3 +186,38 @@ photos, bio, standing and access.
 - **2026-10-16**: Shyden's rulings (AskUserQuestion): restore bio and sign-in photo; everything a suspension removes comes back; every ending gives the GCS back; every suspension starts the same way (SHY-0608). Re-scored 3 -> 8 from the inventory above: six end paths, five effects.
 - **2026-10-16**: In Progress on `story/SHY-0605-ending-a-suspension-restores-everything`. Inventory corrected from the plan's review passes (five end paths write the user; four start paths mask; the `createWarning` row was the separate warned action). Found in passing and folded in: the cache clear on every end path, the admin view of the saved bio and photo, reports.js unsuspend's missing not-suspended check, and the revoke route's `warningCount` decrement. Estimate stays 8.
 - **2026-10-17**: Shyden reversed the GCS ruling: *"if the suspension is lifted due to anything other an an appeal. do not restore the score. only successful appeals should restore the score"*. A run start (`suspensionRunStartedAt`) bounds the appeal's revoke, so a re-suspension's first warning is included and an earlier suspension's never is.
+- **2026-10-17**: In Review. Proof per AC (unit tests mock every service; the
+  integration and web tests run in CI and are confirmed on the PR's run):
+  - One ending + guard: `tests/utils/end-suspension.test.js`; guard
+    `tests/scripts/suspension-ends-in-one-place.test.js` (149 src files; red on
+    the pre-change tree at all five paths; 28 planted forms red, 12 green).
+  - Restores five fields: `end-suspension.test.js` "puts the ... back";
+    integration `tests/routes/suspension-ending-restores-everything.test.js`
+    per end path.
+  - GCS only on an upheld appeal: `end-suspension.test.js` "reads and revokes no
+    warning when the ending is not an upheld appeal"; E3 route test "with the
+    GCS given back"; guard "only the upheld appeal gives the GCS back";
+    integration per path.
+  - Run start, re-suspension, hand-revoked warning, no-field warning:
+    `end-suspension.test.js` (commit 4).
+  - Bans and suggestions on every path: `end-suspension.test.js` "lifts the
+    auto-applied bans", "unflags the suggestions"; each route calls it (guard).
+  - Cache by numeric id: `end-suspension.test.js` "clears the suspension cache
+    by the numeric id after the write".
+  - Admin view: `admin-users-missing-moderation.test.js` (4); web test 17.
+  - One test per end path per effect, red on today's code: each route file's
+    tests run against the pre-change routes: 7, 12, 5 and 4 failures.
+  - Failed step: each route's "answers 500 naming the step"; the panel shows it
+    (`apiCall` throws `data.error`; users.js and appeals.js toast it).
+  - Not suspended changes nothing: "answers alreadyUnsuspended" (E1, E2);
+    `end-suspension.test.js` "does nothing for a user who is not suspended".
+  - warningCount on revoke: `utils/warnings` tests (commit 2).
+  - Escaping: web test 17 plants markup in a bio and asserts it is shown as
+    text with no elements. Bios elsewhere render through Compose `Text` (apps)
+    and are not rendered on the public web.
+  - Auth kept: each route's 403 test (E1, E2, E3, E5 admin; E4 owner).
+  - Audit entry: `end-suspension.test.js` "writes the audit entry in the shape
+    the audit log page reads"; integration "records one ending".
+  - Mutations: 34 predicted, none survived (routes M1-M16, admin view V1-V3,
+    guard reader G1-G15).
+  - Found in passing, filed: SHY-0623 (#2394), seven undeclared packages.
