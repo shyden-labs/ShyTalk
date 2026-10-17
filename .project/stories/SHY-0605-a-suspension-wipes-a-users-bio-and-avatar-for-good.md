@@ -274,3 +274,7 @@ photos, bio, standing and access.
     only when `canAppeal`, `SuspensionScreen.kt:229`).
   - Unit gate 105 files 2,778/2,778 (`daedc86591e` then re-ran its 3 files,
     168/168). Mutations: 15 (N1-N15) then 35 (P1-P36), none survived.
+  - CI run 39056488493 on `97663d3026b`: backend, integration (emulator) and
+    1,424 web tests green; `admin-appeals.spec.ts` test 4 red because the
+    spec approved the fixture's appeal, written before its suspension began,
+    which now (rightly) ends nothing. The spec now suspends, then appeals.
