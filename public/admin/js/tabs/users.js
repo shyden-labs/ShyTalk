@@ -1217,6 +1217,8 @@ export function populateSuspensionSection(data) {
     const preSuspensionPhoto = $('#pre-suspension-photo');
     const preSuspensionName = $('#pre-suspension-name');
     const preSuspensionCover = $('#pre-suspension-cover');
+    const preSuspensionAvatar = $('#pre-suspension-avatar');
+    const preSuspensionBio = $('#pre-suspension-bio');
     if (data._preSuspension && preSuspensionInfo) {
       preSuspensionInfo.style.display = 'block';
       if (preSuspensionName)
@@ -1231,6 +1233,20 @@ export function populateSuspensionSection(data) {
         preSuspensionCover.style.display = 'block';
       } else if (preSuspensionCover) {
         preSuspensionCover.style.display = 'none';
+      }
+      // SHY-0605: the bio and sign-in photo an ending will put back.
+      if (data._preSuspension.avatarUrl && preSuspensionAvatar) {
+        preSuspensionAvatar.src = sanitizeImageUrl(data._preSuspension.avatarUrl);
+        preSuspensionAvatar.style.display = 'block';
+      } else if (preSuspensionAvatar) {
+        preSuspensionAvatar.style.display = 'none';
+      }
+      if (data._preSuspension.description && preSuspensionBio) {
+        preSuspensionBio.textContent = data._preSuspension.description;
+        preSuspensionBio.style.display = 'block';
+      } else if (preSuspensionBio) {
+        preSuspensionBio.textContent = '';
+        preSuspensionBio.style.display = 'none';
       }
     } else if (preSuspensionInfo) {
       preSuspensionInfo.style.display = 'none';

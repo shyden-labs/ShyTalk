@@ -85,15 +85,23 @@ function normalizeUser(user) {
     const preName = user.preSuspensionDisplayName ?? user.pre_suspension_display_name;
     const prePhoto = user.preSuspensionProfilePhotoUrl ?? user.pre_suspension_profile_photo_url;
     const preCover = user.preSuspensionCoverPhotoUrl ?? user.pre_suspension_cover_photo_url;
+    // The bio and sign-in photo are saved too, and an ending puts them back
+    // (SHY-0605), so the admin sees what will come back.
+    const preBio = user.preSuspensionDescription;
+    const preAvatar = user.preSuspensionAvatarUrl;
     if (preName) user.displayName = preName;
     if (prePhoto) user.profilePhotoUrl = prePhoto;
     if (preCover) user.coverPhotoUrl = preCover;
+    if (preBio) user.description = preBio;
+    if (preAvatar) user.avatarUrl = preAvatar;
     // Expose _preSuspension object for the admin panel's pre-suspension info section
-    if (preName || prePhoto || preCover) {
+    if (preName || prePhoto || preCover || preBio || preAvatar) {
       user._preSuspension = {
         displayName: preName || null,
         profilePhotoUrl: prePhoto || null,
         coverPhotoUrl: preCover || null,
+        description: preBio || null,
+        avatarUrl: preAvatar || null,
       };
     }
   }
