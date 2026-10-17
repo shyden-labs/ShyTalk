@@ -69,13 +69,18 @@ admin-users suspend writes a `source: 'suspension'` warning.
 - [ ] Ending restores name, uploaded photo, cover, bio (`description`) and
       sign-in photo (`avatarUrl`); a suspension saves the last two beside
       the others (Shyden 2026-10-16: "Restore both").
-- [ ] Ending revokes every unrevoked warning the suspension created and gives
-      its GCS deduction back, capped at 100, keeping the warning in history
-      marked revoked. It gives the GCS back like the admin "revoke warning"
-      action but leaves `warningCount` alone, which a suspension warning
-      never raised. This
-      holds on every ending: upheld appeal, admin lift, identity-graph lift
-      and timed expiry (Shyden 2026-10-16: "Every ending").
+- [ ] An upheld appeal, and only an upheld appeal, revokes every unrevoked
+      warning this suspension created and gives its GCS deduction back,
+      capped at 100, keeping the warning in history marked revoked. It gives
+      the GCS back like the admin "revoke warning" action but leaves
+      `warningCount` alone, which a suspension warning never raised. An admin
+      lift, identity-graph lift or timed expiry leaves the GCS and the
+      warning as they are (Shyden 2026-10-17: "only successful appeals should
+      restore the score").
+- [ ] "This suspension" starts at the first suspend of a run: suspending an
+      already-suspended user keeps the run's start
+      (`suspensionRunStartedAt`), so an upheld appeal gives back the first
+      warning's deduction too, and never an earlier suspension's.
 - [ ] Ending lifts the device and network bans the suspension applied and
       unflags the suggestions it flagged, on every end path.
 - [ ] Every end path clears the suspension cache with the numeric user id
@@ -145,7 +150,7 @@ photos, bio, standing and access.
 
 - **Given** a user suspended for a day, whose devices were banned
 - **When** they sign in after the day has passed
-- **Then** the ban is lifted and their profile and GCS are as before
+- **Then** the ban is lifted and their profile is as before, and their GCS stays where the suspension left it
 
 ## Test Plan
 
@@ -168,7 +173,7 @@ photos, bio, standing and access.
 | Risk | Mitigation |
 | --- | --- |
 | Restoring brings back reported content | Shyden chose restore; a moderator can still clear a bio by hand. |
-| GCS given back to someone who served a deserved suspension | Shyden chose every ending; the revoked warning stays in history. |
+| GCS given back to someone who served a deserved suspension | Only an upheld appeal gives it back (Shyden 2026-10-17); the revoked warning stays in history. |
 
 ## Definition of Done
 
@@ -180,3 +185,4 @@ photos, bio, standing and access.
 - **2026-10-16**: Filed from SHY-0597.
 - **2026-10-16**: Shyden's rulings (AskUserQuestion): restore bio and sign-in photo; everything a suspension removes comes back; every ending gives the GCS back; every suspension starts the same way (SHY-0608). Re-scored 3 -> 8 from the inventory above: six end paths, five effects.
 - **2026-10-16**: In Progress on `story/SHY-0605-ending-a-suspension-restores-everything`. Inventory corrected from the plan's review passes (five end paths write the user; four start paths mask; the `createWarning` row was the separate warned action). Found in passing and folded in: the cache clear on every end path, the admin view of the saved bio and photo, reports.js unsuspend's missing not-suspended check, and the revoke route's `warningCount` decrement. Estimate stays 8.
+- **2026-10-17**: Shyden reversed the GCS ruling: *"if the suspension is lifted due to anything other an an appeal. do not restore the score. only successful appeals should restore the score"*. A run start (`suspensionRunStartedAt`) bounds the appeal's revoke, so a re-suspension's first warning is included and an earlier suspension's never is.

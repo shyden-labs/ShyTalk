@@ -42,6 +42,7 @@ function suspensionEndedFields(restore = {}) {
     preSuspensionCoverPhotoUrl: null,
     preSuspensionDescription: null,
     preSuspensionAvatarUrl: null,
+    suspensionRunStartedAt: null,
     ...restore,
   };
 }
@@ -67,9 +68,18 @@ const SUSPENDED_DISPLAY_NAME = 'Suspended Account';
  * marks a user suspended without masking), the current profile is saved instead,
  * but never the mask itself.
  *
+ * It also records when the run of suspensions began (`suspensionRunStartedAt`,
+ * SHY-0605). A second suspend rewrites `suspensionStartDate`, but an upheld
+ * appeal gives back the GCS taken since the FIRST, so the first start is kept
+ * the same way the first saved profile is.
+ *
  * @param {object} user the user document as read before the write
+ * @param {number} startedAt when this suspension begins (ms)
  */
-function suspensionStartedProfileFields(user) {
+function suspensionStartedProfileFields(user, startedAt) {
+  if (!Number.isFinite(startedAt)) {
+    throw new TypeError('suspensionStartedProfileFields: startedAt (ms) is required');
+  }
   const alreadySuspended = (user.isSuspended ?? user.is_suspended) === true;
   const keep = (saved, current) => {
     if (alreadySuspended && saved !== null && saved !== undefined) return saved;
@@ -100,6 +110,10 @@ function suspensionStartedProfileFields(user) {
     avatarUrl: null,
     description: null,
     currentRoomId: null,
+    suspensionRunStartedAt: keep(
+      user.suspensionRunStartedAt ?? user.suspensionStartDate,
+      startedAt,
+    ),
   };
 }
 

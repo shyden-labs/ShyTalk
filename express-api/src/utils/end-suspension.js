@@ -44,19 +44,60 @@ async function atStep(step, work) {
 }
 
 /**
+ * Revoke the warnings this run of suspensions wrote, giving their GCS back.
+ *
+ * Only `source` is filtered in the query: an equality on `revoked` would skip
+ * a stored warning that lacks the field. The run starts at the FIRST suspend
+ * (`suspensionRunStartedAt`; a user suspended before that field existed falls
+ * back to `suspensionStartDate`): a second suspend moves the start date past
+ * the first warning, which holds the real deduction. An earlier suspension's
+ * warning is never revoked: it ended without an upheld appeal. With no start
+ * known, nothing is revoked.
+ *
+ * @returns {Promise<{ revokedWarnings: number, gcsRestored: number }>}
+ */
+async function revokeThisRunsWarnings(id, user, actor) {
+  const runStart = user.suspensionRunStartedAt ?? user.suspensionStartDate ?? null;
+  if (runStart === null) return { revokedWarnings: 0, gcsRestored: 0 };
+
+  const warnings = await atStep('warnings', () =>
+    db.collection(`users/${id}/warnings`).where('source', '==', 'suspension').get(),
+  );
+  const open = warnings.docs.filter((d) => {
+    const warning = d.data();
+    return warning.revoked !== true && warning.createdAt >= runStart;
+  });
+  let revokedWarnings = 0;
+  let gcsRestored = 0;
+  // One at a time: each revoke reads the GCS the last one wrote.
+  for (const warning of open) {
+    const result = await atStep('warnings', () => revokeWarning(id, warning.id, { actor }));
+    if (!result.alreadyRevoked) {
+      revokedWarnings += 1;
+      gcsRestored += result.restoredGcs - result.previousGcs;
+    }
+  }
+  return { revokedWarnings, gcsRestored };
+}
+
+/**
  * End a user's suspension and put back everything it took.
  *
  * @param {string|number} uniqueId the suspended user
- * @param {{ actor: string, trigger: string, extra?: object }} options
+ * @param {{ actor: string, trigger: string, extra?: object,
+ *   restoreGcs?: boolean }} options
  *   `actor` is recorded on the audit entry and every revoke (an admin uid, or
  *   `system:suspension-expired`); `trigger` names the end path (UNSUSPEND,
- *   APPEAL_APPROVED, ...); `extra` is written over the cleared fields
+ *   APPEAL_APPROVED, ...); `extra` is written over the cleared fields.
+ *   `restoreGcs` gives back the GCS this suspension took: ONLY an upheld
+ *   appeal passes it (Shyden, 2026-10-17). Any other ending leaves the GCS
+ *   and the suspension warning as they are.
  * @returns {Promise<{ alreadyEnded: true } | { alreadyEnded: false,
  *   restored: string[], revokedWarnings: number, gcsRestored: number,
  *   bansLifted: number, suggestions: object }>}
  * @throws {SuspensionEndError} when a step fails; the user is left suspended
  */
-async function endSuspension(uniqueId, { actor, trigger, extra = {} } = {}) {
+async function endSuspension(uniqueId, { actor, trigger, extra = {}, restoreGcs = false } = {}) {
   if (!actor) throw new TypeError('endSuspension: actor is required');
   if (!trigger) throw new TypeError('endSuspension: trigger is required');
 
@@ -67,24 +108,9 @@ async function endSuspension(uniqueId, { actor, trigger, extra = {} } = {}) {
   const user = snap.data();
   if ((user.isSuspended ?? user.is_suspended) !== true) return { alreadyEnded: true };
 
-  // Only `source` is filtered in the query: an equality on `revoked` would
-  // skip a stored warning that lacks the field. No start-date filter either:
-  // a second suspend moves `suspensionStartDate` past the first warning, which
-  // holds the real deduction. Every ending revokes its warnings, so the
-  // unrevoked ones are this suspension's.
-  const warnings = await atStep('warnings', () =>
-    db.collection(`users/${id}/warnings`).where('source', '==', 'suspension').get(),
-  );
-  let revokedWarnings = 0;
-  let gcsRestored = 0;
-  // One at a time: each revoke reads the GCS the last one wrote.
-  for (const warning of warnings.docs.filter((d) => d.data().revoked !== true)) {
-    const result = await atStep('warnings', () => revokeWarning(id, warning.id, { actor }));
-    if (!result.alreadyRevoked) {
-      revokedWarnings += 1;
-      gcsRestored += result.restoredGcs - result.previousGcs;
-    }
-  }
+  const { revokedWarnings, gcsRestored } = restoreGcs
+    ? await revokeThisRunsWarnings(id, user, actor)
+    : { revokedWarnings: 0, gcsRestored: 0 };
 
   const bansLifted = await atStep('bans', () => liftAutoAppliedBans(id, actor));
 
@@ -125,4 +151,19 @@ async function endSuspension(uniqueId, { actor, trigger, extra = {} } = {}) {
   return { alreadyEnded: false, restored, revokedWarnings, gcsRestored, bansLifted, suggestions };
 }
 
-module.exports = { endSuspension, SuspensionEndError };
+/**
+ * The 500 body for an ending that stopped at a step, or null for any other
+ * error. Every end path answers a failed ending the same way.
+ *
+ * @param {unknown} err
+ * @returns {{ error: string, step: string } | null}
+ */
+function suspensionEndFailure(err) {
+  if (!(err instanceof SuspensionEndError)) return null;
+  return {
+    error: 'The suspension could not be fully ended. The user is still suspended.',
+    step: err.step,
+  };
+}
+
+module.exports = { endSuspension, SuspensionEndError, suspensionEndFailure };

@@ -48,15 +48,23 @@ const {
   unflagUnsuspendedUserSuggestions,
 } = require('../../src/utils/flag-suspended-user-suggestions');
 const { clearSuspensionCache } = require('../../src/middleware/auth');
-const { endSuspension, SuspensionEndError } = require('../../src/utils/end-suspension');
+const {
+  endSuspension,
+  SuspensionEndError,
+  suspensionEndFailure,
+} = require('../../src/utils/end-suspension');
 
 const USER_PATH = 'users/10000001';
 const WARNINGS_PATH = 'users/10000001/warnings';
 const OPTIONS = { actor: 'admin-uid', trigger: 'UNSUSPEND' };
+// Only an upheld appeal gives the GCS back (Shyden, 2026-10-17).
+const APPEAL = { actor: 'admin-uid', trigger: 'APPEAL_APPROVED', restoreGcs: true };
+const RUN_START = 1709000000000;
 
 const SUSPENDED = {
   isSuspended: true,
   suspensionStartDate: 1709000000000,
+  suspensionRunStartedAt: RUN_START,
   displayName: 'Suspended Account',
   preSuspensionDisplayName: 'Ana',
   preSuspensionProfilePhotoUrl: 'https://cdn.example/photo.jpg',
@@ -217,10 +225,10 @@ describe('endSuspension: the profile', () => {
   });
 
   it('writes neither the GCS nor the warning count on the user', async () => {
-    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false });
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
     revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
 
-    await endSuspension('10000001', OPTIONS);
+    await endSuspension('10000001', APPEAL);
 
     expect(userUpdate()).not.toHaveProperty('gcsScore');
     expect(userUpdate()).not.toHaveProperty('warningCount');
@@ -229,34 +237,90 @@ describe('endSuspension: the profile', () => {
 
 describe('endSuspension: the suspension warning', () => {
   it('asks only for suspension warnings, filtering nothing else in the query', async () => {
-    await endSuspension('10000001', OPTIONS);
+    await endSuspension('10000001', APPEAL);
 
     expect(mockWarningsGet).toHaveBeenCalledWith(WARNINGS_PATH, [['source', '==', 'suspension']]);
   });
 
-  it('revokes the suspension warning as the actor', async () => {
-    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false });
+  it('reads and revokes no warning when the ending is not an upheld appeal', async () => {
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
+
+    const result = await endSuspension('10000001', OPTIONS);
+
+    expect(mockWarningsGet).not.toHaveBeenCalled();
+    expect(revokeWarning).not.toHaveBeenCalled();
+    expect(result.revokedWarnings).toBe(0);
+    expect(result.gcsRestored).toBe(0);
+  });
+
+  it('revokes a warning made at the run’s first moment', async () => {
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
     revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
 
-    await endSuspension('10000001', OPTIONS);
+    await endSuspension('10000001', APPEAL);
+
+    expect(revokeWarning).toHaveBeenCalledWith('10000001', 'warn-1', { actor: 'admin-uid' });
+  });
+
+  it('leaves a warning from an earlier suspension, ended without an appeal', async () => {
+    storedWarnings({
+      id: 'warn-old',
+      source: 'suspension',
+      revoked: false,
+      createdAt: RUN_START - 1,
+    });
+
+    await endSuspension('10000001', APPEAL);
+
+    expect(revokeWarning).not.toHaveBeenCalled();
+  });
+
+  it('starts the run at the suspension start for a user with no recorded run start', async () => {
+    storedUser({ isSuspended: true, suspensionStartDate: 1709500000000 });
+    storedWarnings(
+      { id: 'warn-a', source: 'suspension', revoked: false, createdAt: 1709499999999 },
+      { id: 'warn-b', source: 'suspension', revoked: false, createdAt: 1709500000000 },
+    );
+    revokes({ alreadyRevoked: false, deduction: 30, previousGcs: 50, restoredGcs: 80 });
+
+    await endSuspension('10000001', APPEAL);
+
+    expect(revokeWarning.mock.calls.map(([, id]) => id)).toStrictEqual(['warn-b']);
+  });
+
+  it('revokes nothing when the run’s start is not known', async () => {
+    storedUser({ isSuspended: true });
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
+
+    const result = await endSuspension('10000001', APPEAL);
+
+    expect(revokeWarning).not.toHaveBeenCalled();
+    expect(result.gcsRestored).toBe(0);
+  });
+
+  it('revokes the suspension warning as the actor', async () => {
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
+    revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
+
+    await endSuspension('10000001', APPEAL);
 
     expect(revokeWarning).toHaveBeenCalledTimes(1);
     expect(revokeWarning).toHaveBeenCalledWith('10000001', 'warn-1', { actor: 'admin-uid' });
   });
 
   it('revokes a stored warning that has no revoked field', async () => {
-    storedWarnings({ id: 'warn-1', source: 'suspension' });
+    storedWarnings({ id: 'warn-1', source: 'suspension', createdAt: RUN_START });
     revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
 
-    await endSuspension('10000001', OPTIONS);
+    await endSuspension('10000001', APPEAL);
 
     expect(revokeWarning).toHaveBeenCalledWith('10000001', 'warn-1', { actor: 'admin-uid' });
   });
 
   it('skips a warning an admin already revoked by hand', async () => {
-    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: true });
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: true, createdAt: RUN_START });
 
-    await endSuspension('10000001', OPTIONS);
+    await endSuspension('10000001', APPEAL);
 
     expect(revokeWarning).not.toHaveBeenCalled();
   });
@@ -274,7 +338,7 @@ describe('endSuspension: the suspension warning', () => {
       { alreadyRevoked: false, deduction: 0, previousGcs: 80, restoredGcs: 80 },
     );
 
-    const result = await endSuspension('10000001', OPTIONS);
+    const result = await endSuspension('10000001', APPEAL);
 
     expect(revokeWarning.mock.calls.map(([, id]) => id)).toStrictEqual(['warn-a', 'warn-b']);
     expect(result.gcsRestored).toBe(80);
@@ -282,8 +346,8 @@ describe('endSuspension: the suspension warning', () => {
 
   it('revokes one warning at a time, each after the last has written', async () => {
     storedWarnings(
-      { id: 'warn-a', source: 'suspension', revoked: false },
-      { id: 'warn-b', source: 'suspension', revoked: false },
+      { id: 'warn-a', source: 'suspension', revoked: false, createdAt: RUN_START },
+      { id: 'warn-b', source: 'suspension', revoked: false, createdAt: RUN_START },
     );
     let releaseFirst;
     revokeWarning.mockImplementationOnce(
@@ -295,7 +359,7 @@ describe('endSuspension: the suspension warning', () => {
     );
     revokes({ alreadyRevoked: false, deduction: 0, previousGcs: 80, restoredGcs: 80 });
 
-    const ending = endSuspension('10000001', OPTIONS);
+    const ending = endSuspension('10000001', APPEAL);
     await new Promise((resolve) => setImmediate(resolve));
     expect(revokeWarning).toHaveBeenCalledTimes(1);
 
@@ -305,10 +369,10 @@ describe('endSuspension: the suspension warning', () => {
   });
 
   it('does not count a warning revoked by hand while the ending ran', async () => {
-    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false });
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
     revokes({ alreadyRevoked: true });
 
-    const result = await endSuspension('10000001', OPTIONS);
+    const result = await endSuspension('10000001', APPEAL);
 
     expect(result.revokedWarnings).toBe(0);
     expect(result.gcsRestored).toBe(0);
@@ -347,10 +411,10 @@ describe('endSuspension: bans and suggestions', () => {
 
 describe('endSuspension: a step that fails leaves the user suspended', () => {
   it('fails at the warnings step when a revoke fails, writing nothing more', async () => {
-    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false });
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
     revokeWarning.mockRejectedValueOnce(new Error('contention'));
 
-    const ending = endSuspension('10000001', OPTIONS);
+    const ending = endSuspension('10000001', APPEAL);
 
     await expect(ending).rejects.toBeInstanceOf(SuspensionEndError);
     await expect(ending).rejects.toMatchObject({ step: 'warnings', message: 'contention' });
@@ -415,7 +479,7 @@ describe('endSuspension: the record', () => {
   });
 
   it('writes the audit entry in the shape the audit log page reads', async () => {
-    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false });
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
     revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
     liftAutoAppliedBans.mockResolvedValueOnce(2);
     unflagUnsuspendedUserSuggestions.mockResolvedValueOnce({
@@ -423,7 +487,7 @@ describe('endSuspension: the record', () => {
       unflaggedCount: 4,
     });
 
-    await endSuspension('10000001', OPTIONS);
+    await endSuspension('10000001', APPEAL);
 
     expect(mockBatchSet).toHaveBeenCalledWith('adminAuditLog/audit-1', {
       adminUid: 'admin-uid',
@@ -432,7 +496,7 @@ describe('endSuspension: the record', () => {
       targetType: 'user',
       targetId: '10000001',
       details: {
-        trigger: 'UNSUSPEND',
+        trigger: 'APPEAL_APPROVED',
         restored: ['displayName', 'profilePhotoUrl', 'coverPhotoUrl', 'description', 'avatarUrl'],
         revokedWarnings: 1,
         gcsRestored: 80,
@@ -453,11 +517,11 @@ describe('endSuspension: the record', () => {
   });
 
   it('answers what it put back', async () => {
-    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false });
+    storedWarnings({ id: 'warn-1', source: 'suspension', revoked: false, createdAt: RUN_START });
     revokes({ alreadyRevoked: false, deduction: 80, previousGcs: 0, restoredGcs: 80 });
     liftAutoAppliedBans.mockResolvedValueOnce(2);
 
-    const result = await endSuspension('10000001', OPTIONS);
+    const result = await endSuspension('10000001', APPEAL);
 
     expect(result).toStrictEqual({
       alreadyEnded: false,
@@ -467,5 +531,20 @@ describe('endSuspension: the record', () => {
       bansLifted: 2,
       suggestions: NOTHING_FLAGGED,
     });
+  });
+});
+
+describe('suspensionEndFailure', () => {
+  it('answers a failed step with the step named and the user still suspended', () => {
+    const body = suspensionEndFailure(new SuspensionEndError('bans', 'delete failed'));
+
+    expect(body).toStrictEqual({
+      error: 'The suspension could not be fully ended. The user is still suspended.',
+      step: 'bans',
+    });
+  });
+
+  it('answers anything else as null, for the route’s own handling', () => {
+    expect(suspensionEndFailure(new Error('boom'))).toBeNull();
   });
 });

@@ -621,7 +621,7 @@ router.post('/reports/:id/resolve', async (req, res) => {
           suspensionCanAppeal: canAppeal,
           ...SUSPENSION_STARTED_RESET,
           suspendedBy: req.auth.uid,
-          ...suspensionStartedProfileFields(reportedUser ?? {}),
+          ...suspensionStartedProfileFields(reportedUser ?? {}, timestamp),
         });
         clearSuspensionCache(Number(reportedUniqueId)); // Phase 2H finding #1
 
@@ -869,7 +869,7 @@ router.post('/reports/resolve-all/:userId', async (req, res) => {
           suspensionCanAppeal: canAppeal,
           ...SUSPENSION_STARTED_RESET,
           suspendedBy: req.auth.uid,
-          ...suspensionStartedProfileFields(reportedUser ?? {}),
+          ...suspensionStartedProfileFields(reportedUser ?? {}, timestamp),
         });
         clearSuspensionCache(Number(reportedUniqueId));
 
@@ -1271,7 +1271,7 @@ router.post('/admin/users/:uniqueId/suspend', async (req, res) => {
         suspensionCanAppeal: body.canAppeal,
         ...SUSPENSION_STARTED_RESET,
         suspendedBy: req.auth.uid,
-        ...suspensionStartedProfileFields(user),
+        ...suspensionStartedProfileFields(user, timestamp),
       }),
       db.doc(`adminAuditLog/${generateId()}`).set(
         {

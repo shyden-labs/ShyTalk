@@ -1082,7 +1082,7 @@ router.post('/user/:uniqueId/suspend', async (req, res) => {
         suspensionCanAppeal: body.canAppeal,
         ...SUSPENSION_STARTED_RESET,
         suspendedBy: req.auth.uid,
-        ...suspensionStartedProfileFields(user),
+        ...suspensionStartedProfileFields(user, timestamp),
       }),
       db.doc(`adminAuditLog/${generateId()}`).set({
         adminId: req.auth.uid,

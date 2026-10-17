@@ -5,6 +5,10 @@ const {
   suspensionStartedProfileFields,
 } = require('../../src/utils/suspension');
 
+// Every start names when it began; these tests start at one fixed time.
+const START = 1709913600000;
+const started = (user) => suspensionStartedProfileFields(user, START);
+
 // SHY-0597: a suspension saves the user's profile before masking it, and
 // unsuspend puts the saved profile back. Suspending an already-suspended
 // user must keep the first save, or the mask is saved as the "real" name and
@@ -12,7 +16,7 @@ const {
 
 describe('suspensionStartedProfileFields', () => {
   it('saves the current profile of a user who is not suspended', () => {
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       isSuspended: false,
       displayName: 'Ana',
       profilePhotoUrl: 'https://img.example/p.png',
@@ -33,11 +37,38 @@ describe('suspensionStartedProfileFields', () => {
       avatarUrl: null,
       description: null,
       currentRoomId: null,
+      suspensionRunStartedAt: START,
     });
   });
 
+  it('starts the run at this suspension, over a stale start, for a user not suspended', () => {
+    const fields = started({ isSuspended: false, suspensionRunStartedAt: 1700000000000 });
+
+    expect(fields.suspensionRunStartedAt).toBe(START);
+  });
+
+  it('keeps the run’s first start when an already-suspended user is suspended again', () => {
+    const fields = started({
+      isSuspended: true,
+      suspensionRunStartedAt: 1709000000000,
+      suspensionStartDate: 1709500000000,
+    });
+
+    expect(fields.suspensionRunStartedAt).toBe(1709000000000);
+  });
+
+  it('starts the run at the current start for a user suspended before runs were recorded', () => {
+    const fields = started({ isSuspended: true, suspensionStartDate: 1709500000000 });
+
+    expect(fields.suspensionRunStartedAt).toBe(1709500000000);
+  });
+
+  it('refuses a start that names no time', () => {
+    expect(() => suspensionStartedProfileFields({ displayName: 'Ana' })).toThrow(TypeError);
+  });
+
   it('reads the snake_case profile fields when the camelCase ones are absent', () => {
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       display_name: 'Ana',
       profile_photo_url: 'https://img.example/p.png',
       cover_photo_url: 'https://img.example/c.png',
@@ -49,7 +80,7 @@ describe('suspensionStartedProfileFields', () => {
   });
 
   it('saves the current profile over a stale save left on a user who is not suspended', () => {
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       isSuspended: false,
       displayName: 'Ana',
       profilePhotoUrl: 'https://img.example/p.png',
@@ -65,7 +96,7 @@ describe('suspensionStartedProfileFields', () => {
   });
 
   it('saves null for profile fields the user never set', () => {
-    const fields = suspensionStartedProfileFields({ displayName: 'Ana' });
+    const fields = started({ displayName: 'Ana' });
 
     expect(fields.preSuspensionProfilePhotoUrl).toBeNull();
     expect(fields.preSuspensionCoverPhotoUrl).toBeNull();
@@ -74,19 +105,15 @@ describe('suspensionStartedProfileFields', () => {
   // SHY-0605: the bio and the sign-in photo were masked but never saved, so
   // ending a suspension could not put them back.
   it('saves null for a bio the user never wrote', () => {
-    expect(
-      suspensionStartedProfileFields({ displayName: 'Ana' }).preSuspensionDescription,
-    ).toBeNull();
+    expect(started({ displayName: 'Ana' }).preSuspensionDescription).toBeNull();
   });
 
   it('saves null for a sign-in photo the user never had', () => {
-    expect(
-      suspensionStartedProfileFields({ displayName: 'Ana' }).preSuspensionAvatarUrl,
-    ).toBeNull();
+    expect(started({ displayName: 'Ana' }).preSuspensionAvatarUrl).toBeNull();
   });
 
   it('saves the current bio over a stale save left on a user who is not suspended', () => {
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       isSuspended: false,
       description: 'New bio',
       preSuspensionDescription: 'Old bio',
@@ -96,7 +123,7 @@ describe('suspensionStartedProfileFields', () => {
   });
 
   it('saves the current sign-in photo over a stale save left on a user who is not suspended', () => {
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       isSuspended: false,
       avatarUrl: 'https://signin.example/new.png',
       preSuspensionAvatarUrl: 'https://signin.example/old.png',
@@ -106,7 +133,7 @@ describe('suspensionStartedProfileFields', () => {
   });
 
   it('keeps the first saved bio when an already-suspended user is suspended again', () => {
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       isSuspended: true,
       description: null,
       preSuspensionDescription: 'Hola, I teach Spanish',
@@ -116,7 +143,7 @@ describe('suspensionStartedProfileFields', () => {
   });
 
   it('keeps the first saved sign-in photo when an already-suspended user is suspended again', () => {
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       isSuspended: true,
       avatarUrl: null,
       preSuspensionAvatarUrl: 'https://signin.example/a.png',
@@ -126,7 +153,7 @@ describe('suspensionStartedProfileFields', () => {
   });
 
   it('keeps the first saved profile when an already-suspended user is suspended again', () => {
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       isSuspended: true,
       displayName: 'Suspended Account',
       profilePhotoUrl: null,
@@ -143,7 +170,7 @@ describe('suspensionStartedProfileFields', () => {
   });
 
   it('keeps the first saved profile when it is stored in snake_case', () => {
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       is_suspended: true,
       display_name: 'Suspended Account',
       pre_suspension_display_name: 'Ana',
@@ -159,7 +186,7 @@ describe('suspensionStartedProfileFields', () => {
   it('saves the current profile of a user suspended without a saved profile', () => {
     // identity-graph suspend-all sets isSuspended without masking or saving,
     // so the real profile is still on the user when a masking suspend follows.
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       isSuspended: true,
       displayName: 'Ana',
       profilePhotoUrl: 'https://img.example/p.png',
@@ -172,7 +199,7 @@ describe('suspensionStartedProfileFields', () => {
   });
 
   it('never saves the mask as the real name of a suspended user with no saved name', () => {
-    const fields = suspensionStartedProfileFields({
+    const fields = started({
       isSuspended: true,
       displayName: 'Suspended Account',
     });
@@ -186,10 +213,10 @@ describe('suspensionStartedProfileFields', () => {
 
   it('returns a new object on every call', () => {
     const user = { displayName: 'Ana' };
-    const first = suspensionStartedProfileFields(user);
+    const first = started(user);
     first.displayName = 'changed by a caller';
 
-    expect(suspensionStartedProfileFields(user).displayName).toBe('Suspended Account');
+    expect(started(user).displayName).toBe('Suspended Account');
   });
 });
 
@@ -269,6 +296,10 @@ describe('suspensionEndedFields', () => {
 
   it('clears the saved sign-in photo', () => {
     expect(suspensionEndedFields().preSuspensionAvatarUrl).toBeNull();
+  });
+
+  it('clears the run’s start', () => {
+    expect(suspensionEndedFields().suspensionRunStartedAt).toBeNull();
   });
 
   it('lets the restored profile win over the cleared fields', () => {
