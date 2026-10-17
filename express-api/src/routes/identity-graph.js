@@ -13,6 +13,7 @@ const { db } = require('../utils/firebase');
 const { generateId, now } = require('../utils/helpers');
 const log = require('../utils/log');
 const { clearSuspensionCache } = require('../middleware/auth');
+const { endSuspension, suspensionEndFailure } = require('../utils/end-suspension');
 
 const { requireAdmin } = require('../middleware/auth'); // shared — live claim check
 
@@ -214,21 +215,16 @@ router.post('/admin/identity-graph/:id/unsuspend-all', async (req, res) => {
       },
       { merge: true },
     );
-    // Propagate unsuspend to the user itself.
-    try {
-      await db.doc(`users/${id}`).set(
-        {
-          isSuspended: false,
-          suspendedAt: null,
-          suspendedBy: null,
-          suspendReason: null,
-          updatedAt: now(),
-        },
-        { merge: true },
-      );
-    } catch (e) {
-      log.warn('identity-graph', 'User unsuspend propagation failed', { error: e.message });
-    }
+    // End the user's own suspension through the one ending (SHY-0605), so
+    // everything it took comes back. A failure fails the request: it used to
+    // be logged and answered as a success, leaving the user suspended. The
+    // start's own fields (`suspendedAt`, `suspendReason`) are cleared here;
+    // a graph id with no user is not given a stub user.
+    await endSuspension(id, {
+      actor: req.auth.uid,
+      trigger: 'IDENTITY_UNSUSPEND_ALL',
+      extra: { suspendedAt: null, suspendReason: null, updatedAt: now() },
+    });
     const entryId = generateId();
     await db.doc(`adminAuditLog/${entryId}`).set({
       adminUid: req.auth.uniqueId,
@@ -242,8 +238,8 @@ router.post('/admin/identity-graph/:id/unsuspend-all', async (req, res) => {
     });
     res.json({ success: true, unsuspended: nodes.length });
   } catch (err) {
-    log.error('identity-graph', 'Unsuspend-all failed', { error: err.message });
-    res.status(500).json({ error: 'Internal server error' });
+    log.error('identity-graph', 'Unsuspend-all failed', { error: err.message, step: err.step });
+    res.status(500).json(suspensionEndFailure(err) ?? { error: 'Internal server error' });
   }
 });
 

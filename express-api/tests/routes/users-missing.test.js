@@ -76,6 +76,14 @@ jest.mock('../../src/middleware/auth', () => ({
 // incomplete". The appeal route became such a consumer in SHY-0463, when it
 // stopped trusting a flag on the user doc and started asking the appeals
 // collection whether one is already pending.
+// SHY-0605: an expired suspension ends through endSuspension, which has its
+// own tests (tests/utils/end-suspension.test.js); here only the route's part.
+const mockEndSuspension = jest.fn();
+jest.mock('../../src/utils/end-suspension', () => ({
+  ...jest.requireActual('../../src/utils/end-suspension'),
+  endSuspension: (...args) => mockEndSuspension(...args),
+}));
+
 jest.mock('../../src/utils/firestore-helpers', () => ({
   getDoc: jest.fn(),
   queryDocs: jest.fn().mockResolvedValue([]),
@@ -226,11 +234,22 @@ describe('POST /api/users/:uniqueId/appeal', () => {
 // ─── POST /api/users/:uniqueId/lift-suspension ───────────────────
 
 describe('POST /api/users/:uniqueId/lift-suspension', () => {
+  const { SuspensionEndError } = jest.requireActual('../../src/utils/end-suspension');
+  const EXPIRED = {
+    id: '10000001',
+    isSuspended: true,
+    suspensionEndDate: 1709913600000 - 86400000, // now - 1 day
+  };
+  beforeEach(() => {
+    mockEndSuspension.mockReset().mockResolvedValue({ alreadyEnded: false });
+  });
+
   it('returns 403 when caller does not own the account', async () => {
     const app = createApp('uid-A', 10000001);
     const res = await request(app).post('/api/users/10000099/lift-suspension').send({});
 
     expect(res.status).toBe(403);
+    expect(mockEndSuspension).not.toHaveBeenCalled();
   });
 
   it('returns 400 when user is not suspended', async () => {
@@ -244,6 +263,7 @@ describe('POST /api/users/:uniqueId/lift-suspension', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/not suspended/i);
+    expect(mockEndSuspension).not.toHaveBeenCalled();
   });
 
   it('returns 400 when user is suspended but suspension has not yet expired', async () => {
@@ -259,35 +279,62 @@ describe('POST /api/users/:uniqueId/lift-suspension', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/not expired/i);
+    expect(mockEndSuspension).not.toHaveBeenCalled();
   });
 
-  it('returns 200 and clears suspension fields when suspension has expired', async () => {
-    const pastTs = 1709913600000 - 86400000; // now - 1 day
-    getDoc.mockResolvedValueOnce({
-      id: '10000001',
-      isSuspended: true,
-      suspensionEndDate: pastTs,
-    });
-
-    const { clearSuspensionCache } = require('../../src/middleware/auth');
+  // SHY-0605: an expired suspension ends through the one ending, so the
+  // profile, bans and suggestions come back; the GCS does not (only an upheld
+  // appeal gives it back). What the ending writes is tested in
+  // tests/utils/end-suspension.test.js.
+  it('ends an expired suspension as the server, keeping the right to appeal', async () => {
+    getDoc.mockResolvedValueOnce(EXPIRED);
 
     const app = createApp('uid-A', 10000001);
     const res = await request(app).post('/api/users/10000001/lift-suspension').send({});
 
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
+    expect(res.body).toStrictEqual({ success: true });
+    expect(mockEndSuspension).toHaveBeenCalledTimes(1);
+    expect(mockEndSuspension).toHaveBeenCalledWith('10000001', {
+      actor: 'system:suspension-expired',
+      trigger: 'LIFT_EXPIRED',
+      extra: { suspensionCanAppeal: true },
+    });
+  });
 
-    expect(mockDocUpdate).toHaveBeenCalledWith(
-      'users/10000001',
-      expect.objectContaining({
-        isSuspended: false,
-        suspensionReason: null,
-        suspensionEndDate: null,
-      }),
-    );
+  it('writes no ending itself: the profile and cache are the ending’s', async () => {
+    getDoc.mockResolvedValueOnce(EXPIRED);
 
-    // Should clear the suspension cache
-    expect(clearSuspensionCache).toHaveBeenCalledWith(10000001);
+    const app = createApp('uid-A', 10000001);
+    await request(app).post('/api/users/10000001/lift-suspension').send({});
+
+    expect(mockDocUpdate).not.toHaveBeenCalled();
+    expect(require('../../src/middleware/auth').clearSuspensionCache).not.toHaveBeenCalled();
+  });
+
+  it('answers 500 naming the step when the ending stops', async () => {
+    getDoc.mockResolvedValueOnce(EXPIRED);
+    mockEndSuspension.mockRejectedValueOnce(new SuspensionEndError('user', 'write failed'));
+
+    const app = createApp('uid-A', 10000001);
+    const res = await request(app).post('/api/users/10000001/lift-suspension').send({});
+
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({
+      error: 'The suspension could not be fully ended. The user is still suspended.',
+      step: 'user',
+    });
+  });
+
+  it('answers 500 without a step for any other failure', async () => {
+    getDoc.mockResolvedValueOnce(EXPIRED);
+    mockEndSuspension.mockRejectedValueOnce(new Error('boom'));
+
+    const app = createApp('uid-A', 10000001);
+    const res = await request(app).post('/api/users/10000001/lift-suspension').send({});
+
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({ error: 'Internal server error' });
   });
 
   // SHY-0611: a suspension with no end date is permanent (the apps read it so:
@@ -304,6 +351,7 @@ describe('POST /api/users/:uniqueId/lift-suspension', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Suspension is permanent');
     expect(mockDocUpdate).not.toHaveBeenCalled();
+    expect(mockEndSuspension).not.toHaveBeenCalled();
     expect(clearSuspensionCache).not.toHaveBeenCalled();
     expect(log.warn).toHaveBeenCalledWith('users', 'Refused self-lift of a permanent suspension', {
       uniqueId: '10000001',
@@ -333,10 +381,7 @@ describe('POST /api/users/:uniqueId/lift-suspension', () => {
     const res = await request(app).post('/api/users/10000001/lift-suspension').send({});
 
     expect(res.status).toBe(200);
-    expect(mockDocUpdate).toHaveBeenCalledWith(
-      'users/10000001',
-      expect.objectContaining({ isSuspended: false }),
-    );
+    expect(mockEndSuspension).toHaveBeenCalledWith('10000001', expect.anything());
   });
 });
 

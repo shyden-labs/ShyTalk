@@ -32,14 +32,11 @@ const { computeDisplayScore } = require('../utils/gcs');
 const { sendSystemPm } = require('../utils/system-pm');
 const { getDoc } = require('../utils/firestore-helpers');
 const log = require('../utils/log');
-const {
-  suspensionEndedFields,
-  SUSPENSION_STARTED_RESET,
-  suspensionStartedProfileFields,
-} = require('../utils/suspension');
+const { SUSPENSION_STARTED_RESET, suspensionStartedProfileFields } = require('../utils/suspension');
 const { sendEmail } = require('../utils/email');
 const { revokeWarning, WarningRevokeError } = require('../utils/warnings');
-const { autoApplyBans, liftAutoAppliedBans } = require('../utils/auto-bans');
+const { autoApplyBans } = require('../utils/auto-bans');
+const { endSuspension, suspensionEndFailure } = require('../utils/end-suspension');
 const { buildDeletionScheduledEmail } = require('../utils/email-templates');
 const { sendPushToUser } = require('../utils/fcm');
 
@@ -1214,77 +1211,28 @@ router.post('/user/:uniqueId/unsuspend', async (req, res) => {
 
     const snap = await db.doc(`users/${req.params.uniqueId}`).get();
     if (!snap.exists) return res.status(404).json({ error: 'User not found' });
-    const user = { ...snap.data(), id: snap.id };
-
-    // Idempotency guard: skip the write + PM + audit log + ban-lift
-    // when the user is already unsuspended. Without this, defensive
-    // `beforeAll` hooks in tests (admin-keyboard.spec.ts,
-    // admin-users-moderation.spec.ts) that call unsuspend
-    // belt-and-braces fire a spurious "Your suspension has been
-    // lifted" PM, write a phantom UNSUSPEND audit log entry, and
-    // unnecessarily call liftAutoAppliedBans on every clean run.
-    // In production this also suppresses double-clicks from an admin
-    // unsuspending a user whose timed suspension already expired.
-    if (!user.isSuspended) {
-      return res.json({ success: true, alreadyUnsuspended: true });
-    }
-
-    const restore = {};
-    const preName = user.preSuspensionDisplayName ?? user.pre_suspension_display_name ?? null;
-    const prePhoto =
-      user.preSuspensionProfilePhotoUrl ?? user.pre_suspension_profile_photo_url ?? null;
-    const preCover = user.preSuspensionCoverPhotoUrl ?? user.pre_suspension_cover_photo_url ?? null;
-    if (preName) restore.displayName = preName;
-    if (prePhoto) restore.profilePhotoUrl = prePhoto;
-    if (preCover) restore.coverPhotoUrl = preCover;
 
     log.info('admin-users', 'Unsuspending user', {
       adminId: req.auth.uid,
       targetUniqueId: req.params.uniqueId,
     });
 
-    await Promise.all([
-      db.doc(`users/${req.params.uniqueId}`).update(suspensionEndedFields(restore)),
-      db.doc(`adminAuditLog/${generateId()}`).set({
-        adminId: req.auth.uid,
-        action: 'UNSUSPEND',
-        targetUserId: req.params.uniqueId,
-        details: null,
-        createdAt: now(),
-      }),
-    ]);
+    // The profile, bans, suggestions, audit entry and cache are the ending's
+    // (SHY-0605). An admin unsuspend never gives the GCS back: only an upheld
+    // appeal does.
+    const ended = await endSuspension(req.params.uniqueId, {
+      actor: req.auth.uid,
+      trigger: 'UNSUSPEND',
+    });
 
-    // Lift auto-applied bans (non-blocking)
-    liftAutoAppliedBans(req.params.uniqueId, req.auth.uid).catch((err) =>
-      log.error('admin-users', 'Failed to lift auto-applied bans', {
-        uniqueId: req.params.uniqueId,
-        error: err.message,
-      }),
-    );
-
-    // Reverse the suggestion ban-cascade: clear `flaggedForReview` on suggestions
-    // whose flag was set by the matching suspension. Only `submitter_suspended`
-    // flags are cleared — unrelated manual admin flags (different reason) are
-    // preserved. Awaited so the admin response reports partial failures.
-    let suggestionsCascade;
-    try {
-      suggestionsCascade = await unflagUnsuspendedUserSuggestions(req.params.uniqueId);
-    } catch (err) {
-      log.error('admin-users', 'Failed to unflag suspended user suggestions', {
-        uniqueId: req.params.uniqueId,
-        error: err.message,
-      });
-      suggestionsCascade = {
-        unflaggedCount: 0,
-        skippedCount: 0,
-        partial: true,
-        failedSuggestionIds: [],
-        error: err && err.message ? err.message : 'cascade_failed',
-      };
+    // Already unsuspended: no message and no second audit entry, so a
+    // double-click or a test's defensive unsuspend changes nothing.
+    if (ended.alreadyEnded) {
+      return res.json({ success: true, alreadyUnsuspended: true });
     }
 
-    // Send system PM about unsuspension — track failure so admin UI can
-    // surface that the user wasn't informed about being unsuspended.
+    // Sent only once the suspension has ended; a failure is reported so the
+    // admin UI can say the user was not told.
     let pmFailed = false;
     try {
       await sendSystemPm(req.params.uniqueId, 'Your account suspension has been lifted.');
@@ -1293,18 +1241,18 @@ router.post('/user/:uniqueId/unsuspend', async (req, res) => {
       pmFailed = true;
     }
 
-    clearSuspensionCache(Number(req.params.uniqueId));
     res.json({
       success: true,
-      suggestionsCascade,
+      suggestionsCascade: ended.suggestions,
       pms: { failed: pmFailed ? 1 : 0, total: 1 },
     });
   } catch (err) {
     log.error('admin-users', 'Unsuspend user failed', {
       uniqueId: req.params.uniqueId,
       error: err.message,
+      step: err.step,
     });
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(suspensionEndFailure(err) ?? { error: 'Internal server error' });
   }
 });
 
@@ -1366,10 +1314,7 @@ const { evictSuspendedUser, buildCascadeFailure } = require('../utils/evict-susp
 // suggestions get a `flaggedForReview` sticky note so an admin can decide case-by-case
 // whether they stay on the roadmap. Status is preserved, so unsuspend cleanly reverses
 // by clearing the flag fields. See utils/flag-suspended-user-suggestions.js for design.
-const {
-  flagSuspendedUserSuggestions,
-  unflagUnsuspendedUserSuggestions,
-} = require('../utils/flag-suspended-user-suggestions');
+const { flagSuspendedUserSuggestions } = require('../utils/flag-suspended-user-suggestions');
 
 // ═══════════════════════════════════════════════════════════════════
 // Admin Auth Management (PIN lockout, biometric keys, OTP metrics)

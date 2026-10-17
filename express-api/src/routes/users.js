@@ -25,14 +25,14 @@ const { generateId, now } = require('../utils/helpers');
 const { getDoc } = require('../utils/firestore-helpers');
 const { nextUniqueIdFrom } = require('../utils/unique-id-counter');
 const log = require('../utils/log');
-const { clearSuspensionCache, updateUniqueIdCache } = require('../middleware/auth');
+const { updateUniqueIdCache } = require('../middleware/auth');
 const { sendEmail } = require('../utils/email');
 const { buildDeletionScheduledEmail } = require('../utils/email-templates');
 const { sendPushToUser } = require('../utils/fcm');
 const { viewerIsBlocked } = require('../utils/block-check');
 const { checkUserBans } = require('../utils/bans');
 const { findPendingAppeal, createAppeal } = require('../utils/appeals');
-const { suspensionEndedFields } = require('../utils/suspension');
+const { endSuspension, suspensionEndFailure } = require('../utils/end-suspension');
 const {
   mintClaimsMerging,
   deriveCohortFromUser,
@@ -1291,20 +1291,24 @@ router.post('/users/:uniqueId/lift-suspension', async (req, res) => {
 
     log.info('users', 'Lifting expired suspension', { uniqueId });
 
-    // `suspensionCanAppeal: true` is this route's own addition — an expired
-    // suspension leaves the account able to appeal a future one — so it is
-    // spread over the shared clear rather than replacing it.
-    await db.doc(`users/${uniqueId}`).update(suspensionEndedFields({ suspensionCanAppeal: true }));
-
-    clearSuspensionCache(Number(uniqueId));
+    // The owner asks, but the server decided it may end, so the server is the
+    // actor (SHY-0605). An expiry never gives the GCS back. `suspensionCanAppeal:
+    // true` is this route's own addition: an expired suspension leaves the
+    // account able to appeal a future one.
+    await endSuspension(uniqueId, {
+      actor: 'system:suspension-expired',
+      trigger: 'LIFT_EXPIRED',
+      extra: { suspensionCanAppeal: true },
+    });
 
     res.json({ success: true });
   } catch (err) {
     log.error('users', 'Lift suspension failed', {
       uniqueId: req.params.uniqueId,
       error: err.message,
+      step: err.step,
     });
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(suspensionEndFailure(err) ?? { error: 'Internal server error' });
   }
 });
 

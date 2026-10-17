@@ -40,6 +40,14 @@ jest.mock('../../src/utils/firebase', () => ({
   },
 }));
 
+// SHY-0605: unsuspend ends through endSuspension, which has its own tests
+// (tests/utils/end-suspension.test.js); here only the message the route sends.
+const mockEndSuspension = jest.fn();
+jest.mock('../../src/utils/end-suspension', () => ({
+  ...jest.requireActual('../../src/utils/end-suspension'),
+  endSuspension: (...args) => mockEndSuspension(...args),
+}));
+
 jest.mock('../../src/utils/helpers', () => ({
   generateId: jest.fn(() => 'test-id'),
   now: jest.fn(() => 1700000000000),
@@ -266,6 +274,7 @@ describe('POST /api/user/:uid/unsuspend — system message', () => {
   beforeEach(() => {
     app = createAdminUsersApp();
     jest.clearAllMocks();
+    mockEndSuspension.mockReset().mockResolvedValue({ alreadyEnded: false, suggestions: {} });
     mockDocGet.mockResolvedValue({
       exists: true,
       id: 'user-1',
