@@ -251,3 +251,88 @@ describe('an appeal upheld after its suspension ran out', () => {
     expect((await endingsRecorded()).size).toBe(1);
   });
 });
+
+// An appeal belongs to the one suspension it answers and never reaches another
+// (Shyden, 2026-10-18). Suspension 1 runs out with its appeal waiting, and
+// Suspension 2 follows for something new.
+describe('an appeal of an earlier suspension, a later one in force', () => {
+  async function appeal(text) {
+    await request(app())
+      .post(`/api/users/${MEMBER}/appeal`)
+      .set(member.headers)
+      .send({ appealText: text })
+      .expect(200);
+  }
+
+  async function pendingAppealIds() {
+    const snap = await db
+      .collection('suspensionAppeals')
+      .where('userId', '==', MEMBER)
+      .orderBy('createdAt')
+      .get();
+    return snap.docs.filter((d) => d.data().status === 'pending').map((d) => d.id);
+  }
+
+  /** Suspension 1 appealed and run out, Suspension 2 in force and appealed. */
+  async function twoSuspensions() {
+    await appeal('Suspension 1 was a mistake.');
+    await db.doc(`users/${MEMBER}`).update({ suspensionEndDate: Date.now() - 60_000 });
+    clearAuthCaches();
+    await request(app())
+      .post(`/api/users/${MEMBER}/lift-suspension`)
+      .set(member.headers)
+      .expect(200);
+    await request(app())
+      .post(`/api/user/${MEMBER}/suspend`)
+      .set(admin.headers)
+      .send({ reason: 'spam confirmed (SHY-0605 test)', canAppeal: true })
+      .expect(200);
+    clearAuthCaches();
+    await appeal('Suspension 2 was a mistake too.');
+    return pendingAppealIds();
+  }
+
+  function review(appealId, status) {
+    return request(app()).patch(`/api/appeals/${appealId}`).set(admin.headers).send({ status });
+  }
+
+  test('the earlier appeal does not stop the later suspension being appealed', async () => {
+    expect(await twoSuspensions()).toHaveLength(2);
+  });
+
+  test('upholding the earlier appeal leaves the later suspension, its appeal and a 0 score', async () => {
+    const [earlier, later] = await twoSuspensions();
+
+    expect((await review(earlier, 'approved')).status).toBe(200);
+
+    const user = await readUser();
+    expect(user.isSuspended).toBe(true);
+    expect(user.suspensionAppealStatus).toBe('pending');
+    expect(user.gcsScore).toBe(0);
+    expect(await pendingAppealIds()).toEqual([later]);
+    expect((await suspensionWarnings()).map((w) => w.revoked).sort()).toEqual([false, true]);
+  });
+
+  test('denying the earlier appeal leaves the later suspension appealable', async () => {
+    const [earlier] = await twoSuspensions();
+
+    expect((await review(earlier, 'denied')).status).toBe(200);
+
+    const user = await readUser();
+    expect(user.isSuspended).toBe(true);
+    expect(user.suspensionCanAppeal).toBe(true);
+    expect(user.suspensionAppealStatus).toBe('pending');
+  });
+
+  test('upholding both appeals ends the later suspension and gives the whole score back', async () => {
+    const [earlier, later] = await twoSuspensions();
+
+    expect((await review(earlier, 'approved')).status).toBe(200);
+    expect((await review(later, 'approved')).status).toBe(200);
+
+    const user = await readUser();
+    expect(user.isSuspended).toBe(false);
+    expect(user.gcsScore).toBe(GCS_BEFORE);
+    expect((await suspensionWarnings()).map((w) => w.revoked)).toEqual([true, true]);
+  });
+});

@@ -31,7 +31,7 @@ const { buildDeletionScheduledEmail } = require('../utils/email-templates');
 const { sendPushToUser } = require('../utils/fcm');
 const { viewerIsBlocked } = require('../utils/block-check');
 const { checkUserBans } = require('../utils/bans');
-const { findPendingAppeal, createAppeal } = require('../utils/appeals');
+const { appealRefusal, findPendingAppeal, createAppeal } = require('../utils/appeals');
 const { endSuspension, suspensionEndFailure } = require('../utils/end-suspension');
 const {
   mintClaimsMerging,
@@ -1227,6 +1227,12 @@ router.post('/users/:uniqueId/appeal', async (req, res) => {
 
     const uniqueId = req.params.uniqueId;
 
+    // Only a suspension that can be appealed has an appeal to answer, and the
+    // web route admits the same people (SHY-0605; Shyden, 2026-10-18).
+    const user = await getDoc(`users/${uniqueId}`);
+    const refusal = appealRefusal(user);
+    if (refusal) return res.status(refusal.status).json({ error: refusal.error });
+
     // Idempotency check: if a pending appeal already exists, reject with 409.
     // Without this, a user could spam the endpoint, creating unbounded
     // suspensionAppeals docs (Spark quota burn) and admin noise.
@@ -1239,7 +1245,7 @@ router.post('/users/:uniqueId/appeal', async (req, res) => {
     // every later suspension, a new accusation entirely, was refused 409 for
     // ever. Shared with `POST /api/appeals` so the two routes cannot disagree
     // about what "already pending" means, which is how they came to.
-    const pending = await findPendingAppeal(uniqueId);
+    const pending = await findPendingAppeal(uniqueId, user);
     if (pending) {
       log.info('users', 'Suspension appeal refused: one is already pending', {
         uniqueId,
@@ -1250,7 +1256,7 @@ router.post('/users/:uniqueId/appeal', async (req, res) => {
 
     log.info('users', 'Suspension appeal submitted', { uniqueId });
 
-    await createAppeal({ uniqueId, appealText: body.appealText });
+    await createAppeal({ uniqueId, appealText: body.appealText, user });
 
     res.json({ success: true });
   } catch (err) {

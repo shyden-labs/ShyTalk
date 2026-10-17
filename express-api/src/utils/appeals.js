@@ -20,7 +20,7 @@
 
 const { db } = require('./firebase');
 const { generateId, now } = require('./helpers');
-const { getDoc, queryDocs } = require('./firestore-helpers');
+const { queryDocs } = require('./firestore-helpers');
 
 /** The collection both routes write. */
 const APPEALS_COLLECTION = 'suspensionAppeals';
@@ -45,24 +45,81 @@ function toOwnerId(uniqueId) {
   return id;
 }
 
+/** The start (ms) of the run of suspensions in force, or null: none, or unknown. */
+function runInForce(user) {
+  if (!user || (user.isSuspended ?? user.is_suspended) !== true) return null;
+  return user.suspensionRunStartedAt ?? user.suspensionStartDate ?? null;
+}
+
 /**
- * The pending appeal for this person, or null.
+ * The suspension an appeal answers, and whether it is the one in force.
+ *
+ * An appeal belongs to the one suspension it answers and never reaches another
+ * (Shyden, 2026-10-18): a timed suspension can run out while its appeal waits,
+ * and a new one can follow. Since SHY-0605 an appeal records its run
+ * (`suspensionRunStartedAt`). One made before that is placed by when it was
+ * made: during the run in force if made at or after that run began, else in a
+ * run no longer known. Where the run in force has no known start, an older
+ * appeal is taken to answer it, as before; a recorded run never is.
+ *
+ * @param {object|null} user the appellant's document
+ * @param {object} appeal the appeal document
+ * @returns {{ runStartedAt: number|null, inForce: boolean }}
+ */
+function appealedSuspension(user, appeal) {
+  const suspended = !!user && (user.isSuspended ?? user.is_suspended) === true;
+  const current = runInForce(user);
+  const recorded = appeal.suspensionRunStartedAt ?? null;
+  if (recorded !== null) {
+    return { runStartedAt: recorded, inForce: suspended && recorded === current };
+  }
+  if (!suspended) return { runStartedAt: null, inForce: false };
+  if (current === null) return { runStartedAt: null, inForce: true };
+  const madeDuring = (appeal.createdAt ?? 0) >= current;
+  return { runStartedAt: madeDuring ? current : null, inForce: madeDuring };
+}
+
+/**
+ * Why this user may not appeal, as the answer to send, or null.
+ *
+ * Both routes ask it, so they admit the same people: only a suspended user
+ * whose suspension can be appealed has a suspension for an appeal to answer.
+ *
+ * @param {object|null} user the appellant's document
+ * @returns {{ status: number, error: string } | null}
+ */
+function appealRefusal(user) {
+  if (!user || (user.isSuspended ?? user.is_suspended) !== true) {
+    return { status: 400, error: 'User is not suspended' };
+  }
+  if ((user.suspensionCanAppeal ?? user.suspension_can_appeal) !== true) {
+    return { status: 403, error: 'Appeals are not allowed for this suspension' };
+  }
+  return null;
+}
+
+/**
+ * The pending appeal of the suspension in force for this person, or null.
  *
  * Read from the appeals collection, never from a flag on the user document:
  * an appeal that has been resolved or deleted stops blocking the next one,
- * which is the behaviour "already pending" is supposed to describe.
+ * which is the behaviour "already pending" is supposed to describe. An earlier
+ * suspension's appeal, still pending, answers that suspension only, so it does
+ * not stand in the way of appealing this one (SHY-0605).
+ *
+ * @param {string|number} uniqueId
+ * @param {object|null} user the appellant's document
  */
-async function findPendingAppeal(uniqueId) {
+async function findPendingAppeal(uniqueId, user) {
   // `queryDocs` rather than a raw `.get()`: it is how the rest of these routes
   // read Firestore, and it is the seam the existing suites already stand on.
   const rows = await queryDocs(
     db
       .collection(APPEALS_COLLECTION)
       .where('userId', '==', toOwnerId(uniqueId))
-      .where('status', '==', 'pending')
-      .limit(1),
+      .where('status', '==', 'pending'),
   );
-  return rows.length > 0 ? rows[0] : null;
+  return rows.find((row) => appealedSuspension(user, row).inForce) ?? null;
 }
 
 /**
@@ -73,19 +130,15 @@ async function findPendingAppeal(uniqueId) {
  * mirror of the collection, not a second source of truth.
  *
  * The appeal also names the run of suspensions it answers
- * (`suspensionRunStartedAt`, SHY-0605). Upheld, it gives back that run's GCS
- * and no other's, even when the suspension has ended by then: a timed one can
- * run out while its appeal waits, and the ending clears the run start from the
- * user. A user who is not suspended has no run to answer, so it is null.
+ * (`suspensionRunStartedAt`, SHY-0605), so it reaches no other: the ending
+ * clears the run start from the user. Callers admit the user first
+ * (`appealRefusal`), so there is a run in force to name.
+ *
+ * @param {{ uniqueId: string|number, appealText: string, user: object }} appeal
  */
-async function createAppeal({ uniqueId, appealText }) {
+async function createAppeal({ uniqueId, appealText, user }) {
   const userId = toOwnerId(uniqueId);
   const appealId = generateId();
-  const user = (await getDoc(`users/${userId}`)) ?? {};
-  const suspended = (user.isSuspended ?? user.is_suspended) === true;
-  const suspensionRunStartedAt = suspended
-    ? (user.suspensionRunStartedAt ?? user.suspensionStartDate ?? null)
-    : null;
   await Promise.all([
     db.doc(`${APPEALS_COLLECTION}/${appealId}`).set(
       {
@@ -95,7 +148,7 @@ async function createAppeal({ uniqueId, appealText }) {
         reviewedBy: null,
         reviewedAt: null,
         createdAt: now(),
-        suspensionRunStartedAt,
+        suspensionRunStartedAt: runInForce(user),
       },
       { merge: true },
     ),
@@ -104,4 +157,11 @@ async function createAppeal({ uniqueId, appealText }) {
   return appealId;
 }
 
-module.exports = { APPEALS_COLLECTION, toOwnerId, findPendingAppeal, createAppeal };
+module.exports = {
+  APPEALS_COLLECTION,
+  toOwnerId,
+  appealedSuspension,
+  appealRefusal,
+  findPendingAppeal,
+  createAppeal,
+};

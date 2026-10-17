@@ -20,6 +20,7 @@ const { liftAutoAppliedBans } = require('./auto-bans');
 const { unflagUnsuspendedUserSuggestions } = require('./flag-suspended-user-suggestions');
 const { suspensionEndedFields, profileToRestore } = require('./suspension');
 const { clearSuspensionCache } = require('../middleware/auth');
+const { appealedSuspension } = require('./appeals');
 
 /** An ending that stopped before the user was written. `step` names where. */
 class SuspensionEndError extends Error {
@@ -86,33 +87,82 @@ async function revokeRunsWarnings(id, runStart, actor) {
 }
 
 /**
+ * Take the score back to 0 for the suspension in force.
+ *
+ * Every suspension holds the score at 0 while it is in force (Shyden,
+ * 2026-10-18). One that began with the score already at 0 took nothing, so
+ * when an earlier suspension's upheld appeal gives points back, this takes them
+ * again on a warning of the run in force: if that suspension's appeal is
+ * upheld too, they come back then. It reads the score afresh rather than
+ * counting what was just given back, so an approval retried after a failed
+ * hold still ends at 0.
+ *
+ * @returns {Promise<number>} the points held
+ */
+async function holdScoreForRunInForce(id, user, runStartedAt, actor) {
+  const userRef = db.doc(`users/${id}`);
+  const fresh = (await atStep('warnings', () => userRef.get())).data();
+  const gcs = fresh.gcsScore ?? fresh.gcs_score ?? 100;
+  if (gcs <= 0) return 0;
+
+  const reason = user.suspensionReason ?? user.suspension_reason ?? null;
+  const timestamp = now();
+  const batch = db.batch();
+  batch.set(db.doc(`users/${id}/warnings/${generateId()}`), {
+    reason: reason ? `Account suspended: ${reason}` : 'Account suspended',
+    severity: 5,
+    gcsDeduction: gcs,
+    gcsBefore: gcs,
+    gcsAfter: 0,
+    adminNote: 'Held by the suspension in force when an earlier suspension’s appeal was upheld',
+    issuedBy: actor,
+    issuedByName: null,
+    source: 'suspension',
+    suspensionRunStartedAt: runStartedAt,
+    linkedReportId: null,
+    revoked: false,
+    revokedAt: null,
+    revokedBy: null,
+    createdAt: timestamp,
+  });
+  batch.update(userRef, { gcsScore: 0, gcsLastDeductionAt: timestamp });
+  await atStep('warnings', () => batch.commit());
+  return gcs;
+}
+
+/**
  * End a user's suspension and put back everything it took.
  *
  * @param {string|number} uniqueId the suspended user
  * @param {{ actor: string, trigger: string, extra?: object,
- *   restoreGcs?: boolean, appealedRunStartedAt?: number|null }} options
+ *   restoreGcs?: boolean, appeal?: object }} options
  *   `actor` is recorded on the audit entry and every revoke (an admin uid, or
  *   `system:suspension-expired`); `trigger` names the end path (UNSUSPEND,
  *   APPEAL_APPROVED, ...); `extra` is written over the cleared fields.
  *   `restoreGcs` gives back the GCS the appealed suspension took: ONLY an
- *   upheld appeal passes it (Shyden, 2026-10-17). Any other ending leaves the
- *   GCS and the suspension warning as they are. `appealedRunStartedAt` is the
- *   run the appeal recorded; an appeal from before appeals recorded one
- *   answers the run in force. The GCS comes back even when that suspension
- *   has already ended (a timed one can run out while its appeal waits); then
- *   nothing else is written, since the ending already put the rest back.
+ *   upheld appeal passes it (Shyden, 2026-10-17), with the `appeal` itself.
+ *   Any other ending leaves the GCS and the suspension warning as they are.
+ *   An appeal belongs to the one suspension it answers and never reaches
+ *   another (Shyden, 2026-10-18; `appealedSuspension`): its GCS comes back
+ *   even when that suspension has already ended (a timed one can run out
+ *   while its appeal waits), and the suspension in force is ended only when
+ *   it is that one. A later suspension in force holds what comes back.
  * @returns {Promise<{ alreadyEnded: true, revokedWarnings?: number,
- *   gcsRestored?: number } | { alreadyEnded: false, restored: string[],
- *   revokedWarnings: number, gcsRestored: number, bansLifted: number,
- *   suggestions: object }>}
+ *   gcsRestored?: number, gcsHeld?: number } | { alreadyEnded: false,
+ *   restored: string[], revokedWarnings: number, gcsRestored: number,
+ *   bansLifted: number, suggestions: object }>} `alreadyEnded` is true when
+ *   the suspension this call answers is no longer in force.
  * @throws {SuspensionEndError} when a step fails; the user is left suspended
  */
 async function endSuspension(
   uniqueId,
-  { actor, trigger, extra = {}, restoreGcs = false, appealedRunStartedAt = null } = {},
+  { actor, trigger, extra = {}, restoreGcs = false, appeal } = {},
 ) {
   if (!actor) throw new TypeError('endSuspension: actor is required');
   if (!trigger) throw new TypeError('endSuspension: trigger is required');
+  if (restoreGcs && !appeal) {
+    throw new TypeError('endSuspension: an upheld appeal needs the appeal');
+  }
 
   const id = String(uniqueId);
   const userRef = db.doc(`users/${id}`);
@@ -122,13 +172,23 @@ async function endSuspension(
   const suspended = (user.isSuspended ?? user.is_suspended) === true;
   if (!suspended && !restoreGcs) return { alreadyEnded: true };
 
-  const runInForce = suspended
-    ? (user.suspensionRunStartedAt ?? user.suspensionStartDate ?? null)
-    : null;
+  const answered = restoreGcs
+    ? appealedSuspension(user, appeal)
+    : { runStartedAt: null, inForce: true };
   const { revokedWarnings, gcsRestored } = restoreGcs
-    ? await revokeRunsWarnings(id, appealedRunStartedAt ?? runInForce, actor)
+    ? await revokeRunsWarnings(id, answered.runStartedAt, actor)
     : { revokedWarnings: 0, gcsRestored: 0 };
-  if (!suspended) return { alreadyEnded: true, revokedWarnings, gcsRestored };
+  if (!answered.inForce) {
+    const gcsHeld = suspended
+      ? await holdScoreForRunInForce(
+          id,
+          user,
+          user.suspensionRunStartedAt ?? user.suspensionStartDate ?? null,
+          actor,
+        )
+      : 0;
+    return { alreadyEnded: true, revokedWarnings, gcsRestored, gcsHeld };
+  }
 
   const bansLifted = await atStep('bans', () => liftAutoAppliedBans(id, actor));
 

@@ -127,6 +127,14 @@ beforeEach(() => {
 // ─── POST /api/users/:uniqueId/appeal ────────────────────────────
 
 describe('POST /api/users/:uniqueId/appeal', () => {
+  const RUN = 1709000000000;
+  const SUSPENDED_USER = {
+    id: '10000001',
+    isSuspended: true,
+    suspensionCanAppeal: true,
+    suspensionRunStartedAt: RUN,
+  };
+
   // ── PR #502 (audit L1): requireOwner NaN guard ────────────────────
 
   it('returns 400 when :uniqueId is non-numeric (NaN guard)', async () => {
@@ -173,13 +181,7 @@ describe('POST /api/users/:uniqueId/appeal', () => {
   });
 
   it('returns 200 and creates appeal + updates user on success', async () => {
-    // PR #496 (audit H2): the route now reads the user doc to check
-    // for an existing pending appeal. Mock user.exists with no pending
-    // status so the new check passes through to the create path.
-    mockDocGet.mockResolvedValue({
-      exists: true,
-      data: () => ({ suspensionAppealStatus: null }),
-    });
+    getDoc.mockResolvedValueOnce(SUSPENDED_USER);
     const app = createApp('uid-A', 10000001);
     const res = await request(app)
       .post('/api/users/10000001/appeal')
@@ -214,11 +216,10 @@ describe('POST /api/users/:uniqueId/appeal', () => {
     // (SHY-0463). That flag is cleared by only one of the three writers that
     // end a suspension, so gating on it meant one appeal in a lifetime: every
     // later suspension, a new accusation entirely, was refused for ever.
-    queryDocs.mockResolvedValueOnce([{ id: 'existing-appeal', status: 'pending' }]);
-    mockDocGet.mockResolvedValue({
-      exists: true,
-      data: () => ({ suspensionAppealStatus: null }),
-    });
+    queryDocs.mockResolvedValueOnce([
+      { id: 'existing-appeal', status: 'pending', suspensionRunStartedAt: RUN },
+    ]);
+    getDoc.mockResolvedValueOnce(SUSPENDED_USER);
     const app = createApp('uid-A', 10000001);
     const res = await request(app)
       .post('/api/users/10000001/appeal')
@@ -228,6 +229,67 @@ describe('POST /api/users/:uniqueId/appeal', () => {
     expect(res.body.error).toMatch(/already pending/i);
     // No new appeal doc should have been created
     expect(mockDocSet).not.toHaveBeenCalled();
+  });
+
+  // ── SHY-0605: an appeal belongs to the one suspension it answers ──
+  // (Shyden, 2026-10-18). Both submission routes admit the same people,
+  // through appealRefusal in src/utils/appeals.js.
+
+  it('records the suspension the appeal answers', async () => {
+    getDoc.mockResolvedValueOnce(SUSPENDED_USER);
+    const app = createApp('uid-A', 10000001);
+    await request(app).post('/api/users/10000001/appeal').send({ appealText: 'A mistake.' });
+
+    expect(getDoc).toHaveBeenCalledWith('users/10000001');
+    expect(mockDocSet).toHaveBeenCalledWith(
+      'suspensionAppeals/gen-id',
+      expect.objectContaining({ suspensionRunStartedAt: RUN }),
+      { merge: true },
+    );
+  });
+
+  it('accepts an appeal while an earlier suspension’s appeal is still pending', async () => {
+    queryDocs.mockResolvedValueOnce([
+      { id: 'earlier-appeal', status: 'pending', suspensionRunStartedAt: RUN - 1 },
+    ]);
+    getDoc.mockResolvedValueOnce(SUSPENDED_USER);
+    const app = createApp('uid-A', 10000001);
+    const res = await request(app)
+      .post('/api/users/10000001/appeal')
+      .send({ appealText: 'A new accusation, a new appeal.' });
+
+    expect(res.status).toBe(200);
+    expect(mockDocSet).toHaveBeenCalledWith(
+      'suspensionAppeals/gen-id',
+      expect.objectContaining({ status: 'pending', suspensionRunStartedAt: RUN }),
+      { merge: true },
+    );
+  });
+
+  it('returns 400 for a user who is not suspended, creating nothing', async () => {
+    getDoc.mockResolvedValueOnce({ id: '10000001', isSuspended: false });
+    const app = createApp('uid-A', 10000001);
+    const res = await request(app)
+      .post('/api/users/10000001/appeal')
+      .send({ appealText: 'Nothing to appeal.' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual({ error: 'User is not suspended' });
+    expect(mockDocSet).not.toHaveBeenCalled();
+    expect(mockDocUpdate).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when the suspension cannot be appealed, creating nothing', async () => {
+    getDoc.mockResolvedValueOnce({ ...SUSPENDED_USER, suspensionCanAppeal: false });
+    const app = createApp('uid-A', 10000001);
+    const res = await request(app)
+      .post('/api/users/10000001/appeal')
+      .send({ appealText: 'Let me appeal anyway.' });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual({ error: 'Appeals are not allowed for this suspension' });
+    expect(mockDocSet).not.toHaveBeenCalled();
+    expect(mockDocUpdate).not.toHaveBeenCalled();
   });
 });
 

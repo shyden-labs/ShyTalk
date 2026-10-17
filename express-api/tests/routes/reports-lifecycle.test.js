@@ -536,6 +536,13 @@ describe('PATCH /api/appeals/:id (admin review appeal)', () => {
     ({ getDoc } = require('../../src/utils/firestore-helpers'));
     ({ requireAdmin } = require('../../src/middleware/auth'));
     requireAdmin.mockReturnValue(false);
+    // The user, read after the appeal: suspended, its run's start unknown, so
+    // an appeal that names no run answers the suspension in force (SHY-0605).
+    mockDocGet.mockResolvedValue({
+      exists: true,
+      id: 'suspended-user',
+      data: () => ({ isSuspended: true }),
+    });
   });
 
   it('returns 400 for invalid status value', async () => {
@@ -562,7 +569,7 @@ describe('PATCH /api/appeals/:id (admin review appeal)', () => {
       actor: 'admin-firebase-uid',
       trigger: 'APPEAL_APPROVED',
       restoreGcs: true,
-      appealedRunStartedAt: null,
+      appeal: { id: 'appeal-1', userId: 'suspended-user', status: 'pending' },
     });
     // suspensionAppealStatus should be written to user doc
     expect(mockDocUpdate).toHaveBeenCalledWith(
