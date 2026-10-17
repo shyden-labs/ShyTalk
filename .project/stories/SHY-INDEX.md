@@ -449,6 +449,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0621](SHY-0621-every-journey-spec-names-the-phone-not-the-platform.md) | P1 | L | infra | Every journey spec is written once for both phones, and the dead Android specs go | 📝 Draft | — |  |
 | [SHY-0622](SHY-0622-every-moderation-action-shows-in-the-admin-audit-log.md) | P0 | M | bug | Every moderation action shows in the admin audit log | 📝 Draft | — |  |
 | [SHY-0623](SHY-0623-express-api-declares-every-package-it-loads.md) | P0 | S | bug | express-api declares every package it loads | 📝 Draft | — |  |
+| [SHY-0624](SHY-0624-the-web-tests-are-format-checked.md) | P2 | S | chore | The web tests are format-checked | 📝 Draft | — |  |
 
 ## Done
 

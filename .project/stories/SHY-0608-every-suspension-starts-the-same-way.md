@@ -119,3 +119,4 @@ bans devices and network and flags suggestions.
 ## Notes
 
 - **2026-10-16**: Filed from SHY-0605's inventory; Shyden's ruling above. Scored 5: five start paths, five effects, most already written once in admin-users.
+- **2026-10-18**: Found on SHY-0605: the admin suspend route starts the bans without waiting (`autoApplyBans(...).catch(...)`, `express-api/src/routes/admin-users.js:1156`). An ending that follows at once lifts the auto-applied bans before they are written, so they stay after the suspension ends; a failed ban write also answers success. The error-path AC above covers it once `startSuspension` awaits the bans; add a suspend-then-immediately-end test (bans gone) when this is worked. Scope unchanged, estimate stays 5.
