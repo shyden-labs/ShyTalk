@@ -188,21 +188,21 @@ photos, bio, standing and access.
 - **2026-10-17**: Shyden reversed the GCS ruling: *"if the suspension is lifted due to anything other an an appeal. do not restore the score. only successful appeals should restore the score"*. A run start (`suspensionRunStartedAt`) bounds the appeal's revoke, so a re-suspension's first warning is included and an earlier suspension's never is.
 - **2026-10-17**: In Review. Proof per AC (unit tests mock every service; the
   integration and web tests run in CI and are confirmed on the PR's run):
-  - One ending + guard: `tests/utils/end-suspension.test.js`; guard
+  - One ending + guard: `tests/utils/end-suspension.unit.test.js`; guard
     `tests/scripts/suspension-ends-in-one-place.test.js` (149 src files; red on
     the pre-change tree at all five paths; 28 planted forms red, 12 green).
-  - Restores five fields: `end-suspension.test.js` "puts the ... back";
+  - Restores five fields: `end-suspension.unit.test.js` "puts the ... back";
     integration `tests/routes/suspension-ending-restores-everything.test.js`
     per end path.
-  - GCS only on an upheld appeal: `end-suspension.test.js` "reads and revokes no
+  - GCS only on an upheld appeal: `end-suspension.unit.test.js` "reads and revokes no
     warning when the ending is not an upheld appeal"; E3 route test "with the
     GCS given back"; guard "only the upheld appeal gives the GCS back";
     integration per path.
   - Run start, re-suspension, hand-revoked warning, no-field warning:
-    `end-suspension.test.js` (commit 4).
-  - Bans and suggestions on every path: `end-suspension.test.js` "lifts the
+    `end-suspension.unit.test.js` (commit 4).
+  - Bans and suggestions on every path: `end-suspension.unit.test.js` "lifts the
     auto-applied bans", "unflags the suggestions"; each route calls it (guard).
-  - Cache by numeric id: `end-suspension.test.js` "clears the suspension cache
+  - Cache by numeric id: `end-suspension.unit.test.js` "clears the suspension cache
     by the numeric id after the write".
   - Admin view: `admin-users-missing-moderation.test.js` (4); web test 17.
   - One test per end path per effect, red on today's code: each route file's
@@ -210,13 +210,13 @@ photos, bio, standing and access.
   - Failed step: each route's "answers 500 naming the step"; the panel shows it
     (`apiCall` throws `data.error`; users.js and appeals.js toast it).
   - Not suspended changes nothing: "answers alreadyUnsuspended" (E1, E2);
-    `end-suspension.test.js` "does nothing for a user who is not suspended".
+    `end-suspension.unit.test.js` "does nothing for a user who is not suspended".
   - warningCount on revoke: `utils/warnings` tests (commit 2).
   - Escaping: web test 17 plants markup in a bio and asserts it is shown as
     text with no elements. Bios elsewhere render through Compose `Text` (apps)
     and are not rendered on the public web.
   - Auth kept: each route's 403 test (E1, E2, E3, E5 admin; E4 owner).
-  - Audit entry: `end-suspension.test.js` "writes the audit entry in the shape
+  - Audit entry: `end-suspension.unit.test.js` "writes the audit entry in the shape
     the audit log page reads"; integration "records one ending".
   - Mutations: 34 predicted, none survived (routes M1-M16, admin view V1-V3,
     guard reader G1-G15).

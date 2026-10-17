@@ -68,7 +68,7 @@ jest.mock('../../src/middleware/auth', () => ({
 }));
 
 // SHY-0605: every end path ends through endSuspension, which has its own
-// tests (tests/utils/end-suspension.test.js); here only the route's part.
+// tests (tests/utils/end-suspension.unit.test.js); here only the route's part.
 const mockEndSuspension = jest.fn();
 jest.mock('../../src/utils/end-suspension', () => ({
   ...jest.requireActual('../../src/utils/end-suspension'),

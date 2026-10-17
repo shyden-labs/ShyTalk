@@ -83,7 +83,7 @@ jest.mock('../../src/routes/admin-users', () => ({
 
 // Mock firestore-helpers to use our mock db
 // SHY-0605: an upheld appeal ends through endSuspension, which has its own
-// tests (tests/utils/end-suspension.test.js); here only the route's part.
+// tests (tests/utils/end-suspension.unit.test.js); here only the route's part.
 const mockEndSuspension = jest.fn();
 jest.mock('../../src/utils/end-suspension', () => ({
   ...jest.requireActual('../../src/utils/end-suspension'),

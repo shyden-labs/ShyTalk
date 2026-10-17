@@ -77,7 +77,7 @@ jest.mock('../../src/middleware/auth', () => ({
 // stopped trusting a flag on the user doc and started asking the appeals
 // collection whether one is already pending.
 // SHY-0605: an expired suspension ends through endSuspension, which has its
-// own tests (tests/utils/end-suspension.test.js); here only the route's part.
+// own tests (tests/utils/end-suspension.unit.test.js); here only the route's part.
 const mockEndSuspension = jest.fn();
 jest.mock('../../src/utils/end-suspension', () => ({
   ...jest.requireActual('../../src/utils/end-suspension'),
@@ -285,7 +285,7 @@ describe('POST /api/users/:uniqueId/lift-suspension', () => {
   // SHY-0605: an expired suspension ends through the one ending, so the
   // profile, bans and suggestions come back; the GCS does not (only an upheld
   // appeal gives it back). What the ending writes is tested in
-  // tests/utils/end-suspension.test.js.
+  // tests/utils/end-suspension.unit.test.js.
   it('ends an expired suspension as the server, keeping the right to appeal', async () => {
     getDoc.mockResolvedValueOnce(EXPIRED);
 

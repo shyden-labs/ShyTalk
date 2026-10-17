@@ -74,7 +74,7 @@ jest.mock('../../src/routes/admin-users', () => ({
   createWarning: jest.fn().mockResolvedValue(),
 }));
 // SHY-0605: every end path ends through endSuspension, which has its own
-// tests (tests/utils/end-suspension.test.js); here only the route's part.
+// tests (tests/utils/end-suspension.unit.test.js); here only the route's part.
 const mockEndSuspension = jest.fn();
 jest.mock('../../src/utils/end-suspension', () => ({
   ...jest.requireActual('../../src/utils/end-suspension'),
@@ -277,7 +277,7 @@ describe('POST /api/admin/users/:uniqueId/suspend', () => {
 // =================================================================
 // POST /api/admin/users/:uniqueId/unsuspend --- ends through endSuspension
 // (SHY-0605). What the ending puts back (profile, snake_case saves, audit
-// entry, cache) is tested once, in tests/utils/end-suspension.test.js.
+// entry, cache) is tested once, in tests/utils/end-suspension.unit.test.js.
 // =================================================================
 describe('POST /api/admin/users/:uniqueId/unsuspend --- ends through endSuspension (SHY-0605)', () => {
   const { SuspensionEndError } = jest.requireActual('../../src/utils/end-suspension');

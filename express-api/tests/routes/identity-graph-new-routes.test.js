@@ -70,7 +70,7 @@ jest.mock('../../src/utils/firebase', () => ({
 }));
 
 // SHY-0605: unsuspend-all ends the user's suspension through endSuspension,
-// which has its own tests (tests/utils/end-suspension.test.js); here only the
+// which has its own tests (tests/utils/end-suspension.unit.test.js); here only the
 // route's part.
 const mockEndSuspension = jest.fn();
 jest.mock('../../src/utils/end-suspension', () => ({

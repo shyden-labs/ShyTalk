@@ -14,7 +14,7 @@
  * suspension that path's way, then read the user and the suspension warning
  * back from Firestore. The point is what lands in the emulator, which a mocked
  * db cannot show; the steps and their failures are unit-tested in
- * tests/utils/end-suspension.test.js and each route's own test file.
+ * tests/utils/end-suspension.unit.test.js and each route's own test file.
  *
  * NODE_ENV='local' is set BEFORE requiring src/utils/firebase so the Admin SDK
  * and Auth emulator target localhost. PER-FILE opt-in only.

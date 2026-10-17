@@ -68,7 +68,7 @@ jest.mock('../../src/routes/admin-users', () => ({
   createWarning: jest.fn().mockResolvedValue(),
 }));
 // SHY-0605: an upheld appeal ends through endSuspension, which has its own
-// tests (tests/utils/end-suspension.test.js); here only the route's part.
+// tests (tests/utils/end-suspension.unit.test.js); here only the route's part.
 const mockEndSuspension = jest.fn();
 jest.mock('../../src/utils/end-suspension', () => ({
   ...jest.requireActual('../../src/utils/end-suspension'),
@@ -393,7 +393,7 @@ describe('PATCH /api/appeals/:id - requireAdmin blocks + user_id fallback', () =
 // =================================================================
 // PATCH /api/appeals/:id --- an upheld appeal ends through endSuspension
 // (SHY-0605). What the ending puts back (profile, snake_case saves, GCS,
-// bans, cache) is tested once, in tests/utils/end-suspension.test.js.
+// bans, cache) is tested once, in tests/utils/end-suspension.unit.test.js.
 // =================================================================
 describe('PATCH /api/appeals/:id --- an upheld appeal ends through endSuspension (SHY-0605)', () => {
   const { SuspensionEndError } = jest.requireActual('../../src/utils/end-suspension');

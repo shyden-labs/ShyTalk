@@ -41,7 +41,7 @@ jest.mock('../../src/utils/firebase', () => ({
 }));
 
 // SHY-0605: unsuspend ends through endSuspension, which has its own tests
-// (tests/utils/end-suspension.test.js); here only the message the route sends.
+// (tests/utils/end-suspension.unit.test.js); here only the message the route sends.
 const mockEndSuspension = jest.fn();
 jest.mock('../../src/utils/end-suspension', () => ({
   ...jest.requireActual('../../src/utils/end-suspension'),
