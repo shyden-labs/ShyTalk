@@ -4,8 +4,8 @@ status: In Review
 owner: unassigned
 created: 2026-10-16
 priority: P0
-effort: M
-estimate: 8
+effort: L
+estimate: 13
 type: bug
 roadmap_ids: []
 mvp: true
@@ -81,6 +81,29 @@ admin-users suspend writes a `source: 'suspension'` warning.
       already-suspended user keeps the run's start
       (`suspensionRunStartedAt`), so an upheld appeal gives back the first
       warning's deduction too, and never an earlier suspension's.
+- [x] An appeal is tied to the exact suspension it answers and never reaches
+      another (Shyden 2026-10-18: "appeals must be tied to the exact
+      suspension that was given and cannot be allowed to leak into a
+      different suspension/appeal"). Each suspension warning and each appeal
+      records its run (`suspensionRunStartedAt`); an appeal made before that
+      is placed by when it was made.
+- [x] An appeal upheld after its suspension has ended (a timed one can run
+      out while the appeal waits) still gives back that suspension's GCS,
+      and ends nothing.
+- [x] An earlier suspension's appeal, decided while a later suspension is in
+      force, leaves the later suspension in force and its appeal fields
+      untouched (a denial never forbids appealing the later one), and gives
+      back only its own suspension's GCS (Shyden 2026-10-18).
+- [x] Every suspension holds the score at 0 while it is in force: points an
+      earlier appeal gives back during a later suspension are taken again on
+      the later run's own warning, and come back if that appeal is upheld
+      too (Shyden 2026-10-18).
+- [x] An earlier suspension's pending appeal does not stop the user
+      appealing the suspension in force; a second appeal of the same
+      suspension is still refused 409.
+- [x] Both appeal routes admit the same people through one check: a user who
+      is not suspended is refused 400 and a suspension that cannot be
+      appealed 403 (the app's route checked neither; Shyden 2026-10-18).
 - [x] Ending lifts the device and network bans the suspension applied and
       unflags the suggestions it flagged, on every end path.
 - [x] Every end path clears the suspension cache with the numeric user id
@@ -221,3 +244,33 @@ photos, bio, standing and access.
   - Mutations: 34 predicted, none survived (routes M1-M16, admin view V1-V3,
     guard reader G1-G15).
   - Found in passing, filed: SHY-0623 (#2394), seven undeclared packages.
+- **2026-10-18**: CI on `3de05eb44e9` red on two whole-repo file-count floors
+  this branch's new files moved (re-measured: 2004 -> 2013, 472 -> 475). A
+  side note then showed an appeal upheld after its suspension timed out gave
+  nothing back, and that a leftover appeal could block or lift a later,
+  separate suspension. Shyden ruled appeals are tied to their exact
+  suspension, an old appeal leaves a later suspension in force, appeals from
+  a user who is not suspended are refused, and every suspension holds the
+  score at 0 while in force (memory `project-suspension-restores-everything`).
+  Six criteria added; re-scored 8 -> 13 (two more routes, the appeal record,
+  the per-suspension pending check and the held score). Proof per criterion:
+  - Tied to its suspension: `tests/utils/appeals.unit.test.js`
+    "appealedSuspension" (12); warnings tagged: `admin-users-write.test.js`
+    "the warning names its suspension"; appeals record it: "createAppeal".
+  - Upheld after it ended: `end-suspension.unit.test.js` "gives back the GCS
+    of an appealed suspension that already ended, ending nothing";
+    integration "an appeal upheld after its suspension ran out".
+  - Earlier appeal, later suspension in force: `end-suspension.unit.test.js`
+    "gives back an earlier suspension's GCS and leaves the later one in
+    force"; `reports-coverage-appeals.test.js` "an appeal of an earlier
+    suspension, a later one in force" (5); integration, same name (4).
+  - Score held at 0: `end-suspension.unit.test.js` "a later suspension in
+    force holds what comes back" (7); integration "upholding both appeals".
+  - Pending check per suspension: `appeals.unit.test.js` "findPendingAppeal";
+    each route's "accepts an appeal while an earlier suspension's appeal is
+    still pending" and 409 test.
+  - One admission check: `appeals.unit.test.js` "appealRefusal" (6);
+    `users-missing.test.js` 400 and 403 (the app's own screen shows the form
+    only when `canAppeal`, `SuspensionScreen.kt:229`).
+  - Unit gate 105 files 2,778/2,778 (`daedc86591e` then re-ran its 3 files,
+    168/168). Mutations: 15 (N1-N15) then 35 (P1-P36), none survived.
