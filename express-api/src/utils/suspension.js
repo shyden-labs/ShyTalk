@@ -40,6 +40,8 @@ function suspensionEndedFields(restore = {}) {
     preSuspensionDisplayName: null,
     preSuspensionProfilePhotoUrl: null,
     preSuspensionCoverPhotoUrl: null,
+    preSuspensionDescription: null,
+    preSuspensionAvatarUrl: null,
     ...restore,
   };
 }
@@ -90,6 +92,8 @@ function suspensionStartedProfileFields(user) {
       user.preSuspensionCoverPhotoUrl ?? user.pre_suspension_cover_photo_url,
       user.coverPhotoUrl ?? user.cover_photo_url,
     ),
+    preSuspensionDescription: keep(user.preSuspensionDescription, user.description),
+    preSuspensionAvatarUrl: keep(user.preSuspensionAvatarUrl, user.avatarUrl),
     displayName: SUSPENDED_DISPLAY_NAME,
     profilePhotoUrl: null,
     coverPhotoUrl: null,
@@ -99,8 +103,32 @@ function suspensionStartedProfileFields(user) {
   };
 }
 
+/**
+ * The profile fields that end a suspension: put back what the start saved.
+ *
+ * Spread into `suspensionEndedFields(restore)`. A null or missing save restores
+ * nothing, so a field the user changed after the start is left as it is. The
+ * bio and sign-in photo saves are new with SHY-0605 and only ever written in
+ * camelCase, so they have no snake_case form to read.
+ *
+ * @param {object} user the user document as read before the write
+ */
+function profileToRestore(user) {
+  const saves = {
+    displayName: user.preSuspensionDisplayName ?? user.pre_suspension_display_name,
+    profilePhotoUrl: user.preSuspensionProfilePhotoUrl ?? user.pre_suspension_profile_photo_url,
+    coverPhotoUrl: user.preSuspensionCoverPhotoUrl ?? user.pre_suspension_cover_photo_url,
+    description: user.preSuspensionDescription,
+    avatarUrl: user.preSuspensionAvatarUrl,
+  };
+  return Object.fromEntries(
+    Object.entries(saves).filter(([, saved]) => saved !== null && saved !== undefined),
+  );
+}
+
 module.exports = {
   suspensionEndedFields,
+  profileToRestore,
   SUSPENSION_STARTED_RESET,
   SUSPENDED_DISPLAY_NAME,
   suspensionStartedProfileFields,

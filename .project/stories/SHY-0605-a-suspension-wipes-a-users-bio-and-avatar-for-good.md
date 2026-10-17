@@ -1,6 +1,6 @@
 ---
 id: SHY-0605
-status: Draft
+status: In Progress
 owner: unassigned
 created: 2026-10-16
 priority: P0
@@ -39,25 +39,31 @@ What a suspension does today, and what ending it undoes (measured
 
 | A suspension does | Where | Undone on ending? |
 | --- | --- | --- |
-| Saves then masks name, photo, cover | every start path | yes, except timed expiry: `users.js` `lift-suspension` restores nothing and nulls the saved values, so the user keeps "Suspended Account" for good |
-| Blanks bio and sign-in photo, unsaved | every start path | **no** |
+| Saves then masks name, photo, cover | the 4 masking start paths (admin-users suspend, reports.js x3) | yes, except timed expiry: `users.js` `lift-suspension` restores nothing and nulls the saved values, so the user keeps "Suspended Account" for good |
+| Blanks bio and sign-in photo, unsaved | the same 4 start paths | **no** |
 | Sets GCS to 0 with a `source: 'suspension'` warning | admin-users suspend | **no**, on no end path |
-| Warning via `createWarning` | reports.js resolve | **no** |
 | Bans devices and network (`autoApplyBans`) | admin-users suspend only | admin-users unsuspend only |
 | Flags the user's suggestions | admin-users suspend only | admin-users unsuspend only |
 | Evicts from rooms, clears `currentRoomId` | admin-users, reports.js | not needed: they rejoin |
 
-Suspensions end in six places: admin-users unsuspend, reports.js admin
-unsuspend, appeal approval (reports.js), timed expiry (users.js), and the
-identity graph's unsuspend-all and per-node unsuspend (SHY-0606). Each
-carries its own list.
+Suspensions end in five places that write the user: admin-users unsuspend,
+reports.js admin unsuspend, appeal approval (reports.js), timed expiry
+(users.js) and the identity graph's unsuspend-all. Each carries its own
+list. The identity graph's per-node unsuspend touches only the graph node,
+never the user (SHY-0606's).
+
+Corrected 2026-10-16 on develop `8f20691fc33` (plan review passes 1-2):
+the reports.js `createWarning` calls are the separate "warned" actions
+(`source: 'report'`), not part of a suspension, and stay; only the
+admin-users suspend writes a `source: 'suspension'` warning.
 
 ## Acceptance Criteria
 
 ### Happy path
 
-- [ ] One function ends a suspension (`endSuspension` beside the helpers in
-      `express-api/src/utils/suspension.js`) and every end path calls it;
+- [ ] One function ends a suspension (`endSuspension` in
+      `express-api/src/utils/end-suspension.js`, beside the helpers in
+      `suspension.js`) and every end path calls it;
       no end path writes `isSuspended: false` itself, with a guard that
       finds a direct write in any route.
 - [ ] Ending restores name, uploaded photo, cover, bio (`description`) and
@@ -65,11 +71,20 @@ carries its own list.
       the others (Shyden 2026-10-16: "Restore both").
 - [ ] Ending revokes every unrevoked warning the suspension created and gives
       its GCS deduction back, capped at 100, keeping the warning in history
-      marked revoked, the same as the admin "revoke warning" action. This
+      marked revoked. It gives the GCS back like the admin "revoke warning"
+      action but leaves `warningCount` alone, which a suspension warning
+      never raised. This
       holds on every ending: upheld appeal, admin lift, identity-graph lift
       and timed expiry (Shyden 2026-10-16: "Every ending").
 - [ ] Ending lifts the device and network bans the suspension applied and
       unflags the suggestions it flagged, on every end path.
+- [ ] Every end path clears the suspension cache with the numeric user id
+      (found in passing: the identity graph's unsuspend-all never clears
+      it, so an unsuspended user stays blocked up to 5 minutes; appeal
+      approval passes the raw appeal id).
+- [ ] The admin view of a suspended user shows the saved bio and sign-in
+      photo beside the saved name, photo and cover (found in passing:
+      `admin-users.js` shows only those three).
 - [ ] One test per end path per effect, each RED against today's code.
 
 ### Error paths
@@ -84,7 +99,12 @@ carries its own list.
       sign-in photo (SHY-0597's rule).
 - [ ] A warning revoked by hand during the suspension is not revoked twice
       and its GCS is not given back twice.
-- [ ] Ending a suspension of a user who is not suspended changes nothing.
+- [ ] Ending a suspension of a user who is not suspended changes nothing,
+      on every end path (found in passing: reports.js admin unsuspend has
+      no such check and rewrites and audits an unsuspended user).
+- [ ] Revoking a suspension warning by hand leaves `warningCount` alone
+      (found in passing: the revoke route decrements it for every warning,
+      though a suspension warning never incremented it).
 
 ### Performance
 
@@ -106,6 +126,12 @@ carries its own list.
 ### Observability
 
 - [ ] Each ending writes one audit entry naming what was put back.
+
+## Announce
+
+On the roadmap and in the release notes: when a suspension ends, by appeal,
+by an admin or by running out, the account comes back as it was: name,
+photos, bio, standing and access.
 
 ## BDD Scenarios
 
@@ -153,3 +179,4 @@ carries its own list.
 
 - **2026-10-16**: Filed from SHY-0597.
 - **2026-10-16**: Shyden's rulings (AskUserQuestion): restore bio and sign-in photo; everything a suspension removes comes back; every ending gives the GCS back; every suspension starts the same way (SHY-0608). Re-scored 3 -> 8 from the inventory above: six end paths, five effects.
+- **2026-10-16**: In Progress on `story/SHY-0605-ending-a-suspension-restores-everything`. Inventory corrected from the plan's review passes (five end paths write the user; four start paths mask; the `createWarning` row was the separate warned action). Found in passing and folded in: the cache clear on every end path, the admin view of the saved bio and photo, reports.js unsuspend's missing not-suspended check, and the revoke route's `warningCount` decrement. Estimate stays 8.
