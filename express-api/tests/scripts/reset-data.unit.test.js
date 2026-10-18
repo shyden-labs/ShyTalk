@@ -128,6 +128,21 @@ describe('run never reports success after a failed step', () => {
     expect(lines.some((line) => line.includes('reset complete'))).toBe(true);
   });
 
+  test('without R2 credentials the R2 phase is skipped and says so', async () => {
+    const lines = [];
+    await reset.run({
+      db: emptyDb(),
+      rtdb: rtdbStandIn(),
+      wipeR2: null,
+      deleteTreeFn: async () => ({}),
+      log: (line) => lines.push(line),
+    });
+    expect(lines.some((line) => line.includes('Skipping R2 wipe (R2 credentials not set)'))).toBe(
+      true,
+    );
+    expect(lines.some((line) => line.includes('reset complete'))).toBe(true);
+  });
+
   test('a failed R2 wipe rejects the run and never says complete', async () => {
     const lines = [];
     await expect(

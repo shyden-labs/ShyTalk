@@ -40,8 +40,12 @@ this; it does not fix it.
 
 - [x] First, every server path that deletes conversation messages is listed
       in Notes, with the subcollections each leaves behind.
-- [ ] Each of those paths deletes every subcollection under each message it
-      deletes (`edits` today; SHY-0614's `recall` once it lands).
+- [x] Each of those paths deletes every subcollection under each message it
+      deletes (`edits` today; SHY-0614's `recall` once it lands). Proof:
+      `conversation-tree-paths.test.js` (deleteTree, deleteConversation,
+      deleteTestData; the seeded tree holds `recall` since b57e578),
+      `accountDeletion.test.js:364`, `testDataCleanup.test.js`, and the reset
+      script's call pinned by `reset-data.unit.test.js` (SHY-0641).
 - [ ] A one-off clean-up removes the orphaned `edits` already in dev and
       production, counted before and after. **Dev done 2026-10-18**: runs
       39146266945 (dry) and 39146372134 (apply) on b61253c, both
