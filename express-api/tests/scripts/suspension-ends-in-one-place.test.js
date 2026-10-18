@@ -39,8 +39,9 @@ const ENDING = path.join('utils', 'end-suspension.js');
 const SUSPENDED_KEYS = new Set(['isSuspended', 'is_suspended']);
 
 // Measured 2026-10-17: JavaScript files under express-api/src. Equality, so a
-// file added or lost is seen and this figure re-measured.
-const FILES_READ_FLOOR = 149;
+// file added or lost is seen and this figure re-measured. 149 -> 150:
+// src/utils/delete-tree.js (SHY-0631).
+const FILES_READ_FLOOR = 150;
 
 // ─── A small walker: @babel/parser is declared, @babel/traverse is not ───
 
