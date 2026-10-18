@@ -4,8 +4,8 @@ status: Draft
 owner: claude
 created: 2026-10-18
 priority: P0
-effort: S
-estimate: 3
+effort: M
+estimate: 5
 type: bug
 roadmap_ids: []
 mvp: true
@@ -100,7 +100,7 @@ this; it does not fix it.
 
 ## Dependencies
 
-- None blocking.
+- None blocking. SHY-0635 (the other deletion steps) waits on this story.
 
 ## Risks & Mitigations
 
@@ -117,3 +117,29 @@ this; it does not fix it.
 - **2026-10-18**: Filed while designing SHY-0614. P0 as a data-protection
   defect (erased words kept). MVP: launch users delete accounts. Scored 3:
   one cron path, a clean-up script and their tests; larger than SHY-0630 (2).
+- **2026-10-18 (design, read at `6ff7a90e4ca`)**: every server path that
+  deletes conversation messages, and what each leaves behind (rules list five
+  conversation subcollections: `messages` with `edits` under it,
+  `userSettings`, `settings`, `mutes`, `mod_log`):
+  - `cron/accountDeletion.js` `deleteOneOnOneConversation`: lists
+    `messages`, `userSettings`, `mutes`; leaves `edits`, `settings`,
+    `mod_log`. Its caller catches every error, so a failure is never retried.
+  - `routes/admin-cleanup.js` `deleteConversation` (system, all-system,
+    all-private-messages, all-group-chats): the same three; leaves the same.
+  - `cron/testDataCleanup.js` (not scheduled anywhere today): five lists, but
+    one `limit(500)` read each, so a conversation over 500 messages keeps the
+    rest; leaves `edits`.
+  - `routes/test-helpers.js` `deleteTestData`: `messages` only, one batch
+    (fails over 500); leaves `edits`, `userSettings`, `settings`, `mutes`,
+    `mod_log`.
+  - `routes/admin-migrate.js` (dev only, prod-to-dev copy): `messages`,
+    `userSettings`, `mutes`; leaves `edits`, `settings`, `mod_log`.
+  - `scripts/reset-data.mjs` (full wipe): the same three; leaves the same.
+  - `scripts/device-journey-runner.js` (dev set-up, two steps): `messages`
+    only; moved to SHY-0636 with its retry loops.
+  - Not a delete path: `cron/orphanedStorage.js` and `data-export-builder.js`
+    only read messages.
+- **2026-10-18**: Re-scored 3 -> 5 on the list above (six call sites, the
+  clean-up script, a test per path); same size as SHY-0635 (5). The error
+  path AC covers the conversation step here; every other step of the
+  deletion is SHY-0635.
