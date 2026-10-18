@@ -38,4 +38,31 @@ function getExtension(contentType) {
   return map[contentType] ?? 'jpg';
 }
 
-module.exports = { generateId, now, todayStr, yesterdayStr, getExtension };
+// SHY-0625 PLANT, never merged: untested new code, so SonarCloud's quality
+// gate on this throwaway PR fails on coverage and the verdict step must go red.
+function plantedUncovered(values) {
+  const out = [];
+  for (const value of values) {
+    if (typeof value === 'number') {
+      out.push(value * 2);
+    } else if (typeof value === 'string') {
+      out.push(value.toUpperCase());
+    } else if (Array.isArray(value)) {
+      out.push(value.length);
+    } else if (value === null) {
+      out.push('null');
+    } else if (typeof value === 'boolean') {
+      out.push(!value);
+    } else if (typeof value === 'object') {
+      out.push(Object.keys(value).length);
+    } else {
+      out.push(undefined);
+    }
+  }
+  const total = out.filter((v) => typeof v === 'number').reduce((a, b) => a + b, 0);
+  const strings = out.filter((v) => typeof v === 'string').join(',');
+  const flags = out.filter((v) => typeof v === 'boolean').length;
+  return { out, total, strings, flags };
+}
+
+module.exports = { generateId, now, todayStr, yesterdayStr, getExtension, plantedUncovered };
