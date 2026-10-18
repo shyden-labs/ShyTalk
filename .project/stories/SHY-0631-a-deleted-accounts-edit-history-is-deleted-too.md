@@ -38,33 +38,43 @@ this; it does not fix it.
 
 ### Happy path
 
-- [ ] First, every server path that deletes conversation messages is listed
+- [x] First, every server path that deletes conversation messages is listed
       in Notes, with the subcollections each leaves behind.
 - [ ] Each of those paths deletes every subcollection under each message it
       deletes (`edits` today; SHY-0614's `recall` once it lands).
 - [ ] A one-off clean-up removes the orphaned `edits` already in dev and
-      production, counted before and after.
+      production, counted before and after. **Dev done 2026-10-18**: runs
+      39146266945 (dry) and 39146372134 (apply) on b61253c, both
+      `scanned 0, orphaned 0`, before and after, each run having found its
+      planted sentinel first (#2427). Production waits for a release with the
+      script and Shyden's approval in the `production` environment.
 
 ### Error paths
 
-- [ ] A failure partway leaves the deletion resumable on the next cron run,
-      and the run reports it rather than ending green.
+- [x] A failure partway leaves the deletion resumable on the next cron run,
+      and the run reports it rather than ending green. Proof:
+      `accountDeletion-failure.unit.test.js` (the run fails naming the count;
+      the account keeps its user document; the others still go),
+      `delete-tree.unit.test.js:72`, `accountDeletion.test.js:191`.
 
 ### Edge cases
 
 - [ ] A message with many edits is fully deleted (batch limits respected).
-- [ ] A group conversation the user only leaves keeps the other members'
-      history (today's behaviour).
+- [x] A group conversation the user only leaves keeps the other members'
+      history (today's behaviour). Proof: `accountDeletion.test.js:376`.
 
 ### Performance
 
-- [ ] The deletion cron's run time is measured before and after on dev.
+- [x] The deletion's run time is measured before and after on the CI
+      emulator (Shyden, 2026-10-18), 200 messages x 2 edits: 212 ms before
+      (the old code skipped the 400 edits), 412 ms after (#2426 Test Backend).
 
 ### Security
 
-- [ ] An integration test seeds a 1:1 conversation with edited messages,
+- [x] An integration test seeds a 1:1 conversation with edited messages,
       deletes the account, and finds no document left under it, seen RED
-      against today's code first.
+      against today's code first. Proof: `accountDeletion.test.js:364`, red
+      on plant PR #2425 (runs 39126480802, 39128651729).
 
 ### UX
 
@@ -76,8 +86,9 @@ this; it does not fix it.
 
 ### Observability
 
-- [ ] The cron logs how many messages and subcollection documents it
-      deleted per account (counts only).
+- [x] The cron logs how many messages and subcollection documents it
+      deleted per account (counts only). Proof: `accountDeletion-failure.unit.test.js`
+      "accountDeletion logs what it deleted" (3 tests, 4 mutants killed, #2427).
 
 ## BDD Scenarios
 
@@ -143,3 +154,12 @@ this; it does not fix it.
   clean-up script, a test per path); same size as SHY-0635 (5). The error
   path AC covers the conversation step here; every other step of the
   deletion is SHY-0635.
+
+- **2026-10-18 (after #2426, #2427)**: two ACs stay open beside the production
+  clean-up. (1) Paths: `scripts/reset-data.mjs:175` now calls `deleteTree`, but no
+  test pins that call (every other path is proven by
+  `conversation-tree-paths.test.js:49-106`, `accountDeletion.test.js:364` and
+  `testDataCleanup.test.js`; the seeded tree includes SHY-0614's `recall` since
+  b57e578). (2) Many edits: proven per conversation (600 documents, and 501
+  messages at `testDataCleanup.test.js:247`), not for one message holding over
+  500 edits. Both are small tests for the next SHY-0631 PR.
