@@ -456,10 +456,12 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0628](SHY-0628-a-room-messages-edit-keeps-its-history.md) | P0 | M | bug | A room message's edit keeps its history, written by the server | 📝 Draft | — |  |
 | [SHY-0629](SHY-0629-a-groups-moderation-actions-are-logged-by-the-server.md) | P1 | L | feature | A group's moderation actions are logged by the server | 📝 Draft | — |  |
 | [SHY-0630](SHY-0630-the-story-index-reconciler-inserts-rows-on-a-mac-inside-the-table.md) | P0 | S | bug | The story index reconciler inserts its rows on a Mac, inside the Active table | 📝 Draft | — |  |
-| [SHY-0631](SHY-0631-a-deleted-accounts-edit-history-is-deleted-too.md) | P0 | S | bug | A deleted account's edit history is deleted too | 📝 Draft | — |  |
+| [SHY-0631](SHY-0631-a-deleted-accounts-edit-history-is-deleted-too.md) | P0 | M | bug | A deleted account's edit history is deleted too | 📝 Draft | — |  |
 | [SHY-0632](SHY-0632-every-translation-is-read-back-by-google-cloud-translation.md) | P0 | M | infra | Every translation is read back by Google Cloud Translation on the shared key, within its daily ledger | 📝 Draft | — |  |
 | [SHY-0633](SHY-0633-error-messages-show-in-the-readers-language.md) | P0 | L | bug | Error messages in the app show in the reader's language | 📝 Draft | — |  |
 | [SHY-0634](SHY-0634-the-story-sync-reports-only-board-writes-that-did-not-land.md) | P0 | S | bug | The story sync reports only the board writes that did not land | 📝 Draft | — |  |
+| [SHY-0635](SHY-0635-a-failed-account-deletion-step-stops-the-deletion.md) | P0 | M | bug | A failed account deletion step stops the deletion and is tried again | 📝 Draft | — |  |
+| [SHY-0636](SHY-0636-the-journey-runner-retries-nothing.md) | P0 | S | bug | The journey runner retries nothing; a failed step names its cause | 📝 Draft | — |  |
 
 ## Done
 
