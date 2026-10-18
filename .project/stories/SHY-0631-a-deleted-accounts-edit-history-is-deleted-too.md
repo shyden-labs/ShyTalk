@@ -63,7 +63,11 @@ this; it does not fix it.
 
 ### Edge cases
 
-- [ ] A message with many edits is fully deleted (batch limits respected).
+- [x] A message with many edits is fully deleted (batch limits respected).
+      Proof: `conversation-tree-paths.test.js` "deletes one message holding
+      501 edits, more than one batch of 500" (#2435, merged a72ac2ac4a6),
+      red on plant PR #2434 (run 39158136935: a deleteTree capped at one
+      page of 500 left edit `e99`, line 93).
 - [x] A group conversation the user only leaves keeps the other members'
       history (today's behaviour). Proof: `accountDeletion.test.js:376`.
 
@@ -82,11 +86,11 @@ this; it does not fix it.
 
 ### UX
 
-- [ ] Not applicable: no screen changes.
+- [x] Not applicable: no screen changes.
 
 ### i18n
 
-- [ ] Not applicable: no user-facing text.
+- [x] Not applicable: no user-facing text.
 
 ### Observability
 
