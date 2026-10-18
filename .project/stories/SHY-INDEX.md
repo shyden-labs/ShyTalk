@@ -459,6 +459,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0631](SHY-0631-a-deleted-accounts-edit-history-is-deleted-too.md) | P0 | S | bug | A deleted account's edit history is deleted too | 📝 Draft | — |  |
 | [SHY-0632](SHY-0632-every-translation-is-read-back-by-google-cloud-translation.md) | P0 | M | infra | Every translation is read back by Google Cloud Translation on the shared key, within its daily ledger | 📝 Draft | — |  |
 | [SHY-0633](SHY-0633-error-messages-show-in-the-readers-language.md) | P0 | L | bug | Error messages in the app show in the reader's language | 📝 Draft | — |  |
+| [SHY-0634](SHY-0634-the-story-sync-reports-only-board-writes-that-did-not-land.md) | P0 | S | bug | The story sync reports only the board writes that did not land | 📝 Draft | — |  |
 
 ## Done
 
