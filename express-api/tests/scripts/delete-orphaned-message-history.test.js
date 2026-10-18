@@ -98,6 +98,14 @@ describe('delete-orphaned-message-history (real Firestore emulator)', () => {
     expect(await seededExistence()).toEqual(ALL_SEVEN);
   });
 
+  test('a dry run finds its planted sentinel and leaves nothing of it behind', async () => {
+    const { code } = await run([]);
+
+    expect(code).toBe(0);
+    expect(await docsUnder(db, 'conversations/__orphan_sentinel__')).toEqual([]);
+    expect(await exists('conversations/__orphan_sentinel__/messages/m/edits/e')).toBe(false);
+  });
+
   test('--apply removes the orphans and their stray parents, then counts zero', async () => {
     await run([]); // the project id is known once a query has run
     const { code, lines } = await run(['--apply', '--project', db.projectId]);

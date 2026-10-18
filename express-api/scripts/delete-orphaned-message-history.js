@@ -13,11 +13,21 @@
  * `--project` must equal the credential's project, so a command copied from
  * one environment cannot delete in another. Reads document names only
  * (`select()`), never text, and prints numbers only.
+ *
+ * Every run first plants one orphan of its own (SENTINEL_PATH, an edit under a
+ * conversation that does not exist) and fails unless the scan finds it, so a
+ * count of zero is never a blind scan. The sentinel is left out of the printed
+ * counts and removed before the run ends, even when it fails (Shyden,
+ * 2026-10-18: dev and production alike).
  */
 const { deleteTree } = require('../src/utils/delete-tree');
 
 /** Collection-group names that hold a message's history. */
 const HISTORY_GROUPS = ['edits', 'recall'];
+
+/** A conversation id no real conversation can have, and the orphan planted under it. */
+const SENTINEL_CONVERSATION = 'conversations/__orphan_sentinel__';
+const SENTINEL_PATH = `${SENTINEL_CONVERSATION}/messages/m/edits/e`;
 
 /** Documents read per `getAll` call. */
 const READ_GROUP_SIZE = 100;
@@ -92,6 +102,16 @@ async function findOrphans(firestore) {
   return report;
 }
 
+/** The report with the planted sentinel taken out: one scanned, orphaned entry and its conversation. */
+function withoutSentinel(report) {
+  return {
+    ...report,
+    scanned: report.scanned - 1,
+    orphaned: report.orphaned - 1,
+    conversations: report.conversations.filter((path) => path !== SENTINEL_CONVERSATION),
+  };
+}
+
 /** The report as numbers only, for printing. */
 function summarise(report) {
   return {
@@ -116,24 +136,34 @@ async function deleteOrphans(firestore, report) {
  * @returns {Promise<0 | 1>} 1 when orphans remain after `--apply`
  */
 async function main(argv, { firestore, log }) {
-  const before = await findOrphans(firestore);
-  const project = firestore.projectId;
-  const apply = argv.includes('--apply');
-  if (apply) {
-    const flag = argv.indexOf('--project');
-    if (flag === -1 || argv[flag + 1] !== project) {
+  await firestore.doc(SENTINEL_PATH).set({ sentinel: true });
+  try {
+    const before = await findOrphans(firestore);
+    if (!before.conversations.includes(SENTINEL_CONVERSATION)) {
       throw new Error(
-        `--apply needs --project ${project} (the credential's project); nothing was deleted`,
+        `the scan did not find the planted sentinel ${SENTINEL_PATH}, so its counts cannot be trusted; nothing was deleted`,
       );
     }
-  }
-  log(JSON.stringify({ project, phase: 'before', ...summarise(before) }));
-  if (!apply) return 0;
+    const project = firestore.projectId;
+    const apply = argv.includes('--apply');
+    if (apply) {
+      const flag = argv.indexOf('--project');
+      if (flag === -1 || argv[flag + 1] !== project) {
+        throw new Error(
+          `--apply needs --project ${project} (the credential's project); nothing was deleted`,
+        );
+      }
+    }
+    log(JSON.stringify({ project, phase: 'before', ...summarise(withoutSentinel(before)) }));
+    if (!apply) return 0;
 
-  await deleteOrphans(firestore, before);
-  const after = await findOrphans(firestore);
-  log(JSON.stringify({ project, phase: 'after', ...summarise(after) }));
-  return after.orphaned === 0 ? 0 : 1;
+    await deleteOrphans(firestore, before);
+    const after = await findOrphans(firestore);
+    log(JSON.stringify({ project, phase: 'after', ...summarise(after) }));
+    return after.orphaned === 0 ? 0 : 1;
+  } finally {
+    await deleteTree(firestore, firestore.doc(SENTINEL_CONVERSATION));
+  }
 }
 
 if (require.main === module) {
@@ -146,4 +176,12 @@ if (require.main === module) {
     });
 }
 
-module.exports = { parentsOf, findOrphans, summarise, deleteOrphans, main };
+module.exports = {
+  SENTINEL_CONVERSATION,
+  SENTINEL_PATH,
+  parentsOf,
+  findOrphans,
+  summarise,
+  deleteOrphans,
+  main,
+};
