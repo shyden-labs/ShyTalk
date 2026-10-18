@@ -1,6 +1,6 @@
 ---
 id: SHY-0641
-status: In Progress
+status: In Review
 owner: claude
 created: 2026-10-19
 priority: P0
