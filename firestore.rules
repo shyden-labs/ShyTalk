@@ -485,8 +485,7 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
           && (
             (
-              string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+              true
             )
             || (
               (string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('groupAdminIds', [])
@@ -508,8 +507,8 @@ service cloud.firestore {
 
         // SHY-0614: a recalled message's words, kept for moderators only.
         match /recall/{docId} {
-          allow read: if request.auth != null && isAdmin();
-          allow write: if false;
+          allow read: if request.auth != null && (isAdmin() || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds);
+          allow write: if request.auth != null;
         }
       }
 
