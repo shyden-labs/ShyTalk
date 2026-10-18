@@ -70,6 +70,7 @@ const SUB_GROUPS = [
   'giftWall',
   'messages',
   'edits',
+  'recall',
   'userSettings',
   'mutes',
   'settings',

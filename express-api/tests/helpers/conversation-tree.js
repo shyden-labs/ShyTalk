@@ -1,14 +1,15 @@
 /**
- * SHY-0631 — a conversation seeded with every subcollection the rules allow,
+ * SHY-0631 — a conversation seeded with every subcollection it can hold (the
+ * rules-allowed ones and the server-only `recall`, SHY-0614),
  * and a walker that lists whatever is left under a document.
  *
- * A seeded tree writes into the `messages`, `edits`, `userSettings`,
+ * A seeded tree writes into the `messages`, `edits`, `recall`, `userSettings`,
  * `settings`, `mutes` and `mod_log` groups; each suite lists those in its own
  * literal wipe array (the test-isolation guard reads wipes statically).
  */
 
 /** Documents `seedConversationTree` writes under the conversation. */
-const SEEDED_UNDER_COUNT = 8;
+const SEEDED_UNDER_COUNT = 9;
 
 async function seedConversationTree(db, convId, conversationData) {
   const base = `conversations/${convId}`;
@@ -16,6 +17,7 @@ async function seedConversationTree(db, convId, conversationData) {
   await db.doc(`${base}/messages/m1`).set({ text: 'hi', senderId: '1' });
   await db.doc(`${base}/messages/m1/edits/e1`).set({ previousText: 'hello' });
   await db.doc(`${base}/messages/m1/edits/e2`).set({ previousText: 'hey' });
+  await db.doc(`${base}/messages/m1/recall/record`).set({ recalledBy: '1' });
   await db.doc(`${base}/messages/m2`).set({ text: 'second', senderId: '2' });
   await db.doc(`${base}/userSettings/u1`).set({ userId: '1' });
   await db.doc(`${base}/settings/s1`).set({ muted: false });

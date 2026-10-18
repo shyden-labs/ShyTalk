@@ -91,6 +91,7 @@ const TOP_LEVEL = [
 const GROUPS = [
   'messages',
   'edits',
+  'recall',
   'userSettings',
   'settings',
   'mutes',

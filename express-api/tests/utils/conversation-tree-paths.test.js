@@ -27,7 +27,7 @@ const {
 const exists = async (path) => (await db.doc(path).get()).exists;
 
 // Every group a seeded conversation tree writes into.
-const TREE_GROUPS = ['messages', 'edits', 'userSettings', 'settings', 'mutes', 'mod_log'];
+const TREE_GROUPS = ['messages', 'edits', 'recall', 'userSettings', 'settings', 'mutes', 'mod_log'];
 
 async function clearAll() {
   await clearCollection(db, 'conversations');
@@ -58,6 +58,7 @@ describe('deleteTree against the emulator', () => {
       conversations: 1,
       messages: 2,
       edits: 2,
+      recall: 1,
       userSettings: 1,
       settings: 1,
       mutes: 1,
