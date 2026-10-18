@@ -7,6 +7,7 @@
  * (tests/cron/accountDeletion.test.js) proves the deletes themselves.
  */
 const mockDeleteTree = jest.fn();
+const mockLogInfo = jest.fn();
 const mockWrites = [];
 
 /** Every user document is due; nothing else exists. */
@@ -27,19 +28,20 @@ function mockDocRef(path) {
 
 let mockDueUsers = [];
 
+const mockOneOnOne = (id) => ({
+  id,
+  ref: mockDocRef(`conversations/${id}`),
+  data: () => ({ participantIds: [1, 2] }),
+});
+let mockConversations = [];
+
 /** A query whose result depends only on the collection it started from. */
 function mockQuery(name) {
   const docs =
     name === 'users'
       ? mockDueUsers.map((id) => ({ id, data: () => ({}) }))
       : name === 'conversations'
-        ? [
-            {
-              id: 'c1',
-              ref: mockDocRef('conversations/c1'),
-              data: () => ({ participantIds: [1, 2] }),
-            },
-          ]
+        ? mockConversations
         : [];
   const query = {
     where: () => query,
@@ -72,13 +74,19 @@ jest.mock('../../src/utils/r2', () => ({
   listObjects: async () => [],
   deleteObjects: async () => {},
 }));
-jest.mock('../../src/utils/log', () => ({ info: () => {}, warn: () => {}, error: () => {} }));
+jest.mock('../../src/utils/log', () => ({
+  info: (...args) => mockLogInfo(...args),
+  warn: () => {},
+  error: () => {},
+}));
 
 const accountDeletion = require('../../src/cron/accountDeletion');
 
 beforeEach(() => {
   mockWrites.length = 0;
   mockDeleteTree.mockReset();
+  mockLogInfo.mockReset();
+  mockConversations = [mockOneOnOne('c1')];
 });
 
 describe('accountDeletion when a conversation delete fails', () => {
@@ -115,5 +123,61 @@ describe('accountDeletion when a conversation delete fails', () => {
 
     await expect(accountDeletion()).resolves.toBeUndefined();
     expect(mockWrites).toContain('delete users/1001');
+  });
+});
+
+describe('accountDeletion logs what it deleted', () => {
+  const deletedLogs = () =>
+    mockLogInfo.mock.calls.filter(([, message]) => message === 'Conversation documents deleted');
+
+  test('one entry per account, with the documents deleted counted by collection', async () => {
+    mockDueUsers = ['1001', '1002'];
+    mockDeleteTree
+      .mockResolvedValueOnce({ conversations: 1, messages: 2, edits: 3 })
+      .mockResolvedValueOnce({ conversations: 1, messages: 5, recall: 1 });
+
+    await accountDeletion();
+
+    expect(deletedLogs()).toEqual([
+      [
+        'cron',
+        'Conversation documents deleted',
+        { uniqueId: '1001', deleted: { conversations: 1, messages: 2, edits: 3 } },
+      ],
+      [
+        'cron',
+        'Conversation documents deleted',
+        { uniqueId: '1002', deleted: { conversations: 1, messages: 5, recall: 1 } },
+      ],
+    ]);
+  });
+
+  test("an account's conversations are summed into one entry", async () => {
+    mockDueUsers = ['1001'];
+    mockConversations = [mockOneOnOne('c1'), mockOneOnOne('c2')];
+    mockDeleteTree
+      .mockResolvedValueOnce({ conversations: 1, messages: 2, edits: 1 })
+      .mockResolvedValueOnce({ conversations: 1, messages: 4 });
+
+    await accountDeletion();
+
+    expect(deletedLogs()).toEqual([
+      [
+        'cron',
+        'Conversation documents deleted',
+        { uniqueId: '1001', deleted: { conversations: 2, messages: 6, edits: 1 } },
+      ],
+    ]);
+  });
+
+  test('the entry holds counts only, never ids or text from the deleted documents', async () => {
+    mockDueUsers = ['1001'];
+    mockDeleteTree.mockResolvedValueOnce({ conversations: 1, messages: 2 });
+
+    await accountDeletion();
+
+    const [[, , fields]] = deletedLogs();
+    expect(Object.keys(fields).sort()).toEqual(['deleted', 'uniqueId']);
+    for (const n of Object.values(fields.deleted)) expect(Number.isInteger(n)).toBe(true);
   });
 });
