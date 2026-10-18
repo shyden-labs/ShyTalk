@@ -17,6 +17,8 @@ import com.shyden.shytalk.core.util.Resource
 import com.shyden.shytalk.core.util.encodeUrlQueryComponent
 import com.shyden.shytalk.core.util.firebaseCall
 import com.shyden.shytalk.core.util.toMap
+import com.shyden.shytalk.data.remote.ApiException
+import com.shyden.shytalk.data.remote.PrivateMessageEditApi
 import com.shyden.shytalk.data.remote.WorkerApiClient
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -317,31 +319,11 @@ class PrivateMessageRepositoryImpl(
         newText: String,
     ): Resource<Unit> =
         firebaseCall("Failed to edit message") {
-            val messageRef = firestore.document("conversations/$conversationId/messages/$messageId")
-            // Read current message to save edit history
-            val currentDoc = messageRef.get().await()
-            val currentText = currentDoc.getString("text") ?: ""
-            val now = System.currentTimeMillis()
-            // Atomic batch: save edit history + update message together
-            val editRef = messageRef.collection("edits").document()
-            val batch = firestore.batch()
-            batch.set(
-                editRef,
-                mapOf(
-                    "previousText" to currentText,
-                    "editedAt" to now,
-                ),
+            // SHY-0614: the server saves the history entry from the stored text.
+            api.patch(
+                PrivateMessageEditApi.editPath(conversationId, messageId),
+                JSONObject(PrivateMessageEditApi.editBody(newText)),
             )
-            batch.update(
-                messageRef,
-                mapOf(
-                    "text" to newText,
-                    "isEdited" to true,
-                    "editedAt" to now,
-                    "editCount" to FieldValue.increment(1),
-                ),
-            )
-            batch.commit().await()
         }
 
     override suspend fun getEditHistory(
@@ -611,10 +593,12 @@ class PrivateMessageRepositoryImpl(
         messageId: String,
     ): Resource<Unit> =
         firebaseCall("Failed to recall message") {
-            firestore
-                .document("conversations/$conversationId/messages/$messageId")
-                .update(mapOf("isRecalled" to true, "text" to ""))
-                .await()
+            // SHY-0614: the server keeps the recalled text where only admins read it.
+            try {
+                api.post(PrivateMessageEditApi.recallPath(conversationId, messageId))
+            } catch (e: ApiException) {
+                if (!PrivateMessageEditApi.recallAlreadyDone(e.statusCode)) throw e
+            }
         }
 
     // ===== Mod Actions =====
