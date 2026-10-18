@@ -102,8 +102,8 @@ describe('delete-orphaned-message-history (real Firestore emulator)', () => {
     const { code } = await run([]);
 
     expect(code).toBe(0);
-    expect(await docsUnder(db, 'conversations/__orphan_sentinel__')).toEqual([]);
-    expect(await exists('conversations/__orphan_sentinel__/messages/m/edits/e')).toBe(false);
+    expect(await docsUnder(db, 'conversations/shy-0631-orphan-sentinel')).toEqual([]);
+    expect(await exists('conversations/shy-0631-orphan-sentinel/messages/m/edits/e')).toBe(false);
   });
 
   test('--apply removes the orphans and their stray parents, then counts zero', async () => {

@@ -23,8 +23,8 @@ const {
 } = require('../../scripts/delete-orphaned-message-history');
 
 // Pinned as literals, never read back from the script's own constants.
-const SENTINEL_CONVERSATION = 'conversations/__orphan_sentinel__';
-const SENTINEL_PATH = 'conversations/__orphan_sentinel__/messages/m/edits/e';
+const SENTINEL_CONVERSATION = 'conversations/shy-0631-orphan-sentinel';
+const SENTINEL_PATH = 'conversations/shy-0631-orphan-sentinel/messages/m/edits/e';
 
 beforeEach(() => {
   mockDeleted.length = 0;
@@ -214,8 +214,17 @@ describe('main proves its scan can see an orphan', () => {
     expect(script.SENTINEL_CONVERSATION).toBe(SENTINEL_CONVERSATION);
     expect(parentsOf(SENTINEL_PATH)).toStrictEqual({
       conversation: SENTINEL_CONVERSATION,
-      message: 'conversations/__orphan_sentinel__/messages/m',
+      message: 'conversations/shy-0631-orphan-sentinel/messages/m',
     });
+  });
+
+  test('no part of the sentinel path is an id Firestore reserves (__name__)', () => {
+    const script = require('../../scripts/delete-orphaned-message-history');
+    // Firestore refuses any document or collection id shaped __...__ (INVALID_ARGUMENT,
+    // seen on the emulator in #2427's first run); the stand-in here would accept it.
+    for (const segment of script.SENTINEL_PATH.split('/')) {
+      expect(segment).not.toMatch(/^__.*__$/);
+    }
   });
 
   test('a dry run plants the sentinel, leaves it out of the counts, and removes it', async () => {

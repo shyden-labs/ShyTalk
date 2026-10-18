@@ -26,7 +26,8 @@ const { deleteTree } = require('../src/utils/delete-tree');
 const HISTORY_GROUPS = ['edits', 'recall'];
 
 /** A conversation id no real conversation can have, and the orphan planted under it. */
-const SENTINEL_CONVERSATION = 'conversations/__orphan_sentinel__';
+// Not __...__: Firestore reserves ids of that shape and refuses the write.
+const SENTINEL_CONVERSATION = 'conversations/shy-0631-orphan-sentinel';
 const SENTINEL_PATH = `${SENTINEL_CONVERSATION}/messages/m/edits/e`;
 
 /** Documents read per `getAll` call. */
