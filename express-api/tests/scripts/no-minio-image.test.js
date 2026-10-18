@@ -38,9 +38,10 @@ const DEAD_NAMES = [/minio\/minio\b/gi, /minio\/mc\b/gi, /\/minio\/health\b/gi];
 // express-api/src/utils/auto-bans.js, end-suspension.js and warnings.js
 // (SHY-0605). 475 -> 476: scripts/sonar-verdict.js (SHY-0625). 476 -> 478:
 // express-api/src/utils/delete-tree.js and
-// express-api/scripts/delete-orphaned-message-history.js (SHY-0631).
+// express-api/scripts/delete-orphaned-message-history.js (SHY-0631). 478 -> 479:
+// .github/workflows/delete-orphaned-message-history.yml (SHY-0631).
 // SHY-0556 moves this figure to the floors record.
-const FILES_READ_FLOOR = 478;
+const FILES_READ_FLOOR = 479;
 
 function findDeadNames(text) {
   return DEAD_NAMES.flatMap((re) => text.match(re) ?? []);

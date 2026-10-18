@@ -1,0 +1,114 @@
+# SHY-0631 one-off: count, then delete, the message history (`edits`, `recall`)
+# left behind when conversations were deleted by a hand-made subcollection list.
+#
+# Runs express-api/scripts/delete-orphaned-message-history.js. Without `apply`
+# it only counts (a dry run). With `apply` it deletes, counts again, and fails
+# if anything orphaned remains. It prints numbers only, never ids or text.
+#
+# Shyden, 2026-10-18: dev runs straight away; production waits for his
+# approval in the `production` environment, and runs only from `main` (the
+# released cut), never from a branch's unreleased code.
+name: Delete Orphaned Message History
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Project to clean'
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+      apply:
+        description: 'Delete the orphans (off = count only)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: delete-orphaned-message-history-${{ inputs.target }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  dev:
+    name: Orphaned message history (dev)
+    if: inputs.target == 'dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Verify the dev service account is present
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SA_JSON:-}" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT_DEV is not set; nothing was counted or deleted."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-node
+      - name: Install express-api dependencies
+        working-directory: express-api
+        run: npm ci --no-audit --no-fund
+      - name: Count, and delete when asked
+        working-directory: express-api
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}
+          APPLY: ${{ inputs.apply }}
+          FIREBASE_DATABASE_URL: https://shytalk-dev-default-rtdb.europe-west1.firebasedatabase.app
+        run: |
+          set -euo pipefail
+          sa="$RUNNER_TEMP/sa.json"
+          (umask 077 && printf '%s' "$SA_JSON" > "$sa")
+          trap 'rm -f "$sa"' EXIT
+          args=()
+          if [ "$APPLY" = "true" ]; then args=(--apply --project shytalk-dev); fi
+          GOOGLE_APPLICATION_CREDENTIALS="$sa" node scripts/delete-orphaned-message-history.js "${args[@]}"
+
+  prod:
+    name: Orphaned message history (prod)
+    if: inputs.target == 'prod'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Refuse anything but main
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Production runs only from main (the released cut); this run is on $REF. Nothing was counted or deleted."
+            exit 1
+          fi
+      - name: Verify the production service account is present
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SA_JSON:-}" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT_PROD is not available to this job; nothing was counted or deleted."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-node
+      - name: Install express-api dependencies
+        working-directory: express-api
+        run: npm ci --no-audit --no-fund
+      - name: Count, and delete when asked
+        working-directory: express-api
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
+          APPLY: ${{ inputs.apply }}
+          FIREBASE_DATABASE_URL: https://shytalk-7ba69-default-rtdb.asia-southeast1.firebasedatabase.app
+        run: |
+          set -euo pipefail
+          sa="$RUNNER_TEMP/sa.json"
+          (umask 077 && printf '%s' "$SA_JSON" > "$sa")
+          trap 'rm -f "$sa"' EXIT
+          args=()
+          if [ "$APPLY" = "true" ]; then args=(--apply --project shytalk-7ba69); fi
+          GOOGLE_APPLICATION_CREDENTIALS="$sa" node scripts/delete-orphaned-message-history.js "${args[@]}"
