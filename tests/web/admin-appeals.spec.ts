@@ -69,13 +69,14 @@ async function reseedAppeal(testData: TestData): Promise<string> {
 test.describe('Admin Appeals', () => {
   test.describe.configure({ mode: 'serial' });
 
-  // Suspend the test user so the seeded appeal is valid
-  // (fixture no longer auto-suspends to avoid cross-file fragility)
+  // Suspend the test user, then seed an appeal OF that suspension. The
+  // fixture's own appeal is written before this suspension begins, and an
+  // appeal answers only the suspension it was made during (SHY-0605; Shyden,
+  // 2026-10-18), so approving it would rightly end nothing. reseedAppeal
+  // suspends first and appeals after, as a real user would. (The fixture no
+  // longer auto-suspends, to avoid cross-file fragility.)
   test.beforeAll(async ({ testData }) => {
-    await testData.api.post(`/api/user/${testData.user.uniqueId}/suspend`, {
-      reason: 'E2E test setup',
-      canAppeal: true,
-    });
+    await reseedAppeal(testData);
   });
 
   // Restore the worker-scoped test user to unsuspended on exit, so

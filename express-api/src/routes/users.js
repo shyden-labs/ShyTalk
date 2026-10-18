@@ -25,14 +25,14 @@ const { generateId, now } = require('../utils/helpers');
 const { getDoc } = require('../utils/firestore-helpers');
 const { nextUniqueIdFrom } = require('../utils/unique-id-counter');
 const log = require('../utils/log');
-const { clearSuspensionCache, updateUniqueIdCache } = require('../middleware/auth');
+const { updateUniqueIdCache } = require('../middleware/auth');
 const { sendEmail } = require('../utils/email');
 const { buildDeletionScheduledEmail } = require('../utils/email-templates');
 const { sendPushToUser } = require('../utils/fcm');
 const { viewerIsBlocked } = require('../utils/block-check');
 const { checkUserBans } = require('../utils/bans');
-const { findPendingAppeal, createAppeal } = require('../utils/appeals');
-const { suspensionEndedFields } = require('../utils/suspension');
+const { appealRefusal, findPendingAppeal, createAppeal } = require('../utils/appeals');
+const { endSuspension, suspensionEndFailure } = require('../utils/end-suspension');
 const {
   mintClaimsMerging,
   deriveCohortFromUser,
@@ -1227,6 +1227,12 @@ router.post('/users/:uniqueId/appeal', async (req, res) => {
 
     const uniqueId = req.params.uniqueId;
 
+    // Only a suspension that can be appealed has an appeal to answer, and the
+    // web route admits the same people (SHY-0605; Shyden, 2026-10-18).
+    const user = await getDoc(`users/${uniqueId}`);
+    const refusal = appealRefusal(user);
+    if (refusal) return res.status(refusal.status).json({ error: refusal.error });
+
     // Idempotency check: if a pending appeal already exists, reject with 409.
     // Without this, a user could spam the endpoint, creating unbounded
     // suspensionAppeals docs (Spark quota burn) and admin noise.
@@ -1239,7 +1245,7 @@ router.post('/users/:uniqueId/appeal', async (req, res) => {
     // every later suspension, a new accusation entirely, was refused 409 for
     // ever. Shared with `POST /api/appeals` so the two routes cannot disagree
     // about what "already pending" means, which is how they came to.
-    const pending = await findPendingAppeal(uniqueId);
+    const pending = await findPendingAppeal(uniqueId, user);
     if (pending) {
       log.info('users', 'Suspension appeal refused: one is already pending', {
         uniqueId,
@@ -1250,7 +1256,7 @@ router.post('/users/:uniqueId/appeal', async (req, res) => {
 
     log.info('users', 'Suspension appeal submitted', { uniqueId });
 
-    await createAppeal({ uniqueId, appealText: body.appealText });
+    await createAppeal({ uniqueId, appealText: body.appealText, user });
 
     res.json({ success: true });
   } catch (err) {
@@ -1291,20 +1297,24 @@ router.post('/users/:uniqueId/lift-suspension', async (req, res) => {
 
     log.info('users', 'Lifting expired suspension', { uniqueId });
 
-    // `suspensionCanAppeal: true` is this route's own addition — an expired
-    // suspension leaves the account able to appeal a future one — so it is
-    // spread over the shared clear rather than replacing it.
-    await db.doc(`users/${uniqueId}`).update(suspensionEndedFields({ suspensionCanAppeal: true }));
-
-    clearSuspensionCache(Number(uniqueId));
+    // The owner asks, but the server decided it may end, so the server is the
+    // actor (SHY-0605). An expiry never gives the GCS back. `suspensionCanAppeal:
+    // true` is this route's own addition: an expired suspension leaves the
+    // account able to appeal a future one.
+    await endSuspension(uniqueId, {
+      actor: 'system:suspension-expired',
+      trigger: 'LIFT_EXPIRED',
+      extra: { suspensionCanAppeal: true },
+    });
 
     res.json({ success: true });
   } catch (err) {
     log.error('users', 'Lift suspension failed', {
       uniqueId: req.params.uniqueId,
       error: err.message,
+      step: err.step,
     });
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(suspensionEndFailure(err) ?? { error: 'Internal server error' });
   }
 });
 

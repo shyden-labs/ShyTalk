@@ -170,6 +170,8 @@ describe('GET /api/user/:uniqueId — normalizeUser for suspended users', () => 
       displayName: 'RealName',
       profilePhotoUrl: 'https://r2.example.com/profiles/10000001/photo.jpg',
       coverPhotoUrl: 'https://r2.example.com/covers/10000001/cover.jpg',
+      description: null,
+      avatarUrl: null,
     });
   });
 
@@ -200,6 +202,68 @@ describe('GET /api/user/:uniqueId — normalizeUser for suspended users', () => 
       displayName: 'PartialUser',
       profilePhotoUrl: null,
       coverPhotoUrl: null,
+      description: null,
+      avatarUrl: null,
+    });
+  });
+
+  // SHY-0605: a suspension saves the bio and the sign-in photo too, and an
+  // ending puts them back, so the admin sees what will come back.
+  it('shows the saved bio and sign-in photo beside the saved name, photo and cover', async () => {
+    mockDocGet.mockResolvedValueOnce({
+      exists: true,
+      id: '10000003',
+      data: () => ({
+        uniqueId: 10000003,
+        displayName: 'Suspended Account',
+        description: null,
+        avatarUrl: null,
+        isSuspended: true,
+        preSuspensionDisplayName: 'Ana',
+        preSuspensionDescription: 'Learning Portuguese',
+        preSuspensionAvatarUrl: 'https://lh3.example.com/a/ana.png',
+        gcsScore: 0,
+        firebaseUid: 'uid-ana',
+      }),
+    });
+
+    const res = await request(createAdminApp()).get('/api/user/10000003');
+
+    expect(res.status).toBe(200);
+    expect(res.body.description).toBe('Learning Portuguese');
+    expect(res.body.avatarUrl).toBe('https://lh3.example.com/a/ana.png');
+    expect(res.body._preSuspension).toEqual({
+      displayName: 'Ana',
+      profilePhotoUrl: null,
+      coverPhotoUrl: null,
+      description: 'Learning Portuguese',
+      avatarUrl: 'https://lh3.example.com/a/ana.png',
+    });
+  });
+
+  it('shows a saved bio when nothing else was saved', async () => {
+    mockDocGet.mockResolvedValueOnce({
+      exists: true,
+      id: '10000004',
+      data: () => ({
+        uniqueId: 10000004,
+        displayName: 'Suspended Account',
+        isSuspended: true,
+        preSuspensionDescription: 'Only a bio',
+        gcsScore: 0,
+        firebaseUid: 'uid-bio-only',
+      }),
+    });
+
+    const res = await request(createAdminApp()).get('/api/user/10000004');
+
+    expect(res.status).toBe(200);
+    expect(res.body._preSuspension).toEqual({
+      displayName: null,
+      profilePhotoUrl: null,
+      coverPhotoUrl: null,
+      description: 'Only a bio',
+      avatarUrl: null,
     });
   });
 });

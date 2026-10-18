@@ -54,6 +54,7 @@ jest.mock('../../src/utils/gcs', () => ({
 
 jest.mock('../../src/utils/log', () => ({
   info: jest.fn(),
+  warn: jest.fn(),
   error: jest.fn(),
 }));
 
@@ -64,6 +65,14 @@ jest.mock('../../src/utils/system-pm', () => ({
 jest.mock('../../src/middleware/auth', () => ({
   requireAdmin: jest.fn(() => false), // Allow all requests
   clearSuspensionCache: jest.fn(),
+}));
+
+// SHY-0605: every end path ends through endSuspension, which has its own
+// tests (tests/utils/end-suspension.unit.test.js); here only the route's part.
+const mockEndSuspension = jest.fn();
+jest.mock('../../src/utils/end-suspension', () => ({
+  ...jest.requireActual('../../src/utils/end-suspension'),
+  endSuspension: (...args) => mockEndSuspension(...args),
 }));
 
 // ─── App setup ──────────────────────────────────────────────────
@@ -353,9 +362,11 @@ describe('POST /api/user/:uniqueId/suspend — autoApplyBans', () => {
   });
 });
 
-// ─── liftAutoAppliedBans (via unsuspend route) ──────────────────
-
-describe('POST /api/user/:uniqueId/unsuspend — liftAutoAppliedBans', () => {
+// --- Suspend --- the warning names its suspension (SHY-0605) -----------------
+// An upheld appeal gives back the GCS its own suspension took and no other's
+// (Shyden, 2026-10-17), even after that suspension has ended. So the warning
+// records which run of suspensions it belongs to.
+describe('POST /api/user/:uniqueId/suspend --- the warning names its suspension', () => {
   let app;
 
   beforeEach(() => {
@@ -363,142 +374,45 @@ describe('POST /api/user/:uniqueId/unsuspend — liftAutoAppliedBans', () => {
     jest.clearAllMocks();
   });
 
-  it('should remove auto-applied bans using dual-type query', async () => {
-    const { db } = require('../../src/utils/firebase');
+  function suspensionWarning() {
+    const call = mockDocSet.mock.calls.find(([data]) => data && data.source === 'suspension');
+    return call && call[0];
+  }
 
+  it('tags a first suspension’s warning with the run it starts', async () => {
     mockDocGet.mockResolvedValue({
       exists: true,
-      id: '42',
-      data: () => ({ isSuspended: true, displayName: 'Suspended Account' }),
+      id: 'user-42',
+      data: () => ({ displayName: 'Ana', gcsScore: 80 }),
     });
 
-    const mockRefDelete = jest.fn().mockResolvedValue();
-    const whereArgs = [];
+    await request(app).post('/api/user/user-42/suspend').send({ reason: 'Spam', canAppeal: true });
 
-    // Track which collections and where clauses are called
-    db.collection.mockImplementation((collName) => {
-      const chain = {
-        where: jest.fn().mockImplementation((...args) => {
-          whereArgs.push({ collection: collName, args });
-          return chain;
-        }),
-        orderBy: jest.fn().mockImplementation(() => chain),
-        limit: jest.fn().mockImplementation(() => chain),
-        get: jest.fn().mockResolvedValue({
-          docs: [{ id: `${collName}-ban1`, ref: { delete: mockRefDelete } }],
-        }),
-      };
-      return chain;
+    expect(suspensionWarning()).toMatchObject({
+      gcsDeduction: 80,
+      suspensionRunStartedAt: 1700000000000,
     });
-
-    const res = await request(app).post('/api/user/42/unsuspend');
-
-    expect(res.status).toBe(200);
-
-    // Wait for fire-and-forget liftAutoAppliedBans to settle
-    await flushPromises();
-
-    // Should query both string and numeric forms of the uniqueId
-    const linkedIdQueries = whereArgs.filter((w) => w.args[0] === 'linkedUniqueId');
-    const queriedValues = linkedIdQueries.map((w) => w.args[2]);
-    expect(queriedValues).toContain('42');
-    expect(queriedValues).toContain(42);
-
-    // autoApplied filter applied
-    const autoAppliedQueries = whereArgs.filter((w) => w.args[0] === 'autoApplied');
-    expect(autoAppliedQueries.length).toBeGreaterThanOrEqual(2);
-
-    // Bans were deleted
-    expect(mockRefDelete).toHaveBeenCalled();
   });
 
-  it('should deduplicate bans across string and numeric queries', async () => {
-    const { db } = require('../../src/utils/firebase');
-
+  it('tags a re-suspension’s warning with the run already in force', async () => {
     mockDocGet.mockResolvedValue({
       exists: true,
-      id: '12345',
-      data: () => ({ isSuspended: true }),
+      id: 'user-42',
+      data: () => ({
+        displayName: 'Suspended Account',
+        gcsScore: 40,
+        isSuspended: true,
+        suspensionStartDate: 1699000000000,
+        suspensionRunStartedAt: 1698000000000,
+      }),
     });
 
-    const mockRefDelete = jest.fn().mockResolvedValue();
+    await request(app).post('/api/user/user-42/suspend').send({ reason: 'Spam', canAppeal: true });
 
-    // All 4 queries return the same doc id — dedup should delete it only once
-    db.collection.mockImplementation(() => {
-      const chain = {
-        where: jest.fn().mockImplementation(() => chain),
-        orderBy: jest.fn().mockImplementation(() => chain),
-        limit: jest.fn().mockImplementation(() => chain),
-        get: jest.fn().mockResolvedValue({
-          docs: [{ id: 'same-ban', ref: { delete: mockRefDelete } }],
-        }),
-      };
-      return chain;
+    expect(suspensionWarning()).toMatchObject({
+      gcsDeduction: 40,
+      suspensionRunStartedAt: 1698000000000,
     });
-
-    await request(app).post('/api/user/12345/unsuspend');
-    await flushPromises();
-
-    // same-ban appears in all 4 queries, but dedup means deleted only once
-    expect(mockRefDelete).toHaveBeenCalledTimes(1);
-  });
-
-  it('should not delete anything when no auto-applied bans exist', async () => {
-    const { db } = require('../../src/utils/firebase');
-
-    mockDocGet.mockResolvedValue({
-      exists: true,
-      id: '12345',
-      data: () => ({ isSuspended: true }),
-    });
-
-    db.collection.mockImplementation(() => {
-      const chain = {
-        where: jest.fn().mockImplementation(() => chain),
-        orderBy: jest.fn().mockImplementation(() => chain),
-        limit: jest.fn().mockImplementation(() => chain),
-        get: jest.fn().mockResolvedValue({ docs: [] }),
-      };
-      return chain;
-    });
-
-    const res = await request(app).post('/api/user/12345/unsuspend');
-    expect(res.status).toBe(200);
-
-    await flushPromises();
-
-    // No audit log for LIFT_AUTO_BANS since there were none to lift
-    // (the only set calls should be for UNSUSPEND audit log)
-    const liftCalls = mockDocSet.mock.calls.filter((call) => call[0]?.action === 'LIFT_AUTO_BANS');
-    expect(liftCalls).toHaveLength(0);
-  });
-
-  it('should query both deviceBans and networkBans collections', async () => {
-    const { db } = require('../../src/utils/firebase');
-
-    mockDocGet.mockResolvedValue({
-      exists: true,
-      id: '99',
-      data: () => ({ isSuspended: true }),
-    });
-
-    const queriedCollections = [];
-    db.collection.mockImplementation((collName) => {
-      queriedCollections.push(collName);
-      const chain = {
-        where: jest.fn().mockImplementation(() => chain),
-        orderBy: jest.fn().mockImplementation(() => chain),
-        limit: jest.fn().mockImplementation(() => chain),
-        get: jest.fn().mockResolvedValue({ docs: [] }),
-      };
-      return chain;
-    });
-
-    await request(app).post('/api/user/99/unsuspend');
-    await flushPromises();
-
-    expect(queriedCollections).toContain('deviceBans');
-    expect(queriedCollections).toContain('networkBans');
   });
 });
 
@@ -604,132 +518,139 @@ describe('POST /api/user/:uniqueId/suspend --- validation', () => {
   });
 });
 
-// --- Unsuspend --- validation branches --------------------------------------
+// --- Unsuspend --- ends through endSuspension (SHY-0605) ---------------------
 
-describe('POST /api/user/:uniqueId/unsuspend --- validation', () => {
+describe('POST /api/user/:uniqueId/unsuspend --- ends through endSuspension (SHY-0605)', () => {
   let app;
+  const { SuspensionEndError } = jest.requireActual('../../src/utils/end-suspension');
+  const ENDED = {
+    alreadyEnded: false,
+    restored: ['displayName', 'description'],
+    revokedWarnings: 1,
+    gcsRestored: 80,
+    bansLifted: 2,
+    suggestions: {
+      unflaggedCount: 3,
+      skippedCount: 0,
+      partial: false,
+      failedSuggestionIds: [],
+      error: null,
+    },
+  };
 
   beforeEach(() => {
     app = createApp();
     jest.clearAllMocks();
+    mockEndSuspension.mockReset().mockResolvedValue(ENDED);
+    mockDocGet.mockResolvedValue({
+      exists: true,
+      id: '42',
+      data: () => ({ isSuspended: true, displayName: 'Suspended Account' }),
+    });
   });
 
-  it('should return 404 when user does not exist', async () => {
+  it('answers 404 for a user who does not exist, ending nothing', async () => {
     mockDocGet.mockResolvedValue({ exists: false });
 
     const res = await request(app).post('/api/user/nonexistent/unsuspend');
+
     expect(res.status).toBe(404);
     expect(res.body.error).toMatch(/not found/i);
+    expect(mockEndSuspension).not.toHaveBeenCalled();
   });
 
-  it('should return alreadyUnsuspended without writing when isSuspended is false', async () => {
-    const { db } = require('../../src/utils/firebase');
+  it('ends the suspension as the admin, naming this route', async () => {
+    await request(app).post('/api/user/42/unsuspend');
 
-    mockDocGet.mockResolvedValue({
-      exists: true,
-      id: '42',
-      data: () => ({
-        isSuspended: false,
-        displayName: 'Clean User',
-      }),
+    expect(mockEndSuspension).toHaveBeenCalledTimes(1);
+    expect(mockEndSuspension).toHaveBeenCalledWith('42', {
+      actor: 'admin-1',
+      trigger: 'UNSUSPEND',
     });
+  });
 
-    const res = await request(app).post('/api/user/42/unsuspend');
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ success: true, alreadyUnsuspended: true });
+  it('writes nothing itself: the profile, warning, bans and record are the ending’s', async () => {
+    await request(app).post('/api/user/42/unsuspend');
 
-    // Confirm the route returned BEFORE any write side effects fired.
-    // Without the early-return guard, a defensive beforeAll calling
-    // unsuspend on a clean user would emit a spurious PM, write a
-    // phantom UNSUSPEND audit log entry, run liftAutoAppliedBans, and
-    // invalidate the suspension cache — polluting state for the suite.
-    // Pin every side-effect channel explicitly so a future refactor
-    // that moves any of them above the guard is caught.
     expect(mockDocUpdate).not.toHaveBeenCalled();
-    // audit log writes use `db.doc('adminAuditLog/...').set(...)` →
-    // mockDocSet (not mockDocUpdate); the guard must suppress this too.
     expect(mockDocSet).not.toHaveBeenCalled();
-    // liftAutoAppliedBans queries `bans` via `db.collection`; on the
-    // early-return path it must never execute.
-    expect(db.collection).not.toHaveBeenCalled();
-    // System PM ("Your suspension has been lifted") would surprise the
-    // already-unsuspended user.
-    const { sendSystemPm } = require('../../src/utils/system-pm');
-    expect(sendSystemPm).not.toHaveBeenCalled();
-    // Cache invalidation is only meaningful when the suspension state
-    // actually changed — pin its absence on the no-op path.
-    const { clearSuspensionCache } = require('../../src/middleware/auth');
-    expect(clearSuspensionCache).not.toHaveBeenCalled();
+    expect(require('../../src/middleware/auth').clearSuspensionCache).not.toHaveBeenCalled();
   });
 
-  it('should restore pre-suspension profile data on unsuspend', async () => {
-    const { db } = require('../../src/utils/firebase');
-
-    mockDocGet.mockResolvedValue({
-      exists: true,
-      id: '42',
-      data: () => ({
-        isSuspended: true,
-        preSuspensionDisplayName: 'Original Name',
-        preSuspensionProfilePhotoUrl: 'https://example.com/photo.jpg',
-        preSuspensionCoverPhotoUrl: 'https://example.com/cover.jpg',
-      }),
-    });
-
-    db.collection.mockImplementation(() => {
-      const chain = {
-        where: jest.fn().mockImplementation(() => chain),
-        orderBy: jest.fn().mockImplementation(() => chain),
-        limit: jest.fn().mockImplementation(() => chain),
-        get: jest.fn().mockResolvedValue({ docs: [] }),
-      };
-      return chain;
-    });
-
+  it('answers what the ending did and the message it sent', async () => {
     const res = await request(app).post('/api/user/42/unsuspend');
-    expect(res.status).toBe(200);
 
-    expect(mockDocUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        isSuspended: false,
-        displayName: 'Original Name',
-        profilePhotoUrl: 'https://example.com/photo.jpg',
-        coverPhotoUrl: 'https://example.com/cover.jpg',
-      }),
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({
+      success: true,
+      suggestionsCascade: ENDED.suggestions,
+      pms: { failed: 0, total: 1 },
+    });
+  });
+
+  it('tells the user only after the suspension has ended', async () => {
+    const { sendSystemPm } = require('../../src/utils/system-pm');
+
+    await request(app).post('/api/user/42/unsuspend');
+
+    expect(sendSystemPm).toHaveBeenCalledWith('42', 'Your account suspension has been lifted.');
+    expect(mockEndSuspension.mock.invocationCallOrder[0]).toBeLessThan(
+      sendSystemPm.mock.invocationCallOrder[0],
     );
   });
 
-  it('should not restore fields that are null in pre-suspension data', async () => {
-    const { db } = require('../../src/utils/firebase');
+  it('reports a message that could not be sent, the suspension still ended', async () => {
+    require('../../src/utils/system-pm').sendSystemPm.mockRejectedValueOnce(new Error('pm down'));
 
-    mockDocGet.mockResolvedValue({
-      exists: true,
-      id: '42',
-      data: () => ({
-        isSuspended: true,
-        preSuspensionDisplayName: null,
-        preSuspensionProfilePhotoUrl: null,
-        preSuspensionCoverPhotoUrl: null,
-      }),
+    const res = await request(app).post('/api/user/42/unsuspend');
+
+    expect(res.status).toBe(200);
+    expect(res.body.pms).toStrictEqual({ failed: 1, total: 1 });
+  });
+
+  it('answers alreadyUnsuspended for a user not suspended, sending no message', async () => {
+    mockEndSuspension.mockResolvedValueOnce({ alreadyEnded: true });
+
+    const res = await request(app).post('/api/user/42/unsuspend');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ success: true, alreadyUnsuspended: true });
+    expect(require('../../src/utils/system-pm').sendSystemPm).not.toHaveBeenCalled();
+  });
+
+  it('answers 500 naming the step when the ending stops, sending no message', async () => {
+    mockEndSuspension.mockRejectedValueOnce(new SuspensionEndError('suggestions', 'batch failed'));
+
+    const res = await request(app).post('/api/user/42/unsuspend');
+
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({
+      error: 'The suspension could not be fully ended. The user is still suspended.',
+      step: 'suggestions',
     });
+    expect(require('../../src/utils/system-pm').sendSystemPm).not.toHaveBeenCalled();
+  });
 
-    db.collection.mockImplementation(() => {
-      const chain = {
-        where: jest.fn().mockImplementation(() => chain),
-        orderBy: jest.fn().mockImplementation(() => chain),
-        limit: jest.fn().mockImplementation(() => chain),
-        get: jest.fn().mockResolvedValue({ docs: [] }),
-      };
-      return chain;
+  it('answers 500 without a step for any other failure', async () => {
+    mockEndSuspension.mockRejectedValueOnce(new Error('boom'));
+
+    const res = await request(app).post('/api/user/42/unsuspend');
+
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({ error: 'Internal server error' });
+  });
+
+  it('refuses a non-admin with 403 before reading the user or ending anything', async () => {
+    require('../../src/middleware/auth').requireAdmin.mockImplementationOnce((_req, res) => {
+      res.status(403).json({ error: 'Forbidden' });
+      return true;
     });
 
     const res = await request(app).post('/api/user/42/unsuspend');
-    expect(res.status).toBe(200);
 
-    const updateCall = mockDocUpdate.mock.calls[0][0];
-    expect(updateCall.preSuspensionDisplayName).toBeNull();
-    expect(updateCall.preSuspensionProfilePhotoUrl).toBeNull();
-    expect(updateCall.preSuspensionCoverPhotoUrl).toBeNull();
+    expect(res.status).toBe(403);
+    expect(mockDocGet).not.toHaveBeenCalled();
+    expect(mockEndSuspension).not.toHaveBeenCalled();
   });
 });
 
@@ -1275,131 +1196,6 @@ describe('POST /api/user/:uniqueId/suspend --- suggestion cascade', () => {
     expect(res.body.suggestionsCascade.flaggedCount).toBe(0);
     expect(res.body.suggestionsCascade.failedSuggestionIds).toEqual(['sug-Q']);
     expect(res.body.suggestionsCascade.error).toBe('Firestore batch commit blocked by quota');
-  });
-});
-
-describe('POST /api/user/:uniqueId/unsuspend --- suggestion cascade', () => {
-  let app;
-
-  beforeEach(() => {
-    app = createApp();
-    jest.clearAllMocks();
-  });
-
-  it("clears submitter_suspended flags from the user's suggestions on unsuspend", async () => {
-    const { db } = require('../../src/utils/firebase');
-
-    const clearBatchUpdate = jest.fn();
-    const clearBatchCommit = jest.fn().mockResolvedValue();
-    db.batch.mockReturnValue({
-      set: jest.fn(),
-      update: clearBatchUpdate,
-      commit: clearBatchCommit,
-    });
-
-    mockDocGet.mockResolvedValue({
-      exists: true,
-      id: '5151',
-      data: () => ({
-        displayName: 'Reformed User',
-        isSuspended: true,
-        preSuspensionDisplayName: 'Reformed User',
-      }),
-    });
-
-    db.collection.mockImplementation((name) => {
-      if (name === 'suggestions') {
-        return {
-          where: jest.fn().mockReturnValue({
-            get: jest.fn().mockResolvedValue({
-              empty: false,
-              size: 2,
-              docs: [
-                {
-                  id: 'sug-X',
-                  ref: { _path: 'suggestions/sug-X', update: jest.fn() },
-                  data: () => ({
-                    status: 'accepted',
-                    submitterUid: 5151,
-                    flaggedForReview: true,
-                    flaggedReason: 'submitter_suspended',
-                  }),
-                },
-                {
-                  id: 'sug-Y',
-                  ref: { _path: 'suggestions/sug-Y', update: jest.fn() },
-                  data: () => ({
-                    status: 'accepted',
-                    submitterUid: 5151,
-                    flaggedForReview: true,
-                    flaggedReason: 'manual_admin_flag',
-                  }),
-                },
-              ],
-            }),
-          }),
-        };
-      }
-      const chain = {
-        where: jest.fn().mockImplementation(() => chain),
-        orderBy: jest.fn().mockImplementation(() => chain),
-        limit: jest.fn().mockImplementation(() => chain),
-        get: jest.fn().mockResolvedValue({ empty: true, docs: [] }),
-      };
-      return chain;
-    });
-
-    const res = await request(app).post('/api/user/5151/unsuspend');
-
-    expect(res.status).toBe(200);
-    expect(res.body.suggestionsCascade).toBeDefined();
-    expect(res.body.suggestionsCascade.unflaggedCount).toBe(1);
-
-    // Only sug-X (submitter_suspended) is cleared; sug-Y (manual_admin_flag) is preserved.
-    expect(clearBatchUpdate).toHaveBeenCalledTimes(1);
-    const clearedPayload = clearBatchUpdate.mock.calls[0][1];
-    expect(clearedPayload.flaggedForReview).toBe(false);
-    expect(clearedPayload.flaggedReason).toBeNull();
-  });
-
-  it('returns partial=true in suggestionsCascade when the unflag utility throws', async () => {
-    // Pair with the suspend-route throw test: the unsuspend route's outer
-    // catch for unflagUnsuspendedUserSuggestions is otherwise uncovered.
-    const { db } = require('../../src/utils/firebase');
-
-    mockDocGet.mockResolvedValue({
-      exists: true,
-      id: '5353',
-      data: () => ({
-        displayName: 'Reformed User',
-        isSuspended: true,
-      }),
-    });
-
-    db.collection.mockImplementation((name) => {
-      if (name === 'suggestions') {
-        return {
-          where: jest.fn().mockReturnValue({
-            get: jest.fn().mockRejectedValue(new Error('Firestore unavailable on unflag')),
-          }),
-        };
-      }
-      const chain = {
-        where: jest.fn().mockImplementation(() => chain),
-        orderBy: jest.fn().mockImplementation(() => chain),
-        limit: jest.fn().mockImplementation(() => chain),
-        get: jest.fn().mockResolvedValue({ empty: true, docs: [] }),
-      };
-      return chain;
-    });
-
-    const res = await request(app).post('/api/user/5353/unsuspend');
-
-    // Unsuspension must still succeed — cascade failure is reported, not blocking.
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.suggestionsCascade.partial).toBe(true);
-    expect(res.body.suggestionsCascade.error).toBe('Firestore unavailable on unflag');
   });
 });
 

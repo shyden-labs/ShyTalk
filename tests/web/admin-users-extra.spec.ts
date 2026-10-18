@@ -480,4 +480,31 @@ test.describe('Admin Users - Extra Profile Fields', () => {
     await testData.api.post(`/api/user/${uid}/unsuspend`, {});
     await testData.api.post(`/api/user/${uid}/reset-gcs`);
   });
+
+  // ── Test 17: the saved bio is shown, as an ending will put it back (SHY-0605) ──
+  test('pre-suspension bio displays when user is suspended', async ({ page, testData }) => {
+    const uid = String(testData.user.uniqueId);
+    // Markup in a bio is the member's text, never the page's elements.
+    const bio = 'E2E SHY-0605 bio: <b>learning</b> <img src=x> Portuguese';
+    const original = (await testData.api.get(`/api/user/${uid}`)).description ?? '';
+    await testData.api.patch(`/api/user/${uid}`, { description: bio });
+
+    await testData.api.post(`/api/user/${uid}/suspend`, {
+      reason: 'E2E test pre-suspension bio',
+      canAppeal: false,
+    });
+
+    await reloadAndSearch(page, uid);
+    await switchUserSubtab(page, 'moderation');
+
+    const preSuspensionBio = page.locator('#pre-suspension-bio');
+    await expect(preSuspensionBio).toBeVisible();
+    await expect(preSuspensionBio).toHaveText(bio);
+    await expect(preSuspensionBio.locator('b, img')).toHaveCount(0);
+
+    // Unsuspend (which puts the bio back), then restore the bio and reset GCS.
+    await testData.api.post(`/api/user/${uid}/unsuspend`, {});
+    await testData.api.patch(`/api/user/${uid}`, { description: original });
+    await testData.api.post(`/api/user/${uid}/reset-gcs`);
+  });
 });

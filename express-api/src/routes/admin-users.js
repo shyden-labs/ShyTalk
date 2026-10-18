@@ -27,19 +27,16 @@ const router = require('express').Router();
 const { db, auth, FieldValue } = require('../utils/firebase');
 const { mintClaimsMerging, VALID_COHORTS } = require('../utils/firebase-claims');
 const { requireAdmin, clearSuspensionCache, clearAdminClaimCache } = require('../middleware/auth');
-const { clearBanCache } = require('../utils/bans');
-const { syncBannedClaim } = require('../utils/banned-claim');
 const { generateId, now } = require('../utils/helpers');
 const { computeDisplayScore } = require('../utils/gcs');
 const { sendSystemPm } = require('../utils/system-pm');
 const { getDoc } = require('../utils/firestore-helpers');
 const log = require('../utils/log');
-const {
-  suspensionEndedFields,
-  SUSPENSION_STARTED_RESET,
-  suspensionStartedProfileFields,
-} = require('../utils/suspension');
+const { SUSPENSION_STARTED_RESET, suspensionStartedProfileFields } = require('../utils/suspension');
 const { sendEmail } = require('../utils/email');
+const { revokeWarning, WarningRevokeError } = require('../utils/warnings');
+const { autoApplyBans } = require('../utils/auto-bans');
+const { endSuspension, suspensionEndFailure } = require('../utils/end-suspension');
 const { buildDeletionScheduledEmail } = require('../utils/email-templates');
 const { sendPushToUser } = require('../utils/fcm');
 
@@ -88,15 +85,23 @@ function normalizeUser(user) {
     const preName = user.preSuspensionDisplayName ?? user.pre_suspension_display_name;
     const prePhoto = user.preSuspensionProfilePhotoUrl ?? user.pre_suspension_profile_photo_url;
     const preCover = user.preSuspensionCoverPhotoUrl ?? user.pre_suspension_cover_photo_url;
+    // The bio and sign-in photo are saved too, and an ending puts them back
+    // (SHY-0605), so the admin sees what will come back.
+    const preBio = user.preSuspensionDescription;
+    const preAvatar = user.preSuspensionAvatarUrl;
     if (preName) user.displayName = preName;
     if (prePhoto) user.profilePhotoUrl = prePhoto;
     if (preCover) user.coverPhotoUrl = preCover;
+    if (preBio) user.description = preBio;
+    if (preAvatar) user.avatarUrl = preAvatar;
     // Expose _preSuspension object for the admin panel's pre-suspension info section
-    if (preName || prePhoto || preCover) {
+    if (preName || prePhoto || preCover || preBio || preAvatar) {
       user._preSuspension = {
         displayName: preName || null,
         profilePhotoUrl: prePhoto || null,
         coverPhotoUrl: preCover || null,
+        description: preBio || null,
+        avatarUrl: preAvatar || null,
       };
     }
   }
@@ -578,61 +583,19 @@ router.post('/user/:uniqueId/warnings/:warningId/revoke', async (req, res) => {
   try {
     if (await requireAdmin(req, res)) return;
 
-    const uniqueId = req.params.uniqueId;
-    const warningId = req.params.warningId;
-    const timestamp = now();
+    const { uniqueId, warningId } = req.params;
+    const result = await revokeWarning(uniqueId, warningId, { actor: req.auth.uid, audit: true });
+    if (result.alreadyRevoked) return res.status(400).json({ error: 'Warning already revoked' });
 
-    const warningDoc = await getDoc(`users/${uniqueId}/warnings/${warningId}`);
-    if (!warningDoc) return res.status(404).json({ error: 'Warning not found' });
-    if (warningDoc.revoked) return res.status(400).json({ error: 'Warning already revoked' });
-
-    const deduction = warningDoc.gcsDeduction || 0;
-
-    // Read current user GCS
-    const userSnap = await db.doc(`users/${uniqueId}`).get();
-    if (!userSnap.exists) return res.status(404).json({ error: 'User not found' });
-    const user = userSnap.data();
-    const currentGcs = user.gcsScore ?? user.gcs_score ?? 100;
-    const currentCount = user.warningCount ?? user.warning_count ?? 0;
-    const restoredGcs = Math.min(100, currentGcs + deduction);
-
-    log.info('admin-users', 'Revoking warning', {
+    log.info('admin-users', 'Warning revoked', {
       adminId: req.auth.uid,
       targetUniqueId: uniqueId,
       warningId,
-      restored: deduction,
+      restored: result.deduction,
     });
-
-    // Atomic three-write commit. Pre-fix used Promise.all which is
-    // CONCURRENT, not atomic — if the user-doc update failed after
-    // the warning was marked revoked, the warning would be stuck in
-    // a "revoked" state with GCS NOT restored, and the retry path
-    // (line 579 'Warning already revoked' guard) would block the
-    // operator from fixing it. Audit H7 (Phase 2A).
-    //
-    // Pattern matches the warning-CREATION path at line 440 which
-    // already uses db.batch() correctly.
-    const batch = db.batch();
-    batch.update(db.doc(`users/${uniqueId}/warnings/${warningId}`), {
-      revoked: true,
-      revokedAt: timestamp,
-      revokedBy: req.auth.uid,
-    });
-    batch.update(db.doc(`users/${uniqueId}`), {
-      gcsScore: restoredGcs,
-      warningCount: Math.max(0, currentCount - 1),
-    });
-    batch.set(db.doc(`adminAuditLog/${generateId()}`), {
-      adminId: req.auth.uid,
-      action: 'REVOKE_WARNING',
-      targetUserId: uniqueId,
-      details: `Revoked warning ${warningId}, restored ${deduction} GCS (${currentGcs} → ${restoredGcs})`,
-      createdAt: timestamp,
-    });
-    await batch.commit();
-
-    res.json({ success: true, restoredGcs, deduction });
+    res.json({ success: true, restoredGcs: result.restoredGcs, deduction: result.deduction });
   } catch (err) {
+    if (err instanceof WarningRevokeError) return res.status(404).json({ error: err.message });
     log.error('admin-users', 'Revoke warning failed', {
       uniqueId: req.params.uniqueId,
       warningId: req.params.warningId,
@@ -1107,6 +1070,7 @@ router.post('/user/:uniqueId/suspend', async (req, res) => {
     const user = { ...snap.data(), id: snap.id };
 
     const timestamp = now();
+    const started = suspensionStartedProfileFields(user, timestamp);
 
     log.info('admin-users', 'Suspending user', {
       adminId: req.auth.uid,
@@ -1124,7 +1088,7 @@ router.post('/user/:uniqueId/suspend', async (req, res) => {
         suspensionCanAppeal: body.canAppeal,
         ...SUSPENSION_STARTED_RESET,
         suspendedBy: req.auth.uid,
-        ...suspensionStartedProfileFields(user),
+        ...started,
       }),
       db.doc(`adminAuditLog/${generateId()}`).set({
         adminId: req.auth.uid,
@@ -1157,6 +1121,9 @@ router.post('/user/:uniqueId/suspend', async (req, res) => {
           issuedBy: req.auth.uid,
           issuedByName: null,
           source: 'suspension',
+          // The run it belongs to: an upheld appeal gives back its own run's
+          // warnings and no other's, even once that run has ended (SHY-0605).
+          suspensionRunStartedAt: started.suspensionRunStartedAt,
           linkedReportId: null,
           revoked: false,
           revokedAt: null,
@@ -1256,77 +1223,28 @@ router.post('/user/:uniqueId/unsuspend', async (req, res) => {
 
     const snap = await db.doc(`users/${req.params.uniqueId}`).get();
     if (!snap.exists) return res.status(404).json({ error: 'User not found' });
-    const user = { ...snap.data(), id: snap.id };
-
-    // Idempotency guard: skip the write + PM + audit log + ban-lift
-    // when the user is already unsuspended. Without this, defensive
-    // `beforeAll` hooks in tests (admin-keyboard.spec.ts,
-    // admin-users-moderation.spec.ts) that call unsuspend
-    // belt-and-braces fire a spurious "Your suspension has been
-    // lifted" PM, write a phantom UNSUSPEND audit log entry, and
-    // unnecessarily call liftAutoAppliedBans on every clean run.
-    // In production this also suppresses double-clicks from an admin
-    // unsuspending a user whose timed suspension already expired.
-    if (!user.isSuspended) {
-      return res.json({ success: true, alreadyUnsuspended: true });
-    }
-
-    const restore = {};
-    const preName = user.preSuspensionDisplayName ?? user.pre_suspension_display_name ?? null;
-    const prePhoto =
-      user.preSuspensionProfilePhotoUrl ?? user.pre_suspension_profile_photo_url ?? null;
-    const preCover = user.preSuspensionCoverPhotoUrl ?? user.pre_suspension_cover_photo_url ?? null;
-    if (preName) restore.displayName = preName;
-    if (prePhoto) restore.profilePhotoUrl = prePhoto;
-    if (preCover) restore.coverPhotoUrl = preCover;
 
     log.info('admin-users', 'Unsuspending user', {
       adminId: req.auth.uid,
       targetUniqueId: req.params.uniqueId,
     });
 
-    await Promise.all([
-      db.doc(`users/${req.params.uniqueId}`).update(suspensionEndedFields(restore)),
-      db.doc(`adminAuditLog/${generateId()}`).set({
-        adminId: req.auth.uid,
-        action: 'UNSUSPEND',
-        targetUserId: req.params.uniqueId,
-        details: null,
-        createdAt: now(),
-      }),
-    ]);
+    // The profile, bans, suggestions, audit entry and cache are the ending's
+    // (SHY-0605). An admin unsuspend never gives the GCS back: only an upheld
+    // appeal does.
+    const ended = await endSuspension(req.params.uniqueId, {
+      actor: req.auth.uid,
+      trigger: 'UNSUSPEND',
+    });
 
-    // Lift auto-applied bans (non-blocking)
-    liftAutoAppliedBans(req.params.uniqueId, req.auth.uid).catch((err) =>
-      log.error('admin-users', 'Failed to lift auto-applied bans', {
-        uniqueId: req.params.uniqueId,
-        error: err.message,
-      }),
-    );
-
-    // Reverse the suggestion ban-cascade: clear `flaggedForReview` on suggestions
-    // whose flag was set by the matching suspension. Only `submitter_suspended`
-    // flags are cleared — unrelated manual admin flags (different reason) are
-    // preserved. Awaited so the admin response reports partial failures.
-    let suggestionsCascade;
-    try {
-      suggestionsCascade = await unflagUnsuspendedUserSuggestions(req.params.uniqueId);
-    } catch (err) {
-      log.error('admin-users', 'Failed to unflag suspended user suggestions', {
-        uniqueId: req.params.uniqueId,
-        error: err.message,
-      });
-      suggestionsCascade = {
-        unflaggedCount: 0,
-        skippedCount: 0,
-        partial: true,
-        failedSuggestionIds: [],
-        error: err && err.message ? err.message : 'cascade_failed',
-      };
+    // Already unsuspended: no message and no second audit entry, so a
+    // double-click or a test's defensive unsuspend changes nothing.
+    if (ended.alreadyEnded) {
+      return res.json({ success: true, alreadyUnsuspended: true });
     }
 
-    // Send system PM about unsuspension — track failure so admin UI can
-    // surface that the user wasn't informed about being unsuspended.
+    // Sent only once the suspension has ended; a failure is reported so the
+    // admin UI can say the user was not told.
     let pmFailed = false;
     try {
       await sendSystemPm(req.params.uniqueId, 'Your account suspension has been lifted.');
@@ -1335,18 +1253,18 @@ router.post('/user/:uniqueId/unsuspend', async (req, res) => {
       pmFailed = true;
     }
 
-    clearSuspensionCache(Number(req.params.uniqueId));
     res.json({
       success: true,
-      suggestionsCascade,
+      suggestionsCascade: ended.suggestions,
       pms: { failed: pmFailed ? 1 : 0, total: 1 },
     });
   } catch (err) {
     log.error('admin-users', 'Unsuspend user failed', {
       uniqueId: req.params.uniqueId,
       error: err.message,
+      step: err.step,
     });
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(suspensionEndFailure(err) ?? { error: 'Internal server error' });
   }
 });
 
@@ -1394,162 +1312,6 @@ router.delete('/report-locks/:uniqueId', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// HELPER: Auto-apply device + network bans on suspension
-// ══════════════════════════════════════════════════════════════
-
-/**
- * When a user is suspended, automatically ban all their known devices
- * and their last known IP address. Uses the same duration as the
- * suspension if an endDate is provided, otherwise permanent.
- */
-async function autoApplyBans(uniqueId, endDate) {
-  const timestamp = now();
-
-  // Calculate expiry — match suspension duration or permanent
-  let expiresAt = null;
-  let duration = 'permanent';
-  if (endDate) {
-    expiresAt = new Date(endDate).toISOString();
-    duration = 'suspension-match';
-  }
-
-  // Find all devices bound to this user
-  const bindingsSnap = await db
-    .collection('deviceBindings')
-    .where('uniqueId', '==', uniqueId)
-    .get();
-
-  let lastIp = null;
-  const batch = db.batch();
-
-  for (const doc of bindingsSnap.docs) {
-    const binding = doc.data();
-
-    // Create a device ban for each bound device
-    batch.set(db.doc(`deviceBans/${doc.id}`), {
-      deviceId: doc.id,
-      reason: 'Auto-applied: user suspended',
-      duration,
-      expiresAt,
-      linkedUniqueId: uniqueId,
-      autoApplied: true,
-      createdAt: timestamp,
-      createdBy: 'system',
-    });
-
-    // Track the last known IP from the most recent binding
-    if (binding.lastIp || binding.ip) {
-      lastIp = binding.lastIp || binding.ip;
-    }
-  }
-
-  // Create a network ban for the last known IP
-  if (lastIp) {
-    batch.set(db.doc(`networkBans/${generateId()}`), {
-      type: 'ip',
-      value: lastIp,
-      reason: 'Auto-applied: user suspended',
-      duration,
-      expiresAt,
-      linkedUniqueId: uniqueId,
-      autoApplied: true,
-      createdAt: timestamp,
-      createdBy: 'system',
-    });
-  }
-
-  await batch.commit();
-
-  // Auto-applied bans must bite on the target's next request, exactly
-  // like admin-issued ones (SHY-0149 mid-session AC).
-  clearBanCache();
-
-  // SHY-0150: the auto-bans change the target's claim standing — mint
-  // `banned: true` (+ revoke refresh tokens) through the same chokepoint
-  // the admin ban routes use. AFTER clearBanCache so the recompute reads
-  // the standing this batch just created. This helper runs fire-and-forget
-  // from the suspend route, whose .catch logs any failure here.
-  await syncBannedClaim(uniqueId);
-
-  const deviceCount = bindingsSnap.docs.length;
-  const networkCount = lastIp ? 1 : 0;
-  log.info('admin-users', 'Auto-bans applied', {
-    uniqueId,
-    deviceBans: deviceCount,
-    networkBans: networkCount,
-  });
-}
-
-// ══════════════════════════════════════════════════════════════
-// HELPER: Lift auto-applied bans on unsuspension
-// ══════════════════════════════════════════════════════════════
-
-/**
- * Remove device and network bans that were auto-applied during suspension.
- * Only removes bans with autoApplied === true and linkedUserId === uid.
- * Manually-applied bans are left untouched.
- */
-async function liftAutoAppliedBans(uniqueId, adminUid) {
-  const numericId = Number(uniqueId);
-  const stringId = String(uniqueId);
-
-  const [deviceSnapStr, deviceSnapNum, networkSnapStr, networkSnapNum] = await Promise.all([
-    db
-      .collection('deviceBans')
-      .where('linkedUniqueId', '==', stringId)
-      .where('autoApplied', '==', true)
-      .get(),
-    db
-      .collection('deviceBans')
-      .where('linkedUniqueId', '==', numericId)
-      .where('autoApplied', '==', true)
-      .get(),
-    db
-      .collection('networkBans')
-      .where('linkedUniqueId', '==', stringId)
-      .where('autoApplied', '==', true)
-      .get(),
-    db
-      .collection('networkBans')
-      .where('linkedUniqueId', '==', numericId)
-      .where('autoApplied', '==', true)
-      .get(),
-  ]);
-
-  // Deduplicate by doc id in case both queries match the same doc
-  const seen = new Set();
-  const allDocs = [];
-  for (const snap of [deviceSnapStr, deviceSnapNum, networkSnapStr, networkSnapNum]) {
-    for (const d of snap.docs) {
-      if (!seen.has(d.id)) {
-        seen.add(d.id);
-        allDocs.push(d);
-      }
-    }
-  }
-  if (allDocs.length === 0) return;
-
-  await Promise.all(allDocs.map((d) => d.ref.delete()));
-  // Lifting bans must unblock the gate as promptly as banning engages it.
-  clearBanCache();
-
-  // SHY-0150: RECOMPUTE the claim (never blind-clear) — a manually-issued
-  // ban that survives the auto-ban lift keeps the user's claim standing.
-  await syncBannedClaim(uniqueId);
-
-  // Audit log
-  await db.doc(`adminAuditLog/${generateId()}`).set({
-    adminId: adminUid,
-    action: 'LIFT_AUTO_BANS',
-    targetUserId: uniqueId,
-    details: `Removed ${allDocs.length} auto-applied ban(s) on unsuspension`,
-    createdAt: now(),
-  });
-
-  log.info('admin-users', 'Auto-applied bans lifted', { uniqueId, removed: allDocs.length });
-}
-
-// ══════════════════════════════════════════════════════════════
 // HELPER: Evict suspended user from rooms
 // ══════════════════════════════════════════════════════════════
 
@@ -1564,10 +1326,7 @@ const { evictSuspendedUser, buildCascadeFailure } = require('../utils/evict-susp
 // suggestions get a `flaggedForReview` sticky note so an admin can decide case-by-case
 // whether they stay on the roadmap. Status is preserved, so unsuspend cleanly reverses
 // by clearing the flag fields. See utils/flag-suspended-user-suggestions.js for design.
-const {
-  flagSuspendedUserSuggestions,
-  unflagUnsuspendedUserSuggestions,
-} = require('../utils/flag-suspended-user-suggestions');
+const { flagSuspendedUserSuggestions } = require('../utils/flag-suspended-user-suggestions');
 
 // ═══════════════════════════════════════════════════════════════════
 // Admin Auth Management (PIN lockout, biometric keys, OTP metrics)

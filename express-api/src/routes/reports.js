@@ -26,12 +26,14 @@ const { computeDisplayScore } = require('../utils/gcs');
 const { getDoc, queryDocs } = require('../utils/firestore-helpers');
 const { sendFcmToIdentifiers } = require('../utils/fcm');
 const log = require('../utils/log');
-const { findPendingAppeal, createAppeal } = require('../utils/appeals');
 const {
-  suspensionEndedFields,
-  SUSPENSION_STARTED_RESET,
-  suspensionStartedProfileFields,
-} = require('../utils/suspension');
+  appealedSuspension,
+  appealRefusal,
+  findPendingAppeal,
+  createAppeal,
+} = require('../utils/appeals');
+const { SUSPENSION_STARTED_RESET, suspensionStartedProfileFields } = require('../utils/suspension');
+const { endSuspension, suspensionEndFailure } = require('../utils/end-suspension');
 const { createWarning } = require('./admin-users');
 const { MAX_ATTACHMENTS } = require('../utils/attachment-limits');
 const {
@@ -621,7 +623,7 @@ router.post('/reports/:id/resolve', async (req, res) => {
           suspensionCanAppeal: canAppeal,
           ...SUSPENSION_STARTED_RESET,
           suspendedBy: req.auth.uid,
-          ...suspensionStartedProfileFields(reportedUser ?? {}),
+          ...suspensionStartedProfileFields(reportedUser ?? {}, timestamp),
         });
         clearSuspensionCache(Number(reportedUniqueId)); // Phase 2H finding #1
 
@@ -869,7 +871,7 @@ router.post('/reports/resolve-all/:userId', async (req, res) => {
           suspensionCanAppeal: canAppeal,
           ...SUSPENSION_STARTED_RESET,
           suspendedBy: req.auth.uid,
-          ...suspensionStartedProfileFields(reportedUser ?? {}),
+          ...suspensionStartedProfileFields(reportedUser ?? {}, timestamp),
         });
         clearSuspensionCache(Number(reportedUniqueId));
 
@@ -1271,7 +1273,7 @@ router.post('/admin/users/:uniqueId/suspend', async (req, res) => {
         suspensionCanAppeal: body.canAppeal,
         ...SUSPENSION_STARTED_RESET,
         suspendedBy: req.auth.uid,
-        ...suspensionStartedProfileFields(user),
+        ...suspensionStartedProfileFields(user, timestamp),
       }),
       db.doc(`adminAuditLog/${generateId()}`).set(
         {
@@ -1319,38 +1321,21 @@ router.post('/admin/users/:uniqueId/unsuspend', async (req, res) => {
     const user = await getDoc(`users/${req.params.uniqueId}`);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const preName = user.preSuspensionDisplayName ?? user.pre_suspension_display_name ?? null;
-    const prePhoto =
-      user.preSuspensionProfilePhotoUrl ?? user.pre_suspension_profile_photo_url ?? null;
-    const preCover = user.preSuspensionCoverPhotoUrl ?? user.pre_suspension_cover_photo_url ?? null;
+    // Everything the suspension took comes back through the one ending
+    // (SHY-0605); an admin unsuspend leaves the GCS as it is.
+    const ended = await endSuspension(req.params.uniqueId, {
+      actor: req.auth.uid,
+      trigger: 'UNSUSPEND',
+    });
 
-    const restore = {};
-    if (preName) restore.displayName = preName;
-    if (prePhoto) restore.profilePhotoUrl = prePhoto;
-    if (preCover) restore.coverPhotoUrl = preCover;
-
-    await Promise.all([
-      db.doc(`users/${req.params.uniqueId}`).update(suspensionEndedFields(restore)),
-      db.doc(`adminAuditLog/${generateId()}`).set(
-        {
-          adminId: req.auth.uid,
-          action: 'UNSUSPEND',
-          targetUserId: req.params.uniqueId,
-          details: null,
-          createdAt: now(),
-        },
-        { merge: true },
-      ),
-    ]);
-
-    clearSuspensionCache(Number(req.params.uniqueId));
-    res.json({ success: true });
+    res.json(ended.alreadyEnded ? { success: true, alreadyUnsuspended: true } : { success: true });
   } catch (err) {
     log.error('reports', 'POST /api/admin/users/:uniqueId/unsuspend failed', {
       userId: req.params.uniqueId,
       error: err.message,
+      step: err.step,
     });
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(suspensionEndFailure(err) ?? { error: 'Internal server error' });
   }
 });
 
@@ -1372,21 +1357,18 @@ router.post('/appeals', async (req, res) => {
     const uniqueId = req.auth.uniqueId;
 
     const user = await getDoc(`users/${uniqueId}`);
-    const isSuspended = user?.isSuspended ?? user?.is_suspended ?? false;
-    const canAppeal = user?.suspensionCanAppeal ?? user?.suspension_can_appeal ?? false;
-
-    if (!isSuspended) return res.status(400).json({ error: 'User is not suspended' });
-    if (!canAppeal)
-      return res.status(403).json({ error: 'Appeals are not allowed for this suspension' });
+    // Shared with the app's route, so the two admit the same people (SHY-0605).
+    const refusal = appealRefusal(user);
+    if (refusal) return res.status(refusal.status).json({ error: refusal.error });
 
     // Check for existing pending appeal. Shared with the app's
     // `POST /api/users/:uniqueId/appeal` (SHY-0463) so the two routes cannot
     // hold different opinions about whether this person has already appealed
     // — they did, and an appeal made on one was invisible to the other.
-    const existing = await findPendingAppeal(uniqueId);
+    const existing = await findPendingAppeal(uniqueId, user);
     if (existing) return res.status(409).json({ error: 'An appeal is already pending' });
 
-    const appealId = await createAppeal({ uniqueId, appealText: body.appealText });
+    const appealId = await createAppeal({ uniqueId, appealText: body.appealText, user });
 
     res.json({ success: true, appealId });
   } catch (err) {
@@ -1461,6 +1443,14 @@ router.patch('/appeals/:id', async (req, res) => {
 
     const timestamp = now();
     const userId = appeal.userId ?? appeal.user_id;
+    // The user's appeal fields describe the suspension in force. An appeal of
+    // an earlier one belongs to that one alone and leaves them as they are: a
+    // denial would otherwise forbid appealing the later suspension (SHY-0605;
+    // Shyden, 2026-10-18).
+    const answersSuspensionInForce = appealedSuspension(
+      await getDoc(`users/${userId}`),
+      appeal,
+    ).inForce;
 
     // Update the appeal document
     const appealUpdate = {
@@ -1472,32 +1462,26 @@ router.patch('/appeals/:id', async (req, res) => {
     await db.doc(`suspensionAppeals/${req.params.id}`).update(appealUpdate);
 
     // Update user's appeal status on the user document
-    await db.doc(`users/${userId}`).update({
-      suspensionAppealStatus: status, // 'approved' or 'denied'
-      ...(status === 'denied' ? { suspensionCanAppeal: false } : {}),
-    });
+    if (answersSuspensionInForce) {
+      await db.doc(`users/${userId}`).update({
+        suspensionAppealStatus: status, // 'approved' or 'denied'
+        ...(status === 'denied' ? { suspensionCanAppeal: false } : {}),
+      });
+    }
 
-    // If approved, unsuspend the user
+    // An upheld appeal is the ONLY ending that gives back the GCS a
+    // suspension took (SHY-0605; Shyden, 2026-10-17): the GCS of the run the
+    // appeal answers, even if that run has ended since. It ends a suspension
+    // only when that run is the one in force; the ending decides, from the
+    // appeal. A failed ending answers 500 with the appeal already marked:
+    // approving it again finishes the job.
     if (status === 'approved') {
-      const user = await getDoc(`users/${userId}`);
-      if (user) {
-        const preName = user.preSuspensionDisplayName ?? user.pre_suspension_display_name ?? null;
-        const prePhoto =
-          user.preSuspensionProfilePhotoUrl ?? user.pre_suspension_profile_photo_url ?? null;
-        const preCover =
-          user.preSuspensionCoverPhotoUrl ?? user.pre_suspension_cover_photo_url ?? null;
-
-        const restore = {};
-        if (preName) restore.displayName = preName;
-        if (prePhoto) restore.profilePhotoUrl = prePhoto;
-        if (preCover) restore.coverPhotoUrl = preCover;
-
-        await db.doc(`users/${userId}`).update({
-          ...suspensionEndedFields(),
-          ...restore,
-        });
-        clearSuspensionCache(userId);
-      }
+      await endSuspension(userId, {
+        actor: req.auth.uid,
+        trigger: 'APPEAL_APPROVED',
+        restoreGcs: true,
+        appeal,
+      });
     }
 
     // Audit log
@@ -1517,8 +1501,9 @@ router.patch('/appeals/:id', async (req, res) => {
     log.error('reports', 'PATCH /api/appeals/:id failed', {
       appealId: req.params.id,
       error: err.message,
+      step: err.step,
     });
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(suspensionEndFailure(err) ?? { error: 'Internal server error' });
   }
 });
 

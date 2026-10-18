@@ -82,6 +82,13 @@ jest.mock('../../src/routes/admin-users', () => ({
 }));
 
 // Mock firestore-helpers to use our mock db
+// SHY-0605: an upheld appeal ends through endSuspension, which has its own
+// tests (tests/utils/end-suspension.unit.test.js); here only the route's part.
+const mockEndSuspension = jest.fn();
+jest.mock('../../src/utils/end-suspension', () => ({
+  ...jest.requireActual('../../src/utils/end-suspension'),
+  endSuspension: (...args) => mockEndSuspension(...args),
+}));
 jest.mock('../../src/utils/firestore-helpers', () => {
   const { db } = require('../../src/utils/firebase');
   return {
@@ -529,6 +536,13 @@ describe('PATCH /api/appeals/:id (admin review appeal)', () => {
     ({ getDoc } = require('../../src/utils/firestore-helpers'));
     ({ requireAdmin } = require('../../src/middleware/auth'));
     requireAdmin.mockReturnValue(false);
+    // The user, read after the appeal: suspended, its run's start unknown, so
+    // an appeal that names no run answers the suspension in force (SHY-0605).
+    mockDocGet.mockResolvedValue({
+      exists: true,
+      id: 'suspended-user',
+      data: () => ({ isSuspended: true }),
+    });
   });
 
   it('returns 400 for invalid status value', async () => {
@@ -538,41 +552,31 @@ describe('PATCH /api/appeals/:id (admin review appeal)', () => {
     expect(res.body.error).toMatch(/approved.*denied|denied.*approved/i);
   });
 
-  it('returns 200 for approved status and unsuspends user', async () => {
-    const { clearSuspensionCache } = require('../../src/middleware/auth');
-
-    getDoc
-      .mockResolvedValueOnce({
-        id: 'appeal-1',
-        userId: 'suspended-user',
-        status: 'pending',
-      })
-      .mockResolvedValueOnce({
-        id: 'suspended-user',
-        isSuspended: true,
-        preSuspensionDisplayName: 'Original Name',
-        preSuspensionProfilePhotoUrl: null,
-        preSuspensionCoverPhotoUrl: null,
-      });
+  it('returns 200 for approved status and ends the suspension', async () => {
+    mockEndSuspension.mockResolvedValueOnce({ alreadyEnded: false });
+    getDoc.mockResolvedValueOnce({
+      id: 'appeal-1',
+      userId: 'suspended-user',
+      status: 'pending',
+    });
 
     const res = await request(app).patch('/api/appeals/appeal-1').send({ status: 'approved' });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    // User doc should be updated to unsuspend
-    expect(mockDocUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        isSuspended: false,
-        suspensionReason: null,
-      }),
-    );
+    // The ending puts everything back, the GCS included (SHY-0605).
+    expect(mockEndSuspension).toHaveBeenCalledWith('suspended-user', {
+      actor: 'admin-firebase-uid',
+      trigger: 'APPEAL_APPROVED',
+      restoreGcs: true,
+      appeal: { id: 'appeal-1', userId: 'suspended-user', status: 'pending' },
+    });
     // suspensionAppealStatus should be written to user doc
     expect(mockDocUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         suspensionAppealStatus: 'approved',
       }),
     );
-    expect(clearSuspensionCache).toHaveBeenCalledWith('suspended-user');
   });
 
   it('returns 200 for denied status without unsuspending user', async () => {
@@ -602,7 +606,8 @@ describe('PATCH /api/appeals/:id (admin review appeal)', () => {
         suspensionCanAppeal: false,
       }),
     );
-    // User should NOT be unsuspended — clearSuspensionCache not called
+    // User should NOT be unsuspended — no ending, clearSuspensionCache not called
+    expect(mockEndSuspension).not.toHaveBeenCalled();
     expect(clearSuspensionCache).not.toHaveBeenCalled();
   });
 });

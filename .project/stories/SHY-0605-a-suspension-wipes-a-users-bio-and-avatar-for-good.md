@@ -1,11 +1,11 @@
 ---
 id: SHY-0605
-status: Draft
+status: In Review
 owner: unassigned
 created: 2026-10-16
 priority: P0
-effort: M
-estimate: 8
+effort: L
+estimate: 13
 type: bug
 roadmap_ids: []
 mvp: true
@@ -39,73 +39,129 @@ What a suspension does today, and what ending it undoes (measured
 
 | A suspension does | Where | Undone on ending? |
 | --- | --- | --- |
-| Saves then masks name, photo, cover | every start path | yes, except timed expiry: `users.js` `lift-suspension` restores nothing and nulls the saved values, so the user keeps "Suspended Account" for good |
-| Blanks bio and sign-in photo, unsaved | every start path | **no** |
+| Saves then masks name, photo, cover | the 4 masking start paths (admin-users suspend, reports.js x3) | yes, except timed expiry: `users.js` `lift-suspension` restores nothing and nulls the saved values, so the user keeps "Suspended Account" for good |
+| Blanks bio and sign-in photo, unsaved | the same 4 start paths | **no** |
 | Sets GCS to 0 with a `source: 'suspension'` warning | admin-users suspend | **no**, on no end path |
-| Warning via `createWarning` | reports.js resolve | **no** |
 | Bans devices and network (`autoApplyBans`) | admin-users suspend only | admin-users unsuspend only |
 | Flags the user's suggestions | admin-users suspend only | admin-users unsuspend only |
 | Evicts from rooms, clears `currentRoomId` | admin-users, reports.js | not needed: they rejoin |
 
-Suspensions end in six places: admin-users unsuspend, reports.js admin
-unsuspend, appeal approval (reports.js), timed expiry (users.js), and the
-identity graph's unsuspend-all and per-node unsuspend (SHY-0606). Each
-carries its own list.
+Suspensions end in five places that write the user: admin-users unsuspend,
+reports.js admin unsuspend, appeal approval (reports.js), timed expiry
+(users.js) and the identity graph's unsuspend-all. Each carries its own
+list. The identity graph's per-node unsuspend touches only the graph node,
+never the user (SHY-0606's).
+
+Corrected 2026-10-16 on develop `8f20691fc33` (plan review passes 1-2):
+the reports.js `createWarning` calls are the separate "warned" actions
+(`source: 'report'`), not part of a suspension, and stay; only the
+admin-users suspend writes a `source: 'suspension'` warning.
 
 ## Acceptance Criteria
 
 ### Happy path
 
-- [ ] One function ends a suspension (`endSuspension` beside the helpers in
-      `express-api/src/utils/suspension.js`) and every end path calls it;
+- [x] One function ends a suspension (`endSuspension` in
+      `express-api/src/utils/end-suspension.js`, beside the helpers in
+      `suspension.js`) and every end path calls it;
       no end path writes `isSuspended: false` itself, with a guard that
       finds a direct write in any route.
-- [ ] Ending restores name, uploaded photo, cover, bio (`description`) and
+- [x] Ending restores name, uploaded photo, cover, bio (`description`) and
       sign-in photo (`avatarUrl`); a suspension saves the last two beside
       the others (Shyden 2026-10-16: "Restore both").
-- [ ] Ending revokes every unrevoked warning the suspension created and gives
-      its GCS deduction back, capped at 100, keeping the warning in history
-      marked revoked, the same as the admin "revoke warning" action. This
-      holds on every ending: upheld appeal, admin lift, identity-graph lift
-      and timed expiry (Shyden 2026-10-16: "Every ending").
-- [ ] Ending lifts the device and network bans the suspension applied and
+- [x] An upheld appeal, and only an upheld appeal, revokes every unrevoked
+      warning this suspension created and gives its GCS deduction back,
+      capped at 100, keeping the warning in history marked revoked. It gives
+      the GCS back like the admin "revoke warning" action but leaves
+      `warningCount` alone, which a suspension warning never raised. An admin
+      lift, identity-graph lift or timed expiry leaves the GCS and the
+      warning as they are (Shyden 2026-10-17: "only successful appeals should
+      restore the score").
+- [x] "This suspension" starts at the first suspend of a run: suspending an
+      already-suspended user keeps the run's start
+      (`suspensionRunStartedAt`), so an upheld appeal gives back the first
+      warning's deduction too, and never an earlier suspension's.
+- [x] An appeal is tied to the exact suspension it answers and never reaches
+      another (Shyden 2026-10-18: "appeals must be tied to the exact
+      suspension that was given and cannot be allowed to leak into a
+      different suspension/appeal"). Each suspension warning and each appeal
+      records its run (`suspensionRunStartedAt`); an appeal made before that
+      is placed by when it was made.
+- [x] An appeal upheld after its suspension has ended (a timed one can run
+      out while the appeal waits) still gives back that suspension's GCS,
+      and ends nothing.
+- [x] An earlier suspension's appeal, decided while a later suspension is in
+      force, leaves the later suspension in force and its appeal fields
+      untouched (a denial never forbids appealing the later one), and gives
+      back only its own suspension's GCS (Shyden 2026-10-18).
+- [x] Every suspension holds the score at 0 while it is in force: points an
+      earlier appeal gives back during a later suspension are taken again on
+      the later run's own warning, marked as a hold. However the later
+      suspension ends, the hold comes back; what a suspension took for
+      itself still needs an upheld appeal (Shyden 2026-10-18: "Release on
+      any ending").
+- [x] An earlier suspension's pending appeal does not stop the user
+      appealing the suspension in force; a second appeal of the same
+      suspension is still refused 409.
+- [x] Both appeal routes admit the same people through one check: a user who
+      is not suspended is refused 400 and a suspension that cannot be
+      appealed 403 (the app's route checked neither; Shyden 2026-10-18).
+- [x] Ending lifts the device and network bans the suspension applied and
       unflags the suggestions it flagged, on every end path.
-- [ ] One test per end path per effect, each RED against today's code.
+- [x] Every end path clears the suspension cache with the numeric user id
+      (found in passing: the identity graph's unsuspend-all never clears
+      it, so an unsuspended user stays blocked up to 5 minutes; appeal
+      approval passes the raw appeal id).
+- [x] The admin view of a suspended user shows the saved bio and sign-in
+      photo beside the saved name, photo and cover (found in passing:
+      `admin-users.js` shows only those three).
+- [x] One test per end path per effect, each RED against today's code.
 
 ### Error paths
 
-- [ ] A failed step fails the request with an error the admin panel shows;
+- [x] A failed step fails the request with an error the admin panel shows;
       it never answers success with part of the account still taken away.
-- [ ] A user with no bio or sign-in photo saves `null` and restores nothing.
+- [x] A user with no bio or sign-in photo saves `null` and restores nothing.
 
 ### Edge cases
 
-- [ ] Suspending an already-suspended user keeps the first saved bio and
+- [x] Suspending an already-suspended user keeps the first saved bio and
       sign-in photo (SHY-0597's rule).
-- [ ] A warning revoked by hand during the suspension is not revoked twice
+- [x] A warning revoked by hand during the suspension is not revoked twice
       and its GCS is not given back twice.
-- [ ] Ending a suspension of a user who is not suspended changes nothing.
+- [x] Ending a suspension of a user who is not suspended changes nothing,
+      on every end path (found in passing: reports.js admin unsuspend has
+      no such check and rewrites and audits an unsuspended user).
+- [x] Revoking a suspension warning by hand leaves `warningCount` alone
+      (found in passing: the revoke route decrements it for every warning,
+      though a suspension warning never incremented it).
 
 ### Performance
 
-- [ ] N/A: one user per call.
+- [x] N/A: one user per call.
 
 ### Security
 
-- [ ] A restored bio is rendered through the same escaping as any bio.
-- [ ] Every end path keeps its existing admin or owner check, with a test.
+- [x] A restored bio is rendered through the same escaping as any bio.
+- [x] Every end path keeps its existing admin or owner check, with a test.
 
 ### UX
 
-- [ ] N/A: no new screens or copy.
+- [x] N/A: no new screens or copy.
 
 ### i18n
 
-- [ ] N/A: no new copy.
+- [x] N/A: no new copy.
 
 ### Observability
 
-- [ ] Each ending writes one audit entry naming what was put back.
+- [x] Each ending writes one audit entry naming what was put back.
+
+## Announce
+
+On the roadmap and in the release notes: when a suspension ends, by appeal,
+by an admin or by running out, the account comes back as it was: name,
+photos, bio, standing and access.
 
 ## BDD Scenarios
 
@@ -119,7 +175,7 @@ carries its own list.
 
 - **Given** a user suspended for a day, whose devices were banned
 - **When** they sign in after the day has passed
-- **Then** the ban is lifted and their profile and GCS are as before
+- **Then** the ban is lifted and their profile is as before, and their GCS stays where the suspension left it
 
 ## Test Plan
 
@@ -142,7 +198,7 @@ carries its own list.
 | Risk | Mitigation |
 | --- | --- |
 | Restoring brings back reported content | Shyden chose restore; a moderator can still clear a bio by hand. |
-| GCS given back to someone who served a deserved suspension | Shyden chose every ending; the revoked warning stays in history. |
+| GCS given back to someone who served a deserved suspension | Only an upheld appeal gives it back (Shyden 2026-10-17); the revoked warning stays in history. |
 
 ## Definition of Done
 
@@ -153,3 +209,80 @@ carries its own list.
 
 - **2026-10-16**: Filed from SHY-0597.
 - **2026-10-16**: Shyden's rulings (AskUserQuestion): restore bio and sign-in photo; everything a suspension removes comes back; every ending gives the GCS back; every suspension starts the same way (SHY-0608). Re-scored 3 -> 8 from the inventory above: six end paths, five effects.
+- **2026-10-16**: In Progress on `story/SHY-0605-ending-a-suspension-restores-everything`. Inventory corrected from the plan's review passes (five end paths write the user; four start paths mask; the `createWarning` row was the separate warned action). Found in passing and folded in: the cache clear on every end path, the admin view of the saved bio and photo, reports.js unsuspend's missing not-suspended check, and the revoke route's `warningCount` decrement. Estimate stays 8.
+- **2026-10-17**: Shyden reversed the GCS ruling: *"if the suspension is lifted due to anything other an an appeal. do not restore the score. only successful appeals should restore the score"*. A run start (`suspensionRunStartedAt`) bounds the appeal's revoke, so a re-suspension's first warning is included and an earlier suspension's never is.
+- **2026-10-17**: In Review. Proof per AC (unit tests mock every service; the
+  integration and web tests run in CI and are confirmed on the PR's run):
+  - One ending + guard: `tests/utils/end-suspension.unit.test.js`; guard
+    `tests/scripts/suspension-ends-in-one-place.test.js` (149 src files; red on
+    the pre-change tree at all five paths; 28 planted forms red, 12 green).
+  - Restores five fields: `end-suspension.unit.test.js` "puts the ... back";
+    integration `tests/routes/suspension-ending-restores-everything.test.js`
+    per end path.
+  - GCS only on an upheld appeal: `end-suspension.unit.test.js` "reads and revokes no
+    warning when the ending is not an upheld appeal"; E3 route test "with the
+    GCS given back"; guard "only the upheld appeal gives the GCS back";
+    integration per path.
+  - Run start, re-suspension, hand-revoked warning, no-field warning:
+    `end-suspension.unit.test.js` (commit 4).
+  - Bans and suggestions on every path: `end-suspension.unit.test.js` "lifts the
+    auto-applied bans", "unflags the suggestions"; each route calls it (guard).
+  - Cache by numeric id: `end-suspension.unit.test.js` "clears the suspension cache
+    by the numeric id after the write".
+  - Admin view: `admin-users-missing-moderation.test.js` (4); web test 17.
+  - One test per end path per effect, red on today's code: each route file's
+    tests run against the pre-change routes: 7, 12, 5 and 4 failures.
+  - Failed step: each route's "answers 500 naming the step"; the panel shows it
+    (`apiCall` throws `data.error`; users.js and appeals.js toast it).
+  - Not suspended changes nothing: "answers alreadyUnsuspended" (E1, E2);
+    `end-suspension.unit.test.js` "does nothing for a user who is not suspended".
+  - warningCount on revoke: `utils/warnings` tests (commit 2).
+  - Escaping: web test 17 plants markup in a bio and asserts it is shown as
+    text with no elements. Bios elsewhere render through Compose `Text` (apps)
+    and are not rendered on the public web.
+  - Auth kept: each route's 403 test (E1, E2, E3, E5 admin; E4 owner).
+  - Audit entry: `end-suspension.unit.test.js` "writes the audit entry in the shape
+    the audit log page reads"; integration "records one ending".
+  - Mutations: 34 predicted, none survived (routes M1-M16, admin view V1-V3,
+    guard reader G1-G15).
+  - Found in passing, filed: SHY-0623 (#2394), seven undeclared packages.
+- **2026-10-18**: CI on `3de05eb44e9` red on two whole-repo file-count floors
+  this branch's new files moved (re-measured: 2004 -> 2013, 472 -> 475). A
+  side note then showed an appeal upheld after its suspension timed out gave
+  nothing back, and that a leftover appeal could block or lift a later,
+  separate suspension. Shyden ruled appeals are tied to their exact
+  suspension, an old appeal leaves a later suspension in force, appeals from
+  a user who is not suspended are refused, and every suspension holds the
+  score at 0 while in force (memory `project-suspension-restores-everything`).
+  Six criteria added; re-scored 8 -> 13 (two more routes, the appeal record,
+  the per-suspension pending check and the held score). Proof per criterion:
+  - Tied to its suspension: `tests/utils/appeals.unit.test.js`
+    "appealedSuspension" (12); warnings tagged: `admin-users-write.test.js`
+    "the warning names its suspension"; appeals record it: "createAppeal".
+  - Upheld after it ended: `end-suspension.unit.test.js` "gives back the GCS
+    of an appealed suspension that already ended, ending nothing";
+    integration "an appeal upheld after its suspension ran out".
+  - Earlier appeal, later suspension in force: `end-suspension.unit.test.js`
+    "gives back an earlier suspension's GCS and leaves the later one in
+    force"; `reports-coverage-appeals.test.js` "an appeal of an earlier
+    suspension, a later one in force" (5); integration, same name (4).
+  - Score held at 0: `end-suspension.unit.test.js` "a later suspension in
+    force holds what comes back" (7); integration "upholding both appeals".
+  - Pending check per suspension: `appeals.unit.test.js` "findPendingAppeal";
+    each route's "accepts an appeal while an earlier suspension's appeal is
+    still pending" and 409 test.
+  - One admission check: `appeals.unit.test.js` "appealRefusal" (6);
+    `users-missing.test.js` 400 and 403 (the app's own screen shows the form
+    only when `canAppeal`, `SuspensionScreen.kt:229`).
+  - Unit gate 105 files 2,778/2,778 (`daedc86591e` then re-ran its 3 files,
+    168/168). Mutations: 15 (N1-N15) then 35 (P1-P36), none survived.
+  - CI run 39056488493 on `97663d3026b`: backend, integration (emulator) and
+    1,424 web tests green; `admin-appeals.spec.ts` test 4 red because the
+    spec approved the fixture's appeal, written before its suspension began,
+    which now (rightly) ends nothing. The spec now suspends, then appeals.
+- **2026-10-18**: A side note showed held points would be lost if the later
+  suspension ended without an appeal. Shyden chose "Release on any ending":
+  the hold warning carries `hold: true` and every ending gives back its
+  run's holds. Proof: `end-suspension.unit.test.js` "any ending gives back
+  what the suspension held" (7); integration "an admin lift of the later
+  suspension gives back what it held for the earlier appeal".

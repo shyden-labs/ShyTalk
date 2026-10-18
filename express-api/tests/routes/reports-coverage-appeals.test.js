@@ -67,6 +67,13 @@ jest.mock('../../src/utils/fcm', () => ({
 jest.mock('../../src/routes/admin-users', () => ({
   createWarning: jest.fn().mockResolvedValue(),
 }));
+// SHY-0605: an upheld appeal ends through endSuspension, which has its own
+// tests (tests/utils/end-suspension.unit.test.js); here only the route's part.
+const mockEndSuspension = jest.fn();
+jest.mock('../../src/utils/end-suspension', () => ({
+  ...jest.requireActual('../../src/utils/end-suspension'),
+  endSuspension: (...args) => mockEndSuspension(...args),
+}));
 jest.mock('../../src/utils/firestore-helpers', () => {
   const { db } = require('../../src/utils/firebase');
   return {
@@ -218,6 +225,9 @@ describe('PATCH /api/appeals/:id - edge cases', () => {
     require('../../src/middleware/auth').requireAdmin.mockReturnValue(false);
     mockDocUpdate.mockResolvedValue();
     mockDocSet.mockResolvedValue();
+    // The user, read after the appeal: suspended, its run's start unknown, so
+    // an appeal that names no run answers the suspension in force (SHY-0605).
+    mockDocGet.mockResolvedValue({ exists: true, id: 'u1', data: () => ({ isSuspended: true }) });
   });
 
   it('returns 404 when not found', async () => {
@@ -243,25 +253,6 @@ describe('PATCH /api/appeals/:id - edge cases', () => {
     );
   });
 
-  it('restores data on approval', async () => {
-    const { clearSuspensionCache } = require('../../src/middleware/auth');
-    getDoc
-      .mockResolvedValueOnce({ id: 'a1', userId: 'u1', status: 'pending' })
-      .mockResolvedValueOnce({
-        id: 'u1',
-        isSuspended: true,
-        preSuspensionDisplayName: 'Name',
-        preSuspensionProfilePhotoUrl: 'p.jpg',
-        preSuspensionCoverPhotoUrl: 'c.jpg',
-      });
-    const res = await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
-    expect(res.status).toBe(200);
-    expect(mockDocUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ isSuspended: false, displayName: 'Name' }),
-    );
-    expect(clearSuspensionCache).toHaveBeenCalledWith('u1');
-  });
-
   it('writes APPEAL_DENIED audit log', async () => {
     getDoc.mockResolvedValueOnce({ id: 'a1', userId: 'u1', status: 'pending' });
     const res = await request(app).patch('/api/appeals/a1').send({ status: 'denied' });
@@ -272,9 +263,8 @@ describe('PATCH /api/appeals/:id - edge cases', () => {
   });
 
   it('writes APPEAL_APPROVED audit log', async () => {
-    getDoc
-      .mockResolvedValueOnce({ id: 'a1', userId: 'u1', status: 'pending' })
-      .mockResolvedValueOnce({ id: 'u1', isSuspended: true });
+    mockEndSuspension.mockResolvedValueOnce({ alreadyEnded: false });
+    getDoc.mockResolvedValueOnce({ id: 'a1', userId: 'u1', status: 'pending' });
     const res = await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
     expect(res.status).toBe(200);
     expect(mockDocSet).toHaveBeenCalledWith(
@@ -318,6 +308,46 @@ describe('POST /api/appeals - snake_case user fields', () => {
     const res = await request(app).post('/api/appeals').send({ appealText: 'Please reconsider' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+  });
+
+  // SHY-0605: an appeal belongs to the one suspension it answers (Shyden,
+  // 2026-10-18), so an earlier suspension's appeal, still pending, does not
+  // stand in the way of appealing the suspension in force.
+  it('accepts an appeal while an earlier suspension’s appeal is still pending', async () => {
+    getDoc.mockResolvedValueOnce({
+      id: '50990490',
+      isSuspended: true,
+      suspensionCanAppeal: true,
+      suspensionRunStartedAt: 1709500000000,
+    });
+    queryDocs.mockResolvedValueOnce([
+      { id: 'earlier', status: 'pending', suspensionRunStartedAt: 1709000000000 },
+    ]);
+
+    const res = await request(app).post('/api/appeals').send({ appealText: 'A new appeal' });
+
+    expect(res.status).toBe(200);
+    expect(mockDocSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'pending', suspensionRunStartedAt: 1709500000000 }),
+      { merge: true },
+    );
+  });
+
+  it('refuses a second appeal of the suspension in force', async () => {
+    getDoc.mockResolvedValueOnce({
+      id: '50990490',
+      isSuspended: true,
+      suspensionCanAppeal: true,
+      suspensionRunStartedAt: 1709500000000,
+    });
+    queryDocs.mockResolvedValueOnce([
+      { id: 'current', status: 'pending', suspensionRunStartedAt: 1709500000000 },
+    ]);
+
+    const res = await request(app).post('/api/appeals').send({ appealText: 'Again' });
+
+    expect(res.status).toBe(409);
+    expect(mockDocSet).not.toHaveBeenCalled();
   });
 });
 
@@ -372,6 +402,9 @@ describe('PATCH /api/appeals/:id - requireAdmin blocks + user_id fallback', () =
     require('../../src/middleware/auth').requireAdmin.mockReturnValue(false);
     mockDocUpdate.mockResolvedValue();
     mockDocSet.mockResolvedValue();
+    // The user, read after the appeal: suspended, its run's start unknown, so
+    // an appeal that names no run answers the suspension in force (SHY-0605).
+    mockDocGet.mockResolvedValue({ exists: true, id: 'u1', data: () => ({ isSuspended: true }) });
   });
 
   it('returns 403 when admin check fails', async () => {
@@ -392,43 +425,173 @@ describe('PATCH /api/appeals/:id - requireAdmin blocks + user_id fallback', () =
     );
   });
 
-  it('approved appeal with null user doc still succeeds', async () => {
-    getDoc
-      .mockResolvedValueOnce({ id: 'a1', userId: 'u1', status: 'pending' })
-      .mockResolvedValueOnce(null); // user not found
+  it('ends the suspension of the user named by user_id when userId is absent', async () => {
+    mockEndSuspension.mockResolvedValueOnce({ alreadyEnded: false });
+    getDoc.mockResolvedValueOnce({ id: 'a1', user_id: 'u1', status: 'pending' });
+
     const res = await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
+
     expect(res.status).toBe(200);
+    expect(mockEndSuspension).toHaveBeenCalledWith('u1', expect.anything());
+  });
+});
+
+// =================================================================
+// PATCH /api/appeals/:id --- an upheld appeal ends through endSuspension
+// (SHY-0605). What the ending puts back (profile, snake_case saves, GCS,
+// bans, cache) is tested once, in tests/utils/end-suspension.unit.test.js.
+// =================================================================
+describe('PATCH /api/appeals/:id --- an upheld appeal ends through endSuspension (SHY-0605)', () => {
+  const { SuspensionEndError } = jest.requireActual('../../src/utils/end-suspension');
+  let app, getDoc;
+  beforeEach(() => {
+    app = createApp();
+    jest.clearAllMocks();
+    ({ getDoc } = require('../../src/utils/firestore-helpers'));
+    require('../../src/middleware/auth').requireAdmin.mockReturnValue(false);
+    mockDocUpdate.mockResolvedValue();
+    mockDocSet.mockResolvedValue();
+    // The user, read after the appeal: suspended, its run's start unknown, so
+    // an appeal that names no run answers the suspension in force (SHY-0605).
+    mockDocGet.mockResolvedValue({ exists: true, id: 'u1', data: () => ({ isSuspended: true }) });
+    mockEndSuspension.mockReset().mockResolvedValue({ alreadyEnded: false });
+    getDoc.mockResolvedValueOnce({ id: 'a1', userId: 'u1', status: 'pending' });
   });
 
-  it('approved appeal with user doc but no pre-suspension data', async () => {
-    getDoc
-      .mockResolvedValueOnce({ id: 'a1', userId: 'u1', status: 'pending' })
-      .mockResolvedValueOnce({ id: 'u1', isSuspended: true });
-    const res = await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
-    expect(res.status).toBe(200);
-    const unsuspendCall = mockDocUpdate.mock.calls.find((c) => c[0]?.isSuspended === false);
-    expect(unsuspendCall).toBeDefined();
-    expect(unsuspendCall[0].displayName).toBeUndefined();
+  it('ends the suspension as the admin, naming the appeal, with the GCS given back', async () => {
+    await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
+
+    expect(mockEndSuspension).toHaveBeenCalledTimes(1);
+    expect(mockEndSuspension).toHaveBeenCalledWith('u1', {
+      actor: 'admin-firebase-uid',
+      trigger: 'APPEAL_APPROVED',
+      restoreGcs: true,
+      appeal: { id: 'a1', userId: 'u1', status: 'pending' },
+    });
   });
 
-  it('uses snake_case pre-suspension fields on approval', async () => {
-    getDoc
-      .mockResolvedValueOnce({ id: 'a1', userId: 'u1', status: 'pending' })
+  it('writes the user’s appeal fields when the appeal answers the suspension in force', async () => {
+    await request(app).patch('/api/appeals/a1').send({ status: 'denied' });
+
+    expect(mockDocUpdate).toHaveBeenCalledWith({
+      suspensionAppealStatus: 'denied',
+      suspensionCanAppeal: false,
+    });
+  });
+
+  it('ends nothing when the appeal is denied', async () => {
+    const res = await request(app).patch('/api/appeals/a1').send({ status: 'denied' });
+
+    expect(res.status).toBe(200);
+    expect(mockEndSuspension).not.toHaveBeenCalled();
+  });
+
+  it('marks the appeal approved before ending the suspension', async () => {
+    await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
+
+    const marked = mockDocUpdate.mock.calls.findIndex(([fields]) => fields.status === 'approved');
+    expect(marked).toBeGreaterThanOrEqual(0);
+    expect(mockDocUpdate.mock.invocationCallOrder[marked]).toBeLessThan(
+      mockEndSuspension.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('writes no ending itself: the profile and cache are the ending’s', async () => {
+    await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
+
+    expect(mockDocUpdate.mock.calls.map(([fields]) => fields.isSuspended)).not.toContain(false);
+    expect(require('../../src/middleware/auth').clearSuspensionCache).not.toHaveBeenCalled();
+  });
+
+  it('answers success for an appeal whose user is no longer suspended', async () => {
+    mockEndSuspension.mockResolvedValueOnce({ alreadyEnded: true });
+
+    const res = await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ success: true });
+  });
+
+  it('answers 500 naming the step when the ending stops, recording no decision yet', async () => {
+    mockEndSuspension.mockRejectedValueOnce(new SuspensionEndError('warnings', 'revoke failed'));
+
+    const res = await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
+
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({
+      error: 'The suspension could not be fully ended. The user is still suspended.',
+      step: 'warnings',
+    });
+    expect(mockDocSet).not.toHaveBeenCalled();
+  });
+
+  it('answers 500 without a step for any other failure', async () => {
+    mockEndSuspension.mockRejectedValueOnce(new Error('boom'));
+
+    const res = await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
+
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({ error: 'Internal server error' });
+  });
+});
+
+// An appeal belongs to the one suspension it answers (Shyden, 2026-10-18).
+// An appeal of an earlier suspension, decided while a later one is in force,
+// must not touch the later one's appeal fields: a denial would otherwise
+// forbid appealing the later suspension at all (SHY-0605).
+describe('PATCH /api/appeals/:id --- an appeal of an earlier suspension, a later one in force', () => {
+  const EARLIER = {
+    id: 'a1',
+    userId: 'u1',
+    status: 'pending',
+    suspensionRunStartedAt: 1709000000000,
+  };
+  let app;
+
+  beforeEach(() => {
+    app = createApp();
+    jest.clearAllMocks();
+    require('../../src/middleware/auth').requireAdmin.mockReturnValue(false);
+    mockDocUpdate.mockResolvedValue();
+    mockDocSet.mockResolvedValue();
+    mockEndSuspension.mockReset().mockResolvedValue({ alreadyEnded: true });
+    require('../../src/utils/firestore-helpers')
+      .getDoc.mockResolvedValueOnce(EARLIER)
       .mockResolvedValueOnce({
         id: 'u1',
         isSuspended: true,
-        pre_suspension_display_name: 'LegacyName',
-        pre_suspension_profile_photo_url: 'lp.jpg',
-        pre_suspension_cover_photo_url: 'lc.jpg',
+        suspensionRunStartedAt: 1709500000000,
       });
-    const res = await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
+  });
+
+  function userAppealFieldsWritten() {
+    return mockDocUpdate.mock.calls.filter(
+      ([fields]) => 'suspensionAppealStatus' in fields || 'suspensionCanAppeal' in fields,
+    );
+  }
+
+  it.each(['approved', 'denied'])('marks the appeal %s', async (status) => {
+    const res = await request(app).patch('/api/appeals/a1').send({ status });
+
     expect(res.status).toBe(200);
-    expect(mockDocUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        displayName: 'LegacyName',
-        profilePhotoUrl: 'lp.jpg',
-        coverPhotoUrl: 'lc.jpg',
-      }),
+    expect(mockDocUpdate).toHaveBeenCalledWith(expect.objectContaining({ status }));
+  });
+
+  it.each(['approved', 'denied'])(
+    'leaves the later suspension’s appeal fields alone when %s',
+    async (status) => {
+      await request(app).patch('/api/appeals/a1').send({ status });
+
+      expect(userAppealFieldsWritten()).toStrictEqual([]);
+    },
+  );
+
+  it('hands the ending the appeal, which decides what it gives back', async () => {
+    await request(app).patch('/api/appeals/a1').send({ status: 'approved' });
+
+    expect(mockEndSuspension).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ restoreGcs: true, appeal: EARLIER }),
     );
   });
 });

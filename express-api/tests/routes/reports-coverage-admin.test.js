@@ -73,6 +73,13 @@ jest.mock('../../src/utils/fcm', () => ({
 jest.mock('../../src/routes/admin-users', () => ({
   createWarning: jest.fn().mockResolvedValue(),
 }));
+// SHY-0605: every end path ends through endSuspension, which has its own
+// tests (tests/utils/end-suspension.unit.test.js); here only the route's part.
+const mockEndSuspension = jest.fn();
+jest.mock('../../src/utils/end-suspension', () => ({
+  ...jest.requireActual('../../src/utils/end-suspension'),
+  endSuspension: (...args) => mockEndSuspension(...args),
+}));
 jest.mock('../../src/utils/firestore-helpers', () => {
   const { db } = require('../../src/utils/firebase');
   return {
@@ -268,98 +275,98 @@ describe('POST /api/admin/users/:uniqueId/suspend', () => {
 });
 
 // =================================================================
-// POST /api/admin/users/:uniqueId/unsuspend (lines 915-963)
+// POST /api/admin/users/:uniqueId/unsuspend --- ends through endSuspension
+// (SHY-0605). What the ending puts back (profile, snake_case saves, audit
+// entry, cache) is tested once, in tests/utils/end-suspension.unit.test.js.
 // =================================================================
-describe('POST /api/admin/users/:uniqueId/unsuspend', () => {
+describe('POST /api/admin/users/:uniqueId/unsuspend --- ends through endSuspension (SHY-0605)', () => {
+  const { SuspensionEndError } = jest.requireActual('../../src/utils/end-suspension');
   let app, getDoc;
   beforeEach(() => {
     app = createApp();
     jest.clearAllMocks();
     ({ getDoc } = require('../../src/utils/firestore-helpers'));
     require('../../src/middleware/auth').requireAdmin.mockReturnValue(false);
-    mockDocUpdate.mockResolvedValue();
-    mockDocSet.mockResolvedValue();
+    mockEndSuspension.mockReset().mockResolvedValue({ alreadyEnded: false });
+    getDoc.mockResolvedValueOnce({ id: 'u1', isSuspended: true });
   });
 
-  it('returns 404 when user not found', async () => {
-    getDoc.mockResolvedValueOnce(null);
+  it('answers 404 for a user who does not exist, ending nothing', async () => {
+    getDoc.mockReset().mockResolvedValueOnce(null);
+
     const res = await request(app).post('/api/admin/users/u1/unsuspend');
+
     expect(res.status).toBe(404);
+    expect(mockEndSuspension).not.toHaveBeenCalled();
   });
 
-  it('restores pre-suspension data', async () => {
-    const { clearSuspensionCache } = require('../../src/middleware/auth');
-    getDoc.mockResolvedValueOnce({
-      id: 'u1',
-      isSuspended: true,
-      preSuspensionDisplayName: 'Name',
-      preSuspensionProfilePhotoUrl: 'p.jpg',
-      preSuspensionCoverPhotoUrl: 'c.jpg',
-    });
-    const res = await request(app).post('/api/admin/users/u1/unsuspend');
-    expect(res.status).toBe(200);
-    expect(mockDocUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        isSuspended: false,
-        displayName: 'Name',
-        profilePhotoUrl: 'p.jpg',
-        coverPhotoUrl: 'c.jpg',
-      }),
-    );
-    expect(clearSuspensionCache).toHaveBeenCalled();
-  });
+  it('ends the suspension as the admin, naming this route, without the GCS', async () => {
+    await request(app).post('/api/admin/users/u1/unsuspend');
 
-  it('unsuspends without restoring when no pre-suspension data', async () => {
-    getDoc.mockResolvedValueOnce({ id: 'u1', isSuspended: true });
-    const res = await request(app).post('/api/admin/users/u1/unsuspend');
-    expect(res.status).toBe(200);
-    const arg = mockDocUpdate.mock.calls[0][0];
-    expect(arg.isSuspended).toBe(false);
-    expect(arg.displayName).toBeUndefined();
-  });
-
-  it('writes audit log', async () => {
-    getDoc.mockResolvedValueOnce({ id: 'u1', isSuspended: true });
-    const res = await request(app).post('/api/admin/users/u1/unsuspend');
-    expect(res.status).toBe(200);
-    expect(mockDocSet).toHaveBeenCalledWith(expect.objectContaining({ action: 'UNSUSPEND' }), {
-      merge: true,
+    expect(mockEndSuspension).toHaveBeenCalledTimes(1);
+    expect(mockEndSuspension).toHaveBeenCalledWith('u1', {
+      actor: 'admin-firebase-uid',
+      trigger: 'UNSUSPEND',
     });
   });
 
-  it('returns 403 for non-admin', async () => {
-    require('../../src/middleware/auth').requireAdmin.mockImplementation((_req, res) => {
+  it('writes nothing itself: the profile, bans and record are the ending’s', async () => {
+    await request(app).post('/api/admin/users/u1/unsuspend');
+
+    expect(mockDocUpdate).not.toHaveBeenCalled();
+    expect(mockDocSet).not.toHaveBeenCalled();
+    expect(require('../../src/middleware/auth').clearSuspensionCache).not.toHaveBeenCalled();
+  });
+
+  it('answers success once the suspension has ended', async () => {
+    const res = await request(app).post('/api/admin/users/u1/unsuspend');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ success: true });
+  });
+
+  it('answers alreadyUnsuspended for a user not suspended', async () => {
+    mockEndSuspension.mockResolvedValueOnce({ alreadyEnded: true });
+
+    const res = await request(app).post('/api/admin/users/u1/unsuspend');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ success: true, alreadyUnsuspended: true });
+  });
+
+  it('answers 500 naming the step when the ending stops', async () => {
+    mockEndSuspension.mockRejectedValueOnce(new SuspensionEndError('bans', 'lift failed'));
+
+    const res = await request(app).post('/api/admin/users/u1/unsuspend');
+
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({
+      error: 'The suspension could not be fully ended. The user is still suspended.',
+      step: 'bans',
+    });
+  });
+
+  it('answers 500 without a step for any other failure', async () => {
+    mockEndSuspension.mockRejectedValueOnce(new Error('boom'));
+
+    const res = await request(app).post('/api/admin/users/u1/unsuspend');
+
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({ error: 'Internal server error' });
+  });
+
+  it('refuses a non-admin with 403 before reading the user or ending anything', async () => {
+    getDoc.mockReset();
+    require('../../src/middleware/auth').requireAdmin.mockImplementationOnce((_req, res) => {
       res.status(403).json({ error: 'Forbidden' });
       return true;
     });
+
     const res = await request(app).post('/api/admin/users/u1/unsuspend');
+
     expect(res.status).toBe(403);
-  });
-
-  it('returns 500 on error', async () => {
-    getDoc.mockResolvedValueOnce({ id: 'u1', isSuspended: true });
-    mockDocUpdate.mockRejectedValueOnce(new Error('fail'));
-    const res = await request(app).post('/api/admin/users/u1/unsuspend');
-    expect(res.status).toBe(500);
-  });
-
-  it('handles snake_case legacy fields', async () => {
-    getDoc.mockResolvedValueOnce({
-      id: 'u1',
-      isSuspended: true,
-      pre_suspension_display_name: 'Legacy',
-      pre_suspension_profile_photo_url: 'lp.jpg',
-      pre_suspension_cover_photo_url: 'lc.jpg',
-    });
-    const res = await request(app).post('/api/admin/users/u1/unsuspend');
-    expect(res.status).toBe(200);
-    expect(mockDocUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        displayName: 'Legacy',
-        profilePhotoUrl: 'lp.jpg',
-        coverPhotoUrl: 'lc.jpg',
-      }),
-    );
+    expect(getDoc).not.toHaveBeenCalled();
+    expect(mockEndSuspension).not.toHaveBeenCalled();
   });
 });
 

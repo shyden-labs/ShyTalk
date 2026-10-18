@@ -82,7 +82,13 @@ jest.mock('../../src/utils/firestore-helpers', () => ({
   queryDocs: jest.fn().mockResolvedValue([]),
 }));
 
+jest.mock('../../src/utils/warnings', () => ({
+  ...jest.requireActual('../../src/utils/warnings'),
+  revokeWarning: jest.fn(),
+}));
+
 const { getDoc } = require('../../src/utils/firestore-helpers');
+const { revokeWarning, WarningRevokeError } = require('../../src/utils/warnings');
 const { requireAdmin } = require('../../src/middleware/auth');
 
 // ─── App setup ───────────────────────────────────────────────────
@@ -118,6 +124,7 @@ beforeEach(() => {
   mockBatchSet.mockReset();
   mockBatchUpdate.mockReset();
   getDoc.mockReset();
+  revokeWarning.mockReset();
   requireAdmin.mockReset();
 
   mockCollectionGet = jest.fn().mockResolvedValue({ empty: true, docs: [] });
@@ -281,15 +288,18 @@ describe('GET /api/user/:uniqueId/warnings', () => {
 // ─── POST /api/user/:id/warnings/:warnId/revoke ──────────────────
 
 describe('POST /api/user/:uniqueId/warnings/:warningId/revoke', () => {
-  it('returns 403 for non-admin', async () => {
+  it('returns 403 for non-admin and revokes nothing', async () => {
     blockAdmin();
     const app = createAdminApp();
     const res = await request(app).post('/api/user/10000001/warnings/warn-1/revoke');
     expect(res.status).toBe(403);
+    expect(revokeWarning).not.toHaveBeenCalled();
   });
 
   it('returns 404 when warning does not exist', async () => {
-    getDoc.mockResolvedValueOnce(null); // warning doc not found
+    revokeWarning.mockRejectedValueOnce(
+      new WarningRevokeError('warning-not-found', 'Warning not found'),
+    );
 
     const app = createAdminApp();
     const res = await request(app).post('/api/user/10000001/warnings/warn-999/revoke');
@@ -298,11 +308,7 @@ describe('POST /api/user/:uniqueId/warnings/:warningId/revoke', () => {
   });
 
   it('returns 400 when warning is already revoked', async () => {
-    getDoc.mockResolvedValueOnce({
-      id: 'warn-1',
-      revoked: true,
-      gcsDeduction: 10,
-    });
+    revokeWarning.mockResolvedValueOnce({ alreadyRevoked: true });
 
     const app = createAdminApp();
     const res = await request(app).post('/api/user/10000001/warnings/warn-1/revoke');
@@ -310,43 +316,26 @@ describe('POST /api/user/:uniqueId/warnings/:warningId/revoke', () => {
     expect(res.body.error).toMatch(/already revoked/i);
   });
 
-  it('returns 200 and restores GCS on successful revoke', async () => {
-    // First getDoc call = warning doc
-    getDoc.mockResolvedValueOnce({
-      id: 'warn-1',
-      revoked: false,
-      gcsDeduction: 10,
-    });
-    // Second db.doc().get() call = user doc (for current GCS)
-    mockDocGet.mockResolvedValueOnce({
-      exists: true,
-      id: '10000001',
-      data: () => ({ gcsScore: 80, warningCount: 2 }),
+  // SHY-0605: the route revokes through the shared helper, which gives the
+  // GCS back inside one transaction and writes the audit entry with it.
+  it('revokes through the shared helper as the admin, with the audit entry', async () => {
+    revokeWarning.mockResolvedValueOnce({
+      alreadyRevoked: false,
+      deduction: 10,
+      previousGcs: 80,
+      restoredGcs: 90,
     });
 
     const app = createAdminApp();
     const res = await request(app).post('/api/user/10000001/warnings/warn-1/revoke');
 
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.restoredGcs).toBe(90); // 80 + 10
-    expect(res.body.deduction).toBe(10);
-
-    // PR #491: revoke now uses db.batch() for atomicity (audit H7).
-    // The 3 writes (warning revoke, user GCS restore, audit log) are
-    // committed in ONE atomic batch — assert on mockBatchUpdate /
-    // mockBatchSet rather than the global mockDocUpdate / mockDocSet.
-    expect(mockBatchUpdate).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ revoked: true, revokedBy: 'admin-uid' }),
-    );
-    expect(mockBatchUpdate).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ gcsScore: 90, warningCount: 1 }),
-    );
-    // Single batch.commit — proves the 3 writes are atomic, not
-    // 3 separate Promise.all awaits as in the pre-fix code.
-    expect(mockBatchCommit).toHaveBeenCalledTimes(1);
+    expect(res.body).toStrictEqual({ success: true, restoredGcs: 90, deduction: 10 });
+    expect(revokeWarning).toHaveBeenCalledTimes(1);
+    expect(revokeWarning).toHaveBeenCalledWith('10000001', 'warn-1', {
+      actor: 'admin-uid',
+      audit: true,
+    });
   });
 });
 
@@ -494,12 +483,7 @@ describe('GET /api/user/:uniqueId/warnings — pagination', () => {
 
 describe('POST /api/user/:uniqueId/warnings/:warningId/revoke — additional', () => {
   it('returns 404 when user not found during revoke', async () => {
-    getDoc.mockResolvedValueOnce({
-      id: 'warn-1',
-      revoked: false,
-      gcsDeduction: 10,
-    });
-    mockDocGet.mockResolvedValueOnce({ exists: false });
+    revokeWarning.mockRejectedValueOnce(new WarningRevokeError('user-not-found', 'User not found'));
 
     const app = createAdminApp();
     const res = await request(app).post('/api/user/10000001/warnings/warn-1/revoke');
@@ -508,7 +492,7 @@ describe('POST /api/user/:uniqueId/warnings/:warningId/revoke — additional', (
   });
 
   it('returns 500 on Firestore error during revoke', async () => {
-    getDoc.mockRejectedValueOnce(new Error('Firestore read error'));
+    revokeWarning.mockRejectedValueOnce(new Error('Firestore read error'));
 
     const app = createAdminApp();
     const res = await request(app).post('/api/user/10000001/warnings/warn-1/revoke');

@@ -69,6 +69,14 @@ jest.mock('../../src/utils/firebase', () => ({
   },
 }));
 
+// SHY-0605: unsuspend-all ends the user's suspension through endSuspension,
+// which has its own tests (tests/utils/end-suspension.unit.test.js); here only the
+// route's part.
+const mockEndSuspension = jest.fn();
+jest.mock('../../src/utils/end-suspension', () => ({
+  ...jest.requireActual('../../src/utils/end-suspension'),
+  endSuspension: (...args) => mockEndSuspension(...args),
+}));
 jest.mock('../../src/utils/helpers', () => ({
   generateId: jest.fn(() => 'mock-audit-id'),
   now: jest.fn(() => 1709913600000),
@@ -114,6 +122,7 @@ beforeEach(() => {
   mockCollectionGet.mockResolvedValue({ empty: true, docs: [], size: 0 });
   mockDocSet.mockResolvedValue();
   mockDocUpdate.mockResolvedValue();
+  mockEndSuspension.mockReset().mockResolvedValue({ alreadyEnded: false });
   identityGraphRouter = require('../../src/routes/identity-graph');
 });
 
@@ -344,7 +353,7 @@ describe('POST /admin/identity-graph/:id/unsuspend-all', () => {
     expect(res.body.unsuspended).toBe(0);
   });
 
-  test('propagates unsuspend to user doc (isSuspended=false)', async () => {
+  test('ends the user’s suspension as the admin, clearing the start’s own fields', async () => {
     mockDocGet.mockImplementation((path) => {
       if (path && path.includes('identityGraphs/user-1')) {
         return Promise.resolve(makeSuspendedGraphWithNodes('user-1'));
@@ -354,9 +363,20 @@ describe('POST /admin/identity-graph/:id/unsuspend-all', () => {
     const app = createAdminApp();
     await request(app).post('/api/admin/identity-graph/user-1/unsuspend-all').send({}).expect(200);
 
-    const userSetCall = mockDocSet.mock.calls.find((c) => c[0] === 'users/user-1');
-    expect(userSetCall).toBeDefined();
-    expect(userSetCall[1]).toMatchObject({ isSuspended: false });
+    expect(mockEndSuspension).toHaveBeenCalledTimes(1);
+    expect(mockEndSuspension).toHaveBeenCalledWith('user-1', {
+      actor: 'firebase-uid-admin-1',
+      trigger: 'IDENTITY_UNSUSPEND_ALL',
+      extra: { suspendedAt: null, suspendReason: null, updatedAt: 1709913600000 },
+    });
+  });
+
+  test('writes no user itself, so a graph id with no user gets no stub user', async () => {
+    const app = createAdminApp();
+    await request(app).post('/api/admin/identity-graph/nouser/unsuspend-all').send({}).expect(200);
+
+    expect(mockDocSet.mock.calls.map(([path]) => path)).not.toContain('users/nouser');
+    expect(mockDocUpdate.mock.calls.map(([path]) => path)).not.toContain('users/nouser');
   });
 
   test('creates audit log entry', async () => {
@@ -381,6 +401,7 @@ describe('POST /admin/identity-graph/:id/unsuspend-all', () => {
     const res = await request(app).post('/api/admin/identity-graph/user-1/unsuspend-all').send({});
 
     expect(res.status).toBe(403);
+    expect(mockEndSuspension).not.toHaveBeenCalled();
   });
 });
 
@@ -548,24 +569,35 @@ describe('POST /admin/identity-graph/:id/unsuspend-all — error paths', () => {
     expect(res.status).toBe(500);
   });
 
-  test('continues (200) when user doc update fails during unsuspend', async () => {
+  // SHY-0605: a failed ending used to be logged as a warning and answered as
+  // a success, leaving the user suspended. It now fails the request.
+  test('answers 500 naming the step when the ending stops, recording nothing', async () => {
+    const { SuspensionEndError } = jest.requireActual('../../src/utils/end-suspension');
     mockDocGet.mockImplementation((path) => {
       if (path && path.includes('identityGraphs/user-1')) {
         return Promise.resolve(makeSuspendedGraphWithNodes('user-1'));
       }
       return Promise.resolve({ exists: false });
     });
-    mockDocSet.mockImplementation((path) => {
-      if (typeof path === 'string' && path.startsWith('users/')) {
-        return Promise.reject(new Error('User doc write failed'));
-      }
-      return Promise.resolve();
-    });
+    mockEndSuspension.mockRejectedValueOnce(new SuspensionEndError('user', 'write failed'));
     const app = createAdminApp();
     const res = await request(app).post('/api/admin/identity-graph/user-1/unsuspend-all').send({});
 
-    // User propagation failure is caught and warned, not fatal
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({
+      error: 'The suspension could not be fully ended. The user is still suspended.',
+      step: 'user',
+    });
+    const paths = mockDocSet.mock.calls.map(([path]) => String(path));
+    expect(paths.filter((path) => path.startsWith('adminAuditLog/'))).toStrictEqual([]);
+  });
+
+  test('answers 500 without a step for any other ending failure', async () => {
+    mockEndSuspension.mockRejectedValueOnce(new Error('boom'));
+    const app = createAdminApp();
+    const res = await request(app).post('/api/admin/identity-graph/user-1/unsuspend-all').send({});
+
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({ error: 'Internal server error' });
   });
 });
