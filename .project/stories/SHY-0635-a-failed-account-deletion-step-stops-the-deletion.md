@@ -50,6 +50,10 @@ does the same for every other step.
       never before.
 - [ ] Every step is safe to run twice (a second run after a partial one
       deletes what is left and changes nothing else).
+- [ ] The `account_deleted` audit entry is written only after every step
+      succeeded, and its `dataDeleted` lists what was actually deleted. Today
+      it is a fixed list of all 14 kinds (`accountDeletion.js:505-520`, read at
+      b61253c764f), written whatever the steps before it did.
 
 ### Error paths
 

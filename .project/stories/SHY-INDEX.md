@@ -462,6 +462,10 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0634](SHY-0634-the-story-sync-reports-only-board-writes-that-did-not-land.md) | P0 | S | bug | The story sync reports only the board writes that did not land | 📝 Draft | — |  |
 | [SHY-0635](SHY-0635-a-failed-account-deletion-step-stops-the-deletion.md) | P0 | M | bug | A failed account deletion step stops the deletion and is tried again | 📝 Draft | — |  |
 | [SHY-0636](SHY-0636-the-journey-runner-retries-nothing.md) | P0 | S | bug | The journey runner retries nothing; a failed step names its cause | 📝 Draft | — |  |
+| [SHY-0637](SHY-0637-the-dev-portal-cannot-copy-production-into-dev.md) | P0 | S | bug | The dev portal cannot copy production into dev | 📝 Draft | — |  |
+| [SHY-0638](SHY-0638-the-real-ffmpeg-recorder-tests-run-in-ci.md) | P0 | S | bug | The real ffmpeg recorder tests run in CI and never skip | 📝 Draft | — |  |
+| [SHY-0639](SHY-0639-a-checkouts-default-firebase-project-is-dev.md) | P0 | XS | bug | A checkout's default Firebase project is dev, never production | 📝 Draft | — |  |
+| [SHY-0640](SHY-0640-a-deletion-audit-hash-never-uses-a-public-key.md) | P0 | XS | bug | A deletion audit hash never uses a public key | 📝 Draft | — |  |
 
 ## Done
 
