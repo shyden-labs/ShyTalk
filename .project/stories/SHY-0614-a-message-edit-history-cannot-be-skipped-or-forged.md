@@ -10,6 +10,7 @@ type: bug
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
+blocked_by: [SHY-0632]
 ---
 
 # SHY-0614: A private or group message's edit history cannot be skipped or forged, and a recalled message is kept for moderators
@@ -191,7 +192,9 @@ suite; SHY-0626 stops messages being created under another person's name.
 
 ## Dependencies
 
-- None blocking. SHY-0613's checks for trails 12 and 13 assert this story's
+- Blocked by SHY-0632: the privacy line's translations need its Google
+  Cloud Translation read-back. The routes and rules PRs do not wait on it.
+- SHY-0613's checks for trails 12 and 13 assert this story's
   refusals once it lands.
 
 ## Risks & Mitigations

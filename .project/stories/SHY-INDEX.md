@@ -457,6 +457,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0629](SHY-0629-a-groups-moderation-actions-are-logged-by-the-server.md) | P1 | L | feature | A group's moderation actions are logged by the server | 📝 Draft | — |  |
 | [SHY-0630](SHY-0630-the-story-index-reconciler-inserts-rows-on-a-mac-inside-the-table.md) | P0 | S | bug | The story index reconciler inserts its rows on a Mac, inside the Active table | 📝 Draft | — |  |
 | [SHY-0631](SHY-0631-a-deleted-accounts-edit-history-is-deleted-too.md) | P0 | S | bug | A deleted account's edit history is deleted too | 📝 Draft | — |  |
+| [SHY-0632](SHY-0632-every-translation-is-read-back-by-google-cloud-translation.md) | P0 | M | infra | Every translation is read back by Google Cloud Translation on the shared key, within its daily ledger | 📝 Draft | — |  |
 
 ## Done
 
