@@ -10,7 +10,7 @@ type: bug
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
-blocked_by: [SHY-0632]
+blocked_by: [SHY-0632, SHY-0645]
 ---
 
 # SHY-0614: A private or group message's edit history cannot be skipped or forged, and a recalled message is kept for moderators
@@ -268,3 +268,7 @@ suite; SHY-0626 stops messages being created under another person's name.
   covers reactions (0 of 46 files): the dev proof adds reaction scenarios to
   j28 (Theo on Android, Selma on iPhone) and runs them on both phones before
   any production deploy.
+- **2026-10-19, reaction journey**: the runner cannot reach reactions yet
+  (no test tags on the React item, picker or badges, and no way to write as
+  the person not holding the phone). That work is SHY-0645, which the dev
+  proof now waits on; this story's Task 10 runs its journey.

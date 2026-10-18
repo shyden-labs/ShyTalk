@@ -10,6 +10,7 @@ type: bug
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
+blocked_by: [SHY-0645]
 ---
 
 # SHY-0644: A reaction that does not save says so
@@ -105,7 +106,7 @@ Nothing: a small fix to an error case.
 
 ## Dependencies
 
-- None.
+- SHY-0645: the journey this fix is proven on, on both phones.
 
 ## Risks & Mitigations
 
