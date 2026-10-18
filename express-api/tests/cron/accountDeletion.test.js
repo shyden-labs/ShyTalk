@@ -54,6 +54,12 @@ const {
   clearCollection,
   clearCollectionGroup,
 } = require('../helpers/firebase-emulator');
+const {
+  CONVERSATION_TREE_GROUPS,
+  SEEDED_UNDER_COUNT,
+  seedConversationTree,
+  docsUnder,
+} = require('../helpers/conversation-tree');
 
 const UID = '1001'; // user document id (string)
 const N = 1001; // numeric form used by array-contains / collectionGroup queries
@@ -81,10 +87,10 @@ const TOP_LEVEL = [
   'config',
   'decoys',
 ];
+// The conversation tree's groups (edits, settings, mod_log included) so a
+// seeded tree never leaks into the next test.
 const GROUPS = [
-  'messages',
-  'userSettings',
-  'mutes',
+  ...CONVERSATION_TREE_GROUPS,
   'seatRequests',
   'votes',
   'comments',
@@ -176,6 +182,62 @@ describe('accountDeletion main cron (real Firestore emulator)', () => {
     expect(audit).toHaveLength(1);
     expect(audit[0].data().action).toBe('account_deleted');
   }, 30000);
+
+  test('a failed conversation delete keeps the account due, fails the run, and the next run finishes it', async () => {
+    await seedConversationTree(db, 'c1', { participantIds: [N, 2002] });
+    await db.doc(`users/${UID}`).set({
+      email: EMAIL,
+      firebaseUid: 'fb-1001',
+      deletionExecuteAt: now() - 1000,
+      deletionReason: 'user_request',
+    });
+    // Stand in one failed delete; restoreMocks undoes the spy after the test.
+    const spy = jest
+      .spyOn(db, 'recursiveDelete')
+      .mockRejectedValueOnce(new Error('planted: 1 delete failed'));
+
+    await expect(accountDeletion()).rejects.toThrow('1 account deletion(s) failed');
+    expect(await docExists(`users/${UID}`)).toBe(true);
+    expect((await docData(`users/${UID}`)).deletionExecuteAt).toBeGreaterThan(0);
+
+    spy.mockRestore();
+    await accountDeletion();
+
+    expect(await docExists(`users/${UID}`)).toBe(false);
+    expect(await docsUnder(db, 'conversations/c1')).toEqual([]);
+  });
+
+  test('times deleting an account with 200 messages, each edited twice', async () => {
+    await db.doc('conversations/big').set({ participantIds: [N, 2002] });
+    const messagesAndFirstEdits = db.batch();
+    for (let i = 0; i < 200; i += 1) {
+      messagesAndFirstEdits.set(db.doc(`conversations/big/messages/m${i}`), {
+        text: `t${i}`,
+        senderId: UID,
+      });
+      messagesAndFirstEdits.set(db.doc(`conversations/big/messages/m${i}/edits/a`), {
+        previousText: 'a',
+      });
+    }
+    await messagesAndFirstEdits.commit();
+    const secondEdits = db.batch();
+    for (let i = 0; i < 200; i += 1) {
+      secondEdits.set(db.doc(`conversations/big/messages/m${i}/edits/b`), { previousText: 'b' });
+    }
+    await secondEdits.commit();
+    const userDoc = await seedUserDoc();
+    const started = Date.now();
+
+    await hardDeleteAccount(userDoc);
+
+    // SHY-0631 performance AC, read in CI's log: before (plant PR, today's
+    // code) against after (this PR).
+    // eslint-disable-next-line no-console
+    console.log(
+      `[SHY-0631 timing] hardDeleteAccount 200 msgs x 2 edits: ${Date.now() - started} ms`,
+    );
+    expect(await docExists('conversations/big')).toBe(false);
+  });
 
   test('leaves not-yet-due (future) and deletionExecuteAt:0 users untouched (both query clauses)', async () => {
     await db.doc('users/future').set({ deletionExecuteAt: now() + 60 * 60 * 1000 });
@@ -297,18 +359,15 @@ describe('hardDeleteAccount — per-step real erasure', () => {
   }, 30000);
 
   test('Step 3: deletes a 1-on-1 conversation and all its subcollections', async () => {
-    await db.doc('conversations/c1').set({ participantIds: [N, 2002] });
-    await db.doc('conversations/c1/messages/m1').set({ text: 'hi' });
-    await db.doc('conversations/c1/userSettings/s1').set({ userId: UID });
-    await db.doc(`conversations/c1/mutes/${UID}`).set({ muted: true });
+    await seedConversationTree(db, 'c1', { participantIds: [N, 2002] });
+    // Liveness: the walker sees every seeded document before the delete.
+    expect(await docsUnder(db, 'conversations/c1')).toHaveLength(SEEDED_UNDER_COUNT);
     const userDoc = await seedUserDoc();
 
     await hardDeleteAccount(userDoc);
 
     expect(await docExists('conversations/c1')).toBe(false);
-    expect(await docExists('conversations/c1/messages/m1')).toBe(false);
-    expect(await docExists('conversations/c1/userSettings/s1')).toBe(false);
-    expect(await docExists(`conversations/c1/mutes/${UID}`)).toBe(false);
+    expect(await docsUnder(db, 'conversations/c1')).toEqual([]);
   }, 30000);
 
   test('Step 3: removes the user from a group conversation and deletes only their subcollection rows', async () => {
@@ -317,10 +376,15 @@ describe('hardDeleteAccount — per-step real erasure', () => {
     await db.doc('conversations/g1/userSettings/theirs').set({ userId: '2002' });
     await db.doc(`conversations/g1/mutes/${UID}`).set({ muted: true });
     await db.doc('conversations/g1/mutes/2002').set({ muted: true });
+    await db.doc('conversations/g1/messages/gm1').set({ text: 'theirs', senderId: '2002' });
+    await db.doc('conversations/g1/messages/gm1/edits/ge1').set({ previousText: 'old' });
     const userDoc = await seedUserDoc();
 
     await hardDeleteAccount(userDoc);
 
+    // A member who only leaves takes nothing of the others' history with them.
+    expect(await docExists('conversations/g1/messages/gm1')).toBe(true);
+    expect(await docExists('conversations/g1/messages/gm1/edits/ge1')).toBe(true);
     expect(await docExists('conversations/g1')).toBe(true); // group kept
     expect((await docData('conversations/g1')).participantIds).toEqual([2002, 3003]);
     expect(await docExists('conversations/g1/userSettings/mine')).toBe(false);
