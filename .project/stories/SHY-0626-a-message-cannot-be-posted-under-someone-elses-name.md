@@ -154,3 +154,8 @@ not affected.
   defect (impersonation in spaces with minors). MVP: launch users meet it.
   Scored 8: rules for two paths, system messages moved to the server, both
   apps, rules tests and a journey; the same size as SHY-0614.
+- **2026-10-18**: Also found designing SHY-0614: the send route
+  (`POST /api/conversations/:id/messages`) accepts type `MOD_ACTION` from any
+  participant with any text (both apps send "<name> hid a message" this
+  way), so a participant can post a fake moderation notice. The "as the
+  system" ACs cover it; the inventory AC lists it.
