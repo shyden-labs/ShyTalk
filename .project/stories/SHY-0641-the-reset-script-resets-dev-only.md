@@ -1,6 +1,6 @@
 ---
 id: SHY-0641
-status: In Review
+status: Done
 owner: claude
 created: 2026-10-19
 priority: P0
@@ -120,8 +120,9 @@ Nothing: operator tooling with no learner-facing change.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; CI green by step name; merged to
-      `develop`.
+- [x] Every AC ticked with its proof; CI green by step name; merged to
+      `develop`. Proof: PR #2433, PR Checks run 39156109352 green by job name
+      on head f3b872430ba, merged as 5d5866935f6.
 
 ## Notes
 
