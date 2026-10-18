@@ -36,6 +36,11 @@ const {
   clearCollection,
   clearCollectionGroup,
 } = require('../helpers/firebase-emulator');
+const {
+  SEEDED_UNDER_COUNT,
+  seedConversationTree,
+  docsUnder,
+} = require('../helpers/conversation-tree');
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -64,6 +69,7 @@ const SUB_GROUPS = [
   'stalkers',
   'giftWall',
   'messages',
+  'edits',
   'userSettings',
   'mutes',
   'settings',
@@ -227,17 +233,29 @@ describe('testDataCleanup (real Firestore emulator)', () => {
   // --- conversation subcollection cleanup ---
 
   test('deletes a conversation’s subcollections AND the conversation doc', async () => {
-    await seed('conversations/c1', { _testRun: 'test_run', createdAt: 0 });
-    await seed('conversations/c1/messages/m1', { text: 'hi' });
-    await seed('conversations/c1/userSettings/us1', { muted: false });
-    await seed('conversations/c1/mod_log/ml1', { action: 'warn' });
+    await seedConversationTree(db, 'c1', { _testRun: 'test_run', createdAt: 0 });
+    // Liveness: the walker sees every seeded document before the sweep.
+    expect(await docsUnder(db, 'conversations/c1')).toHaveLength(SEEDED_UNDER_COUNT);
 
     await testDataCleanup();
 
     expect(await exists('conversations/c1')).toBe(false);
-    expect(await exists('conversations/c1/messages/m1')).toBe(false);
-    expect(await exists('conversations/c1/userSettings/us1')).toBe(false);
-    expect(await exists('conversations/c1/mod_log/ml1')).toBe(false);
+    expect(await docsUnder(db, 'conversations/c1')).toEqual([]);
+  });
+
+  test('a conversation over 500 messages is deleted in full', async () => {
+    await seed('conversations/big', { _testRun: 'test_run', createdAt: 0 });
+    // A batch holds 500 writes: 500 then 1.
+    const first = db.batch();
+    for (let i = 0; i < 500; i += 1)
+      first.set(db.doc(`conversations/big/messages/m${i}`), { text: 'x' });
+    await first.commit();
+    await seed('conversations/big/messages/m500', { text: 'x' });
+    expect(await docsUnder(db, 'conversations/big')).toHaveLength(501);
+
+    await testDataCleanup();
+
+    expect(await docsUnder(db, 'conversations/big')).toEqual([]);
   });
 
   // --- non-user / non-conversation collections skip subcollection cleanup ---

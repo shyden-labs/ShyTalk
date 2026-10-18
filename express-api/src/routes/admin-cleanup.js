@@ -1080,3 +1080,5 @@ router.post('/cleanup/user-beans/:uniqueId', async (req, res) => {
 });
 
 module.exports = router;
+// SHY-0631 plant: a test seam only, so the tests run today's code.
+module.exports._deleteConversation = deleteConversation;
