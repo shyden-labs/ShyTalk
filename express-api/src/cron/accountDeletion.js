@@ -11,6 +11,7 @@
 const { db, auth, FieldValue } = require('../utils/firebase');
 const { generateId, now } = require('../utils/helpers');
 const { queryDocs } = require('../utils/firestore-helpers');
+const { deleteTree } = require('../utils/delete-tree');
 const { sendEmail } = require('../utils/email');
 const { buildDeletionCompleteEmail } = require('../utils/email-templates');
 const r2 = require('../utils/r2');
@@ -65,20 +66,9 @@ async function deleteUserR2Storage(uniqueId) {
   }
 }
 
-/** Delete a 1-on-1 conversation and all its subcollections. */
+/** Delete a 1-on-1 conversation and everything under it (SHY-0631). */
 async function deleteOneOnOneConversation(convId) {
-  const [messages, userSettings, mutes] = await Promise.all([
-    queryDocs(db.collection(`conversations/${convId}/messages`)),
-    queryDocs(db.collection(`conversations/${convId}/userSettings`)),
-    queryDocs(db.collection(`conversations/${convId}/mutes`)),
-  ]);
-  const allDocs = [
-    ...messages.map((m) => `conversations/${convId}/messages/${m.id}`),
-    ...userSettings.map((s) => `conversations/${convId}/userSettings/${s.id}`),
-    ...mutes.map((m) => `conversations/${convId}/mutes/${m.id}`),
-    `conversations/${convId}`,
-  ];
-  await batchDeletePaths(allDocs);
+  return deleteTree(db, db.doc(`conversations/${convId}`));
 }
 
 /** Remove user from a group conversation. */
@@ -103,24 +93,31 @@ async function removeUserFromGroupConversation(convId, uniqueId) {
   }
 }
 
-/** Step 3: Cleanup conversations */
+/**
+ * Step 3: Cleanup conversations.
+ *
+ * Errors are not caught here (SHY-0631): they leave hardDeleteAccount before
+ * step 8 deletes the user document, so the account stays due and the next
+ * run deletes what is left.
+ */
 async function cleanupConversations(uniqueId) {
-  try {
-    const convSnap = await db
-      .collection('conversations')
-      .where('participantIds', 'array-contains', Number(uniqueId))
-      .get();
-    for (const convDoc of convSnap.docs) {
-      const participantCount = (convDoc.data().participantIds || []).length;
-      if (participantCount <= 2) {
-        await deleteOneOnOneConversation(convDoc.id);
-      } else {
-        await removeUserFromGroupConversation(convDoc.id, uniqueId);
+  const convSnap = await db
+    .collection('conversations')
+    .where('participantIds', 'array-contains', Number(uniqueId))
+    .get();
+  const deleted = {};
+  for (const convDoc of convSnap.docs) {
+    const participantCount = (convDoc.data().participantIds || []).length;
+    if (participantCount <= 2) {
+      const counts = await deleteOneOnOneConversation(convDoc.id);
+      for (const [collection, n] of Object.entries(counts)) {
+        deleted[collection] = (deleted[collection] || 0) + n;
       }
+    } else {
+      await removeUserFromGroupConversation(convDoc.id, uniqueId);
     }
-  } catch (err) {
-    log.error('cron', 'Failed to cleanup conversations', { uniqueId, error: err.message });
   }
+  log.info('cron', 'Conversation documents deleted', { uniqueId, deleted });
 }
 
 /** Delete a room and all its subcollections. */
@@ -541,6 +538,7 @@ async function accountDeletion() {
     .limit(10)
     .get();
 
+  let failed = 0;
   for (const doc of pendingSnap.docs) {
     try {
       // Re-read fresh doc to check if cancelled during processing
@@ -550,6 +548,7 @@ async function accountDeletion() {
       }
       await hardDeleteAccount(freshSnap);
     } catch (err) {
+      failed += 1;
       log.error('cron', 'Account deletion failed', { uniqueId: doc.id, error: err.message });
     }
   }
@@ -586,6 +585,12 @@ async function accountDeletion() {
         });
       }
     }
+  }
+
+  if (failed > 0) {
+    // SHY-0631: a failed account keeps deletionExecuteAt, so the next run
+    // tries it again; the sweep answers 500 so the nightly run is red.
+    throw new Error(`${failed} account deletion(s) failed; each stays due for the next run`);
   }
 }
 

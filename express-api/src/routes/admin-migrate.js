@@ -14,6 +14,7 @@ const { db } = require('../utils/firebase');
 const { clearBanCache } = require('../utils/bans');
 const { requireAdmin } = require('../middleware/auth');
 const log = require('../utils/log');
+const { deleteTree } = require('../utils/delete-tree');
 
 // Same collections the backup cron tracks, minus large operational ones (logs, alerts)
 const TOP_LEVEL_COLLECTIONS = [
@@ -193,8 +194,14 @@ router.post('/admin/migrate-prod-data', async (req, res) => {
     const srcDb = getProdDb();
     const results = { deleted: {}, copied: {}, errors: [] };
 
-    // Phase 1: Delete subcollections in dev first
+    // Phase 1: Delete subcollections in dev first. Conversations go as one
+    // tree (SHY-0631): a per-name list leaves `edits`, `settings`, `mod_log`.
+    await runMigrationOp(results, 'conversations/**', 'delete', async () => {
+      const counts = await deleteTree(db, db.collection('conversations'));
+      return Object.values(counts).reduce((sum, n) => sum + n, 0);
+    });
     for (const [parent, sub] of SUBCOLLECTIONS) {
+      if (parent === 'conversations') continue; // deleted above; still copied in Phase 4
       await runMigrationOp(results, `${parent}/${sub}`, 'delete', async () => {
         const parentDocs = await db.collection(parent).listDocuments();
         let subDeleted = 0;

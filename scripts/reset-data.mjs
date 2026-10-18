@@ -28,10 +28,15 @@
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getDatabase } from 'firebase-admin/database';
+import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
+
+// SHY-0631: the one helper that deletes a conversation's whole tree (CommonJS,
+// no imports of its own, so it runs against this script's Firestore).
+const { deleteTree } = createRequire(import.meta.url)('../express-api/src/utils/delete-tree.js');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -141,7 +146,6 @@ const TOP_LEVEL_COLLECTIONS = [
 // parent → [subcollection names]
 const SUBCOLLECTIONS = {
   rooms: ['messages', 'seatRequests'],
-  conversations: ['messages', 'userSettings', 'mutes'],
   users: ['backpack', 'giftWall', 'transactions', 'stalkers'],
 };
 
@@ -167,6 +171,12 @@ async function run() {
 
   // ── Phase 1: Delete subcollections ──
   console.log('Phase 1: Deleting subcollections...');
+  // Conversations go as one tree (SHY-0631): edits, settings and mod_log too.
+  const convCounts = await deleteTree(db, db.collection('conversations'));
+  const convTotal = Object.values(convCounts).reduce((sum, n) => sum + n, 0);
+  results['conversations/**'] = convTotal;
+  grandTotal += convTotal;
+  if (convTotal > 0) console.log(`  conversations/**: ${convTotal} docs deleted`);
   for (const [parent, subs] of Object.entries(SUBCOLLECTIONS)) {
     const parentDocs = await db.collection(parent).listDocuments();
     for (const sub of subs) {

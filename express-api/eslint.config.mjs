@@ -42,10 +42,11 @@ export default [
     // inside describe/test blocks for isolation (intentional shadow of
     // the file-scope import). no-shadow as a warning floods CI on a
     // pattern that's correct-by-convention in jest test layouts.
+    // `no-undef` stays on (SHY-0631): with globals.jest set it costs nothing,
+    // and a call to a helper out of scope fails lint instead of a CI run.
     files: ['tests/**/*.test.js', 'src/__tests__/**/*.test.js'],
     rules: {
       'prefer-const': 'off',
-      'no-undef': 'off',
       'no-shadow': 'off',
     },
   },

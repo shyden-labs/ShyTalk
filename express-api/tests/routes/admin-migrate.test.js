@@ -75,6 +75,8 @@ const mockProdFirestore = {
 
 // ─── Firebase mock ──────────────────────────────────────────────
 
+// SHY-0631: conversations are deleted as one tree through deleteTree.
+jest.mock('../../src/utils/delete-tree', () => ({ deleteTree: jest.fn().mockResolvedValue({}) }));
 jest.mock('../../src/utils/firebase', () => ({
   db: mockDevDb,
 }));
@@ -523,7 +525,10 @@ describe('POST /api/admin/migrate-prod-data', () => {
     // Subcollection results use "parent/sub" key format
     expect(res.body.details.deleted).toHaveProperty('rooms/messages');
     expect(res.body.details.deleted).toHaveProperty('rooms/seatRequests');
-    expect(res.body.details.deleted).toHaveProperty('conversations/messages');
+    // SHY-0631: conversations are deleted as one tree, not per subcollection.
+    expect(res.body.details.deleted).toHaveProperty('conversations/**');
+    expect(res.body.details.deleted).not.toHaveProperty('conversations/messages');
+    expect(require('../../src/utils/delete-tree').deleteTree).toHaveBeenCalledTimes(1);
     expect(res.body.details.copied).toHaveProperty('rooms/messages');
     expect(res.body.details.copied).toHaveProperty('rooms/seatRequests');
     expect(res.body.details.copied).toHaveProperty('conversations/messages');

@@ -35,6 +35,9 @@ const mockDoc = jest.fn().mockImplementation(() => ({
   delete: jest.fn().mockResolvedValue(),
 }));
 
+// SHY-0631: conversations are deleted through deleteTree, which needs a real
+// BulkWriter; the tree itself is proven in tests/utils/conversation-tree-paths.test.js.
+jest.mock('../../src/utils/delete-tree', () => ({ deleteTree: jest.fn().mockResolvedValue({}) }));
 jest.mock('../../src/utils/firebase', () => ({
   db: {
     collection: (..._args) => {
@@ -453,6 +456,7 @@ describe('POST /api/cleanup/system-conversations', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.deleted).toBe(1);
+    expect(require('../../src/utils/delete-tree').deleteTree).toHaveBeenCalledTimes(1);
   });
 
   test('skips conversations where otherUid is not found', async () => {
@@ -495,6 +499,7 @@ describe('POST /api/cleanup/system-conversations', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(1);
+    expect(require('../../src/utils/delete-tree').deleteTree).toHaveBeenCalledTimes(1);
   });
 
   test('returns 500 when Firestore query fails', async () => {
@@ -540,6 +545,7 @@ describe('POST /api/cleanup/system-conversations', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.deleted).toBe(1);
+    expect(require('../../src/utils/delete-tree').deleteTree).toHaveBeenCalledTimes(1);
   });
 });
 
