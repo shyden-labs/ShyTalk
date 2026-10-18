@@ -16,7 +16,9 @@ import com.shyden.shytalk.core.util.guardedSnapshots
 import com.shyden.shytalk.core.util.jsonToMap
 import com.shyden.shytalk.core.util.logW
 import com.shyden.shytalk.data.firestore.dataMap
+import com.shyden.shytalk.data.remote.ApiException
 import com.shyden.shytalk.data.remote.IosApiClient
+import com.shyden.shytalk.data.remote.PrivateMessageEditApi
 import dev.gitlive.firebase.firestore.Direction
 import dev.gitlive.firebase.firestore.FieldValue
 import dev.gitlive.firebase.firestore.FirebaseFirestore
@@ -305,24 +307,11 @@ class IosPrivateMessageRepositoryImpl(
         newText: String,
     ): Resource<Unit> =
         firebaseCall("Failed to edit message") {
-            val messageRef =
-                firestore
-                    .collection("conversations/$conversationId/messages")
-                    .document(messageId)
-            val currentDoc = messageRef.get()
-            val currentText = currentDoc.get<String>("text")
-            val now = currentTimeMillis()
-
-            val editRef = messageRef.collection("edits").document
-            val batch = firestore.batch()
-            batch.set(editRef, mapOf("previousText" to currentText, "editedAt" to now))
-            batch.updateFields(messageRef) {
-                "text" to newText
-                "isEdited" to true
-                "editedAt" to now
-                "editCount" to FieldValue.increment(1)
-            }
-            batch.commit()
+            // SHY-0614: the server saves the history entry from the stored text.
+            api.patch(
+                PrivateMessageEditApi.editPath(conversationId, messageId),
+                JsonObject(PrivateMessageEditApi.editBody(newText).mapValues { JsonPrimitive(it.value) }),
+            )
         }
 
     override suspend fun getEditHistory(
@@ -599,9 +588,11 @@ class IosPrivateMessageRepositoryImpl(
         messageId: String,
     ): Resource<Unit> =
         firebaseCall("Failed to recall message") {
-            firestore.collection("conversations/$conversationId/messages").document(messageId).updateFields {
-                "isRecalled" to true
-                "text" to ""
+            // SHY-0614: the server keeps the recalled text where only admins read it.
+            try {
+                api.post(PrivateMessageEditApi.recallPath(conversationId, messageId))
+            } catch (e: ApiException) {
+                if (!PrivateMessageEditApi.recallAlreadyDone(e.statusCode)) throw e
             }
         }
 
