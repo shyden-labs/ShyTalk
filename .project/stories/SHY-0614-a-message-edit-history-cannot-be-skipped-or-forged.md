@@ -65,16 +65,26 @@ suite; SHY-0626 stops messages being created under another person's name.
 - [x] First, every client write to `messages`, `edits` and `mod_log` (both
       apps and the website) is listed per call site in Notes, with what each
       changes.
-- [ ] Editing a message's text goes through one server route that, in one
+- [x] Editing a message's text goes through one server route that, in one
       transaction, saves the current text as an `edits` entry (with editor,
       time and previous text read from the stored message, never from the
-      request) and updates the message.
+      request) and updates the message. Proof: PR #2420,
+      `express-api/tests/routes/conversation-message-edits.test.js` "an edit
+      saves the stored text as history and updates the message", "a forged
+      previousText in the body is ignored", "two edits at once both land in
+      history and neither loses the other".
 - [ ] Recalling a message goes through one server route that, in one
       transaction, saves the current text where only admins can read it
       (never in `edits`, which participants read), then marks the message
       recalled and blanks its text.
-- [ ] Both apps call those routes; neither writes `edits`, `isRecalled` or a
-      message's text directly any more.
+- [x] Both apps call those routes; neither writes `edits`, `isRecalled` or a
+      message's text directly any more. Proof: PR #2437 (merged 5321441f845):
+      shared `PrivateMessageEditApi` (commonTest, 7 tests); Android
+      `PrivateMessageRepositoryImplTest` pins the routes, a body of only
+      `text` and no Firestore write (5 of 6 red on the old code; 2 mutants
+      killed); iOS compiled, its runtime proof is the dev journey (Task 10).
+      `git grep` at 5321441f845 finds no `"isRecalled" to true` or
+      `collection("edits")` in either app (room edits are SHY-0628).
 - [ ] Hiding a message stays a phone write, allowed only when `hiddenBy` is
       the caller and only `isHidden` and `hiddenBy` change.
 - [ ] A reaction stays a phone write by any participant, allowed only when
