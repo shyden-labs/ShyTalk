@@ -64,6 +64,19 @@ jobs:
           ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 0
 
+      # SHY-0625: no token means no scan, and no scan is a fail, never a skip
+      # that succeeds. Checked first so a missing token fails in seconds, not
+      # after the test steps below.
+      - name: Require SONAR_TOKEN
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "::error::SONAR_TOKEN is empty: set it as an Actions secret, and as a Dependabot secret for Dependabot PRs"
+            echo "SonarCloud: FAILED. Scan: did not run (SONAR_TOKEN is empty)." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
       # Cache the SonarCloud scanner engine (SHY-0068). AWS WAF
       # intermittently blocks runner IPs on the engine download (PR #1049,
       # PR #1001) — cache the artefact instead of retrying the flake
@@ -173,18 +186,28 @@ jobs:
             echo "Build artifacts found — skipping rebuild"
           else
             echo "No build artifacts — running tests with coverage"
-            ./gradlew :shared:jvmTest testDevDebugUnitTest jacocoDevDebugUnitTestReport || true
+            ./gradlew :shared:jvmTest testDevDebugUnitTest jacocoDevDebugUnitTestReport
           fi
 
       - name: Run SonarCloud analysis
-        if: env.SONAR_TOKEN != ''
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew sonar -Dsonar.token=$SONAR_TOKEN -x :app:sonar
 
-      - name: Skip SonarCloud (no token)
-        if: env.SONAR_TOKEN == ''
+      # SHY-0625: the scanner uploads and stops (`sonar.qualitygate.wait` is
+      # false in build.gradle.kts), so this step reads the result: it waits for
+      # SonarCloud to process THIS analysis, checks a PR's verdict is for the
+      # commit checked out above, and fails on anything but a passed gate.
+      # CEILING_SECONDS is provisional until three waits are measured
+      # (SHY-0625's Performance AC). Pinned by
+      # express-api/tests/scripts/sonar-verdict.unit.test.js and
+      # express-api/tests/scripts/sonarcloud-gate-blocks.test.js.
+      - name: Read the SonarCloud verdict
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: echo "::warning::SonarCloud skipped — SONAR_TOKEN unavailable (Dependabot PR on public repo)"
+          REPORT_TASK_PATH: build/sonar/report-task.txt
+          CEILING_SECONDS: '300'
+          EXPECTED_SHA: ${{ inputs.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/sonar-verdict.js

@@ -93,7 +93,9 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // warnings.js; tests/utils/{auto-bans,end-suspension,warnings,appeals}
 // .unit.test.js; tests/routes/suspension-ending-restores-everything.test.js;
 // tests/scripts/suspension-ends-in-one-place.test.js (SHY-0605).
-const FILES_READ_FLOOR = 2013;
+// 2013 -> 2016: scripts/sonar-verdict.js, tests/scripts/sonar-verdict.unit.test.js
+// and tests/scripts/sonarcloud-gate-blocks.test.js (SHY-0625).
+const FILES_READ_FLOOR = 2016;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

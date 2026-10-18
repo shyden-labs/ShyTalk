@@ -1,6 +1,6 @@
 ---
 id: SHY-0625
-status: Draft
+status: In Review
 owner: claude
 created: 2026-10-18
 priority: P0
@@ -100,7 +100,9 @@ each project's own ticket); this story is ShyTalk's.
 ### Security
 
 - [ ] The token is still read only from secrets, never echoed; the
-      Dependabot secret is the only new home (scan-only key).
+      Dependabot secret is the only new home. (The free plan has no
+      scan-only token: the Dependabot secret holds a personal token,
+      `shytalk-ci-2026-10-18`, expiring 2027-10-18; see Notes.)
 
 ### UX
 
@@ -187,3 +189,10 @@ each project's own ticket); this story is ShyTalk's.
 
 - **2026-10-18**: Filed from SHY-0605 after two side-agent notes on #2395
   (no scan without the token; no verdict read).
+- **2026-10-18**: Nobody held the Actions secret's value, so a new
+  SonarCloud token `shytalk-ci-2026-10-18` (expires 2027-10-18) was made
+  from Shyden's signed-in tab and kept in this Mac's Keychain (service
+  `shytalk-sonarcloud-token`); Shyden set it as the Dependabot secret from
+  his own terminal (the App has no secrets permission, so it cannot read
+  the secret back). The Actions secret still holds the older token. When
+  the token expires the scan fails red, never silently.
