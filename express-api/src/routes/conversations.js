@@ -9,65 +9,14 @@ const router = require('express').Router();
 const { db, rtdb, FieldValue } = require('../utils/firebase');
 const { generateId, now } = require('../utils/helpers');
 const { sendPushToUser } = require('../utils/fcm');
-const { requireSameCohort } = require('../middleware/sameCohort');
 const { cohortFromClaim, effectiveCohort } = require('../utils/firebase-claims');
-const { isLiveAdmin, checkSuspension } = require('../middleware/auth');
-const { auditAdminFlagBypass } = require('../utils/segregation-audit');
-const { isAgeGatingEnabled } = require('../safety/age-gating-flag');
-const { checkFeatureAccess } = require('../safety/enforce');
+const { checkSuspension } = require('../middleware/auth');
+const {
+  gateConversationWrite,
+  gateCrossCohortConversation,
+} = require('../utils/conversation-write-gate');
 const log = require('../utils/log');
 const { openStream } = require('../utils/sse');
-
-/**
- * UK OSA #17 PR 4 + PR 8 — combined gate for conversation reads.
- *
- * Two gate paths, in order:
- *
- *   1. (PR 8) `crossCohortAtMigration: true` → 404 regardless of
- *      current cohorts. Set by the migration script on 1:1 cross-
- *      cohort threads. The flag is the load-bearing rules-side hide
- *      (firestore.rules denies reads on the parent + every
- *      subcollection when set, per PR 3); Express mirrors the 404
- *      as defence in depth. Admin callers are exempt (live-admin
- *      re-check, same pattern as `requireSameCohort`) — moderators
- *      need cross-cohort visibility for forensics. No audit row is
- *      written here: the migration already wrote one per migrated
- *      thread, and a per-request audit on a known-blocked thread
- *      would be noise.
- *
- *   2. (PR 4) Runtime cohort gate — 1:1 only. Looks up the OTHER
- *      participant's current cohort and 404s if it mismatches the
- *      caller's. Group conversations skip both gates (the freeze
- *      semantics for groups are participant-list only — existing
- *      members keep read+write per design doc § "Migration").
- */
-async function gateCrossCohortConversation(req, res, conv) {
-  if (conv?.crossCohortAtMigration === true) {
-    // Admin re-check matches requireSameCohort's pattern (60s
-    // adminClaimCache, demoted-admin defence). Honoured here so a
-    // mod can read a hidden thread for an appeal without bypassing
-    // the rest of the gate machinery.
-    if (req?.auth?.token?.admin === true) {
-      const liveAdmin = req?.auth?.uid ? await isLiveAdmin(req.auth.uid) : false;
-      if (liveAdmin) {
-        auditAdminFlagBypass(req, String(req?.params?.id ?? ''));
-        return false;
-      }
-    }
-    res.status(404).json({ error: 'Not found' });
-    return true;
-  }
-  if (conv?.isGroup) return false;
-  const participantIds = (conv?.participantIds || []).map(String);
-  if (participantIds.length !== 2) return false;
-  const callerId = String(req.auth.uniqueId);
-  const otherId = participantIds.find((p) => p !== callerId);
-  if (!otherId) return false;
-  return requireSameCohort(req, res, otherId, async () => {
-    const snap = await db.doc(`users/${otherId}`).get();
-    return snap.exists ? snap.data() : null;
-  });
-}
 
 const DEFAULT_MESSAGE_LIMIT = 50;
 const MAX_MESSAGE_LIMIT = 200;
@@ -519,45 +468,13 @@ router.post('/conversations/:id/messages', async (req, res) => {
     const convDoc = convSnap.data();
     if (!convDoc) return res.status(500).json({ error: 'Corrupted conversation data' });
 
+    // Participant check, SHY-0060 DM age gate and cohort gate: one home
+    // shared with the edit and recall routes (SHY-0614).
+    if (await gateConversationWrite(req, res, convDoc, { ageGate: true })) return;
+
     const participantIds = convDoc.participantIds || [];
-    // participantIds are stored as STRINGS (the app writes them, firestore.rules
-    // enforces `string(callerUniqueId()) in participantIds`) but senderId
-    // (req.auth.uniqueId) is a NUMBER — coerce both, as the GET route above
-    // (line ~222) already does, so this check isn't type-fooled into a 403.
-    if (!participantIds.map(String).includes(String(senderId))) {
-      return res.status(403).json({ error: 'Not a participant of this conversation' });
-    }
 
-    // SHY-0060 — per-feature age gate on 1:1 DMs (inert unless the operator
-    // flag is ON). A DM with a mutually-followed user is 13+ (bidirectional
-    // consent); a DM with anyone else is 18+ (the stranger predator-vector).
-    // Group conversations are moderated multi-user spaces — out of scope. The
-    // flag is checked first so the sender doc is loaded only when gating is on.
-    // IDs cross a String/Number boundary here: participantIds are stored as
-    // STRINGS (firestore.rules + the app), senderId (req.auth.uniqueId) is a
-    // NUMBER, and followingIds/followerIds are NUMBERS (the follow route
-    // writes parseInt'd ids). Coerce everything to String for comparison —
-    // the same pattern this file's GET route + gateCrossCohortConversation use.
-    const senderIdStr = String(senderId);
-    const dmRecipientIds = participantIds.map(String).filter((pid) => pid !== senderIdStr);
-    if (!convDoc.isGroup && dmRecipientIds.length === 1 && (await isAgeGatingEnabled(db))) {
-      const senderData = (await db.doc(`users/${senderId}`).get()).data() || {};
-      const recipientId = dmRecipientIds[0]; // String
-      const mutualFollow =
-        Array.isArray(senderData.followingIds) &&
-        Array.isArray(senderData.followerIds) &&
-        senderData.followingIds.map(String).includes(recipientId) &&
-        senderData.followerIds.map(String).includes(recipientId);
-      const dmFeature = mutualFollow
-        ? 'DIRECT_MESSAGE_WITH_FOLLOWED_USER'
-        : 'DIRECT_MESSAGE_WITH_STRANGER';
-      const dmBlock = await checkFeatureAccess(db, dmFeature, senderData);
-      if (dmBlock) return res.status(dmBlock.status).json(dmBlock.body);
-    }
-
-    if (await gateCrossCohortConversation(req, res, convDoc)) return;
-
-    // Same String/Number coercion as the participant check above — without it a
+    // Same String/Number coercion as gateConversationWrite's participant check — without it a
     // String-typed participantIds array never filters out the Number senderId,
     // so the sender would be counted as their own recipient (self-unread +
     // self-notify). Recipient ids feed userSettings doc paths (coercion-safe).
