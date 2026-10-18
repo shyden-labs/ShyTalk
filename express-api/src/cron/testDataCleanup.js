@@ -11,6 +11,7 @@ const { db, FieldValue } = require('../utils/firebase');
 const { clearBanCache } = require('../utils/bans');
 const { restoreUniqueIdCounter } = require('../utils/unique-id-counter');
 const log = require('../utils/log');
+const { deleteTree } = require('../utils/delete-tree');
 
 const TEST_PREFIX = 'test_';
 const MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
@@ -65,16 +66,13 @@ async function cleanupTaggedCollection(colName, cutoff) {
     if (colName === 'users') {
       userIds.push(doc.data().uniqueId || doc.id);
       await deleteSubcollections(doc.ref, USER_SUBCOLLECTIONS);
+      await doc.ref.delete();
     } else if (colName === 'conversations') {
-      await deleteSubcollections(doc.ref, [
-        'messages',
-        'userSettings',
-        'mutes',
-        'settings',
-        'mod_log',
-      ]);
+      // SHY-0631: the whole tree, `edits` included and past 500 messages.
+      await deleteTree(db, doc.ref);
+    } else {
+      await doc.ref.delete();
     }
-    await doc.ref.delete();
     deleted++;
   }
 

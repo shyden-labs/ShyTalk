@@ -34,6 +34,9 @@ const mockDoc = jest.fn().mockImplementation(() => ({
   delete: jest.fn().mockResolvedValue(),
 }));
 
+// SHY-0631: conversations are deleted through deleteTree, which needs a real
+// BulkWriter; the tree itself is proven in tests/utils/conversation-tree-paths.test.js.
+jest.mock('../../src/utils/delete-tree', () => ({ deleteTree: jest.fn().mockResolvedValue({}) }));
 jest.mock('../../src/utils/firebase', () => ({
   db: {
     collection: (..._args) => {
@@ -507,6 +510,7 @@ describe('POST /api/cleanup/all-private-messages', () => {
     const res = await request(app).post('/api/cleanup/all-private-messages');
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(1);
+    expect(require('../../src/utils/delete-tree').deleteTree).toHaveBeenCalledTimes(1);
   });
 
   test('returns early when no private messages found', async () => {
@@ -555,6 +559,7 @@ describe('POST /api/cleanup/all-group-chats', () => {
     const res = await request(app).post('/api/cleanup/all-group-chats');
     expect(res.status).toBe(200);
     expect(res.body.deleted).toBe(1);
+    expect(require('../../src/utils/delete-tree').deleteTree).toHaveBeenCalledTimes(1);
     expect(mockDeleteObject).toHaveBeenCalledWith('groups/photo1.webp');
   });
 

@@ -35,6 +35,7 @@ const { requireAdmin } = require('../middleware/auth');
 const { clearBanCache } = require('../utils/bans');
 const r2 = require('../utils/r2');
 const { queryDocs } = require('../utils/firestore-helpers');
+const { deleteTree } = require('../utils/delete-tree');
 const log = require('../utils/log');
 
 // Every route in this file is admin-only — gate by path prefix so the
@@ -54,30 +55,9 @@ router.use('/storage/audit', adminGuard);
 
 const listObjectsWithMeta = r2.listObjectsWithMetadata;
 
-/**
- * Delete a conversation and all its associated subcollection data from Firestore.
- */
+/** Delete a conversation and everything under it (SHY-0631). */
 async function deleteConversation(convId) {
-  const [messages, userSettings, mutes] = await Promise.all([
-    queryDocs(db.collection(`conversations/${convId}/messages`)),
-    queryDocs(db.collection(`conversations/${convId}/userSettings`)),
-    queryDocs(db.collection(`conversations/${convId}/mutes`)),
-  ]);
-
-  const allDocs = [
-    ...messages.map((m) => `conversations/${convId}/messages/${m.id}`),
-    ...userSettings.map((s) => `conversations/${convId}/userSettings/${s.id}`),
-    ...mutes.map((m) => `conversations/${convId}/mutes/${m.id}`),
-    `conversations/${convId}`,
-  ];
-
-  for (let i = 0; i < allDocs.length; i += 500) {
-    const batch = db.batch();
-    for (const path of allDocs.slice(i, i + 500)) {
-      batch.delete(db.doc(path));
-    }
-    await batch.commit();
-  }
+  return deleteTree(db, db.doc(`conversations/${convId}`));
 }
 
 /**
@@ -1080,3 +1060,4 @@ router.post('/cleanup/user-beans/:uniqueId', async (req, res) => {
 });
 
 module.exports = router;
+module.exports._deleteConversation = deleteConversation;

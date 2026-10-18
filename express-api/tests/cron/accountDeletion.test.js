@@ -55,7 +55,6 @@ const {
   clearCollectionGroup,
 } = require('../helpers/firebase-emulator');
 const {
-  CONVERSATION_TREE_GROUPS,
   SEEDED_UNDER_COUNT,
   seedConversationTree,
   docsUnder,
@@ -87,10 +86,15 @@ const TOP_LEVEL = [
   'config',
   'decoys',
 ];
-// The conversation tree's groups (edits, settings, mod_log included) so a
-// seeded tree never leaks into the next test.
+// `edits`, `settings` and `mod_log` too (SHY-0631): a seeded conversation
+// tree never leaks into the next test.
 const GROUPS = [
-  ...CONVERSATION_TREE_GROUPS,
+  'messages',
+  'edits',
+  'userSettings',
+  'settings',
+  'mutes',
+  'mod_log',
   'seatRequests',
   'votes',
   'comments',

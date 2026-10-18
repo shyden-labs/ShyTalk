@@ -35,6 +35,9 @@ const mockDoc = jest.fn().mockImplementation(() => ({
   delete: jest.fn().mockResolvedValue(),
 }));
 
+// SHY-0631: conversations are deleted through deleteTree, which needs a real
+// BulkWriter; the tree itself is proven in tests/utils/conversation-tree-paths.test.js.
+jest.mock('../../src/utils/delete-tree', () => ({ deleteTree: jest.fn().mockResolvedValue({}) }));
 jest.mock('../../src/utils/firebase', () => ({
   db: {
     collection: (..._args) => {
@@ -317,6 +320,7 @@ describe('POST /api/cleanup/all-system-conversations', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.deleted).toBe(2);
+    expect(require('../../src/utils/delete-tree').deleteTree).toHaveBeenCalledTimes(2);
   });
 
   test('returns deleted 0 when no system conversations exist', async () => {

@@ -15,6 +15,7 @@ const { getFcmCaptures, clearFcmCaptures } = require('../utils/fcm');
 const { clearBanCache } = require('../utils/bans');
 const { nextUniqueIdFrom, restoreUniqueIdCounter } = require('../utils/unique-id-counter');
 const log = require('../utils/log');
+const { deleteTree } = require('../utils/delete-tree');
 
 const TEST_PREFIX = 'test_';
 
@@ -723,13 +724,11 @@ async function deleteTestData(testRunId) {
     const snap = await query.get();
     for (const doc of snap.docs) {
       if (col === 'conversations') {
-        // Conversations have messages subcollection — delete those first
-        const msgSnap = await doc.ref.collection('messages').get();
-        const msgBatch = db.batch();
-        msgSnap.docs.forEach((m) => msgBatch.delete(m.ref));
-        if (msgSnap.size > 0) await msgBatch.commit();
+        // SHY-0631: the whole tree, not only `messages`.
+        await deleteTree(db, doc.ref);
+      } else {
+        await doc.ref.delete();
       }
-      await doc.ref.delete();
       deleted++;
     }
   }

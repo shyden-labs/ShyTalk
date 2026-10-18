@@ -1,17 +1,11 @@
 /**
  * SHY-0631 — a conversation seeded with every subcollection the rules allow,
  * and a walker that lists whatever is left under a document.
+ *
+ * A seeded tree writes into the `messages`, `edits`, `userSettings`,
+ * `settings`, `mutes` and `mod_log` groups; each suite lists those in its own
+ * literal wipe array (the test-isolation guard reads wipes statically).
  */
-
-/** Subcollection names a seeded tree uses; clear these groups between tests. */
-const CONVERSATION_TREE_GROUPS = [
-  'messages',
-  'edits',
-  'userSettings',
-  'settings',
-  'mutes',
-  'mod_log',
-];
 
 /** Documents `seedConversationTree` writes under the conversation. */
 const SEEDED_UNDER_COUNT = 8;
@@ -37,10 +31,13 @@ async function docsUnder(db, docPath) {
       // listDocuments includes "missing" documents that only hold
       // subcollections, so an orphaned `edits` under a deleted message is
       // still reached.
-      for (const child of await col.listDocuments()) {
-        if ((await child.get()).exists) found.push(child.path);
-        await walk(child);
+      const children = await col.listDocuments();
+      if (children.length === 0) continue;
+      // One read per collection, not one per document.
+      for (const snap of await db.getAll(...children)) {
+        if (snap.exists) found.push(snap.ref.path);
       }
+      for (const child of children) await walk(child);
     }
   }
   await walk(db.doc(docPath));
@@ -48,7 +45,6 @@ async function docsUnder(db, docPath) {
 }
 
 module.exports = {
-  CONVERSATION_TREE_GROUPS,
   SEEDED_UNDER_COUNT,
   seedConversationTree,
   docsUnder,
