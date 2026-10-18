@@ -439,7 +439,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0611](SHY-0611-a-permanently-suspended-user-can-lift-their-own-suspension.md) | P0 | S | bug | A permanently suspended user can lift their own suspension | ✅ Done | — |  |
 | [SHY-0612](SHY-0612-alert-issues-stay-off-the-board.md) | P1 | S | infra | Alert issues stay off the ShyTalk Stories board | 📝 Draft | — |  |
 | [SHY-0613](SHY-0613-logs-and-audit-trails-have-their-own-release-suite.md) | P1 | L | infra | Logs and audit trails have their own test suite, required before every release | 📝 Draft | — |  |
-| [SHY-0614](SHY-0614-a-message-edit-history-cannot-be-skipped-or-forged.md) | P0 | L | bug | A message's edit history, a group's moderation log and a report's message text cannot be skipped or forged | 📝 Draft | — |  |
+| [SHY-0614](SHY-0614-a-message-edit-history-cannot-be-skipped-or-forged.md) | P0 | L | bug | A private or group message's edit history cannot be skipped or forged, and a recalled message is kept for moderators | 📝 Draft | — |  |
 | [SHY-0615](SHY-0615-the-android-and-ios-apps-keep-a-log.md) | P3 | L | infra | The Android and iOS apps keep a log, the same way every project does | 📝 Draft | — |  |
 | [SHY-0616](SHY-0616-every-website-page-and-the-dev-gate-keep-a-log.md) | P3 | M | infra | Every website page, the portal and the dev-site gate keep a log | 📝 Draft | — |  |
 | [SHY-0617](SHY-0617-a-guard-keeps-both-phones-on-the-same-tests.md) | P1 | M | infra | A guard keeps Android and iPhone on exactly the same phone tests | 📝 Draft | — |  |
@@ -451,6 +451,11 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0623](SHY-0623-express-api-declares-every-package-it-loads.md) | P0 | S | bug | express-api declares every package it loads | 📝 Draft | — |  |
 | [SHY-0624](SHY-0624-the-web-tests-are-format-checked.md) | P2 | S | chore | The web tests are format-checked | 📝 Draft | — |  |
 | [SHY-0625](SHY-0625-the-sonarcloud-check-passes-only-when-the-scan-ran-and-passed.md) | P0 | M | bug | The SonarCloud check passes only when the scan ran and the code passed | 👀 In Review | — |  |
+| [SHY-0626](SHY-0626-a-message-cannot-be-posted-under-someone-elses-name.md) | P0 | L | bug | A message cannot be posted under someone else's name, or as the system | 📝 Draft | — |  |
+| [SHY-0627](SHY-0627-a-reports-message-text-is-read-by-the-server.md) | P0 | M | bug | A report's message text is the message as it was sent, read by the server | 📝 Draft | — |  |
+| [SHY-0628](SHY-0628-a-room-messages-edit-keeps-its-history.md) | P0 | M | bug | A room message's edit keeps its history, written by the server | 📝 Draft | — |  |
+| [SHY-0629](SHY-0629-a-groups-moderation-actions-are-logged-by-the-server.md) | P1 | L | feature | A group's moderation actions are logged by the server | 📝 Draft | — |  |
+| [SHY-0630](SHY-0630-the-story-index-reconciler-inserts-rows-on-a-mac-inside-the-table.md) | P0 | S | bug | The story index reconciler inserts its rows on a Mac, inside the Active table | 📝 Draft | — |  |
 
 ## Done
 
