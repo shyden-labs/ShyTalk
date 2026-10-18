@@ -75,6 +75,24 @@ describe('deleteTree against the emulator', () => {
     expect(await exists('conversations/c2')).toBe(true);
     expect(await docsUnder(db, 'conversations/c2')).toHaveLength(SEEDED_UNDER_COUNT);
   });
+
+  test('deletes one message holding 501 edits, more than one batch of 500', async () => {
+    await db.doc('conversations/many').set({ participantIds: ['1', '2'] });
+    await db.doc('conversations/many/messages/m1').set({ text: 'hi', senderId: '1' });
+    const edits = db.collection('conversations/many/messages/m1/edits');
+    // A batch holds at most 500 writes, so the 501st edit goes in on its own.
+    const first = db.batch();
+    for (let i = 0; i < 500; i += 1) first.set(edits.doc(`e${i}`), { previousText: 'x' });
+    await first.commit();
+    await edits.doc('e500').set({ previousText: 'x' });
+    expect(await edits.listDocuments()).toHaveLength(501);
+
+    const counts = await deleteTree(db, db.doc('conversations/many'));
+
+    expect(await exists('conversations/many')).toBe(false);
+    expect(await docsUnder(db, 'conversations/many')).toEqual([]);
+    expect(counts).toEqual({ conversations: 1, messages: 1, edits: 501 });
+  });
 });
 
 describe('admin clean-up', () => {
