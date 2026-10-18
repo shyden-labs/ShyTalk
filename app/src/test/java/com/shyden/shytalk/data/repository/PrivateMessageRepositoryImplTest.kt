@@ -18,11 +18,13 @@ import com.shyden.shytalk.core.util.Resource
 import com.shyden.shytalk.data.remote.ApiException
 import com.shyden.shytalk.data.remote.WorkerApiClient
 import io.mockk.CapturingSlot
+import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -512,25 +514,48 @@ class PrivateMessageRepositoryImplTest {
 
     // endregion
 
-    // region editMessage — direct Firestore
+    // region editMessage — the server route (SHY-0614)
 
     @Test
-    fun `editMessage returns Success`() =
+    fun `editMessage patches the edit route with only the new text`() =
         runTest {
+            val body = slot<JSONObject>()
+            coEvery { api.patch("/api/conversations/conv-1/messages/msg-1", capture(body)) } returns JSONObject()
+            clearMocks(firestore, answers = false)
+
             val result = repo.editMessage("conv-1", "msg-1", "Updated text")
+
             assertTrue(result is Resource.Success)
+            assertEquals(
+                listOf("text"),
+                body.captured
+                    .keys()
+                    .asSequence()
+                    .toList(),
+            )
+            assertEquals("Updated text", body.captured.getString("text"))
+            verify(exactly = 0) { firestore.batch() }
+            verify(exactly = 0) { firestore.document(any()) }
         }
 
     @Test
-    fun `editMessage returns Error on exception`() =
+    fun `editMessage returns Error when the route refuses`() =
         runTest {
-            every { mockBatch.commit() } returns Tasks.forException(RuntimeException("Fail"))
+            coEvery { api.patch(any(), any()) } throws ApiException(403, "Only the sender can edit this message")
 
             val result = repo.editMessage("conv-1", "msg-1", "Updated text")
-            assertTrue(result is Resource.Error)
 
-            // Restore default for subsequent tests
-            every { mockBatch.commit() } returns Tasks.forResult(null)
+            assertTrue(result is Resource.Error)
+        }
+
+    @Test
+    fun `editMessage returns Error when the message was recalled`() =
+        runTest {
+            coEvery { api.patch(any(), any()) } throws ApiException(409, "Message was recalled")
+
+            val result = repo.editMessage("conv-1", "msg-1", "Updated text")
+
+            assertTrue(result is Resource.Error)
         }
 
     // endregion
@@ -601,13 +626,39 @@ class PrivateMessageRepositoryImplTest {
 
     // endregion
 
-    // region recallMessage — direct Firestore
+    // region recallMessage — the server route (SHY-0614)
 
     @Test
-    fun `recallMessage returns Success`() =
+    fun `recallMessage posts the recall route`() =
         runTest {
+            coEvery { api.post("/api/conversations/conv-1/messages/msg-1/recall", any()) } returns JSONObject()
+            clearMocks(firestore, answers = false)
+
             val result = repo.recallMessage("conv-1", "msg-1")
+
             assertTrue(result is Resource.Success)
+            coVerify(exactly = 1) { api.post("/api/conversations/conv-1/messages/msg-1/recall", any()) }
+            verify(exactly = 0) { firestore.document(any()) }
+        }
+
+    @Test
+    fun `recallMessage treats already recalled as success`() =
+        runTest {
+            coEvery { api.post(any(), any()) } throws ApiException(409, "Message already recalled")
+
+            val result = repo.recallMessage("conv-1", "msg-1")
+
+            assertTrue(result is Resource.Success)
+        }
+
+    @Test
+    fun `recallMessage returns Error on any other refusal`() =
+        runTest {
+            coEvery { api.post(any(), any()) } throws ApiException(403, "Only the sender can recall this message")
+
+            val result = repo.recallMessage("conv-1", "msg-1")
+
+            assertTrue(result is Resource.Error)
         }
 
     // endregion
