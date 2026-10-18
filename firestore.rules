@@ -475,20 +475,41 @@ service cloud.firestore {
           && !isBanned()
           && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
-        allow update, delete: if request.auth != null
+        // SHY-0614: text, edit fields and recall are written only by the
+        // server routes (conversation-message-edits.js). A phone may add a
+        // reaction (any participant) or hide a message naming itself (group
+        // staff); each shape lists the only fields it may change. The
+        // conversation `get()` is cached per request (one read billed).
+        allow update: if request.auth != null
           && !isBanned()
-          && (string(callerUniqueId()) == resource.data.senderId
-              || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupAdminIds
-              || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupModIds);
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
+          && (
+            (
+              string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+            )
+            || (
+              (string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('groupAdminIds', [])
+                || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('groupModIds', []))
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isHidden', 'hiddenBy'])
+              && request.resource.data.isHidden == true
+              && request.resource.data.hiddenBy == string(callerUniqueId())
+            )
+          );
+        allow delete: if false;
 
         match /edits/{editId} {
           allow read: if request.auth != null
             && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
             && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
-          allow create: if request.auth != null
-            && !isBanned()
-            && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
-            && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
+          // SHY-0614: history is written only by the server routes.
+          allow write: if false;
+        }
+
+        // SHY-0614: a recalled message's words, kept for moderators only.
+        match /recall/{docId} {
+          allow read: if request.auth != null && isAdmin();
+          allow write: if false;
         }
       }
 
@@ -537,15 +558,14 @@ service cloud.firestore {
               || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupModIds);
       }
 
-      // Mod log — participants read, admins/mods create
+      // Mod log — participants read; no phone writes it
       match /mod_log/{logId} {
         allow read: if request.auth != null
           && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
-        allow create: if request.auth != null
-          && !isBanned()
-          && (string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupAdminIds
-              || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupModIds);
+        // SHY-0614: nothing writes the group log today; SHY-0629 gives it a
+        // server writer. No phone may write one.
+        allow write: if false;
       }
     }
 
