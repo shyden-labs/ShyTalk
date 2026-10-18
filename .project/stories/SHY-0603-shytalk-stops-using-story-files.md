@@ -119,10 +119,10 @@ Measured 2026-10-15 on `origin/develop`:
 
 ## Risks & Mitigations
 
-| Risk | Mitigation |
-| --- | --- |
+| Risk                                           | Mitigation                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- |
 | A session keeps writing story files from habit | The CI refusal and the updated memories; the global note says so in every session. |
-| A superseded story still held something needed | Each is read before closing; anything still needed becomes an issue. |
+| A superseded story still held something needed | Each is read before closing; anything still needed becomes an issue.               |
 
 ## Definition of Done
 
@@ -134,3 +134,10 @@ Measured 2026-10-15 on `origin/develop`:
 - **2026-10-15**: Filed from Shyden's ruling. Estimate 8: deletion and
   rewiring across scripts, hooks and docs, sized against the size of the
   chain above.
+- **2026-10-19**: Another reason, measured: with story files, a story cannot
+  be shown In Progress while its branch or PR is open, as the standing rule
+  needs. The pre-merge gate lets a story leave Draft only for In Review
+  (SHY-0518), so a docs PR setting SHY-0614 In Progress was refused (#2443,
+  run 39173766829), and the sync writes the board's Status from the file, so
+  setting it on the board by hand is undone at the story's next change. After
+  the cut-over the board's Status is set directly when work starts.

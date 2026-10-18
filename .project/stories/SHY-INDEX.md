@@ -468,6 +468,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0640](SHY-0640-a-deletion-audit-hash-never-uses-a-public-key.md) | P0 | XS | bug | A deletion audit hash never uses a public key | 📝 Draft | — |  |
 | [SHY-0641](SHY-0641-the-reset-script-resets-dev-only.md) | P0 | M | bug | The reset script resets dev only, and fails when a step fails | ✅ Done | — |  |
 | [SHY-0642](SHY-0642-a-guards-file-count-is-the-same-on-every-machine.md) | P0 | S | bug | A guard's file count is the same on every machine | 📝 Draft | — |  |
+| [SHY-0643](SHY-0643-a-reaction-names-only-the-person-who-made-it.md) | P0 | M | bug | A reaction names only the person who made it | 📝 Draft | — |  |
 
 ## Done
 

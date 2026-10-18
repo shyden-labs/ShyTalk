@@ -253,3 +253,12 @@ suite; SHY-0626 stops messages being created under another person's name.
   conversation, the force-update screen as the "update" message, and route
   logging in place of rules-refusal logging the server cannot see.
   Orphaned `edits` after account deletion filed as SHY-0631.
+- **2026-10-19, rules**: plant #2441 ran the 20 rules tests against today's
+  rules (run 39171598647): the 13 predicted red were red by name, among them
+  "ALLOW a recipient reacts". Five refusals are refused today too (recall
+  record read x2 and write, an outsider reacting, a reaction carrying a text
+  change), so a second plant (#2442) runs four mutants of the locked rules to
+  see those red before PR 3 opens. The locked rule cannot stop a participant
+  rewriting other people's reactions: filed as SHY-0643. The file stays
+  Draft until PR 3 moves it to In Review (a file cannot show In Progress
+  today; noted on SHY-0603).
