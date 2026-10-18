@@ -290,51 +290,45 @@ const OPS = [
         .doc(`conversations/c-msg-${a.uniqueId}/messages/m-${a.uniqueId}`)
         .set({ senderId: sid(a), text: 'hi', createdAt: 1 }),
   },
+  // SHY-0614: a phone no longer edits, recalls or deletes a message, nor
+  // writes `edits` or `mod_log` (`allow write: if false`, nothing to gate).
+  // The two message updates a phone may still make are gated here.
   {
-    label: 'conversations/messages update (sender)',
+    label: 'conversations/messages update (participant, reaction)',
     seed: async (a) => {
-      await seedDoc(`conversations/c-mu-${a.uniqueId}`, {
+      await seedDoc(`conversations/c-mr-${a.uniqueId}`, {
         participantIds: [sid(a), sid(PEER)],
         groupAdminIds: [],
         groupModIds: [],
       });
-      await seedDoc(`conversations/c-mu-${a.uniqueId}/messages/m1`, {
-        senderId: sid(a),
-        text: 'hi',
-      });
-    },
-    op: (db, a) => db.doc(`conversations/c-mu-${a.uniqueId}/messages/m1`).update({ text: 'e' }),
-  },
-  {
-    label: 'conversations/messages delete (sender)',
-    seed: async (a) => {
-      await seedDoc(`conversations/c-md-${a.uniqueId}`, {
-        participantIds: [sid(a), sid(PEER)],
-        groupAdminIds: [],
-        groupModIds: [],
-      });
-      await seedDoc(`conversations/c-md-${a.uniqueId}/messages/m1`, {
-        senderId: sid(a),
-        text: 'hi',
-      });
-    },
-    op: (db, a) => db.doc(`conversations/c-md-${a.uniqueId}/messages/m1`).delete(),
-  },
-  {
-    label: 'conversations/messages/edits create (participant)',
-    seed: async (a) => {
-      await seedDoc(`conversations/c-ed-${a.uniqueId}`, {
-        participantIds: [sid(a), sid(PEER)],
-      });
-      await seedDoc(`conversations/c-ed-${a.uniqueId}/messages/m1`, {
-        senderId: sid(a),
+      await seedDoc(`conversations/c-mr-${a.uniqueId}/messages/m1`, {
+        senderId: sid(PEER),
         text: 'hi',
       });
     },
     op: (db, a) =>
       db
-        .doc(`conversations/c-ed-${a.uniqueId}/messages/m1/edits/e-${a.uniqueId}`)
-        .set({ previousText: 'hi', editedAt: 1 }),
+        .doc(`conversations/c-mr-${a.uniqueId}/messages/m1`)
+        .update({ reactions: { '👍': [sid(a)] } }),
+  },
+  {
+    label: 'conversations/messages update (group mod, hide)',
+    seed: async (a) => {
+      await seedDoc(`conversations/c-mh-${a.uniqueId}`, {
+        participantIds: [sid(a), sid(PEER)],
+        groupAdminIds: [],
+        groupModIds: [sid(a)],
+        isGroup: true,
+      });
+      await seedDoc(`conversations/c-mh-${a.uniqueId}/messages/m1`, {
+        senderId: sid(PEER),
+        text: 'hi',
+      });
+    },
+    op: (db, a) =>
+      db
+        .doc(`conversations/c-mh-${a.uniqueId}/messages/m1`)
+        .update({ isHidden: true, hiddenBy: sid(a) }),
   },
   {
     label: 'conversations/userSettings write (own settings)',
@@ -365,19 +359,6 @@ const OPS = [
       }),
     op: (db, a) =>
       db.doc(`conversations/c-mt-${a.uniqueId}/mutes/${sid(a)}`).set({ mutedUntil: 1 }),
-  },
-  {
-    label: 'conversations/mod_log create (group admin)',
-    seed: (a) =>
-      seedDoc(`conversations/c-ml-${a.uniqueId}`, {
-        participantIds: [sid(a), sid(PEER)],
-        groupAdminIds: [sid(a)],
-        groupModIds: [],
-      }),
-    op: (db, a) =>
-      db
-        .doc(`conversations/c-ml-${a.uniqueId}/mod_log/l-${a.uniqueId}`)
-        .set({ action: 'mute', actorId: sid(a), at: 1 }),
   },
   {
     label: 'suggestions create',

@@ -107,8 +107,9 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // and tests/scripts/delete-orphaned-message-history-workflow.unit.test.js (SHY-0631).
 // 2031 -> 2032: tests/scripts/reset-data.unit.test.js (SHY-0641).
 // 2032 -> 2034: shared/.../data/remote/PrivateMessageEditApi.kt and its
-// commonTest (SHY-0614).
-const FILES_READ_FLOOR = 2034;
+// commonTest (SHY-0614). 2034 -> 2035:
+// tests/firestore-rules/message-history-rules.test.js (SHY-0614).
+const FILES_READ_FLOOR = 2035;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
