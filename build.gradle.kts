@@ -57,10 +57,11 @@ sonar {
         property("sonar.organization", "shydenmcm")
         property("sonar.host.url", "https://sonarcloud.io")
         property("sonar.gradle.skipCompile", "true")
-        // Quality gate: advisory-only on free plan (can't customize "Sonar way" thresholds).
-        // Coverage and duplication gates fail on static JS translation files that are tested
-        // by Playwright, not JVM unit tests. SonarCloud dashboard exclusions don't affect
-        // the Gradle scanner's PR analysis. Upgrade to paid plan to use custom quality gates.
+        // The scanner uploads and does not wait: the free plan refused the scanner's own
+        // gate wait on non-main branches ("Organization is not allowed to access data from
+        // non-main branches"). CI's `Read the SonarCloud verdict` step reads the gate of
+        // this analysis instead and fails the job on anything but OK (SHY-0625,
+        // scripts/sonar-verdict.js).
         property("sonar.qualitygate.wait", "false")
 
         // Let the Gradle plugin auto-detect Kotlin sources from shared module.
