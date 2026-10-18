@@ -230,7 +230,7 @@ describe('accountDeletion main cron (real Firestore emulator)', () => {
     const userDoc = await seedUserDoc();
     const started = Date.now();
 
-    await hardDeleteAccount(userDoc);
+    await accountDeletion.hardDeleteAccount(userDoc);
 
     // SHY-0631 performance AC, read in CI's log: before (plant PR, today's
     // code) against after (this PR).
