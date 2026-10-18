@@ -260,5 +260,11 @@ suite; SHY-0626 stops messages being created under another person's name.
   change), so a second plant (#2442) runs four mutants of the locked rules to
   see those red before PR 3 opens. The locked rule cannot stop a participant
   rewriting other people's reactions: filed as SHY-0643. The file stays
-  Draft until PR 3 moves it to In Review (a file cannot show In Progress
-  today; noted on SHY-0603).
+  Draft until its last PR moves it to In Review (a file cannot show In
+  Progress today; noted on SHY-0603).
+- **2026-10-19, reactions**: the old rule refuses every recipient's
+  reaction on live today, and the app shows nothing (filed as SHY-0644).
+  PR 3 adds five more rules tests for each shape the apps write. No journey
+  covers reactions (0 of 46 files): the dev proof adds reaction scenarios to
+  j28 (Theo on Android, Selma on iPhone) and runs them on both phones before
+  any production deploy.
