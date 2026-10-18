@@ -187,27 +187,25 @@ describe('accountDeletion main cron (real Firestore emulator)', () => {
     expect(audit[0].data().action).toBe('account_deleted');
   }, 30000);
 
-  test('a failed conversation delete keeps the account due, fails the run, and the next run finishes it', async () => {
-    await seedConversationTree(db, 'c1', { participantIds: [N, 2002] });
+  test('a run after a partial delete finishes it: the conversation document was kept, edits were left', async () => {
+    // What a failed run leaves under deleteTree: the conversation document
+    // (deleted only once its subcollections went) and part of its tree, here
+    // the edits of a message that was already deleted.
+    await db.doc('conversations/c1').set({ participantIds: [N, 2002] });
+    await db.doc('conversations/c1/messages/gone/edits/e1').set({ previousText: 'hello' });
+    await db.doc('conversations/c1/userSettings/u1').set({ userId: UID });
     await db.doc(`users/${UID}`).set({
       email: EMAIL,
       firebaseUid: 'fb-1001',
       deletionExecuteAt: now() - 1000,
       deletionReason: 'user_request',
     });
-    // Stand in one failed delete; restoreMocks undoes the spy after the test.
-    const spy = jest
-      .spyOn(db, 'recursiveDelete')
-      .mockRejectedValueOnce(new Error('planted: 1 delete failed'));
+    expect(await docsUnder(db, 'conversations/c1')).toHaveLength(2);
 
-    await expect(accountDeletion()).rejects.toThrow('1 account deletion(s) failed');
-    expect(await docExists(`users/${UID}`)).toBe(true);
-    expect((await docData(`users/${UID}`)).deletionExecuteAt).toBeGreaterThan(0);
-
-    spy.mockRestore();
     await accountDeletion();
 
     expect(await docExists(`users/${UID}`)).toBe(false);
+    expect(await docExists('conversations/c1')).toBe(false);
     expect(await docsUnder(db, 'conversations/c1')).toEqual([]);
   });
 

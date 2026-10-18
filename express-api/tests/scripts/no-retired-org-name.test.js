@@ -95,11 +95,12 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // tests/scripts/suspension-ends-in-one-place.test.js (SHY-0605).
 // 2013 -> 2016: scripts/sonar-verdict.js, tests/scripts/sonar-verdict.unit.test.js
 // and tests/scripts/sonarcloud-gate-blocks.test.js (SHY-0625).
-// 2016 -> 2023: src/utils/delete-tree.js, scripts/delete-orphaned-message-history.js,
+// 2016 -> 2024: src/utils/delete-tree.js, scripts/delete-orphaned-message-history.js,
 // tests/helpers/conversation-tree.js, tests/utils/delete-tree.unit.test.js,
-// tests/utils/conversation-tree-paths.test.js and the script's two test files
-// (SHY-0631).
-const FILES_READ_FLOOR = 2023;
+// tests/utils/conversation-tree-paths.test.js,
+// tests/cron/accountDeletion-failure.unit.test.js and the script's two test
+// files (SHY-0631).
+const FILES_READ_FLOOR = 2024;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
