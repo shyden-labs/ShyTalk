@@ -105,7 +105,8 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // tests/cron/accountDeletion-failure.unit.test.js and the script's two test
 // files (SHY-0631). 2029 -> 2031: .github/workflows/delete-orphaned-message-history.yml
 // and tests/scripts/delete-orphaned-message-history-workflow.unit.test.js (SHY-0631).
-const FILES_READ_FLOOR = 2031;
+// 2031 -> 2032: tests/scripts/reset-data.unit.test.js (SHY-0641).
+const FILES_READ_FLOOR = 2032;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
