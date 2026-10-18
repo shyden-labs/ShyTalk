@@ -1,6 +1,6 @@
 ---
 id: SHY-0605
-status: In Review
+status: Done
 owner: unassigned
 created: 2026-10-16
 priority: P0
@@ -202,8 +202,8 @@ photos, bio, standing and access.
 
 ## Definition of Done
 
-- [ ] Every AC above ticked with its test named in Notes.
-- [ ] Story `In Review` before merge; CI green by name; merged to `develop`.
+- [x] Every AC above ticked with its test named in Notes.
+- [x] Story `In Review` before merge; CI green by name; merged to `develop`.
 
 ## Notes
 
@@ -286,3 +286,4 @@ photos, bio, standing and access.
   run's holds. Proof: `end-suspension.unit.test.js` "any ending gives back
   what the suspension held" (7); integration "an admin lift of the later
   suspension gives back what it held for the earlier appeal".
+- **2026-10-18**: Done. `origin/develop` (47c07fa) merged into the branch (clean); floored guards 182/182 (7 suites) on the merged tree. PR Checks run 39081703052 green by job name on head 0b7339ec1db (19 jobs, verdicts identical to the earlier green run 39065650556; SonarCloud passed; head SHA = `headRefOid`). Squash-merged as PR #2395 (`87fc5d59047`).

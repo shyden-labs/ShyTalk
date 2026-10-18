@@ -10,6 +10,7 @@ type: infra
 roadmap_ids: []
 mvp: false
 epic: EPIC-0001
+blocked_by: [SHY-0625]
 ---
 
 # SHY-0561: The pre-push hook runs no test suite, only quick static checks
@@ -145,3 +146,4 @@ Three tests pin the hook today: `actionlint-shellcheck-invocation.test.js`,
 - **2026-10-18**: Backlog sweep. SHY-0276 is closed as superseded by this
   story, and SHY-0517 is folded into it: its remaining part is the
   pushed-range edge case above. Estimate unchanged.
+- **2026-10-18**: Blocked by SHY-0625 (the SonarCloud check passes only when the scan ran and passed); the GitHub "Blocked by" link already exists.

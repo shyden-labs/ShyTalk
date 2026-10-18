@@ -430,7 +430,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0603](SHY-0603-shytalk-stops-using-story-files.md) | P1 | L | infra | ShyTalk stops using story files; the issues are the tickets | 📝 Draft | — |  |
 
 | [SHY-0604](SHY-0604-find-live-accounts-whose-real-name-a-double-suspension-erased.md) | P0 | M | bug | Find live accounts a suspension left worse off | 📝 Draft | — |  |
-| [SHY-0605](SHY-0605-a-suspension-wipes-a-users-bio-and-avatar-for-good.md) | P0 | M | bug | Ending a suspension puts everything back | 🚧 In Progress | — |  |
+| [SHY-0605](SHY-0605-a-suspension-wipes-a-users-bio-and-avatar-for-good.md) | P0 | M | bug | Ending a suspension puts everything back | ✅ Done | — |  |
 | [SHY-0606](SHY-0606-identity-graph-suspensions-skip-the-suspension-lifecycle.md) | P0 | M | bug | Identity-graph suspensions skip the suspension lifecycle | 📝 Draft | — |  |
 | [SHY-0607](SHY-0607-two-admin-validation-tests-pass-whatever-happens.md) | P0 | S | bug | Two admin validation tests pass whatever happens | 📝 Draft | — |  |
 | [SHY-0608](SHY-0608-every-suspension-starts-the-same-way.md) | P0 | M | bug | Every suspension starts the same way | 📝 Draft | — |  |
