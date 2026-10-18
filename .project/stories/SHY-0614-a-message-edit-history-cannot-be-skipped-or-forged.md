@@ -76,8 +76,10 @@ suite; SHY-0626 stops messages being created under another person's name.
       message's text directly any more.
 - [ ] Hiding a message stays a phone write, allowed only when `hiddenBy` is
       the caller and only `isHidden` and `hiddenBy` change.
-- [ ] A reaction stays a phone write, allowed only when `reactions` is the
-      one field that changes.
+- [ ] A reaction stays a phone write by any participant, allowed only when
+      `reactions` is the one field that changes. (Today's rule lets only the
+      sender or group staff update a message, so a recipient's reaction is
+      refused; read from the rule on 2026-10-18, proven by the new test.)
 
 ### Error paths
 
@@ -86,6 +88,8 @@ suite; SHY-0626 stops messages being created under another person's name.
       `isEdited`, `editedAt`, `editCount` or `isRecalled`.
 - [ ] The rules refuse every client read and write of the recalled-text
       records except an admin's read.
+- [ ] The rules refuse every client delete of a message (no app deletes one;
+      a delete would erase the record).
 - [ ] The edit and recall routes refuse anyone but the sender, a banned
       user, a message already recalled, and a conversation flagged
       `crossCohortAtMigration`.
@@ -97,7 +101,10 @@ suite; SHY-0626 stops messages being created under another person's name.
       recall alone; never an edited recalled message.
 - [ ] Old edit entries written by earlier app versions stay readable.
 - [ ] Apps still in use that write directly get a clear error, not a silent
-      loss: the edit or recall fails visibly and asks the user to update.
+      loss: the edit or recall fails visibly, and the release raises config
+      `minVersionCode` so they open the existing force-update screen.
+- [ ] Every server path that deletes a conversation's messages also deletes
+      their recalled-text records.
 
 ### Performance
 
@@ -119,16 +126,20 @@ suite; SHY-0626 stops messages being created under another person's name.
 
 ### i18n
 
-- [ ] The "update the app" error and the privacy policy's new line (below)
-      are translated in every shipped locale and read back by Google Cloud
-      Translation before commit.
+- [ ] The privacy policy's new line (below) is translated by Google Cloud
+      Translation in every shipped locale and read back by it before commit.
+      The "update the app" message is the existing translated force-update
+      screen; no new text.
 
 ### Observability
 
-- [ ] A refused direct write is logged by source with the app version, so
-      old-app use is visible.
-- [ ] The privacy policy says moderators can read a message after it is
-      recalled.
+- [ ] Each route logs every edit and recall with the conversation id,
+      message id and caller, never the text. (The server never sees a rules
+      refusal and the API gets no app version, so old-app use ends with the
+      `minVersionCode` raise rather than being logged.)
+- [ ] The privacy policy says: "If you recall (unsend) a message, ShyTalk's
+      moderators can still read what it said. It is deleted when the
+      conversation is deleted."
 
 ## BDD Scenarios
 
@@ -219,3 +230,13 @@ suite; SHY-0626 stops messages being created under another person's name.
   | `PrivateMessageRepositoryImpl.toggleReaction`                         | transaction: message `reactions`                                                                                               |
   | `sendTextMessage` and the other sends                                 | none: `POST /api/conversations/:id/messages`                                                                                   |
   | `mod_log`                                                             | no writer and no reader anywhere; only `cron/testDataCleanup.js` names it                                                      |
+
+- **2026-10-18, design**: approach chosen: server routes for edit and recall
+  in a transaction, rules lock the fields (rules-only checks rejected: they
+  cannot make the honest record the only one; a Cloud Function trigger
+  rejected: it runs after the forged write is live). ACs amended from the
+  design: reactions by any participant (today a recipient's is refused), no
+  client delete of a message, recall records deleted with their
+  conversation, the force-update screen as the "update" message, and route
+  logging in place of rules-refusal logging the server cannot see.
+  Orphaned `edits` after account deletion filed as SHY-0631.

@@ -456,6 +456,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0628](SHY-0628-a-room-messages-edit-keeps-its-history.md) | P0 | M | bug | A room message's edit keeps its history, written by the server | 📝 Draft | — |  |
 | [SHY-0629](SHY-0629-a-groups-moderation-actions-are-logged-by-the-server.md) | P1 | L | feature | A group's moderation actions are logged by the server | 📝 Draft | — |  |
 | [SHY-0630](SHY-0630-the-story-index-reconciler-inserts-rows-on-a-mac-inside-the-table.md) | P0 | S | bug | The story index reconciler inserts its rows on a Mac, inside the Active table | 📝 Draft | — |  |
+| [SHY-0631](SHY-0631-a-deleted-accounts-edit-history-is-deleted-too.md) | P0 | S | bug | A deleted account's edit history is deleted too | 📝 Draft | — |  |
 
 ## Done
 
