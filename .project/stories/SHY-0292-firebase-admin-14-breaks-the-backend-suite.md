@@ -1,6 +1,6 @@
 ---
 id: SHY-0292
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-08-06
 priority: P2
@@ -13,6 +13,13 @@ mvp: false
 ---
 
 # SHY-0292: firebase-admin 14 breaks the backend suite
+
+## CANCELLED — done
+
+Read 2026-10-18: `express-api/package.json` on develop requires
+`firebase-admin` `^14.5.0`, the supported major this story asked for.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

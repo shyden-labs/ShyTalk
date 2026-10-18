@@ -1,6 +1,6 @@
 ---
 id: SHY-0030
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-06-07
 priority: P2
@@ -13,6 +13,16 @@ mvp: true
 ---
 
 # SHY-0030: ios_parity_navigation.feature freshness check + update
+
+## CANCELLED — covered by SHY-0621
+
+SHY-0621 measured on 2026-10-16 that the 46 feature files under
+`app/src/androidTest/assets/features` never run (`ShyTalkTestRunner` is a
+plain `AndroidJUnitRunner`), and it deletes them, first moving into
+`journey-tests` any scenario no journey covers. `ios_parity_navigation.feature` is one of them, and SHY-0621's own
+acceptance criteria close this story as covered by it.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

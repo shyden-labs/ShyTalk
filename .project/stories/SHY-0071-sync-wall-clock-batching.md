@@ -1,6 +1,6 @@
 ---
 id: SHY-0071
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-06-10
 priority: P1
@@ -13,6 +13,13 @@ mvp: true
 ---
 
 # SHY-0071: Sync wall-clock — batch per-file gh lookups + scan-mode validation
+
+## CANCELLED — superseded by SHY-0603
+
+SHY-0603 retires the story files and this tooling with them; this story
+fixes no live defect (only speed or index tidiness).
+
+Closed in the 2026-10-18 backlog sweep, on Shyden's decision ("Close the cosmetic ones only").
 
 ## User Story
 

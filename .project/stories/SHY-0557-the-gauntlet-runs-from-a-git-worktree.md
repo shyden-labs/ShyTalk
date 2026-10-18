@@ -1,6 +1,6 @@
 ---
 id: SHY-0557
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-10-12
 priority: P0
@@ -13,6 +13,14 @@ epic: EPIC-0001
 ---
 
 # SHY-0557: The gauntlet runs from a git worktree
+
+## CANCELLED — duplicate of SHY-0302
+
+SHY-0302 (filed 2026-08-16) is the same one-line defect at
+`express-api/scripts/gauntlet/lib.sh:61`, with fuller acceptance criteria.
+SHY-0302 takes this story's P0 and its two test files.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

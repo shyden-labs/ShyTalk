@@ -1,6 +1,6 @@
 ---
 id: SHY-0560
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-10-12
 priority: P0
@@ -13,6 +13,13 @@ epic: EPIC-0001
 ---
 
 # SHY-0560: The story index shows each story's real status, read from the story file
+
+## CANCELLED — superseded by SHY-0603
+
+SHY-0603 retires the story files and this tooling with them; this story
+fixes no live defect (only speed or index tidiness).
+
+Closed in the 2026-10-18 backlog sweep, on Shyden's decision ("Close the cosmetic ones only").
 
 ## User Story
 

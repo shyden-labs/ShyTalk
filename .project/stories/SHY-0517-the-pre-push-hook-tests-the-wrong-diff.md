@@ -1,6 +1,6 @@
 ---
 id: SHY-0517
-status: Draft
+status: Cancelled
 owner: unassigned
 created: 2026-09-04
 priority: P2
@@ -13,6 +13,16 @@ epic: EPIC-0001
 ---
 
 # SHY-0517: The pre-push hook tests the wrong diff
+
+## CANCELLED — folded into SHY-0561
+
+SHY-0561 removes every test suite from the pre-push hook, so the
+sixteen-minute browser run this story measured is gone. What is left, the
+hook reading its diff from the pushed range and a branch delete running
+nothing, is now an acceptance criterion of SHY-0561. The large-file check
+still compares with `main`, as this story wanted.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

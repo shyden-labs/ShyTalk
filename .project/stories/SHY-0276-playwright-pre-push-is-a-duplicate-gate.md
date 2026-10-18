@@ -1,6 +1,6 @@
 ---
 id: SHY-0276
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-08-04
 priority: P2
@@ -13,6 +13,14 @@ mvp: false
 ---
 
 # SHY-0276: The Playwright pre-push gate is a slower, weaker duplicate of a CI job
+
+## CANCELLED — superseded by SHY-0561
+
+SHY-0561's Notes: "Supersedes SHY-0276 (Playwright in pre-push) ... closed
+or re-scoped once SHY-0518 lets an existing Draft story be edited".
+SHY-0518 is Done (#2311).
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

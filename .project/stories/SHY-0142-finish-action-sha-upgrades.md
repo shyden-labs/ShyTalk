@@ -1,6 +1,6 @@
 ---
 id: SHY-0142
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-07-01
 priority: P1
@@ -13,6 +13,15 @@ mvp: false
 ---
 
 # SHY-0142: Sync the CI pin-tests to the dependabot-bumped action SHAs (finish the pin-drift cleanup)
+
+## CANCELLED — its failures can no longer happen
+
+Read 2026-10-18: none of the 16 `*-pin.test.js` files hard-codes a SHA
+any more (0 found), so the stale-SHA `toContain` failures this story
+describes cannot occur. The cause it names, a workflow-only PR skipping
+the guard suites, is SHY-0325.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

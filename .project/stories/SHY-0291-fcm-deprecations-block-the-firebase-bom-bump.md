@@ -1,6 +1,6 @@
 ---
 id: SHY-0291
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-08-06
 priority: P2
@@ -13,6 +13,16 @@ mvp: false
 ---
 
 # SHY-0291: FCM deprecations block the firebase-bom bump, and -Werror turns them into a wall
+
+## CANCELLED — duplicate of SHY-0244, and done
+
+Same six `-Werror` errors from the same Dependabot PR #1519 as SHY-0324;
+both are the migration SHY-0244 owns (filed 2026-07-25). Read on develop
+2026-10-18: firebase-bom is 34.18.0, `ShyTalkMessagingService` implements
+`onRegistered`, `AndroidPushIdentifiers` calls `FirebaseMessaging.register()`,
+no `onNewToken` remains, and #1519 is closed.
+
+Closed in the 2026-10-18 backlog sweep.
 
 ## User Story
 

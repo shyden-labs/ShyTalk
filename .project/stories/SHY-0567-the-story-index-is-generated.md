@@ -1,6 +1,6 @@
 ---
 id: SHY-0567
-status: Draft
+status: Cancelled
 owner: claude
 created: 2026-10-12
 priority: P1
@@ -13,6 +13,13 @@ epic: EPIC-0001
 ---
 
 # SHY-0567: The story index is generated from the story files, so two PRs never conflict in it
+
+## CANCELLED — superseded by SHY-0603
+
+SHY-0603 retires the story files and this tooling with them; this story
+fixes no live defect (only speed or index tidiness).
+
+Closed in the 2026-10-18 backlog sweep, on Shyden's decision ("Close the cosmetic ones only").
 
 ## User Story
 
