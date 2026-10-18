@@ -36,10 +36,18 @@ async function deleteTree(firestore, ref) {
     const collection = documentRef.parent.id;
     counts[collection] = (counts[collection] || 0) + 1;
   });
+  // PLANT (do not merge): the old cap, one page of 500 per collection.
+  async function deleteCapped(collection) {
+    const page = await collection.limit(500).get();
+    for (const doc of page.docs) {
+      for (const sub of await doc.ref.listCollections()) await deleteCapped(sub);
+      writer.delete(doc.ref);
+    }
+  }
   try {
     if (typeof ref.listCollections === 'function') {
       for (const subcollection of await ref.listCollections()) {
-        await firestore.recursiveDelete(subcollection, writer);
+        await deleteCapped(subcollection);
       }
       const deleted = writer.delete(ref);
       await writer.flush();
