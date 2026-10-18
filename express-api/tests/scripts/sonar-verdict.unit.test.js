@@ -6,9 +6,9 @@
  * `scripts/sonar-verdict.js` is the CI step that turns a SonarCloud analysis
  * into a pass or a fail. It replaced a step that warned and succeeded when the
  * scan never ran, and a scanner setting (`sonar.qualitygate.wait=false`) that
- * never read the quality gate at all. Loaded in-process; `fetch`, the clock and
- * the pause between polls are stand-ins, so no request leaves the test and no
- * test waits.
+ * never read the quality gate at all. Loaded in-process; `fetch` is a
+ * stand-in and Jest's fake timers drive the real pollUntil, so no request
+ * leaves the test and no test waits in real time.
  */
 
 const {
@@ -38,16 +38,22 @@ function fakeFetch(routes) {
   return { fetch, calls };
 }
 
-/** A clock that moves only when the stand-in pause is called. */
-function fakeClock() {
-  let t = 0;
-  return {
-    now: () => t,
-    sleep: async (ms) => {
-      t += ms;
-    },
-  };
+/**
+ * Moves the fake clock until `promise` settles: pollUntil pauses on a timer,
+ * so a wait settles only as the fake clock passes. Returns the same promise.
+ */
+async function drive(promise) {
+  let settled = false;
+  promise.then(
+    () => (settled = true),
+    () => (settled = true),
+  );
+  while (!settled) await jest.advanceTimersByTimeAsync(250);
+  return promise;
 }
+
+beforeEach(() => jest.useFakeTimers({ now: 0 }));
+afterEach(() => jest.useRealTimers());
 
 const task = (status, analysisId) => ({ body: { task: { id: 'AX1', status, analysisId } } });
 
@@ -85,27 +91,28 @@ describe('readReportTask', () => {
 });
 
 describe('waitForTask', () => {
-  const wait = (fetch, clock, ceilingMs = 10_000) =>
-    waitForTask({
-      fetch,
-      serverUrl: SERVER,
-      taskId: 'AX1',
-      token: TOKEN,
-      ceilingMs,
-      intervalMs: 1_000,
-      ...clock,
-    });
+  const wait = (fetch, ceilingMs = 10_000) =>
+    drive(
+      waitForTask({
+        fetch,
+        serverUrl: SERVER,
+        taskId: 'AX1',
+        token: TOKEN,
+        ceilingMs,
+        intervalMs: 1_000,
+      }),
+    );
 
   test('returns the analysis id when the first poll says SUCCESS', async () => {
     const { fetch } = fakeFetch({ 'api/ce/task': [task('SUCCESS', 'AN1')] });
-    await expect(wait(fetch, fakeClock())).resolves.toEqual({ analysisId: 'AN1', elapsedMs: 0 });
+    await expect(wait(fetch)).resolves.toEqual({ analysisId: 'AN1', elapsedMs: 0 });
   });
 
   test('waits through PENDING and IN_PROGRESS, then returns the analysis id', async () => {
     const { fetch, calls } = fakeFetch({
       'api/ce/task': [task('PENDING'), task('IN_PROGRESS'), task('SUCCESS', 'AN1')],
     });
-    await expect(wait(fetch, fakeClock())).resolves.toEqual({
+    await expect(wait(fetch)).resolves.toEqual({
       analysisId: 'AN1',
       elapsedMs: 2_000,
     });
@@ -114,48 +121,42 @@ describe('waitForTask', () => {
 
   test('sends the token as a bearer header, never in the URL', async () => {
     const { fetch, calls } = fakeFetch({ 'api/ce/task': [task('SUCCESS', 'AN1')] });
-    await wait(fetch, fakeClock());
+    await wait(fetch);
     expect(calls[0].url).toBe(`${SERVER}/api/ce/task?id=AX1`);
     expect(calls[0].init.headers.Authorization).toBe(`Bearer ${TOKEN}`);
   });
 
   test('fails when the task FAILED', async () => {
     const { fetch } = fakeFetch({ 'api/ce/task': [task('FAILED')] });
-    await expect(wait(fetch, fakeClock())).rejects.toThrow('SonarCloud task AX1 ended FAILED');
+    await expect(wait(fetch)).rejects.toThrow('SonarCloud task AX1 ended FAILED');
   });
 
   test('fails when the task was CANCELED', async () => {
     const { fetch } = fakeFetch({ 'api/ce/task': [task('CANCELED')] });
-    await expect(wait(fetch, fakeClock())).rejects.toThrow('SonarCloud task AX1 ended CANCELED');
+    await expect(wait(fetch)).rejects.toThrow('SonarCloud task AX1 ended CANCELED');
   });
 
   test('fails on a status it does not know', async () => {
     const { fetch } = fakeFetch({ 'api/ce/task': [task('PAUSED')] });
-    await expect(wait(fetch, fakeClock())).rejects.toThrow(
-      'SonarCloud task AX1 has unknown status PAUSED',
-    );
+    await expect(wait(fetch)).rejects.toThrow('SonarCloud task AX1 has unknown status PAUSED');
   });
 
   test('fails at the ceiling naming the task, its last status and the time waited', async () => {
     const { fetch } = fakeFetch({ 'api/ce/task': [task('IN_PROGRESS')] });
-    await expect(wait(fetch, fakeClock(), 3_000)).rejects.toThrow(
+    await expect(wait(fetch, 3_000)).rejects.toThrow(
       'SonarCloud task AX1 still IN_PROGRESS after 3s (ceiling 3s)',
     );
   });
 
   test('fails at once on a non-200 reply, naming the URL and code', async () => {
     const { fetch, calls } = fakeFetch({ 'api/ce/task': [{ status: 401, body: {} }] });
-    await expect(wait(fetch, fakeClock())).rejects.toThrow(
-      `${SERVER}/api/ce/task?id=AX1 answered 401`,
-    );
+    await expect(wait(fetch)).rejects.toThrow(`${SERVER}/api/ce/task?id=AX1 answered 401`);
     expect(calls).toHaveLength(1);
   });
 
   test('fails when SUCCESS carries no analysis id', async () => {
     const { fetch } = fakeFetch({ 'api/ce/task': [task('SUCCESS')] });
-    await expect(wait(fetch, fakeClock())).rejects.toThrow(
-      'SonarCloud task AX1 succeeded with no analysisId',
-    );
+    await expect(wait(fetch)).rejects.toThrow('SonarCloud task AX1 succeeded with no analysisId');
   });
 });
 
@@ -292,14 +293,15 @@ describe('run', () => {
   async function go(envVars, routeTable) {
     const out = { summary: [], log: [] };
     const { fetch } = fakeFetch(routeTable);
-    const code = await run({
-      env: envVars,
-      fetch,
-      readFile: () => REPORT,
-      appendSummary: (text) => out.summary.push(text),
-      log: (text) => out.log.push(text),
-      ...fakeClock(),
-    });
+    const code = await drive(
+      run({
+        env: envVars,
+        fetch,
+        readFile: () => REPORT,
+        appendSummary: (text) => out.summary.push(text),
+        log: (text) => out.log.push(text),
+      }),
+    );
     return { code, text: [...out.summary, ...out.log].join('\n'), summary: out.summary.join('\n') };
   }
 
@@ -309,6 +311,13 @@ describe('run', () => {
     expect(summary).toContain('SonarCloud quality gate: OK');
     expect(summary).toContain('Scan: ran; SonarCloud processed analysis AN1 after 0s.');
     expect(summary).toContain(`${SERVER}/dashboard?id=x`);
+  });
+
+  test('the log carries the measured wait, so it can be read back from CI', async () => {
+    const { code, text } = await go(env(), routes(gateReply('OK')));
+    expect(code).toBe(0);
+    expect(text.split('\n')).toContain('Scan: ran; SonarCloud processed analysis AN1 after 0s.');
+    expect(text.match(/Scan: ran;/g)).toHaveLength(2);
   });
 
   test('a PR whose gate is ERROR exits 1 and the summary names the failed condition', async () => {

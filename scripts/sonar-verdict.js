@@ -18,6 +18,8 @@
  * `run` below. Pinned by express-api/tests/scripts/sonar-verdict.unit.test.js.
  */
 
+const { pollUntil } = require('../express-api/scripts/drivers/poll-until.js');
+
 const TERMINAL_FAILURES = new Set(['FAILED', 'CANCELED']);
 const STILL_RUNNING = new Set(['PENDING', 'IN_PROGRESS']);
 
@@ -48,31 +50,34 @@ async function getJson({ fetch, serverUrl, path, token }) {
 }
 
 /**
- * Waits for the analysis task to finish: a wait on SonarCloud's queue, with a
- * ceiling that names the task, its last status and the time waited.
+ * Waits for the analysis task to leave SonarCloud's queue: one wait through
+ * pollUntil (the repo's one clock wait, SHY-0245), which stops the instant the
+ * task is no longer PENDING or IN_PROGRESS, or at the ceiling. A task still
+ * running at the ceiling fails naming the task, its last status and the time
+ * waited.
  */
-async function waitForTask({ fetch, serverUrl, taskId, token, ceilingMs, intervalMs, now, sleep }) {
-  const started = now();
-  for (;;) {
-    const { task } = await getJson({ fetch, serverUrl, path: `api/ce/task?id=${taskId}`, token });
-    const status = task?.status;
-    const elapsedMs = now() - started;
-    if (status === 'SUCCESS') {
-      if (!task.analysisId)
-        throw new Error(`SonarCloud task ${taskId} succeeded with no analysisId`);
-      return { analysisId: task.analysisId, elapsedMs };
-    }
-    if (TERMINAL_FAILURES.has(status)) throw new Error(`SonarCloud task ${taskId} ended ${status}`);
-    if (!STILL_RUNNING.has(status))
-      throw new Error(`SonarCloud task ${taskId} has unknown status ${status}`);
-    if (elapsedMs >= ceilingMs) {
-      throw new Error(
-        `SonarCloud task ${taskId} still ${status} after ${Math.round(elapsedMs / 1000)}s ` +
-          `(ceiling ${Math.round(ceilingMs / 1000)}s)`,
-      );
-    }
-    await sleep(intervalMs);
+async function waitForTask({ fetch, serverUrl, taskId, token, ceilingMs, intervalMs }) {
+  const started = Date.now();
+  const task = await pollUntil(
+    async () =>
+      (await getJson({ fetch, serverUrl, path: `api/ce/task?id=${taskId}`, token })).task ?? {},
+    (polled) => !STILL_RUNNING.has(polled.status),
+    { intervalMs, deadlineMs: ceilingMs },
+  );
+  const status = task.status;
+  const elapsedMs = Date.now() - started;
+  if (status === 'SUCCESS') {
+    if (!task.analysisId) throw new Error(`SonarCloud task ${taskId} succeeded with no analysisId`);
+    return { analysisId: task.analysisId, elapsedMs };
   }
+  if (TERMINAL_FAILURES.has(status)) throw new Error(`SonarCloud task ${taskId} ended ${status}`);
+  if (STILL_RUNNING.has(status)) {
+    throw new Error(
+      `SonarCloud task ${taskId} still ${status} after ${Math.round(elapsedMs / 1000)}s ` +
+        `(ceiling ${Math.round(ceilingMs / 1000)}s)`,
+    );
+  }
+  throw new Error(`SonarCloud task ${taskId} has unknown status ${status}`);
 }
 
 /** The quality gate of one analysis. */
@@ -128,7 +133,7 @@ function verdict({ status, conditions }) {
  * CEILING_SECONDS, EXPECTED_SHA, PR_NUMBER (empty when not a pull request).
  * Returns the exit code; writes the job summary either way.
  */
-async function run({ env, fetch, readFile, appendSummary, log, now, sleep }) {
+async function run({ env, fetch, readFile, appendSummary, log }) {
   const lines = [];
   try {
     if (!env.SONAR_TOKEN) {
@@ -152,8 +157,6 @@ async function run({ env, fetch, readFile, appendSummary, log, now, sleep }) {
       token,
       ceilingMs: ceilingSeconds * 1000,
       intervalMs: 5000,
-      now,
-      sleep,
     });
     lines.push(
       `Scan: ran; SonarCloud processed analysis ${analysisId} after ${Math.round(elapsedMs / 1000)}s.`,
@@ -177,8 +180,11 @@ async function run({ env, fetch, readFile, appendSummary, log, now, sleep }) {
       await readGate({ fetch, serverUrl: report.serverUrl, analysisId, token }),
     );
     if (result.ok) {
-      appendSummary(['SonarCloud quality gate: OK', ...lines].join('\n'));
-      log('SonarCloud quality gate: OK');
+      // The log carries the summary's lines too: the job summary cannot be
+      // read back through the API, and the measured wait sets the ceiling.
+      const passed = ['SonarCloud quality gate: OK', ...lines].join('\n');
+      appendSummary(passed);
+      log(passed);
       return 0;
     }
     throw new Error(result.reasons.join('; '));
@@ -186,7 +192,7 @@ async function run({ env, fetch, readFile, appendSummary, log, now, sleep }) {
     appendSummary(
       ['SonarCloud quality gate: FAILED', `Why: ${error.message}`, ...lines].join('\n'),
     );
-    log(`::error::SonarCloud quality gate: FAILED: ${error.message}`);
+    log([`::error::SonarCloud quality gate: FAILED: ${error.message}`, ...lines].join('\n'));
     return 1;
   }
 }
@@ -201,8 +207,6 @@ if (require.main === module) {
     readFile: (path) => fs.readFileSync(path, 'utf8'),
     appendSummary: (text) => fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${text}\n`),
     log: (text) => process.stdout.write(`${text}\n`),
-    now: () => Date.now(),
-    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   }).then((code) => {
     process.exitCode = code;
   });
