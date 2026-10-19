@@ -1,0 +1,33 @@
+name: Plant Rules Mutants
+
+# PLANT (do not merge): SHY-0648 per-clause mutation run of the group rule.
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  mutants:
+    name: Rules mutants (plant)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-node
+        with:
+          cache: 'npm'
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - uses: ./.github/actions/start-firebase-emulators
+
+      - name: Run each mutant of the group rule
+        run: |
+          cd express-api && npm ci
+          cd .. && node plant/rules-mutants.mjs
