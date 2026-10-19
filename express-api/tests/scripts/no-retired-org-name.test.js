@@ -109,7 +109,7 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 2032 -> 2034: shared/.../data/remote/PrivateMessageEditApi.kt and its
 // commonTest (SHY-0614). 2034 -> 2035:
 // tests/firestore-rules/message-history-rules.test.js (SHY-0614).
-const FILES_READ_FLOOR = 2036;
+const FILES_READ_FLOOR = 2038;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
