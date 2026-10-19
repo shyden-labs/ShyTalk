@@ -270,13 +270,18 @@ const OPS = [
       }),
   },
   {
-    label: 'conversations update (participant, non-membership field)',
+    // SHY-0648: a phone may change only the group fields the apps write, by
+    // role (a one-to-one takes no phone update but a participant leaving), so
+    // the sample is a member renaming a group under the default
+    // whoCanEditInfo (EVERYONE). `lastMessage` is written by the server only.
+    label: 'conversations update (group member renames, non-membership field)',
     seed: (a) =>
       seedDoc(`conversations/c-upd-${a.uniqueId}`, {
         participantIds: [sid(a), sid(PEER)],
-        isGroup: false,
+        isGroup: true,
+        createdBy: sid(PEER),
       }),
-    op: (db, a) => db.doc(`conversations/c-upd-${a.uniqueId}`).update({ lastMessage: 'x' }),
+    op: (db, a) => db.doc(`conversations/c-upd-${a.uniqueId}`).update({ groupName: 'x' }),
   },
   {
     label: 'conversations/messages create (participant)',
