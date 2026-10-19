@@ -1,6 +1,6 @@
 ---
 id: SHY-0642
-status: Draft
+status: In Review
 owner: claude
 created: 2026-10-19
 priority: P0
@@ -52,8 +52,13 @@ they must agree with CI.
       `git ls-files --cached --others --exclude-standard`) lists it; a real
       ignored `app/src/dev/google-services.json` copied into a worktree left
       `no-retired-org-name` at 2037 (the old walk read 2038).
-- [ ] Run in the main checkout (44 ignored files today), each guard reads the
-      same count as CI at the same commit.
+- [x] Run in the main checkout (44 ignored files today), each guard reads the
+      same count as CI at the same commit. Proof: after #2455 merged
+      (17c92eeb072, tree b3b6cda42e4, the same tree as the PR head CI tested),
+      `shytalk-floors.zsh` in the main checkout passed 134 of 134 tests in the
+      three files, each asserting `filesRead` EQUAL to its floor (2037, 482,
+      153), with 260,223 git-ignored files and 5 untracked, not-ignored
+      entries in that checkout.
 
 ### Error paths
 
@@ -78,7 +83,10 @@ they must agree with CI.
       runs, old against new on one machine: no-minio-image 79 -> 138 ms,
       no-retired-org-name 219 -> 324 ms, suspension-ends-in-one-place
       363 -> 453 ms. Jest prints no per-file time in CI, so CI's check is the
-      Test Backend job's time on the PR against develop's.
+      Test Backend job's time on the PR against develop's: the PR's run
+      (39193226505) took 399 s (Express tests step 324 s) against 491 s
+      (398 s) and 500 s (416 s) on the two green code runs before it
+      (39190622872, 39177283003): no slowdown visible within CI's spread.
 
 ### Security
 
@@ -134,8 +142,9 @@ Nothing: operator tooling with no learner-facing change.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; CI green by step name; merged to
-      `develop`.
+- [x] Every AC ticked with its proof; CI green by step name; merged to
+      `develop` (#2455, 17c92eeb072; run 39193226505 every job success or
+      path-skipped, read by name on e9f97832ae2 = headRefOid).
 
 ## Notes
 
@@ -144,3 +153,5 @@ Nothing: operator tooling with no learner-facing change.
   day cannot be trusted in the main checkout); not MVP (tooling). Scored 3:
   one shared change to how three guards list files, two plants each and their
   tests.
+- **2026-10-19**: Merged in #2455; the main-checkout run and CI's job time
+  tick the last AC. In Review until Shyden closes it.
