@@ -340,3 +340,11 @@ describe('--debug dumps the screen on passing steps too', () => {
     expect(help.slice(0, 900)).toContain('--debug');
   });
 });
+
+describe('J28R puts Theo on Android and Selma on the iPhone (SHY-0645)', () => {
+  const { REACTION_PHONE_BY_PLATFORM: P } = require('../../scripts/device-journey-runner');
+  test('Android is Theo', () =>
+    expect(P.android).toEqual({ name: 'Theo', email: 'host@shytalk.dev', uid: '50000060' }));
+  test('iPhone is Selma', () =>
+    expect(P.ios).toEqual({ name: 'Selma', email: 'mc-singer@shytalk.dev', uid: '50000080' }));
+});

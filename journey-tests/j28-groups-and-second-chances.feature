@@ -42,6 +42,27 @@ Feature: j28 — a conversation with more than two people in it
     When Selma on iOS replies
     Then Alice and Theo both see Selma's reply
 
+  # Walked by the runner journey J28R (SHY-0645).
+  @blocker @android-physical @ios-device
+  Scenario: two people react to a group message
+    Given Alice, Theo and Selma are in a group and Alice has sent a message
+    When Theo reacts with ❤️ and Selma reacts with 👍
+    Then Alice, Theo and Selma all see ❤️ and 👍 under the message
+
+  # Walked by the runner journey J28R (SHY-0645).
+  @blocker @android-physical @ios-device
+  Scenario: taking a reaction back
+    Given Theo's ❤️ and Selma's 👍 are on Alice's message
+    When Selma taps her 👍 again
+    Then everyone sees ❤️ and no 👍
+
+  # Walked by the runner journey J28R (SHY-0645).
+  @blocker @android-physical @ios-device
+  Scenario: the recipient's reaction reaches the sender
+    Given Alice has sent Theo a one-to-one message
+    When Theo reacts with 😂
+    Then Alice sees 😂 under her message
+
   @blocker @android-physical
   Scenario: Leaving a group
     Given Theo is in a group with Alice and Selma

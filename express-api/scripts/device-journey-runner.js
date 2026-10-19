@@ -68,6 +68,13 @@ const {
   ANDROID_SOURCE_UNAVAILABLE,
 } = require('./drivers/android-source-session');
 const { createRecorder } = require('./drivers/journey-screen-recorder');
+const {
+  firestoreAsPerson,
+  reactAs,
+  createGroupAs,
+  canonicalReactions,
+  waitForStored,
+} = require('./lib/firestore-as-person');
 
 // --------------------------------------------------------------------------
 // Repo / target configuration
@@ -4924,6 +4931,260 @@ function selectJourneys(all, selectedIds) {
   return [...core, ...rest];
 }
 
+// SHY-0645: who holds the phone in the reaction journey. The other one acts
+// over the network as themselves (firestore-as-person.js), so the same
+// definition runs on both phones with the roles swapped.
+const THEO = { name: 'Theo', email: 'host@shytalk.dev', uid: '50000060' };
+const SELMA = { name: 'Selma', email: 'mc-singer@shytalk.dev', uid: '50000080' };
+const REACTION_PHONE_BY_PLATFORM = Object.freeze({ android: THEO, ios: SELMA });
+const ALICE = { name: 'Alice', email: 'adult-power@shytalk.dev', uid: '50000010' };
+const HEART = 0; // places in quickReactions (ReactionTagsTest pins the order)
+const LAUGH = 1;
+const THUMBS = 2;
+const QUICK = ['❤️', '😂', '👍'];
+const STORE_WAIT_MS = 15000;
+
+const J28R = {
+  id: 'J28R',
+  kind: 'ui',
+  title:
+    'j28 — reactions: two people react in a group, one takes it back, a recipient reacts one-to-one',
+  async run(device, reporter, ctx) {
+    const phone = REACTION_PHONE_BY_PLATFORM[device.kind];
+    if (!phone) throw new Error(`J28R has no persona for platform "${device.kind}"`);
+    const { firestoreDocumentsUrl } = requireActiveApi();
+    const stamp = Date.now();
+    const groupName = `JR-J28R-${stamp}`;
+    const groupText = `JR-J28R-GROUP-${stamp}`;
+    const dmText = `JR-J28R-DM-${stamp}`;
+    const tokens = {};
+    const fsOf = {};
+    let group;
+    let groupMsg;
+    let dmConv;
+    let dmMsg;
+
+    const stored = (convId, msgId) => async () => {
+      const r = await apiCall('GET', `/api/conversations/${convId}/messages?limit=50`, {
+        token: tokens.Alice,
+      });
+      if (r.status !== 200) {
+        throw new Error(
+          `GET messages of ${convId} as Alice expected 200; got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`,
+        );
+      }
+      const m = Array.isArray(r.body) ? r.body.find((x) => x.id === msgId) : undefined;
+      if (!m) throw new Error(`message ${msgId} is not among the last 50 of ${convId}`);
+      return m.reactions || {};
+    };
+    const expectStored = (convId, msgId, want, what) =>
+      waitForStored(
+        stored(convId, msgId),
+        (got) => canonicalReactions(got) === canonicalReactions(want),
+        {
+          timeoutMs: STORE_WAIT_MS,
+          what,
+          describe: canonicalReactions,
+        },
+      );
+    const phoneReacts = async (msgId, place) => {
+      await tapId(device, `privateChat_msgTarget_${msgId}`);
+      await waitForId(device, 'privateChat_reactMenuItem', 10000);
+      await tapId(device, 'privateChat_reactMenuItem');
+      await waitForId(device, `privateChat_reactionPick_${place}`, 10000);
+      await tapId(device, `privateChat_reactionPick_${place}`);
+    };
+    const badge = (msgId, place) => `privateChat_reactionBadge_${msgId}_${place}`;
+    // Who reacts with what is fixed by persona; HOW depends on who holds the phone.
+    const reactsAs = async (person, msgId, place) => {
+      if (person === phone) return phoneReacts(msgId, place);
+      return reactAs(fsOf[person.name], {
+        conversationId: group.id,
+        messageId: msgId,
+        emoji: QUICK[place],
+        uid: person.uid,
+      });
+    };
+
+    await reporter.step(
+      device,
+      'Setup: Alice, Theo and Selma each sign in to the network as themselves',
+      async () => {
+        for (const p of [ALICE, THEO, SELMA]) {
+          tokens[p.name] = await getIdToken(p.email);
+          fsOf[p.name] = firestoreAsPerson({
+            documentsUrl: firestoreDocumentsUrl,
+            token: tokens[p.name],
+            who: p.name,
+          });
+        }
+        return `three ID tokens; Firestore at ${new URL(firestoreDocumentsUrl).host}`;
+      },
+    );
+
+    await reporter.step(
+      device,
+      `Setup: Alice makes a new group "${groupName}" and posts in it`,
+      async () => {
+        group = await createGroupAs(fsOf.Alice, {
+          creatorId: ALICE.uid,
+          cohort: 'adult',
+          memberIds: [THEO.uid, SELMA.uid],
+          groupName,
+          now: stamp,
+        });
+        const r = await apiCall('POST', `/api/conversations/${group.id}/messages`, {
+          token: tokens.Alice,
+          body: { text: groupText, type: 'TEXT' },
+        });
+        if (r.status !== 200)
+          throw new Error(
+            `Alice's group message expected 200; got ${r.status}: ${JSON.stringify(r.body)}`,
+          );
+        groupMsg = r.body.id;
+        return `conversations/${group.id} with ${group.participantIds.join(', ')}; message ${groupMsg}`;
+      },
+    );
+
+    await reporter.step(device, `Setup: Alice writes to ${phone.name} one-to-one`, async () => {
+      const c = await apiCall('POST', '/api/conversations', {
+        token: tokens.Alice,
+        body: { otherUserId: phone.uid },
+      });
+      if (c.status !== 200)
+        throw new Error(`one-to-one chat expected 200; got ${c.status}: ${JSON.stringify(c.body)}`);
+      dmConv = c.body.id;
+      const r = await apiCall('POST', `/api/conversations/${dmConv}/messages`, {
+        token: tokens.Alice,
+        body: { text: dmText, type: 'TEXT' },
+      });
+      if (r.status !== 200)
+        throw new Error(
+          `Alice's one-to-one message expected 200; got ${r.status}: ${JSON.stringify(r.body)}`,
+        );
+      dmMsg = r.body.id;
+      return `conversations/${dmConv}, new message ${dmMsg}`;
+    });
+
+    await signInAs(device, reporter, ctx, phone.email);
+
+    const openChatByText = async (needle, label) => {
+      await tapId(device, 'main_messagesTab');
+      const pickRow = (nodes) =>
+        nodes.find((n) => n.center && `${n.text || ''} ${n.desc || ''}`.includes(needle));
+      const rows = await waitForText(device, needle, 15000);
+      const row = pickRow(rows);
+      if (!row)
+        throw new Error(
+          `${label} is not in ${phone.name}'s messages; on screen: ${summarizeScreen(rows).texts.slice(0, 12).join(' | ')}`,
+        );
+      await tapResolved(device, row, { label, relocate: pickRow });
+      await waitForId(device, 'privateChat_messageInput', 12000);
+    };
+
+    await reporter.step(device, `UI: ${phone.name} opens the new group`, async () => {
+      await openChatByText(groupName, `the group "${groupName}"`);
+      await waitForId(device, `privateChat_msgTarget_${groupMsg}`, 12000);
+      return "Alice's group message is on screen";
+    });
+
+    // Scenario: two people react to a group message.
+    // Each reaction is in the store before the next person acts: the network
+    // write is pinned to the message's updateTime, so acting while the
+    // phone's write is in flight would fail as a conflict at random. The
+    // store is read FIRST after a phone tap: a write the rules refuse shows
+    // nothing on screen (SHY-0644), so the screen alone would only time out.
+    const via = (person) => (person === phone ? 'on the phone' : 'over the network');
+    await reporter.step(
+      device,
+      `UI|API: Theo reacts ❤️ to Alice's message (${via(THEO)})`,
+      async () => {
+        await reactsAs(THEO, groupMsg, HEART);
+        const got = await expectStored(
+          group.id,
+          groupMsg,
+          { '❤️': [THEO.uid] },
+          `Theo's ❤️ ${via(THEO)} (a refused phone write shows no error: SHY-0644)`,
+        );
+        return `stored ${canonicalReactions(got)}`;
+      },
+    );
+    await reporter.step(
+      device,
+      `UI|API: Selma reacts 👍 to Alice's message (${via(SELMA)})`,
+      async () => {
+        await reactsAs(SELMA, groupMsg, THUMBS);
+        const got = await expectStored(
+          group.id,
+          groupMsg,
+          { '❤️': [THEO.uid], '👍': [SELMA.uid] },
+          `Selma's 👍 ${via(SELMA)} beside Theo's ❤️ (a refused phone write shows no error: SHY-0644)`,
+        );
+        return `stored ${canonicalReactions(got)}`;
+      },
+    );
+    await reporter.step(device, `UI: ${phone.name} sees ❤️ and 👍 under the message`, async () => {
+      await waitForId(device, badge(groupMsg, HEART), 15000);
+      await waitForId(device, badge(groupMsg, THUMBS), 15000);
+      return 'both badges are on screen';
+    });
+
+    // Scenario: taking a reaction back
+    await reporter.step(device, `UI|API: Selma takes her 👍 back (${via(SELMA)})`, async () => {
+      if (phone === SELMA) await tapId(device, badge(groupMsg, THUMBS));
+      else
+        await reactAs(fsOf.Selma, {
+          conversationId: group.id,
+          messageId: groupMsg,
+          emoji: '👍',
+          uid: SELMA.uid,
+        });
+      return phone === SELMA ? 'Selma tapped her badge' : 'Selma toggled it over the network';
+    });
+    await reporter.step(device, "Store: only Theo's ❤️ is left", async () => {
+      const got = await expectStored(
+        group.id,
+        groupMsg,
+        { '❤️': [THEO.uid] },
+        "Selma's 👍 taken back, Theo's ❤️ kept",
+      );
+      return canonicalReactions(got);
+    });
+    await reporter.step(device, `UI: ${phone.name} sees ❤️ and no 👍`, async () => {
+      await waitForIdGone(device, badge(groupMsg, THUMBS), {
+        stays: badge(groupMsg, HEART),
+        timeoutMs: 15000,
+      });
+      return '👍 gone, ❤️ still there';
+    });
+
+    // Scenario: the recipient's reaction reaches the sender
+    await reporter.step(device, `UI: ${phone.name} opens Alice's one-to-one chat`, async () => {
+      await tapId(device, 'privateChat_backButton');
+      await openChatByText(dmText, "Alice's one-to-one chat");
+      await waitForId(device, `privateChat_msgTarget_${dmMsg}`, 12000);
+      return "Alice's new message is on screen";
+    });
+    await reporter.step(device, `UI: ${phone.name} reacts 😂 to Alice's message`, async () => {
+      await phoneReacts(dmMsg, LAUGH);
+      return 'tapped 😂';
+    });
+    await reporter.step(device, `Store: Alice reads ${phone.name}'s 😂`, async () => {
+      const got = await expectStored(
+        dmConv,
+        dmMsg,
+        { '😂': [phone.uid] },
+        `${phone.name}'s 😂 on Alice's message (a refused phone write shows no error: SHY-0644)`,
+      );
+      return canonicalReactions(got);
+    });
+    await reporter.step(device, `UI: ${phone.name} sees 😂 under Alice's message`, async () => {
+      await waitForId(device, badge(dmMsg, LAUGH), 15000);
+      return '😂 badge on screen';
+    });
+  },
+};
+
 function buildJourneys(ctx) {
   const smoke = {
     id: 'J-SMOKE',
@@ -5020,6 +5281,7 @@ function buildJourneys(ctx) {
     J04,
     J11,
     J07,
+    J28R,
     J09,
     J12,
     J05,
@@ -5401,4 +5663,5 @@ module.exports = {
   DEV_GOOGLE_SERVICES,
   setActiveApi,
   TARGETS,
+  REACTION_PHONE_BY_PLATFORM,
 };
