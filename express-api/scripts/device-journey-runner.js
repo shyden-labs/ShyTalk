@@ -1610,6 +1610,30 @@ async function waitForId(device, id, timeoutMs = 8000) {
 }
 
 /**
+ * Wait until #id has LEFT the screen, judged only on a dump that still shows
+ * #stays (SHY-0645). Without the anchor, an empty tree or the wrong screen
+ * would read as "gone" and pass: that is how an absence check goes vacuous.
+ */
+async function waitForIdGone(device, id, { stays, timeoutMs = 8000 } = {}) {
+  if (!stays)
+    throw new Error('waitForIdGone needs a `stays` id: absence is only judged beside a presence');
+  const deadline = Date.now() + timeoutMs;
+  let seen = { stays: false, id: false };
+  while (Date.now() < deadline) {
+    const tick = Date.now();
+    const nodes = await dump(device);
+    seen = { stays: !!byId(nodes, stays), id: !!byId(nodes, id) };
+    if (seen.stays && !seen.id) return nodes;
+    await pollGap(tick, device);
+  }
+  const yn = (b) => (b ? 'yes' : 'no');
+  throw new Error(
+    `timed out (${timeoutMs}ms) waiting for #${id} to leave while #${stays} stays; ` +
+      `last screen had #${stays}: ${yn(seen.stays)}, #${id}: ${yn(seen.id)}`,
+  );
+}
+
+/**
  * Wait for the FIRST of several ids and say which one arrived.
  *
  * A sign-in that is EXPECTED not to reach Home — a suspended or banned person
@@ -5345,6 +5369,7 @@ module.exports = {
   SUPPORT_PERSONA_BY_PLATFORM,
   parseNodes,
   byId,
+  waitForIdGone,
   byText,
   byTextContains,
   summarizeScreen,
