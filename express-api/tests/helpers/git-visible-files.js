@@ -23,15 +23,28 @@ const path = require('path');
 
 /**
  * @param {string} dir a folder inside a git checkout
+ * @param {string[]} [within] files or folders under `dir` to limit the list
+ *   to, taken literally (no wildcards). A guard names its own roots, so git
+ *   looks for untracked files there only: about half the time of the whole
+ *   checkout (measured 2026-10-19).
  * @returns {Set<string>} paths relative to `dir`, in the platform's separator
  */
-function gitVisibleFiles(dir) {
+function gitVisibleFiles(dir, within = []) {
   // A missing cwd makes spawnSync report `git ENOENT`, which reads as git
   // not being installed; say what is missing instead.
   if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) {
     throw new Error(`git ls-files failed in ${dir}: no such folder`);
   }
-  const res = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
+  const args = [
+    '--literal-pathspecs',
+    'ls-files',
+    '--cached',
+    '--others',
+    '--exclude-standard',
+    '-z',
+  ];
+  if (within.length > 0) args.push('--', ...within.map((rel) => rel.split(path.sep).join('/')));
+  const res = spawnSync('git', args, {
     cwd: dir,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,

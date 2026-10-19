@@ -483,26 +483,35 @@ describe('SHY-0605 — the route reader names each ending', () => {
   });
 });
 
-// SHY-0642: a git-ignored file exists on one machine and not in CI, so the
-// walk keeps only what git tracks or would track.
-describe('SHY-0642 — the walk counts what CI has', () => {
+// SHY-0642: the cases about ignore rules ask the real git, in one repository
+// built once; each case removes what it planted, so the next starts clean.
+describe("SHY-0642 — git decides what is read, so the count is CI's", () => {
   const ENDING_WRITE = 'ref.update({ isSuspended: false });\n';
   let root;
-  beforeEach(() => {
+  let planted = [];
+  const plant = (rel, body) => {
+    fs.writeFileSync(path.join(root, rel), body);
+    planted.push(rel);
+  };
+  beforeAll(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0642-src-'));
     execFileSync('git', ['init', '-q'], { cwd: root });
-    fs.mkdirSync(path.join(root, 'routes'));
+    fs.mkdirSync(path.join(root, 'routes', 'nested'), { recursive: true });
     fs.writeFileSync(path.join(root, 'routes', 'clean.js'), 'module.exports = {};\n');
   });
-  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+  afterEach(() => {
+    for (const rel of planted) fs.rmSync(path.join(root, rel));
+    planted = [];
+  });
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 
   const verdict = () => {
     const { files, findings } = scanTree(root);
     return { files, findings: findings.map((f) => f.split(':')[0]) };
   };
 
-  test('a planted ending write in a scanned file is reported by path', () => {
-    fs.writeFileSync(path.join(root, 'routes', 'end.js'), ENDING_WRITE);
+  test('an untracked ending write that is not ignored is read and reported', () => {
+    plant(path.join('routes', 'end.js'), ENDING_WRITE);
     expect(verdict()).toEqual({
       files: [path.join('routes', 'clean.js'), path.join('routes', 'end.js')],
       findings: [path.join('routes', 'end.js')],
@@ -510,13 +519,18 @@ describe('SHY-0642 — the walk counts what CI has', () => {
   });
 
   test('a git-ignored file is neither read nor counted', () => {
-    fs.writeFileSync(path.join(root, '.gitignore'), '*.local.js\n');
-    fs.writeFileSync(path.join(root, 'routes', 'end.local.js'), ENDING_WRITE);
+    plant('.gitignore', '*.local.js\n');
+    plant(path.join('routes', 'end.local.js'), ENDING_WRITE);
     expect(verdict()).toEqual({ files: [path.join('routes', 'clean.js')], findings: [] });
   });
 
   test('a root outside any repository fails rather than counting the disk', () => {
-    fs.rmSync(path.join(root, '.git'), { recursive: true, force: true });
-    expect(() => scanTree(root)).toThrow(/git ls-files failed in .*not a git repository/i);
+    const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0642-src-bare-'));
+    try {
+      fs.mkdirSync(path.join(bare, 'routes'));
+      expect(() => scanTree(bare)).toThrow(/git ls-files failed in .*not a git repository/i);
+    } finally {
+      fs.rmSync(bare, { recursive: true, force: true });
+    }
   });
 });

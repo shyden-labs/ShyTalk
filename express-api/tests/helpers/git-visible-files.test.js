@@ -82,6 +82,22 @@ describe('SHY-0642 — gitVisibleFiles lists what git tracks or would track', ()
     ]);
   });
 
+  test('given folders, it lists only the files under them', () => {
+    write(root, 'src/nested/new.js');
+    write(root, 'other/new.js');
+    write(root, 'third/new.js');
+    expect([...gitVisibleFiles(root, ['src/nested', 'other'])].sort()).toEqual([
+      path.join('other', 'new.js'),
+      path.join('src', 'nested', 'new.js'),
+    ]);
+  });
+
+  test('a given name is literal: a star in it is not a wildcard', () => {
+    write(root, 'notes/a*.md');
+    write(root, 'notes/ab.md');
+    expect([...gitVisibleFiles(root, ['notes/a*.md'])]).toEqual([path.join('notes', 'a*.md')]);
+  });
+
   test('a name with a space and a non-ASCII letter comes back as written', () => {
     write(root, 'src/ünï code.js');
     expect(gitVisibleFiles(root).has(path.join('src', 'ünï code.js'))).toBe(true);

@@ -55,10 +55,10 @@ function findDeadNames(text) {
   return DEAD_NAMES.flatMap((re) => text.match(re) ?? []);
 }
 
-function scan(repoRoot, roots) {
-  // SHY-0642: only files git tracks or would track, so the count is CI's on
-  // every machine; throws when git cannot say.
-  const visible = gitVisibleFiles(repoRoot);
+// SHY-0642: a walked file is read only when git tracks or would track it, so
+// the count is CI's on every machine. `visible` defaults to git's answer for
+// the roots, which throws when git cannot say.
+function scan(repoRoot, roots, visible = gitVisibleFiles(repoRoot, roots)) {
   const files = roots.flatMap((root) =>
     fs
       .readdirSync(path.join(repoRoot, root), { recursive: true })
@@ -131,38 +131,19 @@ describe('SHY-0544 — findDeadNames recognises every form the stack wrote', () 
   });
 });
 
+// The plants about kinds and pruning are not about ignore rules: they pass a
+// stand-in that sees every file, so they start no git. Git's answer is tested
+// in the SHY-0642 block below.
+const EVERY_FILE = { has: () => true };
+
 describe('SHY-0544 — a planted name in a scanned file turns the verdict red', () => {
   let root;
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0544-'));
-    execFileSync('git', ['init', '-q'], { cwd: root });
     fs.mkdirSync(path.join(root, 'local', 'nested'), { recursive: true });
     fs.writeFileSync(path.join(root, 'local', 'clean.yml'), 'image: versity/versitygw:v1.8.0\n');
   });
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
-
-  // SHY-0642: a git-ignored file exists on one machine and not in CI.
-  test('a git-ignored file under a scanned root is neither read nor counted', () => {
-    fs.writeFileSync(path.join(root, '.gitignore'), '*.local.yml\n');
-    fs.writeFileSync(path.join(root, 'local', 'compose.local.yml'), 'image: minio/minio\n');
-    expect(scan(root, ['local'])).toEqual({
-      files: [path.join('local', 'clean.yml')],
-      findings: [],
-    });
-  });
-
-  test('an untracked file that is not ignored is read and counted', () => {
-    fs.writeFileSync(path.join(root, 'local', 'nested', 'new.sh'), 'docker pull minio/mc\n');
-    expect(scan(root, ['local'])).toEqual({
-      files: [path.join('local', 'clean.yml'), path.join('local', 'nested', 'new.sh')],
-      findings: [`${path.join('local', 'nested', 'new.sh')}: minio/mc`],
-    });
-  });
-
-  test('a root outside any repository fails rather than counting the disk', () => {
-    fs.rmSync(path.join(root, '.git'), { recursive: true, force: true });
-    expect(() => scan(root, ['local'])).toThrow(/git ls-files failed in .*not a git repository/i);
-  });
 
   test.each([
     ['local/docker-compose.yml', 'image: minio/minio:RELEASE.2025-09-07T16-13-09Z\n'],
@@ -170,7 +151,7 @@ describe('SHY-0544 — a planted name in a scanned file turns the verdict red', 
     ['local/start.ps1', 'Invoke-WebRequest -Uri "http://localhost:9002/minio/health/live"\n'],
   ])('a planted %s is reported by path', (rel, body) => {
     fs.writeFileSync(path.join(root, rel), body);
-    const { files, findings } = scan(root, ['local']);
+    const { files, findings } = scan(root, ['local'], EVERY_FILE);
     expect({ filesRead: files.length, findings: findings.map((f) => f.split(':')[0]) }).toEqual({
       filesRead: 2,
       findings: [path.join(...rel.split('/'))],
@@ -179,7 +160,7 @@ describe('SHY-0544 — a planted name in a scanned file turns the verdict red', 
 
   test('a file outside the scanned kinds is not read', () => {
     fs.writeFileSync(path.join(root, 'local', 'notes.md'), 'minio/minio\n');
-    expect(scan(root, ['local'])).toEqual({
+    expect(scan(root, ['local'], EVERY_FILE)).toEqual({
       files: [path.join('local', 'clean.yml')],
       findings: [],
     });
@@ -188,9 +169,58 @@ describe('SHY-0544 — a planted name in a scanned file turns the verdict red', 
   test('a file under node_modules is not read', () => {
     fs.mkdirSync(path.join(root, 'local', 'node_modules', 'pkg'), { recursive: true });
     fs.writeFileSync(path.join(root, 'local', 'node_modules', 'pkg', 'index.js'), 'minio/minio\n');
+    expect(scan(root, ['local'], EVERY_FILE)).toEqual({
+      files: [path.join('local', 'clean.yml')],
+      findings: [],
+    });
+  });
+});
+
+// SHY-0642: the cases about ignore rules ask the real git, in one repository
+// built once; each case removes what it planted, so the next starts clean.
+describe("SHY-0642 — git decides what is read, so the count is CI's", () => {
+  let root;
+  let planted = [];
+  const plant = (rel, body) => {
+    fs.writeFileSync(path.join(root, rel), body);
+    planted.push(rel);
+  };
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0642-'));
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    fs.mkdirSync(path.join(root, 'local', 'nested'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'local', 'clean.yml'), 'image: versity/versitygw:v1.8.0\n');
+  });
+  afterEach(() => {
+    for (const rel of planted) fs.rmSync(path.join(root, rel));
+    planted = [];
+  });
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('a git-ignored file under a scanned root is neither read nor counted', () => {
+    plant('.gitignore', '*.local.yml\n');
+    plant(path.join('local', 'compose.local.yml'), 'image: minio/minio\n');
     expect(scan(root, ['local'])).toEqual({
       files: [path.join('local', 'clean.yml')],
       findings: [],
     });
+  });
+
+  test('an untracked file that is not ignored is read and counted', () => {
+    plant(path.join('local', 'nested', 'new.sh'), 'docker pull minio/mc\n');
+    expect(scan(root, ['local'])).toEqual({
+      files: [path.join('local', 'clean.yml'), path.join('local', 'nested', 'new.sh')],
+      findings: [`${path.join('local', 'nested', 'new.sh')}: minio/mc`],
+    });
+  });
+
+  test('a root outside any repository fails rather than counting the disk', () => {
+    const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0642-bare-'));
+    try {
+      fs.mkdirSync(path.join(bare, 'local'));
+      expect(() => scan(bare, ['local'])).toThrow(/git ls-files failed in .*not a git repository/i);
+    } finally {
+      fs.rmSync(bare, { recursive: true, force: true });
+    }
   });
 });
