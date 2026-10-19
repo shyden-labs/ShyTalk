@@ -472,6 +472,9 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0644](SHY-0644-a-reaction-that-does-not-save-says-so.md) | P0 | S | bug | A reaction that does not save says so | 📝 Draft | — |  |
 | [SHY-0645](SHY-0645-a-journey-proves-reactions-on-both-phones.md) | P0 | M | infra | A journey proves reactions on both phones | 📝 Draft | — |  |
 | [SHY-0646](SHY-0646-merged-work-keeps-its-story-in-progress-until-it-closes.md) | P2 | S | infra | Merged work keeps its story In Progress until the story closes | 📝 Draft | — |  |
+| [SHY-0647](SHY-0647-making-a-group-on-a-phone-reports-what-happened.md) | P0 | M | bug | Making a group on a phone reports what happened | 📝 Draft | — |  |
+| [SHY-0648](SHY-0648-a-group-member-cannot-give-themselves-powers.md) | P0 | L | bug | A group member cannot give themselves powers | 📝 Draft | — |  |
+| [SHY-0649](SHY-0649-an-admin-who-leaves-a-group-only-leaves.md) | P0 | S | bug | An admin who leaves a group only leaves | 📝 Draft | — |  |
 
 ## Done
 
