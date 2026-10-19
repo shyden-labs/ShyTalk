@@ -475,6 +475,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0647](SHY-0647-making-a-group-on-a-phone-reports-what-happened.md) | P0 | M | bug | Making a group on a phone reports what happened | 📝 Draft | — |  |
 | [SHY-0648](SHY-0648-a-group-member-cannot-give-themselves-powers.md) | P0 | L | bug | A group member cannot give themselves powers | 📝 Draft | — |  |
 | [SHY-0649](SHY-0649-an-admin-who-leaves-a-group-only-leaves.md) | P0 | S | bug | An admin who leaves a group only leaves | 📝 Draft | — |  |
+| [SHY-0650](SHY-0650-a-bot-merge-does-not-throw-away-a-prs-tests.md) | P2 | M | infra | A bot's merge does not throw away a PR's tests | 📝 Draft | — |  |
 
 ## Done
 

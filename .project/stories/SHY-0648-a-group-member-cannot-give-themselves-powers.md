@@ -57,11 +57,18 @@ actions to the server.
 
 ### Happy path
 
-- [ ] First, the hole is proven: rules tests in the emulator, run against
+- [x] First, the hole is proven: rules tests in the emulator, run against
       today's rules in a plant PR (not merged), show each escalation below
       allowed, with the prediction written in the PR body before CI runs.
       The result is recorded here.
-- [ ] The rules check the caller's role for each change, matching the
+      Proof: plant PR #2458 (closed unmerged). Run 39198147350 on
+      50066a8f637: 16 failed, exactly the 16 DENY tests by name; 16430
+      passed; 4 skipped (SHY-0638's). Run 39200135598 on 9095c47d32d (the
+      fix's 18 further cases added): 24 failed, the 16 plus exactly the 8
+      predicted `g-perm` refusals. Both predictions were written in the PR
+      body before CI reported. The CI log names only failing tests, so the
+      ALLOW passes are read by elimination.
+- [x] The rules check the caller's role for each change, matching the
       roles the apps already show (owner = `createdBy`; admin = owner or in
       `groupAdminIds`; mod = in `groupModIds`):
       - `createdBy`, `groupAdminIds`, `groupModIds`, `permissions`,
@@ -74,41 +81,64 @@ actions to the server.
       - adding a member: the level `whoCanAddMembers` names, with today's
         one-at-a-time, same-cohort gate kept;
       - leaving (removing yourself): any member.
-- [ ] Every admin action each app makes today still succeeds for the role
+      Proof: `conversationChangeAllowed()` in `firestore.rules`, PR #2461 (merged 76edc8d7090), PR Checks run 39219747986 on head 00ed6b4ca24, every job success by name (Test Backend, Integration, Build & Test, SonarCloud, chromium Playwright); 41 tests in
+      `conversations-rules.test.js` ("SHY-0648 —" blocks).
+- [x] Every admin action each app makes today still succeeds for the role
       the app offers it to (one rules test per action, as the repository
-      writes it).
+      writes it). Proof: inventory of every write in both repositories
+      (11 fields, identical on Android and iOS); ALLOW tests g-ok-1..7 and
+      g-perm-6/7/9/10/11/12/13/15/17/18 cover leave, roles, transfer, rename,
+      close, permissions, add, remove, system messages, notify mode,
+      description and photo; green in PR #2461 (merged 76edc8d7090), PR Checks run 39219747986 on head 00ed6b4ca24, every job success by name (Test Backend, Integration, Build & Test, SonarCloud, chromium Playwright).
 
 ### Error paths
 
-- [ ] Each escalation is refused, one rules test per case, each seen red
+- [x] Each escalation is refused, one rules test per case, each seen red
       on today's rules first: a member sets themselves as owner, admin or
       mod; removes another member; removes the owner; closes the group;
       changes permissions, system messages, notify mode, cohort or
       `isGroup`; edits the name when `whoCanEditInfo` is above their role.
-- [ ] A mod cannot do the owner's or admins' changes; an admin cannot do
-      the owner's.
-- [ ] A transfer of ownership names a current participant.
+      Proof: g-esc-1..16, red on today's rules (#2458 run 39198147350),
+      green on the new rules (#2461).
+- [x] A mod cannot do the owner's or admins' changes; an admin cannot do
+      the owner's. Proof: g-esc-13 (mod self-promotes), g-perm-4 (mod
+      closes), g-esc-14 (admin takes ownership), g-perm-16 (admin renames and
+      promotes); each red on today's rules, green on the new.
+- [x] A transfer of ownership names a current participant. Proof:
+      g-esc-16 refused (red on today's rules), g-ok-3 allowed.
 
 ### Edge cases
 
-- [ ] A group with no `permissions` map falls back to the apps' defaults
+- [x] A group with no `permissions` map falls back to the apps' defaults
       (`GroupPermissions`: add and edit for everyone, remove for admins).
-- [ ] A one-to-one conversation cannot be turned into a group, nor take
-      group fields.
-- [ ] Changes that touch several fields at once need the role for every
-      field they touch.
+      Proof: g-perm-13 (rename allowed), g-perm-14 (remove refused, red on
+      today's rules), g-perm-15 (an unknown level reads as its default, as
+      `GroupPermissions.parseLevel`).
+- [x] A one-to-one conversation cannot be turned into a group, nor take
+      group fields; nor can it grow (found while fixing: today a DM
+      participant can add a same-cohort stranger, who then reads it).
+      Proof: g-esc-15 and g-perm-1, both red on today's rules.
+- [x] Changes that touch several fields at once need the role for every
+      field they touch. Proof: g-perm-16 (red on today's rules);
+      g-perm-18 (the owner's four-field write) allowed.
 
 ### Performance
 
-- [ ] No extra document reads: the checks read only the conversation
-      document the rule already has (`resource.data`).
+- [x] No extra document reads: the checks read only the conversation
+      document the rule already has (`resource.data`). Proof: the new
+      functions read only `resource.data` and `request.resource.data`; the
+      only `get()` in the update rule is the existing add-member cohort
+      read (#2461 diff).
 
 ### Security
 
-- [ ] A security review of the new rule is recorded in the PR, with each
-      branch's test named.
-- [ ] Field lists are allow-lists (`hasOnly`), so a field added later is
-      refused until a rule names it.
+- [x] A security review of the new rule is recorded in the PR, with each
+      branch's test named. Proof: #2461's body, "Security review".
+- [x] Field lists are allow-lists (`hasOnly`), so a field added later is
+      refused until a rule names it. Proof: `groupChangeAllowed` and the
+      one-to-one branch use `hasOnly`; g-perm-2 and g-perm-3 (a field the
+      apps never write, by a member and by the owner) red on today's rules,
+      green on the new.
 
 ### UX
 
@@ -187,3 +217,7 @@ it and who is in it.
   measured against SHY-0614 (8: two writes moved, 25 rules tests): one
   rule rewritten for nine field groups, about 25 rules tests plus a plant
   run, two small logging changes.
+- **2026-10-19**: Fixed in #2461 (merged 76edc8d7090). Still open: the
+  per-clause mutation runs from the Test Plan (drop each clause, its tests
+  red), the device log of a refused group write, the dev check of group
+  actions, and Shyden's approval to deploy the rules to production.
