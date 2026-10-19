@@ -189,6 +189,34 @@ function devFirebaseKey(env = process.env) {
   return key;
 }
 
+/** The dev APK's google-services.json, parsed, or null when this machine has none. */
+function readDevGoogleServices() {
+  if (!fs.existsSync(DEV_GOOGLE_SERVICES)) return null;
+  return JSON.parse(fs.readFileSync(DEV_GOOGLE_SERVICES, 'utf8'));
+}
+
+/**
+ * The dev Firebase project id (SHY-0645: the reaction journey writes
+ * Firestore over REST as each persona). Same two sources as the key, in the
+ * same order, and no default: `DEV_FIREBASE_PROJECT_ID`, then the file the
+ * dev APK is built from.
+ */
+function devFirebaseProjectId(env = process.env, readServices = readDevGoogleServices) {
+  const fromEnv = env.DEV_FIREBASE_PROJECT_ID;
+  if (fromEnv && fromEnv.trim()) return fromEnv.trim();
+  const services = readServices();
+  if (!services) {
+    throw new Error(
+      `No dev Firebase project id. Set DEV_FIREBASE_PROJECT_ID, or provide ${DEV_GOOGLE_SERVICES} ` +
+        '(gitignored; written from a secret, and present wherever the dev APK can be built).',
+    );
+  }
+  const id = services?.project_info?.project_id;
+  if (!id)
+    throw new Error(`Could not read the dev Firebase project id from ${DEV_GOOGLE_SERVICES}`);
+  return id;
+}
+
 /** Where the operator's dev persona password is kept, per provision-test-personas.js. */
 const DEV_CREDENTIALS_FILE = '~/.shytalk/dev-personas-credentials';
 
@@ -219,6 +247,11 @@ const TARGETS = {
     // what makes these tokens worth asserting with.
     authUrl:
       'http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo',
+    // SHY-0645: the people not on the phone write Firestore over REST as
+    // themselves. 8080 is the emulator the stack starts, `demo-shytalk` its
+    // project; the runner runs on the Mac, so no tunnel is involved.
+    firestoreDocumentsUrl:
+      'http://localhost:8080/v1/projects/demo-shytalk/databases/(default)/documents',
     // Seeded by scripts/seed-personas-local.js, which fixes it.
     password: { kind: 'fixed', value: 'localdev123' },
   },
@@ -236,6 +269,10 @@ const TARGETS = {
     // getter has no way to be told which environment is meant.
     authUrlFor(env) {
       return `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${devFirebaseKey(env)}`;
+    },
+    // SHY-0645: a function for the same reason as authUrlFor.
+    firestoreDocumentsUrlFor(env) {
+      return `https://firestore.googleapis.com/v1/projects/${devFirebaseProjectId(env)}/databases/(default)/documents`;
     },
     // Generated per-environment by provision-test-personas.js. There is no
     // default, and that is the point: a dev run without it must refuse rather
@@ -2526,14 +2563,18 @@ function resolveTargetApi(target, env = process.env) {
 
   const { apiBaseUrl } = cfg;
   const authUrl = cfg.authUrlFor ? cfg.authUrlFor(env) : cfg.authUrl;
+  const firestoreDocumentsUrl = cfg.firestoreDocumentsUrlFor
+    ? cfg.firestoreDocumentsUrlFor(env)
+    : cfg.firestoreDocumentsUrl;
   return {
     apiBaseUrl,
     authUrl,
+    firestoreDocumentsUrl,
     password,
     // Printed in the run header so the target is legible without reading the
     // source. The password is deliberately absent: a header reaches CI logs,
     // screenshots and evidence pages.
-    describe: `api=${apiBaseUrl} auth=${new URL(authUrl).host}`,
+    describe: `api=${apiBaseUrl} auth=${new URL(authUrl).host} fs=${new URL(firestoreDocumentsUrl).host}`,
   };
 }
 
@@ -5331,6 +5372,7 @@ module.exports = {
   getIdToken,
   resolveTargetApi,
   devFirebaseKey,
+  devFirebaseProjectId,
   DEV_GOOGLE_SERVICES,
   setActiveApi,
   TARGETS,
