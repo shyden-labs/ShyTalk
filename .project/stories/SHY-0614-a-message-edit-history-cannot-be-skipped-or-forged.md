@@ -10,7 +10,7 @@ type: bug
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
-blocked_by: [SHY-0632]
+blocked_by: [SHY-0632, SHY-0645]
 ---
 
 # SHY-0614: A private or group message's edit history cannot be skipped or forged, and a recalled message is kept for moderators
@@ -85,22 +85,45 @@ suite; SHY-0626 stops messages being created under another person's name.
       killed); iOS compiled, its runtime proof is the dev journey (Task 10).
       `git grep` at 5321441f845 finds no `"isRecalled" to true` or
       `collection("edits")` in either app (room edits are SHY-0628).
-- [ ] Hiding a message stays a phone write, allowed only when `hiddenBy` is
+- [x] Hiding a message stays a phone write, allowed only when `hiddenBy` is
       the caller and only `isHidden` and `hiddenBy` change.
-- [ ] A reaction stays a phone write by any participant, allowed only when
+      Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
+      Tests "ALLOW group admin hides naming themself", "group admin cannot hide
+      naming someone else", "group admin cannot change text while hiding";
+      the last two red against the old rules (plant #2441) and against mutants
+      M3+M4 (plant #2442).
+- [x] A reaction stays a phone write by any participant, allowed only when
       `reactions` is the one field that changes. (Today's rule lets only the
       sender or group staff update a message, so a recipient's reaction is
       refused; read from the rule on 2026-10-18, proven by the new test.)
+      Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
+      "ALLOW a recipient reacts" (red on the old rules, #2441), "a reaction
+      cannot carry a text change" (red on mutant M3) and "an outsider cannot
+      react" (red on mutant M4, #2442). Whose ids the map lists: SHY-0643.
 
 ### Error paths
 
-- [ ] The rules refuse a client create on `edits` and on `mod_log`.
-- [ ] The rules refuse a client update that changes a message's `text`,
+- [x] The rules refuse a client create on `edits` and on `mod_log`.
+      Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
+      Both edits tests and "group admin cannot write mod_log" red on the old
+      rules (#2441); static pin "edits, recall and mod_log refuse every client
+      write" red on mutant M2 (#2442).
+- [x] The rules refuse a client update that changes a message's `text`,
       `isEdited`, `editedAt`, `editCount` or `isRecalled`.
-- [ ] The rules refuse every client read and write of the recalled-text
+      Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
+      Five "sender cannot ... directly" tests, each red on the old rules
+      (#2441) and on mutants M3+M4 (#2442).
+- [x] The rules refuse every client read and write of the recalled-text
       records except an admin's read.
-- [ ] The rules refuse every client delete of a message (no app deletes one;
+      Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
+      "ALLOW admin reads the recall record" (red on the old rules, #2441);
+      "participant/sender cannot read the recall record" red on mutant M1 and
+      "nobody can write the recall record" red on mutant M2 (#2442); the old
+      rules refused these too (no rule matched), so only the mutants prove them.
+- [x] The rules refuse every client delete of a message (no app deletes one;
       a delete would erase the record).
+      Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
+      "sender cannot delete a message" red on the old rules (#2441).
 - [ ] The edit and recall routes refuse anyone but the sender, a banned
       user, a message already recalled, and a conversation flagged
       `crossCohortAtMigration`.
@@ -124,12 +147,22 @@ suite; SHY-0626 stops messages being created under another person's name.
 
 ### Security
 
-- [ ] Rules tests in the emulator prove each refusal above, one test per
+- [x] Rules tests in the emulator prove each refusal above, one test per
       case (skipped history, forged entry on own message, forged entry on
       someone else's message, direct text change, direct recall, recalled
       text read by a participant, forged `hiddenBy`, forged `mod_log`), each
       seen RED against today's rules first.
-- [ ] A security review of the routes and rules is recorded in the PR.
+      Proof: `message-history-rules.test.js`, 25 tests, all PASS in run
+      39177283003 (PR #2447). Plant #2441 ran 20 against the old rules: the 13
+      predicted red were red by name (skipped history = direct text change,
+      forged entry on own and on another's message, direct recall, forged
+      `hiddenBy`, forged `mod_log` among them). One case could not be red on
+      the old rules, because they already refused it (no rule matched):
+      recalled text read by a participant. It was seen red on mutant M1
+      instead (plant #2442), as `plant-result.md` records.
+- [x] A security review of the routes and rules is recorded in the PR.
+      Proof: PR #2447 body, "Security review, inline" (both routes and the
+      rules diff; one gap filed as SHY-0643).
 
 ### UX
 
@@ -268,3 +301,7 @@ suite; SHY-0626 stops messages being created under another person's name.
   covers reactions (0 of 46 files): the dev proof adds reaction scenarios to
   j28 (Theo on Android, Selma on iPhone) and runs them on both phones before
   any production deploy.
+- **2026-10-19, reaction journey**: the runner cannot reach reactions yet
+  (no test tags on the React item, picker or badges, and no way to write as
+  the person not holding the phone). That work is SHY-0645, which the dev
+  proof now waits on; this story's Task 10 runs its journey.
