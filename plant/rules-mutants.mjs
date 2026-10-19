@@ -61,8 +61,8 @@ const ALL_DENY = Object.entries(T)
 // [id, what is dropped, find, replace, predicted red test keys]
 const MUTANTS = [
   ['M01', 'group allow-list of fields',
-    "changed.hasOnly(['participantIds', 'groupName', 'groupDescription',",
-    "true || changed.hasOnly(['participantIds', 'groupName', 'groupDescription',",
+    "changed.hasOnly(['participantIds', 'groupName', 'groupDescription',\n                                'groupPhotoUrl', 'isClosed', 'groupAdminIds',\n                                'groupModIds', 'createdBy', 'permissions',\n                                'systemMessageConfig', 'modNotifyMode'])",
+    'true',
     ['d10', 'd11', 'e2', 'e3']],
   ['M02', 'owner-only for owner, roles, permissions, system messages, notify mode',
     '              || isGroupOwner())', '              || true)',
