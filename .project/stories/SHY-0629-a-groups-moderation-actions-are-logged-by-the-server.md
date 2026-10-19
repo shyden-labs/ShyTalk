@@ -135,3 +135,9 @@ Filed on 2026-10-18 at Shyden's choice ("Lock it, file a log story").
   reports (assumed; Shyden may re-rank). Scored 13: seven actions moved to
   server routes across both apps, a reader in the admin panel and the app,
   rules tests and a journey; larger than SHY-0614 (8), which moves two.
+- **2026-10-19**: SHY-0648 (P0) puts role checks into the conversation
+  update rule first (owner, admin, mod and the group's `permissions`).
+  When this story moves the actions to server routes, each route keeps
+  those same role checks, and the rules keep refusing the phone writes
+  SHY-0648 refuses. Shyden chose this order on 2026-10-19; this story
+  stays P1.
