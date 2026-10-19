@@ -122,3 +122,11 @@ CI-config + build-plumbing + test-infrastructure story — **no app/backend/web 
 ## Notes
 
 - 2026-07-14 ~17:05 WIB — **CREATED fully-refined** ([[feedback-no-skeleton-stories-fully-refined]]) as the split-out successor to [[SHY-0186]] (code-reviewer R1 Imp-1 on PR #1598: increments 2-4 under one SHY violated 1-story-1-PR; EPIC-0003 sub-slice pattern applied). Carries the execution/guard/CI scope with SHY-0186's discovery baked in: the link failure is `ld: framework 'FirebaseCore' not found` because the K/N test binary transitively links `iosMain`'s gitlive-Firebase native stack (CocoaPods-provided). Design options (a) linkerOpts / **(b) KMP `cocoapods{}` plugin (recommended)** / (c) stub-shim recorded with trade-offs in Test Plan increment A; final decision to be validated + recorded here at pickup. Needs a focused, non-contended session (the Xcode toolchain must be free — 2026-07-13/14 sessions saw multi-hour contention).
+- **2026-10-20**: Measured on develop c9331e1a40d while proving SHY-0648's
+  logging AC per platform: `:shared:compileTestKotlinIosSimulatorArm64`
+  fails with 18 `Name contains illegal characters: ","` errors in commonTest
+  (PreviewWatermarkContentTest, ServerHealthTest, WatermarkFormatTest x3,
+  CohortSurfaceTest x3, PersistedSessionOutcomeTest x4,
+  BackendFailurePolicyTest, RoomScreenContentTest x2, VoiceUnavailabilityTest,
+  ColdStartClaimGateTest x2), so no shared test runs on Kotlin/Native today.
+  SHY-0648's observability AC waits on this story for its iOS proof.
