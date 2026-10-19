@@ -403,6 +403,78 @@ service cloud.firestore {
                  == request.auth.token.get('cohort', 'minor')
             )
         );
+
+      // SHY-0648 — who may change a conversation. The apps offer each
+      // change only to one role (GroupSettingsSheet); these rules make the
+      // same check, so a direct write cannot skip it. Owner = `createdBy`;
+      // admin = owner or in `groupAdminIds`; mod = in `groupModIds`; the
+      // rest follow the group's `permissions` (defaults as GroupPermissions).
+      // Only the fields the apps write may change: an allow-list, so a field
+      // added later is refused until a rule names it. Reads only
+      // `resource.data`, so no document read is billed.
+      function isGroupOwner() {
+        return string(callerUniqueId()) == resource.data.get('createdBy', '');
+      }
+      function isGroupAdmin() {
+        return isGroupOwner()
+          || string(callerUniqueId()) in resource.data.get('groupAdminIds', []);
+      }
+      function isGroupStaff() {
+        return isGroupAdmin()
+          || string(callerUniqueId()) in resource.data.get('groupModIds', []);
+      }
+      // A GroupPermissions.PermissionLevel name. ADMINS_AND_MODS is the old
+      // name the apps still read as MODS_AND_ABOVE.
+      function levelAllows(level) {
+        return level == 'EVERYONE'
+          || (level in ['MODS_AND_ABOVE', 'ADMINS_AND_MODS'] && isGroupStaff())
+          || (level == 'ADMINS_ONLY' && isGroupAdmin())
+          || (level == 'OWNER_ONLY' && isGroupOwner());
+      }
+      // As GroupPermissions.parseLevel: a missing or unknown level reads as
+      // that permission's default, so the rules allow what the apps offer.
+      function permissionAllows(key, fallback) {
+        let level = resource.data.get('permissions', {}).get(key, fallback);
+        let known = ['EVERYONE', 'MODS_AND_ABOVE', 'ADMINS_AND_MODS', 'ADMINS_ONLY', 'OWNER_ONLY'];
+        return (level in known && levelAllows(level))
+          || (!(level in known) && levelAllows(fallback));
+      }
+      function groupChangeAllowed(changed, removed, added, leavingOnly) {
+        return changed.hasOnly(['participantIds', 'groupName', 'groupDescription',
+                                'groupPhotoUrl', 'isClosed', 'groupAdminIds',
+                                'groupModIds', 'createdBy', 'permissions',
+                                'systemMessageConfig', 'modNotifyMode'])
+          && (!changed.hasAny(['createdBy', 'groupAdminIds', 'groupModIds', 'permissions',
+                               'systemMessageConfig', 'modNotifyMode'])
+              || isGroupOwner())
+          && (!('createdBy' in changed)
+              || request.resource.data.createdBy in request.resource.data.participantIds)
+          && (!('isClosed' in changed) || isGroupAdmin())
+          && (!changed.hasAny(['groupName', 'groupDescription', 'groupPhotoUrl'])
+              || permissionAllows('whoCanEditInfo', 'EVERYONE'))
+          && (added.size() == 0 || permissionAllows('whoCanAddMembers', 'EVERYONE'))
+          && (leavingOnly
+              || (permissionAllows('whoCanRemoveMembers', 'ADMINS_ONLY')
+                  && !(resource.data.get('createdBy', '') in removed)));
+      }
+      // A one-to-one is never updated by a phone (created only); its one
+      // allowed change is a participant removing themselves. It cannot
+      // grow, become a group or take group fields.
+      function conversationChangeAllowed() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        let removed = resource.data.participantIds
+          .removeAll(request.resource.data.participantIds);
+        let added = request.resource.data.participantIds
+          .removeAll(resource.data.participantIds);
+        let leavingOnly = removed.hasOnly([string(callerUniqueId())]);
+        return (resource.data.get('isGroup', false) == true
+                && groupChangeAllowed(changed, removed, added, leavingOnly))
+          || (resource.data.get('isGroup', false) != true
+              && changed.hasOnly(['participantIds'])
+              && added.size() == 0
+              && leavingOnly);
+      }
+
       // UK OSA #17 PR 8 — update gate. Caller must be a participant,
       // AND:
       //   • Migration flags (crossCohortAtMigration, frozenAtMigration,
@@ -422,9 +494,10 @@ service cloud.firestore {
       //         per-add cohort `get()`.
       //       - The added id's current cohort must match the
       //         caller's JWT claim.
-      // Removals (size == 0) and non-participantIds changes are
-      // unaffected — members can leave / be kicked from frozen
-      // groups, and lastMessage / groupName updates flow.
+      // Removals (size == 0) pass the growth gate — members can leave /
+      // be kicked from frozen groups. Who may make each change, removals
+      // included, is `conversationChangeAllowed()` (SHY-0648) below the
+      // growth gate.
       allow update: if request.auth != null
         && !isBanned()
         && string(callerUniqueId()) in resource.data.participantIds
@@ -451,7 +524,8 @@ service cloud.firestore {
                )).data.get('cohort', 'minor')
                == request.auth.token.get('cohort', 'minor')
           )
-        );
+        )
+        && conversationChangeAllowed();
 
       // Subcollection reads MUST propagate the `crossCohortAtMigration`
       // flag from the parent conversation doc — otherwise a participant
