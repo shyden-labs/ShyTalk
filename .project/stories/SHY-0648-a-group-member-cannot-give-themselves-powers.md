@@ -232,3 +232,13 @@ it and who is in it.
   red tests. One mutant left out as equivalent (the one-to-one branch's
   isGroup check). Still open: the device log of a refused group write, the
   dev check of group actions, and Shyden's approval for production.
+- **2026-10-20**: Device logging done in #2475 (merged 278b6434e43):
+  `firebaseCall` logs every failure through a test seam that defaults to
+  `logE("firebaseCall", action, error)`, and every group write on both apps
+  passes an action-naming message, so a refusal is logged with its action
+  and the PERMISSION_DENIED exception. FirebaseCallLoggingTest (4 tests)
+  green on jvmTest and testAndroidHostTest locally and in CI; two mutants
+  killed (logging past the seam, logging a generic action). The AC stays
+  open for its iOS proof: commonTest does not compile for Kotlin/Native
+  (SHY-0188). The dev phone walk was stopped by a stale persona password
+  on this Mac (see SHY-0525's note); the password was rotated.

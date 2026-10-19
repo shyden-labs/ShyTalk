@@ -77,6 +77,10 @@ platform, and be verified in the artefact before a device sees it.
       before install, when the bundle's password is empty or the dylib is stale.
 - [ ] A provenance sidecar that is unreadable or malformed counts as a
       mismatch (rebuild), never as a match.
+- [ ] A password dev does not accept is refused before any build: the
+      runner and the iOS script each sign one persona in on dev (one
+      sign-in call, the password never printed) and stop, naming the
+      credentials file, when dev answers `INVALID_LOGIN_CREDENTIALS`.
 
 ### Edge cases
 
@@ -197,3 +201,12 @@ platform, and be verified in the artefact before a device sees it.
   `dev-2026-09-06T02-34-23-007Z` failed J02/J08 at "Pick persona" on a
   credential-less APK; rerun `dev-2026-09-06T02-52-39-583Z` with
   `DEV_QA_PERSONAS_PASSWORD` exported by hand passed J-SMOKE and J02.
+- **2026-10-20**: A second way to bake a dead credential, found on the
+  SHY-0648 phone walk. `~/.shytalk/dev-personas.env` (last changed 12 Jul)
+  had drifted from the `DEV_QA_PERSONAS_PASSWORD` secret that re-seeds dev
+  on every deploy: all 17 personas answered `INVALID_LOGIN_CREDENTIALS`
+  (Firebase sign-in from the Mac). `scripts/ios/build-debug-dev.sh` and
+  `:app:installDevDebug` both built and installed with it without a word,
+  and the persona sign-in failed on the phone. New error-path AC added: prove
+  the password signs in on dev before building. Shyden chose to rotate the
+  password (secret, local files, re-seed) the same day.
