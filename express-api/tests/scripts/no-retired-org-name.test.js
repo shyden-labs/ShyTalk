@@ -118,7 +118,8 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 2035 -> 2037: tests/helpers/git-visible-files.js and its test (SHY-0642).
 // Since SHY-0642 a git-ignored file is never counted, so this is CI's
 // figure on every machine.
-const FILES_READ_FLOOR = 2037;
+// 2037 -> 2038: PLANT ONLY, never merged (SHY-0648 mutation run files).
+const FILES_READ_FLOOR = 2038;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
