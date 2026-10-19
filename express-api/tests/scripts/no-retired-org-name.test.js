@@ -1,3 +1,7 @@
+/* eslint-disable sonarjs/no-os-command-from-path --
+ * Spawns the hardcoded binary `git` with literal argv (`init`, `add`) to build
+ * a throwaway repository for the planted cases; no user-controlled command and
+ * no PATH manipulation. Matches the firebase-admin-namespace-surface convention. */
 /**
  * no-retired-org-name.test.js — SHY-0545.
  *
@@ -17,9 +21,11 @@
  * verdict carries the number of files read beside the findings, so a walk
  * that silently reads nothing cannot pass.
  */
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { gitVisibleFiles } = require('../helpers/git-visible-files');
 
 const REPO = path.resolve(__dirname, '../../..');
 const RETIRED_LOGIN = ['shyden', 'ltd'].join('-');
@@ -109,7 +115,10 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 2032 -> 2034: shared/.../data/remote/PrivateMessageEditApi.kt and its
 // commonTest (SHY-0614). 2034 -> 2035:
 // tests/firestore-rules/message-history-rules.test.js (SHY-0614).
-const FILES_READ_FLOOR = 2035;
+// 2035 -> 2037: tests/helpers/git-visible-files.js and its test (SHY-0642).
+// Since SHY-0642 a git-ignored file is never counted, so this is CI's
+// figure on every machine.
+const FILES_READ_FLOOR = 2037;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
@@ -129,11 +138,16 @@ function walk(repoRoot, rel, out) {
 }
 
 function scan(repoRoot, roots) {
+  // SHY-0642: only files git tracks or would track, so the count is CI's on
+  // every machine; throws when git cannot say.
+  const visible = gitVisibleFiles(repoRoot);
   const top = fs
     .readdirSync(repoRoot, { withFileTypes: true })
     .filter((entry) => entry.isFile() && ROOT_FILES.test(entry.name))
     .map((entry) => entry.name);
-  const files = [...top, ...roots.flatMap((root) => walk(repoRoot, root, []))];
+  const files = [...top, ...roots.flatMap((root) => walk(repoRoot, root, []))].filter((rel) =>
+    visible.has(rel),
+  );
   const findings = files.flatMap((rel) =>
     findRetiredName(fs.readFileSync(path.join(repoRoot, rel), 'utf8')).map(
       (name) => `${rel}: ${name}`,
@@ -200,10 +214,34 @@ describe('SHY-0545 — a planted name in a scanned file turns the verdict red', 
   let root;
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0545-'));
+    execFileSync('git', ['init', '-q'], { cwd: root });
     fs.mkdirSync(path.join(root, 'scripts', 'nested'), { recursive: true });
     fs.writeFileSync(path.join(root, 'scripts', 'clean.sh'), 'OWNER=shyden-labs\n');
   });
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  // SHY-0642: a git-ignored file exists on one machine and not in CI.
+  test('a git-ignored file under a scanned root is neither read nor counted', () => {
+    fs.writeFileSync(path.join(root, '.gitignore'), 'google-services.json\n');
+    fs.writeFileSync(path.join(root, 'scripts', 'google-services.json'), `${RETIRED_LOGIN}\n`);
+    expect(scan(root, ['scripts'])).toEqual({
+      files: [path.join('scripts', 'clean.sh')],
+      findings: [],
+    });
+  });
+
+  test('an untracked file that is not ignored is read and counted', () => {
+    fs.writeFileSync(path.join(root, 'scripts', 'nested', 'new.sh'), `${RETIRED_LOGIN}\n`);
+    expect(scan(root, ['scripts'])).toEqual({
+      files: [path.join('scripts', 'clean.sh'), path.join('scripts', 'nested', 'new.sh')],
+      findings: [`${path.join('scripts', 'nested', 'new.sh')}: ${RETIRED_LOGIN}`],
+    });
+  });
+
+  test('a root outside any repository fails rather than counting the disk', () => {
+    fs.rmSync(path.join(root, '.git'), { recursive: true, force: true });
+    expect(() => scan(root, ['scripts'])).toThrow(/git ls-files failed in .*not a git repository/i);
+  });
 
   test.each([
     ['scripts/nested/sync.sh', `PROJECT_OWNER=${RETIRED_LOGIN}\n`],

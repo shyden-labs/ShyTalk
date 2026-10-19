@@ -1,3 +1,7 @@
+/* eslint-disable sonarjs/no-os-command-from-path --
+ * Spawns the hardcoded binary `git` with literal argv (`init`, `add`) to build
+ * a throwaway repository for the planted cases; no user-controlled command and
+ * no PATH manipulation. Matches the firebase-admin-namespace-surface convention. */
 /**
  * no-minio-image.test.js — SHY-0544.
  *
@@ -12,9 +16,11 @@
  * verdict carries the number of files read beside the findings, so a walk
  * that silently reads nothing cannot pass.
  */
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { gitVisibleFiles } = require('../helpers/git-visible-files');
 
 const REPO = path.resolve(__dirname, '../../..');
 // express-api/tests is left out: it holds this guard, whose plants name the
@@ -50,12 +56,16 @@ function findDeadNames(text) {
 }
 
 function scan(repoRoot, roots) {
+  // SHY-0642: only files git tracks or would track, so the count is CI's on
+  // every machine; throws when git cannot say.
+  const visible = gitVisibleFiles(repoRoot);
   const files = roots.flatMap((root) =>
     fs
       .readdirSync(path.join(repoRoot, root), { recursive: true })
       .map((rel) => path.join(root, rel))
       .filter((rel) => !rel.split(path.sep).includes('node_modules'))
-      .filter((rel) => KINDS.test(rel) && fs.statSync(path.join(repoRoot, rel)).isFile()),
+      .filter((rel) => KINDS.test(rel) && visible.has(rel))
+      .filter((rel) => fs.statSync(path.join(repoRoot, rel)).isFile()),
   );
   const findings = files.flatMap((rel) =>
     findDeadNames(fs.readFileSync(path.join(repoRoot, rel), 'utf8')).map(
@@ -125,10 +135,34 @@ describe('SHY-0544 — a planted name in a scanned file turns the verdict red', 
   let root;
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0544-'));
+    execFileSync('git', ['init', '-q'], { cwd: root });
     fs.mkdirSync(path.join(root, 'local', 'nested'), { recursive: true });
     fs.writeFileSync(path.join(root, 'local', 'clean.yml'), 'image: versity/versitygw:v1.8.0\n');
   });
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  // SHY-0642: a git-ignored file exists on one machine and not in CI.
+  test('a git-ignored file under a scanned root is neither read nor counted', () => {
+    fs.writeFileSync(path.join(root, '.gitignore'), '*.local.yml\n');
+    fs.writeFileSync(path.join(root, 'local', 'compose.local.yml'), 'image: minio/minio\n');
+    expect(scan(root, ['local'])).toEqual({
+      files: [path.join('local', 'clean.yml')],
+      findings: [],
+    });
+  });
+
+  test('an untracked file that is not ignored is read and counted', () => {
+    fs.writeFileSync(path.join(root, 'local', 'nested', 'new.sh'), 'docker pull minio/mc\n');
+    expect(scan(root, ['local'])).toEqual({
+      files: [path.join('local', 'clean.yml'), path.join('local', 'nested', 'new.sh')],
+      findings: [`${path.join('local', 'nested', 'new.sh')}: minio/mc`],
+    });
+  });
+
+  test('a root outside any repository fails rather than counting the disk', () => {
+    fs.rmSync(path.join(root, '.git'), { recursive: true, force: true });
+    expect(() => scan(root, ['local'])).toThrow(/git ls-files failed in .*not a git repository/i);
+  });
 
   test.each([
     ['local/docker-compose.yml', 'image: minio/minio:RELEASE.2025-09-07T16-13-09Z\n'],
