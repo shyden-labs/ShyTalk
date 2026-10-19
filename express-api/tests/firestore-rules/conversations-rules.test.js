@@ -475,3 +475,171 @@ describe('SHY-0648 — a group member cannot give themselves powers', () => {
     );
   });
 });
+
+describe("SHY-0648 — each change follows the group's roles and permissions", () => {
+  const withPermissions = (changes) => ({
+    permissions: { ...groupDoc().permissions, ...changes },
+  });
+  // A group written before `permissions` existed: the key is absent.
+  const groupDocWithoutPermissions = () => {
+    const { permissions: _absent, ...rest } = groupDoc();
+    return rest;
+  };
+
+  test('DENY: a one-to-one participant adds a third person', async () => {
+    await seedConv('g-perm-1', convDoc([OWNER, MEMBER]));
+    await seedDoc(`users/${id(NEWCOMER)}`, { cohort: 'adult' });
+    await assertFails(
+      groupRef(MEMBER, 'g-perm-1').update({
+        participantIds: [id(OWNER), id(MEMBER), id(NEWCOMER)],
+      }),
+    );
+  });
+
+  test('DENY: a member writes a field the apps never write', async () => {
+    await seedConv('g-perm-2', groupDoc());
+    await assertFails(groupRef(MEMBER, 'g-perm-2').update({ lastMessage: 'forged' }));
+  });
+
+  test('DENY: even the owner writes a field the apps never write', async () => {
+    await seedConv('g-perm-3', groupDoc());
+    await assertFails(groupRef(OWNER, 'g-perm-3').update({ lastMessage: 'forged' }));
+  });
+
+  test('DENY: a mod closes the group', async () => {
+    await seedConv('g-perm-4', groupDoc({ groupModIds: [id(MEMBER)] }));
+    await assertFails(groupRef(MEMBER, 'g-perm-4').update({ isClosed: true }));
+  });
+
+  test('DENY: a member adds a user when whoCanAddMembers is ADMINS_ONLY', async () => {
+    await seedConv('g-perm-5', groupDoc(withPermissions({ whoCanAddMembers: 'ADMINS_ONLY' })));
+    await seedDoc(`users/${id(NEWCOMER)}`, { cohort: 'adult' });
+    await assertFails(
+      groupRef(MEMBER, 'g-perm-5').update({
+        participantIds: [id(OWNER), id(MEMBER), id(MEMBER_3), id(NEWCOMER)],
+      }),
+    );
+  });
+
+  test('ALLOW: an admin adds a user when whoCanAddMembers is ADMINS_ONLY', async () => {
+    await seedConv(
+      'g-perm-6',
+      groupDoc({
+        groupAdminIds: [id(MEMBER)],
+        ...withPermissions({ whoCanAddMembers: 'ADMINS_ONLY' }),
+      }),
+    );
+    await seedDoc(`users/${id(NEWCOMER)}`, { cohort: 'adult' });
+    await assertSucceeds(
+      groupRef(MEMBER, 'g-perm-6').update({
+        participantIds: [id(OWNER), id(MEMBER), id(MEMBER_3), id(NEWCOMER)],
+      }),
+    );
+  });
+
+  test('ALLOW: a member removes another when whoCanRemoveMembers is EVERYONE', async () => {
+    await seedConv('g-perm-7', groupDoc(withPermissions({ whoCanRemoveMembers: 'EVERYONE' })));
+    await assertSucceeds(
+      groupRef(MEMBER, 'g-perm-7').update({ participantIds: [id(OWNER), id(MEMBER)] }),
+    );
+  });
+
+  test('DENY: nobody removes the owner, even when whoCanRemoveMembers is EVERYONE', async () => {
+    await seedConv(
+      'g-perm-8',
+      groupDoc({
+        groupAdminIds: [id(MEMBER)],
+        ...withPermissions({ whoCanRemoveMembers: 'EVERYONE' }),
+      }),
+    );
+    await assertFails(
+      groupRef(MEMBER, 'g-perm-8').update({ participantIds: [id(MEMBER), id(MEMBER_3)] }),
+    );
+  });
+
+  test('ALLOW: an admin who is not the owner removes a member (ADMINS_ONLY)', async () => {
+    await seedConv('g-perm-9', groupDoc({ groupAdminIds: [id(MEMBER)] }));
+    await assertSucceeds(
+      groupRef(MEMBER, 'g-perm-9').update({ participantIds: [id(OWNER), id(MEMBER)] }),
+    );
+  });
+
+  test('ALLOW: the owner removes a member (ADMINS_ONLY)', async () => {
+    await seedConv('g-perm-10', groupDoc());
+    await assertSucceeds(
+      groupRef(OWNER, 'g-perm-10').update({ participantIds: [id(OWNER), id(MEMBER)] }),
+    );
+  });
+
+  test('ALLOW: a mod removes a member when whoCanRemoveMembers is MODS_AND_ABOVE', async () => {
+    await seedConv(
+      'g-perm-11',
+      groupDoc({
+        groupModIds: [id(MEMBER)],
+        ...withPermissions({ whoCanRemoveMembers: 'MODS_AND_ABOVE' }),
+      }),
+    );
+    await assertSucceeds(
+      groupRef(MEMBER, 'g-perm-11').update({ participantIds: [id(OWNER), id(MEMBER)] }),
+    );
+  });
+
+  test('ALLOW: a mod removes a member under the old name ADMINS_AND_MODS', async () => {
+    await seedConv(
+      'g-perm-12',
+      groupDoc({
+        groupModIds: [id(MEMBER)],
+        ...withPermissions({ whoCanRemoveMembers: 'ADMINS_AND_MODS' }),
+      }),
+    );
+    await assertSucceeds(
+      groupRef(MEMBER, 'g-perm-12').update({ participantIds: [id(OWNER), id(MEMBER)] }),
+    );
+  });
+
+  test('ALLOW: with no permissions map a member renames (default EVERYONE)', async () => {
+    await seedConv('g-perm-13', groupDocWithoutPermissions());
+    await assertSucceeds(groupRef(MEMBER, 'g-perm-13').update({ groupName: 'Spanish club' }));
+  });
+
+  test('DENY: with no permissions map a member removes another (default ADMINS_ONLY)', async () => {
+    await seedConv('g-perm-14', groupDocWithoutPermissions());
+    await assertFails(
+      groupRef(MEMBER, 'g-perm-14').update({ participantIds: [id(OWNER), id(MEMBER)] }),
+    );
+  });
+
+  test('ALLOW: an unknown level reads as its default (a member renames)', async () => {
+    await seedConv('g-perm-15', groupDoc(withPermissions({ whoCanEditInfo: 'NOT_A_LEVEL' })));
+    await assertSucceeds(groupRef(MEMBER, 'g-perm-15').update({ groupName: 'Spanish club' }));
+  });
+
+  test('DENY: an admin renames and promotes in one write (needs the owner for both)', async () => {
+    await seedConv('g-perm-16', groupDoc({ groupAdminIds: [id(MEMBER)] }));
+    await assertFails(
+      groupRef(MEMBER, 'g-perm-16').update({
+        groupName: 'Spanish club',
+        groupModIds: [id(MEMBER_3)],
+      }),
+    );
+  });
+
+  test('ALLOW: the owner leaves (removes only themselves)', async () => {
+    await seedConv('g-perm-17', groupDoc());
+    await assertSucceeds(
+      groupRef(OWNER, 'g-perm-17').update({ participantIds: [id(MEMBER), id(MEMBER_3)] }),
+    );
+  });
+
+  test('ALLOW: the owner changes system messages, notify mode, description and photo', async () => {
+    await seedConv('g-perm-18', groupDoc());
+    await assertSucceeds(
+      groupRef(OWNER, 'g-perm-18').update({
+        systemMessageConfig: { showJoins: false },
+        modNotifyMode: 'OWNER_ONLY',
+        groupDescription: 'We practise Spanish',
+        groupPhotoUrl: 'https://example.invalid/g.png',
+      }),
+    );
+  });
+});
