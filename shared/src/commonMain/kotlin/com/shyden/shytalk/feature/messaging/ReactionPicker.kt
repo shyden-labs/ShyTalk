@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -24,6 +25,27 @@ val quickReactions =
         "\uD83D\uDE22", // sad
         "\uD83D\uDE21", // angry
     )
+
+/** SHY-0645: the context-menu item that opens the reaction picker. */
+const val REACT_MENU_ITEM_TAG = "privateChat_reactMenuItem"
+
+/** SHY-0645: the picker's emoji at [index] in [quickReactions]. */
+fun reactionPickTag(index: Int): String = "privateChat_reactionPick_$index"
+
+/**
+ * SHY-0645: the badge for [emoji] under message [messageId]. Numbered by the
+ * emoji's place in [quickReactions]; an emoji the picker does not offer (a
+ * reaction written by another client) is named `u` + its UTF-16 code units,
+ * four hex digits each, so no two badges share a tag.
+ */
+fun reactionBadgeTag(
+    messageId: String,
+    emoji: String,
+): String {
+    val index = quickReactions.indexOf(emoji)
+    val n = if (index >= 0) "$index" else "u" + emoji.map { it.code.toString(16).padStart(4, '0') }.joinToString("")
+    return "privateChat_reactionBadge_${messageId}_$n"
+}
 
 @Composable
 fun ReactionPicker(
@@ -41,12 +63,13 @@ fun ReactionPicker(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            quickReactions.forEach { emoji ->
+            quickReactions.forEachIndexed { index, emoji ->
                 Text(
                     text = emoji,
                     fontSize = 24.sp,
                     modifier =
                         Modifier
+                            .testTag(reactionPickTag(index))
                             .clickable { onReact(emoji) }
                             .padding(4.dp),
                 )
@@ -59,6 +82,7 @@ fun ReactionPicker(
 fun ReactionBadges(
     reactions: Map<String, List<String>>,
     currentUserId: String,
+    messageId: String,
     onToggleReaction: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -71,7 +95,10 @@ fun ReactionBadges(
         reactions.forEach { (emoji, userIds) ->
             val isOwnReaction = currentUserId in userIds
             Surface(
-                modifier = Modifier.clickable { onToggleReaction(emoji) },
+                modifier =
+                    Modifier
+                        .testTag(reactionBadgeTag(messageId, emoji))
+                        .clickable { onToggleReaction(emoji) },
                 shape = RoundedCornerShape(12.dp),
                 color =
                     if (isOwnReaction) {
