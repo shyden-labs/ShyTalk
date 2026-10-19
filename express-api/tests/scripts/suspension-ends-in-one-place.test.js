@@ -1,3 +1,7 @@
+/* eslint-disable sonarjs/no-os-command-from-path --
+ * Spawns the hardcoded binary `git` with literal argv (`init`, `add`) to build
+ * a throwaway repository for the planted cases; no user-controlled command and
+ * no PATH manipulation. Matches the firebase-admin-namespace-surface convention. */
 /**
  * suspension-ends-in-one-place.test.js — SHY-0605.
  *
@@ -29,9 +33,12 @@
  * Moves to the guards suite with SHY-0563. Its file floor moves to the floors
  * record with SHY-0556.
  */
+const { execFileSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { parse } = require('@babel/parser');
+const { gitVisibleFiles } = require('../helpers/git-visible-files');
 
 const SRC = path.resolve(__dirname, '../../src');
 const HOME = path.join('utils', 'suspension.js');
@@ -281,10 +288,14 @@ function routeOf(node, parents) {
 }
 
 function scanTree(root) {
+  // SHY-0642: only files git tracks or would track, so the count is CI's on
+  // every machine; throws when git cannot say.
+  const visible = gitVisibleFiles(root);
   const files = fs
     .readdirSync(root, { recursive: true })
     .filter((rel) => !rel.split(path.sep).includes('node_modules'))
-    .filter((rel) => rel.endsWith('.js') && fs.statSync(path.join(root, rel)).isFile())
+    .filter((rel) => rel.endsWith('.js') && visible.has(rel))
+    .filter((rel) => fs.statSync(path.join(root, rel)).isFile())
     .sort();
   const sites = [];
   const findings = [];
@@ -469,5 +480,57 @@ describe('SHY-0605 — the route reader names each ending', () => {
     ['options with a spread', `endSuspension(id, { ...opts });`, 'computed'],
   ])('reads %s', (_form, code, expected) => {
     expect(endingsIn(code).map(restoreGcsOf)).toEqual([expected]);
+  });
+});
+
+// SHY-0642: the cases about ignore rules ask the real git, in one repository
+// built once; each case removes what it planted, so the next starts clean.
+describe("SHY-0642 — git decides what is read, so the count is CI's", () => {
+  const ENDING_WRITE = 'ref.update({ isSuspended: false });\n';
+  let root;
+  let planted = [];
+  const plant = (rel, body) => {
+    fs.writeFileSync(path.join(root, rel), body);
+    planted.push(rel);
+  };
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0642-src-'));
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    fs.mkdirSync(path.join(root, 'routes', 'nested'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'routes', 'clean.js'), 'module.exports = {};\n');
+  });
+  afterEach(() => {
+    for (const rel of planted) fs.rmSync(path.join(root, rel));
+    planted = [];
+  });
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const verdict = () => {
+    const { files, findings } = scanTree(root);
+    return { files, findings: findings.map((f) => f.split(':')[0]) };
+  };
+
+  test('an untracked ending write that is not ignored is read and reported', () => {
+    plant(path.join('routes', 'end.js'), ENDING_WRITE);
+    expect(verdict()).toEqual({
+      files: [path.join('routes', 'clean.js'), path.join('routes', 'end.js')],
+      findings: [path.join('routes', 'end.js')],
+    });
+  });
+
+  test('a git-ignored file is neither read nor counted', () => {
+    plant('.gitignore', '*.local.js\n');
+    plant(path.join('routes', 'end.local.js'), ENDING_WRITE);
+    expect(verdict()).toEqual({ files: [path.join('routes', 'clean.js')], findings: [] });
+  });
+
+  test('a root outside any repository fails rather than counting the disk', () => {
+    const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0642-src-bare-'));
+    try {
+      fs.mkdirSync(path.join(bare, 'routes'));
+      expect(() => scanTree(bare)).toThrow(/git ls-files failed in .*not a git repository/i);
+    } finally {
+      fs.rmSync(bare, { recursive: true, force: true });
+    }
   });
 });
