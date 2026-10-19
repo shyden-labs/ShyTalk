@@ -1706,11 +1706,14 @@ test.describe("Integration — conversation participant ADD gate + frozenAtMigra
   test("group admin CAN remove a participant from a frozenAtMigration group (shrinkage allowed)", async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore() as unknown as Firestore;
+      // SHY-0648: removing another member needs whoCanRemoveMembers
+      // (default ADMINS_ONLY), so the caller is the group's owner.
       await setDoc(doc(db, "conversations", "group-frozen-shrink"), {
         participantIds: ["200000416", "200000417"],
         isGroup: true,
         cohort: "adult",
         frozenAtMigration: true,
+        createdBy: "200000416",
       });
     });
     const caller = testEnv.authenticatedContext("uid-frozen-shrink", {
@@ -1725,7 +1728,9 @@ test.describe("Integration — conversation participant ADD gate + frozenAtMigra
     );
   });
 
-  test("group admin CAN update non-participant fields on a frozen group (lastMessage, etc.)", async () => {
+  test("group admin CAN update non-participant fields on a frozen group (name, description)", async () => {
+    // SHY-0648: a phone may change only the group fields the apps write
+    // (`lastMessage` is the server's), so the sample is the owner renaming.
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore() as unknown as Firestore;
       await setDoc(doc(db, "conversations", "group-frozen-lastmsg"), {
@@ -1733,6 +1738,7 @@ test.describe("Integration — conversation participant ADD gate + frozenAtMigra
         isGroup: true,
         cohort: "adult",
         frozenAtMigration: true,
+        createdBy: "200000418",
       });
     });
     const caller = testEnv.authenticatedContext("uid-frozen-lastmsg", {
@@ -1742,12 +1748,8 @@ test.describe("Integration — conversation participant ADD gate + frozenAtMigra
     const db = caller.firestore() as unknown as Firestore;
     await assertSucceeds(
       updateDoc(doc(db, "conversations", "group-frozen-lastmsg"), {
-        lastMessage: {
-          text: "still chatting",
-          senderId: "200000418",
-          createdAt: Date.now(),
-        },
-        lastMessageAt: Date.now(),
+        groupName: "Still chatting",
+        groupDescription: "Frozen, not closed",
       }),
     );
   });
