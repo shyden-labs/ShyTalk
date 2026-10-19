@@ -278,3 +278,200 @@ describe('conversations list — crossCohortAtMigration segregation (SHY-0132)',
     );
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SHY-0648 — who may change a group. Owner = `createdBy`; admin = owner or in
+// `groupAdminIds`; mod = in `groupModIds`; the rest follow the group's
+// `permissions` (defaults as `GroupPermissions`). Each write is shaped as the
+// app repositories write it; the rules judge the resulting document, so the
+// new array stands in for arrayUnion / arrayRemove.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const OWNER = ADULT;
+const MEMBER = ADULT_2;
+const MEMBER_3 = { uid: 'fbuid-adult-4', uniqueId: 50004, cohort: 'adult' };
+const NEWCOMER = { uid: 'fbuid-adult-5', uniqueId: 50005, cohort: 'adult' };
+const id = (p) => String(p.uniqueId);
+
+function groupDoc(overrides = {}) {
+  return convDoc([OWNER, MEMBER, MEMBER_3], {
+    isGroup: true,
+    groupName: 'Spanish practice',
+    createdBy: id(OWNER),
+    crossCohortAtMigration: false,
+    cohort: 'adult',
+    isClosed: false,
+    groupAdminIds: [],
+    groupModIds: [],
+    permissions: {
+      whoCanSend: 'EVERYONE',
+      whoCanAddMembers: 'EVERYONE',
+      whoCanEditInfo: 'EVERYONE',
+      whoCanDeleteMessages: 'MODS_AND_ABOVE',
+      whoCanMuteMembers: 'MODS_AND_ABOVE',
+      whoCanRemoveMembers: 'ADMINS_ONLY',
+    },
+    systemMessageConfig: { showJoins: true },
+    modNotifyMode: 'ALL_ADMINS',
+    ...overrides,
+  });
+}
+
+function groupRef(persona, convId) {
+  return dbFor(persona).doc(`conversations/${convId}`);
+}
+
+describe('SHY-0648 — a group member cannot give themselves powers', () => {
+  test('DENY: a member sets themselves as owner', async () => {
+    await seedConv('g-esc-1', groupDoc());
+    await assertFails(groupRef(MEMBER, 'g-esc-1').update({ createdBy: id(MEMBER) }));
+  });
+
+  test('DENY: a member puts themselves in groupAdminIds', async () => {
+    await seedConv('g-esc-2', groupDoc());
+    await assertFails(
+      groupRef(MEMBER, 'g-esc-2').update({ groupAdminIds: [id(MEMBER)], groupModIds: [] }),
+    );
+  });
+
+  test('DENY: a member puts themselves in groupModIds', async () => {
+    await seedConv('g-esc-3', groupDoc());
+    await assertFails(
+      groupRef(MEMBER, 'g-esc-3').update({ groupAdminIds: [], groupModIds: [id(MEMBER)] }),
+    );
+  });
+
+  test('DENY: a member removes another member (whoCanRemoveMembers ADMINS_ONLY)', async () => {
+    await seedConv('g-esc-4', groupDoc());
+    await assertFails(
+      groupRef(MEMBER, 'g-esc-4').update({ participantIds: [id(OWNER), id(MEMBER)] }),
+    );
+  });
+
+  test('DENY: a member removes the owner', async () => {
+    await seedConv('g-esc-5', groupDoc());
+    await assertFails(
+      groupRef(MEMBER, 'g-esc-5').update({ participantIds: [id(MEMBER), id(MEMBER_3)] }),
+    );
+  });
+
+  test('DENY: a member closes the group', async () => {
+    await seedConv('g-esc-6', groupDoc());
+    await assertFails(groupRef(MEMBER, 'g-esc-6').update({ isClosed: true }));
+  });
+
+  test("DENY: a member rewrites the group's permissions", async () => {
+    await seedConv('g-esc-7', groupDoc());
+    await assertFails(
+      groupRef(MEMBER, 'g-esc-7').update({
+        permissions: { ...groupDoc().permissions, whoCanRemoveMembers: 'EVERYONE' },
+      }),
+    );
+  });
+
+  test("DENY: a member changes the group's system messages", async () => {
+    await seedConv('g-esc-8', groupDoc());
+    await assertFails(
+      groupRef(MEMBER, 'g-esc-8').update({ systemMessageConfig: { showJoins: false } }),
+    );
+  });
+
+  test("DENY: a member changes the group's mod notify mode", async () => {
+    await seedConv('g-esc-9', groupDoc());
+    await assertFails(groupRef(MEMBER, 'g-esc-9').update({ modNotifyMode: 'OWNER_ONLY' }));
+  });
+
+  test("DENY: a member changes the group's cohort", async () => {
+    await seedConv('g-esc-10', groupDoc());
+    await assertFails(groupRef(MEMBER, 'g-esc-10').update({ cohort: 'minor' }));
+  });
+
+  test('DENY: a member turns the group into a one-to-one', async () => {
+    await seedConv('g-esc-11', groupDoc());
+    await assertFails(groupRef(MEMBER, 'g-esc-11').update({ isGroup: false }));
+  });
+
+  test('DENY: a member renames the group when whoCanEditInfo is ADMINS_ONLY', async () => {
+    await seedConv(
+      'g-esc-12',
+      groupDoc({ permissions: { ...groupDoc().permissions, whoCanEditInfo: 'ADMINS_ONLY' } }),
+    );
+    await assertFails(groupRef(MEMBER, 'g-esc-12').update({ groupName: 'Taken over' }));
+  });
+
+  test('DENY: a mod puts themselves in groupAdminIds', async () => {
+    await seedConv('g-esc-13', groupDoc({ groupModIds: [id(MEMBER)] }));
+    await assertFails(
+      groupRef(MEMBER, 'g-esc-13').update({ groupAdminIds: [id(MEMBER)], groupModIds: [] }),
+    );
+  });
+
+  test('DENY: an admin who is not the owner sets themselves as owner', async () => {
+    await seedConv('g-esc-14', groupDoc({ groupAdminIds: [id(MEMBER)] }));
+    await assertFails(groupRef(MEMBER, 'g-esc-14').update({ createdBy: id(MEMBER) }));
+  });
+
+  test('DENY: a one-to-one participant turns the thread into a group they run', async () => {
+    await seedConv('g-esc-15', convDoc([OWNER, MEMBER]));
+    await assertFails(
+      groupRef(MEMBER, 'g-esc-15').update({
+        isGroup: true,
+        createdBy: id(MEMBER),
+        groupAdminIds: [id(MEMBER)],
+      }),
+    );
+  });
+
+  test('DENY: the owner hands ownership to someone outside the group', async () => {
+    await seedConv('g-esc-16', groupDoc());
+    await assertFails(groupRef(OWNER, 'g-esc-16').update({ createdBy: id(NEWCOMER) }));
+  });
+
+  test('ALLOW: a member leaves (removes only themselves)', async () => {
+    await seedConv('g-ok-1', groupDoc());
+    await assertSucceeds(
+      groupRef(MEMBER, 'g-ok-1').update({ participantIds: [id(OWNER), id(MEMBER_3)] }),
+    );
+  });
+
+  test('ALLOW: the owner makes a member an admin (updateGroupRoles)', async () => {
+    await seedConv('g-ok-2', groupDoc());
+    await assertSucceeds(
+      groupRef(OWNER, 'g-ok-2').update({ groupAdminIds: [id(MEMBER)], groupModIds: [] }),
+    );
+  });
+
+  test('ALLOW: the owner hands ownership to a member (transferOwnership)', async () => {
+    await seedConv('g-ok-3', groupDoc());
+    await assertSucceeds(groupRef(OWNER, 'g-ok-3').update({ createdBy: id(MEMBER) }));
+  });
+
+  test('ALLOW: a member renames the group when whoCanEditInfo is EVERYONE', async () => {
+    await seedConv('g-ok-4', groupDoc());
+    await assertSucceeds(groupRef(MEMBER, 'g-ok-4').update({ groupName: 'Spanish club' }));
+  });
+
+  test('ALLOW: an admin closes the group (closeGroupConversation)', async () => {
+    await seedConv('g-ok-5', groupDoc({ groupAdminIds: [id(MEMBER)] }));
+    await assertSucceeds(groupRef(MEMBER, 'g-ok-5').update({ isClosed: true }));
+  });
+
+  test("ALLOW: the owner changes the group's permissions", async () => {
+    await seedConv('g-ok-6', groupDoc());
+    await assertSucceeds(
+      groupRef(OWNER, 'g-ok-6').update({
+        permissions: { ...groupDoc().permissions, whoCanEditInfo: 'ADMINS_ONLY' },
+      }),
+    );
+  });
+
+  test('ALLOW: a member adds a same-cohort user when whoCanAddMembers is EVERYONE', async () => {
+    await seedConv('g-ok-7', groupDoc());
+    await seedDoc(`users/${id(NEWCOMER)}`, { cohort: 'adult' });
+    await assertSucceeds(
+      groupRef(MEMBER, 'g-ok-7').update({
+        participantIds: [id(OWNER), id(MEMBER), id(MEMBER_3), id(NEWCOMER)],
+      }),
+    );
+  });
+});
