@@ -221,3 +221,14 @@ it and who is in it.
   per-clause mutation runs from the Test Plan (drop each clause, its tests
   red), the device log of a refused group write, the dev check of group
   actions, and Shyden's approval to deploy the rules to production.
+- **2026-10-19**: Per-clause mutation runs done in plant PR #2472 (closed
+  unmerged). Run 1 (39280700518): baseline 56 green; 19 mutants killed as
+  predicted; four survived as predicted, each a missing test (a one-to-one
+  participant removing the other, a plain member removing under
+  MODS_AND_ABOVE, OWNER_ONLY, an unknown level's default); one harness
+  defect (M01's `true ||` also dropped what followed it), fixed. Run 2
+  (39286172972) with five new tests (g-perm-19..23) and one more mutant:
+  baseline 61 green; all 25 mutants killed, each with exactly the predicted
+  red tests. One mutant left out as equivalent (the one-to-one branch's
+  isGroup check). Still open: the device log of a refused group write, the
+  dev check of group actions, and Shyden's approval for production.

@@ -642,4 +642,42 @@ describe("SHY-0648 — each change follows the group's roles and permissions", (
       }),
     );
   });
+
+  test('DENY: a one-to-one participant removes the other person', async () => {
+    await seedConv('g-perm-19', convDoc([OWNER, MEMBER]));
+    await assertFails(groupRef(MEMBER, 'g-perm-19').update({ participantIds: [id(MEMBER)] }));
+  });
+
+  test('DENY: a member removes another when whoCanRemoveMembers is MODS_AND_ABOVE', async () => {
+    await seedConv(
+      'g-perm-20',
+      groupDoc(withPermissions({ whoCanRemoveMembers: 'MODS_AND_ABOVE' })),
+    );
+    await assertFails(
+      groupRef(MEMBER, 'g-perm-20').update({ participantIds: [id(OWNER), id(MEMBER)] }),
+    );
+  });
+
+  test('DENY: an admin renames the group when whoCanEditInfo is OWNER_ONLY', async () => {
+    await seedConv(
+      'g-perm-21',
+      groupDoc({
+        groupAdminIds: [id(MEMBER)],
+        ...withPermissions({ whoCanEditInfo: 'OWNER_ONLY' }),
+      }),
+    );
+    await assertFails(groupRef(MEMBER, 'g-perm-21').update({ groupName: 'Spanish club' }));
+  });
+
+  test('ALLOW: the owner renames the group when whoCanEditInfo is OWNER_ONLY', async () => {
+    await seedConv('g-perm-22', groupDoc(withPermissions({ whoCanEditInfo: 'OWNER_ONLY' })));
+    await assertSucceeds(groupRef(OWNER, 'g-perm-22').update({ groupName: 'Spanish club' }));
+  });
+
+  test('DENY: an unknown level reads as its default (a member removes another)', async () => {
+    await seedConv('g-perm-23', groupDoc(withPermissions({ whoCanRemoveMembers: 'NOT_A_LEVEL' })));
+    await assertFails(
+      groupRef(MEMBER, 'g-perm-23').update({ participantIds: [id(OWNER), id(MEMBER)] }),
+    );
+  });
 });
