@@ -186,5 +186,12 @@ the old condition.
 - Reviewed. The first fix put the empty state behind the very gate that caused
   the symptom; the reviewer caught it and the story records why that gate was
   never the security control it was credited as.
+- **2026-10-21, reversed in part by SHY-0662**: Shyden ruled on 2026-10-20
+  that no distributed tester build carries the persona password, and the
+  public repository's PR artifacts made every CI build downloadable. The
+  password left every CI build (the iOS archive step's env among them) and
+  `dev-builds-share-persona-credential.test.js` was removed; its seam is now
+  held the other way by `no-build-carries-persona-password.test.js`. Phone
+  tests use local builds (`scripts/ios/build-debug-dev.sh`, unchanged).
 
 Reviewed-up-to: 5e5aa6010bedc935965f3f839d6cb2ab38562f77
