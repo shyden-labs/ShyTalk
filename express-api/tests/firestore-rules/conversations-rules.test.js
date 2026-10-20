@@ -681,3 +681,49 @@ describe("SHY-0648 — each change follows the group's roles and permissions", (
     );
   });
 });
+
+// SHY-0647 — both apps make a group, add each member, then write every
+// member's `userSettings` row in ONE batch (PrivateMessageRepositoryImpl,
+// IosPrivateMessageRepositoryImpl). The rule allows a person's own row, or
+// any row by someone in `groupAdminIds`; the creator is `createdBy` and is
+// not in `groupAdminIds`. The group is seeded as it stands at that batch.
+function settingsRef(persona, convId, rowOwner) {
+  return dbFor(persona).doc(`conversations/${convId}/userSettings/${id(rowOwner)}`);
+}
+const settingsRow = (rowOwner) => ({ unreadCount: 0, userId: id(rowOwner) });
+
+describe("SHY-0647 — the settings rows a group's creator writes", () => {
+  test('ALLOW: the creator of a group with no admins writes their own row', async () => {
+    await seedConv('g-set-1', groupDoc());
+    await assertSucceeds(settingsRef(OWNER, 'g-set-1', OWNER).set(settingsRow(OWNER)));
+  });
+
+  test("DENY: the creator of a group with no admins writes a member's row", async () => {
+    await seedConv('g-set-2', groupDoc());
+    await assertFails(settingsRef(OWNER, 'g-set-2', MEMBER).set(settingsRow(MEMBER)));
+  });
+
+  test("DENY: the app's one batch of every member's row is refused whole", async () => {
+    await seedConv('g-set-3', groupDoc());
+    const batch = dbFor(OWNER).batch();
+    batch.set(settingsRef(OWNER, 'g-set-3', OWNER), settingsRow(OWNER));
+    batch.set(settingsRef(OWNER, 'g-set-3', MEMBER), settingsRow(MEMBER));
+    batch.set(settingsRef(OWNER, 'g-set-3', MEMBER_3), settingsRow(MEMBER_3));
+    await assertFails(batch.commit());
+  });
+
+  test("DENY: the creator writes a member's row when they promoted another member to admin", async () => {
+    await seedConv('g-set-4', groupDoc({ groupAdminIds: [id(MEMBER)] }));
+    await assertFails(settingsRef(OWNER, 'g-set-4', MEMBER_3).set(settingsRow(MEMBER_3)));
+  });
+
+  test("ALLOW: a member in groupAdminIds writes another member's row", async () => {
+    await seedConv('g-set-5', groupDoc({ groupAdminIds: [id(MEMBER)] }));
+    await assertSucceeds(settingsRef(MEMBER, 'g-set-5', MEMBER_3).set(settingsRow(MEMBER_3)));
+  });
+
+  test("DENY: a member writes another member's row", async () => {
+    await seedConv('g-set-6', groupDoc());
+    await assertFails(settingsRef(MEMBER, 'g-set-6', MEMBER_3).set(settingsRow(MEMBER_3)));
+  });
+});
