@@ -554,6 +554,8 @@ service cloud.firestore {
         // reaction (any participant) or hide a message naming itself (group
         // staff); each shape lists the only fields it may change. The
         // conversation `get()` is cached per request (one read billed).
+        // SHY-0647: staff includes the owner (`createdBy`), who holds every
+        // power an admin or mod holds.
         allow update: if request.auth != null
           && !isBanned()
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
@@ -563,7 +565,8 @@ service cloud.firestore {
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
             )
             || (
-              (string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('groupAdminIds', [])
+              (string(callerUniqueId()) == get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('createdBy', '')
+                || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('groupAdminIds', [])
                 || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('groupModIds', []))
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isHidden', 'hiddenBy'])
               && request.resource.data.isHidden == true
@@ -587,7 +590,8 @@ service cloud.firestore {
         }
       }
 
-      // User-specific conversation settings — own settings, or participant can init others during group creation.
+      // User-specific conversation settings — own settings, or the group's
+      // owner or an admin (SHY-0647: making a group writes every member's row).
       // UK OSA #17 PR 8 — `write` MUST propagate crossCohortAtMigration
       // (sibling of the `read` gate one line up). Otherwise a
       // participant in a migration-hidden 1:1 can still mute/unmute,
@@ -601,6 +605,7 @@ service cloud.firestore {
           && !isBanned()
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
           && (string(callerUniqueId()) == settingsId
+              || string(callerUniqueId()) == get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('createdBy', '')
               || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupAdminIds);
       }
 
@@ -614,7 +619,7 @@ service cloud.firestore {
           && string(callerUniqueId()) == settingsId;
       }
 
-      // Mutes — participants read, admins/mods can mute/unmute members.
+      // Mutes — participants read, the owner/admins/mods can mute/unmute members.
       // UK OSA #17 PR 8 — `write` MUST propagate crossCohortAtMigration
       // (sibling of the `read` gate). Otherwise an admin/mod in a
       // hidden cross-cohort group can still mute members, leaking
@@ -628,6 +633,7 @@ service cloud.firestore {
           && !isBanned()
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
           && (string(callerUniqueId()) == muteId
+              || string(callerUniqueId()) == get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('createdBy', '')
               || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupAdminIds
               || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupModIds);
       }

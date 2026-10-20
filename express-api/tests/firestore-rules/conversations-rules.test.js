@@ -684,37 +684,90 @@ describe("SHY-0648 — each change follows the group's roles and permissions", (
 
 // SHY-0647 — both apps make a group, add each member, then write every
 // member's `userSettings` row in ONE batch (PrivateMessageRepositoryImpl,
-// IosPrivateMessageRepositoryImpl). The rule allows a person's own row, or
-// any row by someone in `groupAdminIds`; the creator is `createdBy` and is
-// not in `groupAdminIds`. The group is seeded as it stands at that batch.
+// IosPrivateMessageRepositoryImpl). The owner (`createdBy`) holds every power
+// an admin or mod holds (Shyden, 2026-10-20), so the owner may write those
+// rows, mute members and hide messages, as the apps offer them
+// (`Conversation.isAdmin`, `isModOrAbove`). The group is seeded as it stands
+// at that batch: no admins, no mods.
 function settingsRef(persona, convId, rowOwner) {
   return dbFor(persona).doc(`conversations/${convId}/userSettings/${id(rowOwner)}`);
 }
 const settingsRow = (rowOwner) => ({ unreadCount: 0, userId: id(rowOwner) });
 
-describe("SHY-0647 — the settings rows a group's creator writes", () => {
-  test('ALLOW: the creator of a group with no admins writes their own row', async () => {
+describe('SHY-0647 — the owner holds every power an admin or mod holds', () => {
+  test('ALLOW: the owner of a group with no admins writes their own row', async () => {
     await seedConv('g-set-1', groupDoc());
     await assertSucceeds(settingsRef(OWNER, 'g-set-1', OWNER).set(settingsRow(OWNER)));
   });
 
-  test("DENY: the creator of a group with no admins writes a member's row", async () => {
+  test("ALLOW: the owner of a group with no admins writes a member's row", async () => {
     await seedConv('g-set-2', groupDoc());
-    await assertFails(settingsRef(OWNER, 'g-set-2', MEMBER).set(settingsRow(MEMBER)));
+    await assertSucceeds(settingsRef(OWNER, 'g-set-2', MEMBER).set(settingsRow(MEMBER)));
   });
 
-  test("DENY: the app's one batch of every member's row is refused whole", async () => {
+  test("ALLOW: the app's one batch of every member's row, sent by the owner", async () => {
     await seedConv('g-set-3', groupDoc());
     const batch = dbFor(OWNER).batch();
     batch.set(settingsRef(OWNER, 'g-set-3', OWNER), settingsRow(OWNER));
     batch.set(settingsRef(OWNER, 'g-set-3', MEMBER), settingsRow(MEMBER));
     batch.set(settingsRef(OWNER, 'g-set-3', MEMBER_3), settingsRow(MEMBER_3));
-    await assertFails(batch.commit());
+    await assertSucceeds(batch.commit());
   });
 
-  test("DENY: the creator writes a member's row when they promoted another member to admin", async () => {
+  test("ALLOW: the owner writes a member's row when they promoted another member to admin", async () => {
     await seedConv('g-set-4', groupDoc({ groupAdminIds: [id(MEMBER)] }));
-    await assertFails(settingsRef(OWNER, 'g-set-4', MEMBER_3).set(settingsRow(MEMBER_3)));
+    await assertSucceeds(settingsRef(OWNER, 'g-set-4', MEMBER_3).set(settingsRow(MEMBER_3)));
+  });
+
+  test("DENY: a mod writes another member's row", async () => {
+    await seedConv('g-set-7', groupDoc({ groupModIds: [id(MEMBER)] }));
+    await assertFails(settingsRef(MEMBER, 'g-set-7', MEMBER_3).set(settingsRow(MEMBER_3)));
+  });
+
+  test('ALLOW: the owner of a group with no admins or mods mutes a member', async () => {
+    await seedConv('g-mute-1', groupDoc());
+    await assertSucceeds(
+      dbFor(OWNER)
+        .doc(`conversations/g-mute-1/mutes/${id(MEMBER)}`)
+        .set({ mutedUntil: 1 }),
+    );
+  });
+
+  test('DENY: a member mutes another member', async () => {
+    await seedConv('g-mute-2', groupDoc());
+    await assertFails(
+      dbFor(MEMBER)
+        .doc(`conversations/g-mute-2/mutes/${id(MEMBER_3)}`)
+        .set({ mutedUntil: 1 }),
+    );
+  });
+
+  test('ALLOW: the owner of a group with no admins or mods hides a message naming themself', async () => {
+    await seedConv('g-hide-1', groupDoc());
+    await seedDoc('conversations/g-hide-1/messages/m1', {
+      senderId: id(MEMBER),
+      text: 'hola',
+      type: 'TEXT',
+    });
+    await assertSucceeds(
+      dbFor(OWNER)
+        .doc('conversations/g-hide-1/messages/m1')
+        .update({ isHidden: true, hiddenBy: id(OWNER) }),
+    );
+  });
+
+  test('DENY: a member hides a message', async () => {
+    await seedConv('g-hide-2', groupDoc());
+    await seedDoc('conversations/g-hide-2/messages/m1', {
+      senderId: id(MEMBER_3),
+      text: 'hola',
+      type: 'TEXT',
+    });
+    await assertFails(
+      dbFor(MEMBER)
+        .doc('conversations/g-hide-2/messages/m1')
+        .update({ isHidden: true, hiddenBy: id(MEMBER) }),
+    );
   });
 
   test("ALLOW: a member in groupAdminIds writes another member's row", async () => {
