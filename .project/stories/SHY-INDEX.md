@@ -478,6 +478,9 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0650](SHY-0650-a-bot-merge-does-not-throw-away-a-prs-tests.md) | P2 | M | infra | A bot's merge does not throw away a PR's tests | 📝 Draft | — |  |
 | [SHY-0651](SHY-0651-every-test-checks-one-case.md) | P2 | L | infra | Every test checks one case, so a failure names the case | 📝 Draft | — |  |
 | [SHY-0653](SHY-0653-a-group-mute-lasts-exactly-as-long-as-it-was-set.md) | P0 | M | bug | A group mute lasts exactly as long as it was set | 📝 Draft | — |  |
+| [SHY-0652](SHY-0652-no-admin-or-mod-can-act-on-a-groups-owner.md) | P0 | S | bug | No admin or mod can act on a group's owner | 📝 Draft | — |  |
+| [SHY-0654](SHY-0654-rooms-run-by-shytalks-approved-hosts-are-open-to-every-age-group.md) | P1 | L | feature | Rooms run by ShyTalk's approved hosts are open to every age group | 📝 Draft | — |  |
+| [SHY-0655](SHY-0655-a-groups-who-can-send-setting-is-kept-by-the-rules-not-only-the-app.md) | P0 | S | bug | A group's "who can send" setting is kept by the rules, not only the app | 📝 Draft | — |  |
 
 ## Done
 

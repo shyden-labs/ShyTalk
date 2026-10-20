@@ -52,7 +52,11 @@ it.
 
 ### Happy path
 
-- [ ] A user can open and use gacha without being asked to verify their age.
+- [ ] A user of any age, under-18s included, can open and use gacha
+      without being asked to verify their age (Shyden, 2026-10-20:
+      "Everyone, under-18s too").
+- [ ] A pull still costs ShyCoins, for every age group (Shyden, 2026-10-20:
+      "Keep ShyCoins, accept the risk").
 - [ ] The age-verification screen is no longer reachable from the gacha flow.
 - [ ] No user-facing reference to age verification remains in the gacha flow, in any of the 20 locales.
 
@@ -68,6 +72,7 @@ it.
 - [ ] **The cohort gate remains a sealed screen** (SHY-0311) and remains server-enforced (`requireSameCohort`).
 - [ ] Date-of-birth collection, if it serves cohort assignment rather than gacha gating, is retained — cohort assignment must keep working.
 - [ ] The admin age-verification review surface is removed only if it served exclusively the gacha gate; if it also serves cohort disputes, it is retained.
+- [ ] The ID check stays for date-of-birth corrections: `POST /api/admin/age-verification/:id/modify-dob` (`express-api/src/routes/admin-age-verification.js:323`, read 2026-10-20) keeps working and keeps moving a user between cohorts; only the check's use as a gacha gate goes.
 - [ ] Removing the gate does not change which cohort any existing user is in.
 
 ### Performance
@@ -209,6 +214,7 @@ failure mode is not doing too little.
 | Date-of-birth collection is removed, breaking cohort assignment | Explicit AC and mutation: cohort assignment must still resolve. |
 | An endpoint loses an unrelated authorization check during cleanup | Every touched route is re-asserted for its remaining guards. |
 | Personal data is left orphaned in the datastore | Explicit Security AC requiring a recorded decision; deletion is operator-gated per the SHY-0145 precedent. |
+| **Brazil: loot boxes for minors.** Brazil Law 15.211/2025 and Decree 12.880/2026 reportedly ban paid random-item features for under-18s, and tech note 55/2026 reportedly counts virtual-currency payment (secondary sources only; the official texts timed out on 2026-10-20). Pulls cost ShyCoins, which are bought with real money as well as earned free, and gacha is open to under-18s. | **Accepted by Shyden, 2026-10-20: "Keep ShyCoins, accept the risk"**, chosen over a free-tickets-only option after these facts were shown. Not re-litigated; a reversal would be a new story. |
 | The legal reasoning turns out to be wrong for Indonesia | Out of this story's control and recorded, not re-litigated: the facts raised are in `[[project-indonesia-relocation-and-age-gating-decision]]` and the operator reaffirmed the decision. A reversal would be a new story. |
 
 ## Definition of Done
@@ -233,4 +239,5 @@ failure mode is not doing too little.
 
 - **2026-08-17** — Operator decision: remove the gacha age-verification gate, keep cohort segregation. Reasoning: gacha awards no cash-out value, so the gambling-age rationale does not apply. The business is also relocating from the UK to Indonesia.
 - **2026-08-17** — Facts raised before the decision, recorded so they are not re-derived: Indonesia is stricter on gambling than the UK (criminal under Art. 303 KUHP, active Kominfo blocking of gambling apps); jurisdiction generally follows the user rather than the company (UK OSA applies to services with UK users, GDPR to EU users, COPPA to US under-13s); store Families policy is contractual and global, triggering on whether children are likely in the audience. Operator reaffirmed after these were raised. Full context in `[[project-indonesia-relocation-and-age-gating-decision]]`.
+- **2026-10-20** — Shyden widened the decision, chosen from written options after the facts were shown: gacha is open to **everyone, under-18s too** (against the recommendation "adults only, no ID check"), and pulls **keep ShyCoins** with the Brazil risk accepted (see Risks). Facts shown, measured that day: no cash-out exists (beans only redeem to coins, `economy.js:1480`; no bean transfer among the 13 economy routes); coins are bought with real money (`BillingService.kt`, `apple-notifications.js`) and spent on pulls; Apple rates paid random items as "Loot Boxes" (9+, Australia 16+, Brazil A18), not "Gambling". Indonesia was not re-checked. Cohort segregation is unchanged by this ruling. The ID check stays for date-of-birth corrections (Edge cases).
 - **2026-08-17** — Scope drawn deliberately narrow. Age verification and cohort segregation are separate mechanisms; the no-cash-out argument reaches the first and not the second. Over-removal is this story's primary risk and the mutation table is built entirely from over-removals.

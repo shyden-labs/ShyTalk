@@ -55,24 +55,47 @@ Found on 2026-10-20 while preparing SHY-0652, reading `develop` at
       before the fix: `expected:<4600000> but was:<null>` (12 tests, 1
       failed; the permanent-row control passed).
 - [ ] A timed mute is saved with its end time (and who muted), on both
-      phones, and reads back with the same end time.
-- [ ] A mute ends at its end time: the member can post again with no
-      action by anyone.
+      phones, and reads back with the same end time. **Android and shared
+      code proven, 2026-10-20**, run 39376955810 on c66d4213e24 (merged as 690bd97d365), every job green by name: `MuteInfoFromMapTest.kt:132`
+      (end at mutedAt plus duration), `:154` (toRow read back gives the
+      same mute), `PrivateMessageRepositoryImplTest.kt:910` (Android saves
+      the row at its member's path), `PrivateChatViewModelTest.kt:1569`
+      (who muted and the end time). The iOS writer
+      (`IosPrivateMessageRepositoryImpl.kt:609`, `set(mute.toRow())`) has
+      no test of its own: the phone walk proves it.
+- [x] A mute ends at its end time: the member can post again with no
+      action by anyone. **Proven, 2026-10-20**, run 39376955810 on c66d4213e24 (merged as 690bd97d365), every job green by name: `express-api/tests/firestore-rules/conversations-rules.test.js`
+      `:831` (legacy row ended) and `:915` (new-shape row ended) ALLOW the
+      post; `PrivateChatViewModelTest.kt:1647` (the own mute ends by itself
+      with the chat open, writing nothing).
 
 ### Error paths
 
-- [ ] A muted member's new message is refused by the rules while the mute
-      lasts.
-- [ ] A muted member cannot delete or change their own mute before it ends.
+- [x] A muted member's new message is refused by the rules while the mute
+      lasts. **Proven, 2026-10-20**, run 39376955810 on c66d4213e24 (merged as 690bd97d365), every job green by name: `express-api/tests/firestore-rules/conversations-rules.test.js` `:819`,
+      `:825` (legacy timed and permanent), `:900`, `:909` (new shape).
+- [x] A muted member cannot delete or change their own mute before it ends.
+      **Proven, 2026-10-20**, run 39376955810 on c66d4213e24 (merged as 690bd97d365), every job green by name: `express-api/tests/firestore-rules/conversations-rules.test.js` `:843`, `:849`
+      (delete timed and permanent), `:855` (shorten).
 
 ### Edge cases
 
-- [ ] A permanent mute (no end time) lasts until staff lift it.
-- [ ] A mute saved before the fix (`duration` only) is read as ending at
-      `mutedAt + duration`, by the apps and the rules alike.
-- [ ] A member writes no mutes row at all, not even their own once it has
+- [x] A permanent mute (no end time) lasts until staff lift it. **Proven,
+      2026-10-20**, run 39376955810 on c66d4213e24 (merged as 690bd97d365), every job green by name: `express-api/tests/firestore-rules/conversations-rules.test.js` `:825`, `:909` (no post),
+      `:849` (no self-delete), `:871`, `:877`, `:883` (owner, admin, mod
+      lift); `PrivateChatViewModelTest.kt:1669` (never ends by itself).
+- [x] A mute saved before the fix (`duration` only) is read as ending at
+      `mutedAt + duration`, by the apps and the rules alike. **Proven,
+      2026-10-20**, run 39376955810 on c66d4213e24 (merged as 690bd97d365), every job green by name: `MuteInfoFromMapTest.kt:98` (apps);
+      `express-api/tests/firestore-rules/conversations-rules.test.js` `:819` (legacy row in force) and `:831` (legacy row
+      ended).
+- [x] A member writes no mutes row at all, not even their own once it has
       ended; an ended mute just stops showing (Shyden, 2026-10-20: a mute is
       a moderation action; a member mutes only their own notifications).
+      **Proven, 2026-10-20**, run 39376955810 on c66d4213e24 (merged as 690bd97d365), every job green by name: `express-api/tests/firestore-rules/conversations-rules.test.js` `:865`, `:939`
+      (own ended row, both shapes), `:889` (another's ended row), `:948`
+      (a row for themselves); `PrivateChatViewModelTest.kt:1659` (an ended
+      own mute is not shown and nothing is written).
 
 ### Performance
 
@@ -82,7 +105,11 @@ Found on 2026-10-20 while preparing SHY-0652, reading `develop` at
 ### Security
 
 - [ ] A direct database write cannot skip any of the above: rules tests,
-      one per case, each seen RED against today's rules first.
+      one per case, each seen RED against today's rules first. **Five of
+      nine seen, 2026-10-20**: `:819`, `:825`, `:843`, `:849`, `:855` ran
+      as TODAY passes on the old rules (run 39360163266), then flipped.
+      `:900`, `:909`, `:939`, `:948` were added with the fix and have not
+      been run against the old rules.
 
 ### UX
 
