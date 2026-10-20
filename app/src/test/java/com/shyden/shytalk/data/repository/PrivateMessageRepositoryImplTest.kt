@@ -14,6 +14,7 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Transaction
 import com.google.firebase.firestore.WriteBatch
 import com.shyden.shytalk.core.model.Conversation
+import com.shyden.shytalk.core.model.MuteInfo
 import com.shyden.shytalk.core.util.Resource
 import com.shyden.shytalk.data.remote.ApiException
 import com.shyden.shytalk.data.remote.WorkerApiClient
@@ -903,11 +904,22 @@ class PrivateMessageRepositoryImplTest {
 
     // region muteGroupMember — direct Firestore
 
+    // SHY-0653: the row saved is the mute's own toRow(), at mutes/{mutedUserId},
+    // so its end time (`expiresAt`) and who muted reach Firestore.
     @Test
-    fun `muteGroupMember returns Success`() =
+    fun `muteGroupMember saves the mute's row at its member's path`() =
         runTest {
-            val result = repo.muteGroupMember("conv-1", "user-bad", 3600000L, "Spamming")
+            val mute = MuteInfo.starting("user-bad", "mod-1", "Mod", 1_000_000L, 3_600_000L, "Spamming")
+            val row = slot<Map<String, Any?>>()
+            every { mockDocRef.set(capture(row)) } returns Tasks.forResult(null)
+
+            val result = repo.muteGroupMember("conv-1", mute)
+
             assertTrue(result is Resource.Success)
+            verify { firestore.document("conversations/conv-1/mutes/user-bad") }
+            assertEquals(mute.toRow(), row.captured)
+            assertEquals(4_600_000L, row.captured["expiresAt"])
+            assertEquals("mod-1", row.captured["mutedBy"])
         }
 
     // endregion

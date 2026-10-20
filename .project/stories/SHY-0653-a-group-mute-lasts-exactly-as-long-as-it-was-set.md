@@ -42,9 +42,18 @@ Found on 2026-10-20 while preparing SHY-0652, reading `develop` at
 
 ### Happy path
 
-- [ ] First, rules tests prove or disprove gaps 2 and 3 on today's rules,
+- [x] First, rules tests prove or disprove gaps 2 and 3 on today's rules,
       and a unit test proves or disproves gap 1; each result is recorded
-      here before any fix.
+      here before any fix. **Proven, 2026-10-20**, all three:
+      gaps 2 and 3 by PR #2480 head 05db43ae3d2, PR Checks run 39360163266,
+      every job green by name, `PASS
+      tests/firestore-rules/conversations-rules.test.js` with 16,495 tests
+      (11 new): on today's rules a member under a timed or permanent mute
+      posted, deleted their own mute before it ended, and shortened it.
+      Gap 1 by `MuteInfoFromMapTest` "fromMap reads a row saved with
+      duration as ending at mutedAt plus duration", run on the laptop
+      before the fix: `expected:<4600000> but was:<null>` (12 tests, 1
+      failed; the permanent-row control passed).
 - [ ] A timed mute is saved with its end time (and who muted), on both
       phones, and reads back with the same end time.
 - [ ] A mute ends at its end time: the member can post again with no

@@ -218,9 +218,7 @@ class FakePrivateMessageRepository : PrivateMessageRepository {
 
     override suspend fun muteGroupMember(
         conversationId: String,
-        userId: String,
-        duration: Long?,
-        reason: String?,
+        mute: MuteInfo,
     ): Resource<Unit> = Resource.Success(Unit)
 
     override suspend fun unmuteGroupMember(

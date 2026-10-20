@@ -62,6 +62,22 @@ service cloud.firestore {
       return request.auth.token.get('banned', false) == true;
     }
 
+    // SHY-0653: a group mute row (`conversations/{id}/mutes/{mutedUserId}`)
+    // stops its member while it is active and has not ended. It ends at
+    // `expiresAt` (epoch ms); rows written before the fix carry `mutedAt` +
+    // `duration` (ms) instead; a row with neither is permanent. The apps read
+    // it the same way (`MuteInfo.fromMap`, `isInForceAt`).
+    function muteInForce(m) {
+      return m.get('isActive', true) == true
+        && ((m.get('expiresAt', null) != null
+              && m.expiresAt > request.time.toMillis())
+          || (m.get('expiresAt', null) == null
+              && m.get('duration', null) != null
+              && m.get('mutedAt', 0) + m.duration > request.time.toMillis())
+          || (m.get('expiresAt', null) == null
+              && m.get('duration', null) == null));
+    }
+
     // ── Users (keyed by uniqueId, not Firebase UID) ──────────────
     match /users/{uniqueId} {
       // Authed users can read profiles in their own cohort. Own-doc
@@ -545,10 +561,15 @@ service cloud.firestore {
         allow read: if request.auth != null
           && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
+        // SHY-0653: a member whose group mute is in force cannot post. Only a
+        // group pays the mute-row read; a one-to-one never has one.
         allow create: if request.auth != null
           && !isBanned()
           && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
-          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
+          && !(get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('isGroup', false) == true
+            && exists(/databases/$(database)/documents/conversations/$(conversationId)/mutes/$(string(callerUniqueId())))
+            && muteInForce(get(/databases/$(database)/documents/conversations/$(conversationId)/mutes/$(string(callerUniqueId()))).data));
         // SHY-0614: text, edit fields and recall are written only by the
         // server routes (conversation-message-edits.js). A phone may add a
         // reaction (any participant) or hide a message naming itself (group
@@ -629,13 +650,21 @@ service cloud.firestore {
         allow read: if request.auth != null
           && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
-        allow write: if request.auth != null
+        // SHY-0653: only staff set or change a mute. The muted member may only
+        // clear their own row once it has ended (the apps' auto-unmute).
+        allow create, update: if request.auth != null
           && !isBanned()
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
-          && (string(callerUniqueId()) == muteId
-              || string(callerUniqueId()) == get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('createdBy', '')
+          && (string(callerUniqueId()) == get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('createdBy', '')
               || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupAdminIds
               || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupModIds);
+        allow delete: if request.auth != null
+          && !isBanned()
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
+          && (string(callerUniqueId()) == get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('createdBy', '')
+              || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupAdminIds
+              || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupModIds
+              || (string(callerUniqueId()) == muteId && !muteInForce(resource.data)));
       }
 
       // Mod log — participants read; no phone writes it

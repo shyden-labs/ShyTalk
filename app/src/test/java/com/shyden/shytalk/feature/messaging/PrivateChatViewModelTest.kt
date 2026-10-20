@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.shyden.shytalk.core.model.ConversationSettings
 import com.shyden.shytalk.core.model.GroupPermissions
 import com.shyden.shytalk.core.model.MessageEdit
+import com.shyden.shytalk.core.model.MuteInfo
 import com.shyden.shytalk.core.model.PmPrivacy
 import com.shyden.shytalk.core.model.PrivateMessage
 import com.shyden.shytalk.core.model.PrivateMessageType
@@ -11,6 +12,7 @@ import com.shyden.shytalk.core.model.SystemMessageConfig
 import com.shyden.shytalk.core.util.Constants
 import com.shyden.shytalk.core.util.ModerationFilter
 import com.shyden.shytalk.core.util.Resource
+import com.shyden.shytalk.core.util.currentTimeMillis
 import com.shyden.shytalk.data.local.StickerStorage
 import com.shyden.shytalk.data.repository.AuthRepository
 import com.shyden.shytalk.data.repository.PrivateMessageRepository
@@ -24,6 +26,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -32,7 +35,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -1550,23 +1555,126 @@ class PrivateChatViewModelTest {
     @Test
     fun `muteGroupMember success reloads mutes`() =
         runTest {
-            coEvery { pmRepository.muteGroupMember(conversationId, "target-user", any(), any()) } returns Resource.Success(Unit)
+            coEvery { pmRepository.muteGroupMember(conversationId, any()) } returns Resource.Success(Unit)
+            val vm = createViewModel()
+            advanceUntilIdle()
+            coVerify(exactly = 0) { pmRepository.getGroupMutes(conversationId) }
+            vm.muteGroupMember("target-user", Constants.MUTE_DURATION_5MIN, "spam")
+            advanceUntilIdle()
+            coVerify(exactly = 1) { pmRepository.getGroupMutes(conversationId) }
+        }
+
+    // SHY-0653: the saved mute names who muted and when it ends.
+    @Test
+    fun `muteGroupMember saves who muted and an end time duration after now`() =
+        runTest {
+            val saved = slot<MuteInfo>()
+            coEvery { pmRepository.muteGroupMember(conversationId, capture(saved)) } returns Resource.Success(Unit)
             val vm = createViewModel()
             advanceUntilIdle()
             vm.muteGroupMember("target-user", Constants.MUTE_DURATION_5MIN, "spam")
             advanceUntilIdle()
-            coVerify { pmRepository.muteGroupMember(conversationId, "target-user", Constants.MUTE_DURATION_5MIN, "spam") }
+            assertEquals("target-user", saved.captured.mutedUserId)
+            assertEquals(currentUserId, saved.captured.mutedBy)
+            assertEquals("spam", saved.captured.reason)
+            assertEquals(saved.captured.mutedAt + Constants.MUTE_DURATION_5MIN, saved.captured.expiresAt)
+        }
+
+    @Test
+    fun `muteGroupMember with no duration saves a permanent mute`() =
+        runTest {
+            val saved = slot<MuteInfo>()
+            coEvery { pmRepository.muteGroupMember(conversationId, capture(saved)) } returns Resource.Success(Unit)
+            val vm = createViewModel()
+            advanceUntilIdle()
+            vm.muteGroupMember("target-user", null, null)
+            advanceUntilIdle()
+            assertNull(saved.captured.expiresAt)
         }
 
     @Test
     fun `muteGroupMember failure sets error`() =
         runTest {
-            coEvery { pmRepository.muteGroupMember(conversationId, "target-user", any(), any()) } returns Resource.Error("fail")
+            coEvery { pmRepository.muteGroupMember(conversationId, any()) } returns Resource.Error("fail")
             val vm = createViewModel()
             advanceUntilIdle()
             vm.muteGroupMember("target-user", Constants.MUTE_DURATION_5MIN, null)
             advanceUntilIdle()
             assertEquals("Failed to mute member", vm.uiState.value.error)
+        }
+
+    // SHY-0653: a member's own timed mute ends at its end time while the chat
+    // is open, and an already-ended mute is cleared on opening.
+    private fun createGroupViewModelWithMutes(mutes: List<MuteInfo>): PrivateChatViewModel {
+        val group =
+            TestData.createTestConversation(
+                conversationId = "group-mute",
+                participantIds = listOf(currentUserId, "user-a"),
+                isGroup = true,
+                groupName = "Mute Group",
+                createdBy = "user-a",
+            )
+        coEvery { pmRepository.getConversation("group-mute") } returns Resource.Success(group)
+        coEvery { pmRepository.getGroupMutes("group-mute") } returns Resource.Success(mutes)
+        val currentUser = TestData.createTestUser(uid = currentUserId, displayName = "Current")
+        val userA = TestData.createTestUser(uid = "user-a", displayName = "A")
+        coEvery { userRepository.getUsers(any()) } returns Resource.Success(listOf(currentUser, userA))
+        coEvery { pmRepository.unmuteGroupMember("group-mute", currentUserId) } returns Resource.Success(Unit)
+        every { pmRepository.getMessages("group-mute", any()) } returns MutableSharedFlow()
+        every { pmRepository.observeConversationSettings("group-mute", currentUserId) } returns settingsFlow
+        return PrivateChatViewModel(
+            otherUserId = "",
+            pmRepository = pmRepository,
+            userRepository = userRepository,
+            authRepository = authRepository,
+            typingRepository = typingRepository,
+            reportRepository = reportRepository,
+            initialConversationId = "group-mute",
+        ).also { activeViewModels.add(it) }
+    }
+
+    @Test
+    fun `an own timed mute shows while it lasts`() =
+        runTest {
+            val mute = MuteInfo(mutedUserId = currentUserId, mutedAt = 0L, expiresAt = currentTimeMillis() + 60_000L)
+            val vm = createGroupViewModelWithMutes(listOf(mute))
+            runCurrent()
+            assertEquals(mute, vm.uiState.value.currentUserMuteInfo)
+            coVerify(exactly = 0) { pmRepository.unmuteGroupMember("group-mute", currentUserId) }
+        }
+
+    @Test
+    fun `an own timed mute ends by itself at its end time with the chat open`() =
+        runTest {
+            val mute = MuteInfo(mutedUserId = currentUserId, mutedAt = 0L, expiresAt = currentTimeMillis() + 60_000L)
+            val vm = createGroupViewModelWithMutes(listOf(mute))
+            runCurrent()
+            advanceTimeBy(60_001L)
+            runCurrent()
+            assertNull(vm.uiState.value.currentUserMuteInfo)
+            coVerify(exactly = 1) { pmRepository.unmuteGroupMember("group-mute", currentUserId) }
+        }
+
+    @Test
+    fun `an own mute that already ended is cleared on opening`() =
+        runTest {
+            val mute = MuteInfo(mutedUserId = currentUserId, mutedAt = 0L, expiresAt = 1L)
+            val vm = createGroupViewModelWithMutes(listOf(mute))
+            runCurrent()
+            assertNull(vm.uiState.value.currentUserMuteInfo)
+            coVerify(exactly = 1) { pmRepository.unmuteGroupMember("group-mute", currentUserId) }
+        }
+
+    @Test
+    fun `an own permanent mute never ends by itself`() =
+        runTest {
+            val mute = MuteInfo(mutedUserId = currentUserId, mutedAt = 0L, expiresAt = null)
+            val vm = createGroupViewModelWithMutes(listOf(mute))
+            runCurrent()
+            advanceTimeBy(120_000L)
+            runCurrent()
+            assertEquals(mute, vm.uiState.value.currentUserMuteInfo)
+            coVerify(exactly = 0) { pmRepository.unmuteGroupMember("group-mute", currentUserId) }
         }
 
     // ===== Unmute Group Member =====

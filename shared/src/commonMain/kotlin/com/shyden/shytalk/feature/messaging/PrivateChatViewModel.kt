@@ -167,6 +167,7 @@ class PrivateChatViewModel(
     private var typingJob: Job? = null
     private var typingResetJob: Job? = null
     private var wsEventsJob: Job? = null
+    private var muteEndJob: Job? = null
     private val olderMessages = mutableListOf<PrivateMessage>()
     private val pendingMessages = mutableMapOf<String, PrivateMessage>()
     private var lazyHttpClient: HttpClient? = null
@@ -1193,7 +1194,16 @@ class PrivateChatViewModel(
         val conversationId = _uiState.value.conversationId
         if (conversationId.isEmpty()) return
         viewModelScope.launch {
-            when (pmRepository.muteGroupMember(conversationId, userId, duration, reason)) {
+            val mute =
+                MuteInfo.starting(
+                    mutedUserId = userId,
+                    mutedBy = currentUserId,
+                    mutedByName = _uiState.value.currentUserName,
+                    mutedAt = currentTimeMillis(),
+                    duration = duration,
+                    reason = reason,
+                )
+            when (pmRepository.muteGroupMember(conversationId, mute)) {
                 is Resource.Success -> {
                     loadGroupMutes(conversationId)
                     // Send MOD_ACTION message
@@ -1230,6 +1240,7 @@ class PrivateChatViewModel(
                 is Resource.Success -> {
                     loadGroupMutes(conversationId)
                     if (userId == currentUserId) {
+                        muteEndJob?.cancel()
                         _uiState.update { it.copy(currentUserMuteInfo = null) }
                     }
                     val targetName =
@@ -1281,14 +1292,11 @@ class PrivateChatViewModel(
                 is Resource.Success -> {
                     val myMute = result.data.find { it.mutedUserId == currentUserId && it.isActive }
                     if (myMute != null) {
-                        // Check if expired
-                        val now = currentTimeMillis()
-                        if (myMute.expiresAt != null && myMute.expiresAt < now) {
-                            // Auto-unmute
-                            pmRepository.unmuteGroupMember(conversationId, currentUserId)
-                            _uiState.update { it.copy(currentUserMuteInfo = null) }
-                        } else {
+                        if (myMute.isInForceAt(currentTimeMillis())) {
                             _uiState.update { it.copy(currentUserMuteInfo = myMute) }
+                            scheduleMuteEnd(conversationId, myMute)
+                        } else {
+                            endOwnMute(conversationId)
                         }
                     }
                 }
@@ -1296,6 +1304,26 @@ class PrivateChatViewModel(
                 else -> Unit
             }
         }
+    }
+
+    // SHY-0653: a timed mute ends at its end time with the chat still open. The
+    // rules let a member clear their own mute row only once it has ended.
+    private fun scheduleMuteEnd(
+        conversationId: String,
+        mute: MuteInfo,
+    ) {
+        val endsAt = mute.expiresAt ?: return
+        muteEndJob?.cancel()
+        muteEndJob =
+            viewModelScope.launch {
+                delay((endsAt - currentTimeMillis()).coerceAtLeast(0L))
+                endOwnMute(conversationId)
+            }
+    }
+
+    private suspend fun endOwnMute(conversationId: String) {
+        _uiState.update { it.copy(currentUserMuteInfo = null) }
+        pmRepository.unmuteGroupMember(conversationId, currentUserId)
     }
 
     private fun loadGroupMutes(conversationId: String) {
