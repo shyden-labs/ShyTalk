@@ -481,6 +481,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0652](SHY-0652-no-admin-or-mod-can-act-on-a-groups-owner.md) | P0 | S | bug | No admin or mod can act on a group's owner | 📝 Draft | — |  |
 | [SHY-0654](SHY-0654-rooms-run-by-shytalks-approved-hosts-are-open-to-every-age-group.md) | P1 | L | feature | Rooms run by ShyTalk's approved hosts are open to every age group | 📝 Draft | — |  |
 | [SHY-0655](SHY-0655-a-groups-who-can-send-setting-is-kept-by-the-rules-not-only-the-app.md) | P0 | S | bug | A group's "who can send" setting is kept by the rules, not only the app | 📝 Draft | — |  |
+| [SHY-0656](SHY-0656-a-groups-owner-admins-and-mods-can-mute-a-member-from-the-app.md) | P0 | M | bug | A group's owner, admins and mods can mute a member from the app | 📝 Draft | — |  |
 
 ## Done
 
