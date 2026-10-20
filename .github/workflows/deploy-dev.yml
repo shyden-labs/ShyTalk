@@ -588,13 +588,20 @@ jobs:
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
-          # See pr-checks.yml's matching env for rationale. The persona
-          # picker on dev variant only appears when this is non-empty.
-          DEV_QA_PERSONAS_PASSWORD: ${{ secrets.DEV_QA_PERSONAS_PASSWORD }}
+          # No persona password (SHY-0662): Shyden ruled on 2026-10-20 that no
+          # distributed tester build carries it; phone tests use local builds.
         run: |
           ./gradlew assembleDevRelease
           mkdir -p dev-release-apk
           cp app/build/outputs/apk/dev/release/*.apk dev-release-apk/
+
+      - name: Check built devRelease APK holds no persona password
+        if: steps.cached-apk.outputs.found != 'true' || steps.download-apk.outcome == 'failure'
+        uses: ./.github/actions/apk-holds-no-persona-password
+        with:
+          dir: app/build/outputs/apk/dev/release
+          build-config: app/build/generated/source/buildConfig/dev/release/com/shyden/shytalk/BuildConfig.java
+          password: ${{ secrets.DEV_QA_PERSONAS_PASSWORD }}
 
       - name: Locate APK
         id: find-apk
@@ -620,6 +627,15 @@ jobs:
           echo "found=true" >> "$GITHUB_OUTPUT"
           echo "apk_path=${apks[0]}" >> "$GITHUB_OUTPUT"
           echo "Found APK: ${apks[0]}"
+
+      # SHY-0662: the APK about to go to testers holds no persona password,
+      # whether it was built above or downloaded from the PR's run (an
+      # artifact a PR built before SHY-0662 may still hold one).
+      - name: Check distributed APK holds no persona password
+        uses: ./.github/actions/apk-holds-no-persona-password
+        with:
+          dir: dev-release-apk
+          password: ${{ secrets.DEV_QA_PERSONAS_PASSWORD }}
 
       # SHY-0361 — the note names the ticket(s) this build carries and says
       # where it was built from. A hand-written `release-notes` input still
@@ -956,12 +972,9 @@ jobs:
         id: archive
         timeout-minutes: 50
         env:
-          # SHY-0416 — the same credential `distribute-android` passes. Without
-          # it every iOS dev build ships with an empty persona password, so
-          # `BuildVariant.isPersonaPickerAvailable` is false and NOBODY can sign
-          # in to an iOS dev build. That is why iOS journey proof was
-          # perpetually "owed": no persona-based iOS walk was ever possible.
-          DEV_QA_PERSONAS_PASSWORD: ${{ secrets.DEV_QA_PERSONAS_PASSWORD }}
+          # No persona password (SHY-0662, retiring SHY-0416's): no TestFlight
+          # build carries it (Shyden, 2026-10-20). It was never handed to
+          # xcodebuild here anyway; iPhone tests use scripts/ios/build-debug-dev.sh.
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           # SHY-0205 — effective deployed ref for the watermark stamp

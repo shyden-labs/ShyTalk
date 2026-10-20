@@ -42,7 +42,7 @@ on:
         description: 'Firebase service account JSON for the dev project'
         required: false
       DEV_QA_PERSONAS_PASSWORD:
-        description: 'Shared seeded-persona password (single source of truth — the same secret the Android/iOS app builds, pr-checks, deploy-dev and the journey matrix all read)'
+        description: 'Shared seeded-persona password (single source of truth: the same secret the journey matrix signs in with and the APK check searches for; no CI app build reads it, SHY-0662)'
         required: false
 
   workflow_dispatch:

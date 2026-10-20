@@ -119,7 +119,10 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // Since SHY-0642 a git-ignored file is never counted, so this is CI's
 // figure on every machine.
 // 2037 -> 2038: shared/.../core/util/FirebaseCallLoggingTest.kt (SHY-0648).
-const FILES_READ_FLOOR = 2038;
+// 2038 -> 2041: .github/actions/apk-holds-no-persona-password/action.yml,
+// scripts/ci/apk-persona-check.js and two tests added, one test removed
+// (SHY-0662).
+const FILES_READ_FLOOR = 2041;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

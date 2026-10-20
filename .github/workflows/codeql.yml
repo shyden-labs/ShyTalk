@@ -63,6 +63,15 @@ jobs:
       - name: Build Kotlin project
         run: ./gradlew assembleDevDebug --no-daemon -x lint -x test
 
+      # SHY-0662: every Android build is checked for the dev persona
+      # password, kept or not, so a build that starts carrying it is seen.
+      - name: Check devDebug APK holds no persona password
+        uses: ./.github/actions/apk-holds-no-persona-password
+        with:
+          dir: app/build/outputs/apk/dev/debug
+          build-config: app/build/generated/source/buildConfig/dev/debug/com/shyden/shytalk/BuildConfig.java
+          password: ${{ secrets.DEV_QA_PERSONAS_PASSWORD }}
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
         with:
