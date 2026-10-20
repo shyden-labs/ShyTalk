@@ -650,8 +650,10 @@ service cloud.firestore {
         allow read: if request.auth != null
           && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
-        // SHY-0653: only staff set or change a mute. The muted member may only
-        // clear their own row once it has ended (the apps' auto-unmute).
+        // SHY-0653: a mute is a moderation action. Only the owner, admins and
+        // mods set, change or lift one; a member writes no mutes row, not even
+        // their own once it has ended (Shyden, 2026-10-20). An ended mute stops
+        // nothing anyway: the messages rule reads its end time.
         allow create, update: if request.auth != null
           && !isBanned()
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
@@ -663,8 +665,7 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
           && (string(callerUniqueId()) == get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('createdBy', '')
               || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupAdminIds
-              || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupModIds
-              || (string(callerUniqueId()) == muteId && !muteInForce(resource.data)));
+              || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupModIds);
       }
 
       // Mod log — participants read; no phone writes it

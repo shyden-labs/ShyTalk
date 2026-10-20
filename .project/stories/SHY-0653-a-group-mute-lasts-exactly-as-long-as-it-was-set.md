@@ -70,7 +70,9 @@ Found on 2026-10-20 while preparing SHY-0652, reading `develop` at
 - [ ] A permanent mute (no end time) lasts until staff lift it.
 - [ ] A mute saved before the fix (`duration` only) is read as ending at
       `mutedAt + duration`, by the apps and the rules alike.
-- [ ] A member may clear their own mute once it has ended.
+- [ ] A member writes no mutes row at all, not even their own once it has
+      ended; an ended mute just stops showing (Shyden, 2026-10-20: a mute is
+      a moderation action; a member mutes only their own notifications).
 
 ### Performance
 

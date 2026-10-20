@@ -785,8 +785,9 @@ describe('SHY-0647 — the owner holds every power an admin or mod holds', () =>
 // apps write it as `userId`, `mutedAt` (epoch ms) and, for a timed mute,
 // `duration` (ms); a permanent mute has no `duration`. Since the fix the apps
 // write `expiresAt` (epoch ms) instead. A mute in force stops its member
-// posting; only staff set or change one; the member may clear their own row
-// only once it has ended (the apps' auto-unmute). Rows are seeded in both
+// posting; only staff (owner, admins, mods) set, change or lift one; a member
+// writes no mutes row, not even their own once it has ended (Shyden,
+// 2026-10-20: a mute is a moderation action). Rows are seeded in both
 // shapes; the old shape is what is already stored.
 const HOUR_MS = 60 * 60 * 1000;
 const lastingMute = (p) => ({ userId: id(p), mutedAt: Date.now(), duration: HOUR_MS });
@@ -859,16 +860,36 @@ describe('SHY-0653 — a group mute lasts exactly as long as it was set', () => 
     );
   });
 
-  test('ALLOW: a member clears their own mute once it has ended', async () => {
+  // Shyden, 2026-10-20: a mute is a moderation action; a member writes
+  // nothing to the mutes rows, not even to tidy one that has ended.
+  test('DENY: a member deletes their own mute once it has ended', async () => {
     await seedConv('g-mu-4', groupDoc());
     await seedDoc(`conversations/g-mu-4/mutes/${id(MEMBER)}`, endedMute(MEMBER));
-    await assertSucceeds(muteRef(MEMBER, 'g-mu-4', MEMBER).delete());
+    await assertFails(muteRef(MEMBER, 'g-mu-4', MEMBER).delete());
   });
 
   test("ALLOW: the owner lifts a member's mute before it ends", async () => {
     await seedConv('g-mu-5', groupDoc());
     await seedDoc(`conversations/g-mu-5/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
     await assertSucceeds(muteRef(OWNER, 'g-mu-5', MEMBER).delete());
+  });
+
+  test("ALLOW: an admin lifts a member's mute before it ends", async () => {
+    await seedConv('g-mu-5a', groupDoc({ groupAdminIds: [id(MEMBER_3)] }));
+    await seedDoc(`conversations/g-mu-5a/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertSucceeds(muteRef(MEMBER_3, 'g-mu-5a', MEMBER).delete());
+  });
+
+  test("ALLOW: a mod lifts a member's mute before it ends", async () => {
+    await seedConv('g-mu-5m', groupDoc({ groupModIds: [id(MEMBER_3)] }));
+    await seedDoc(`conversations/g-mu-5m/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertSucceeds(muteRef(MEMBER_3, 'g-mu-5m', MEMBER).delete());
+  });
+
+  test("DENY: a member lifts another member's ended mute", async () => {
+    await seedConv('g-mu-5d', groupDoc());
+    await seedDoc(`conversations/g-mu-5d/mutes/${id(MEMBER)}`, endedMute(MEMBER));
+    await assertFails(muteRef(MEMBER_3, 'g-mu-5d', MEMBER).delete());
   });
 
   test('ALLOW: a mod mutes a member for an hour', async () => {
@@ -915,13 +936,13 @@ describe('SHY-0653 — a group mute lasts exactly as long as it was set', () => 
     await assertSucceeds(newMessage(MEMBER, 'dm-mp-1'));
   });
 
-  test('ALLOW: a member clears their own new-shape mute once it has ended', async () => {
+  test('DENY: a member deletes their own new-shape mute once it has ended', async () => {
     await seedConv('g-mu-7', groupDoc());
     await seedDoc(
       `conversations/g-mu-7/mutes/${id(MEMBER)}`,
       newShapeMute(MEMBER, Date.now() - 1000),
     );
-    await assertSucceeds(muteRef(MEMBER, 'g-mu-7', MEMBER).delete());
+    await assertFails(muteRef(MEMBER, 'g-mu-7', MEMBER).delete());
   });
 
   test('DENY: a member writes a mute row for themselves', async () => {

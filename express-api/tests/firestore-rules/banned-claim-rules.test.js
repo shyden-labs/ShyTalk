@@ -354,16 +354,43 @@ const OPS = [
     op: (db, a) =>
       db.doc(`conversations/c-ls-${a.uniqueId}/settings/${sid(a)}`).set({ muted: true }),
   },
+  // SHY-0653: only a group's owner, admins and mods write a mute row; a member
+  // writes none, not even their own (Shyden, 2026-10-20). So the actor here is
+  // an admin muting PEER, and lifting PEER's mute.
   {
-    label: 'conversations/mutes write (own mute doc)',
+    label: 'conversations/mutes create (group admin mutes a member)',
     seed: (a) =>
       seedDoc(`conversations/c-mt-${a.uniqueId}`, {
         participantIds: [sid(a), sid(PEER)],
-        groupAdminIds: [],
+        groupAdminIds: [sid(a)],
         groupModIds: [],
       }),
     op: (db, a) =>
-      db.doc(`conversations/c-mt-${a.uniqueId}/mutes/${sid(a)}`).set({ mutedUntil: 1 }),
+      db.doc(`conversations/c-mt-${a.uniqueId}/mutes/${sid(PEER)}`).set({
+        userId: sid(PEER),
+        mutedBy: sid(a),
+        mutedAt: 1,
+        expiresAt: null,
+        isActive: true,
+      }),
+  },
+  {
+    label: "conversations/mutes delete (group admin lifts a member's mute)",
+    seed: async (a) => {
+      await seedDoc(`conversations/c-mtd-${a.uniqueId}`, {
+        participantIds: [sid(a), sid(PEER)],
+        groupAdminIds: [sid(a)],
+        groupModIds: [],
+      });
+      await seedDoc(`conversations/c-mtd-${a.uniqueId}/mutes/${sid(PEER)}`, {
+        userId: sid(PEER),
+        mutedBy: sid(a),
+        mutedAt: 1,
+        expiresAt: null,
+        isActive: true,
+      });
+    },
+    op: (db, a) => db.doc(`conversations/c-mtd-${a.uniqueId}/mutes/${sid(PEER)}`).delete(),
   },
   {
     label: 'suggestions create',

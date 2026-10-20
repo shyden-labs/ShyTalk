@@ -1291,13 +1291,9 @@ class PrivateChatViewModel(
             when (val result = pmRepository.getGroupMutes(conversationId)) {
                 is Resource.Success -> {
                     val myMute = result.data.find { it.mutedUserId == currentUserId && it.isActive }
-                    if (myMute != null) {
-                        if (myMute.isInForceAt(currentTimeMillis())) {
-                            _uiState.update { it.copy(currentUserMuteInfo = myMute) }
-                            scheduleMuteEnd(conversationId, myMute)
-                        } else {
-                            endOwnMute(conversationId)
-                        }
+                    if (myMute != null && myMute.isInForceAt(currentTimeMillis())) {
+                        _uiState.update { it.copy(currentUserMuteInfo = myMute) }
+                        scheduleMuteEnd(myMute)
                     }
                 }
 
@@ -1306,24 +1302,18 @@ class PrivateChatViewModel(
         }
     }
 
-    // SHY-0653: a timed mute ends at its end time with the chat still open. The
-    // rules let a member clear their own mute row only once it has ended.
-    private fun scheduleMuteEnd(
-        conversationId: String,
-        mute: MuteInfo,
-    ) {
+    // SHY-0653: a timed mute ends at its end time with the chat still open.
+    // Ending it is screen-only: a mute is a moderation action, so a member
+    // writes no mutes row, not even their own once it has ended; the rules
+    // read the end time themselves.
+    private fun scheduleMuteEnd(mute: MuteInfo) {
         val endsAt = mute.expiresAt ?: return
         muteEndJob?.cancel()
         muteEndJob =
             viewModelScope.launch {
                 delay((endsAt - currentTimeMillis()).coerceAtLeast(0L))
-                endOwnMute(conversationId)
+                _uiState.update { it.copy(currentUserMuteInfo = null) }
             }
-    }
-
-    private suspend fun endOwnMute(conversationId: String) {
-        _uiState.update { it.copy(currentUserMuteInfo = null) }
-        pmRepository.unmuteGroupMember(conversationId, currentUserId)
     }
 
     private fun loadGroupMutes(conversationId: String) {

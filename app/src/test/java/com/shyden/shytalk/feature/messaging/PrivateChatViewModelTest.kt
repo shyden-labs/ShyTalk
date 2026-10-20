@@ -1604,7 +1604,8 @@ class PrivateChatViewModelTest {
         }
 
     // SHY-0653: a member's own timed mute ends at its end time while the chat
-    // is open, and an already-ended mute is cleared on opening.
+    // is open, and an already-ended mute is not shown on opening. Ending it is
+    // screen-only: a member never writes to the mutes rows (Shyden, 2026-10-20).
     private fun createGroupViewModelWithMutes(mutes: List<MuteInfo>): PrivateChatViewModel {
         val group =
             TestData.createTestConversation(
@@ -1619,7 +1620,6 @@ class PrivateChatViewModelTest {
         val currentUser = TestData.createTestUser(uid = currentUserId, displayName = "Current")
         val userA = TestData.createTestUser(uid = "user-a", displayName = "A")
         coEvery { userRepository.getUsers(any()) } returns Resource.Success(listOf(currentUser, userA))
-        coEvery { pmRepository.unmuteGroupMember("group-mute", currentUserId) } returns Resource.Success(Unit)
         every { pmRepository.getMessages("group-mute", any()) } returns MutableSharedFlow()
         every { pmRepository.observeConversationSettings("group-mute", currentUserId) } returns settingsFlow
         return PrivateChatViewModel(
@@ -1640,11 +1640,11 @@ class PrivateChatViewModelTest {
             val vm = createGroupViewModelWithMutes(listOf(mute))
             runCurrent()
             assertEquals(mute, vm.uiState.value.currentUserMuteInfo)
-            coVerify(exactly = 0) { pmRepository.unmuteGroupMember("group-mute", currentUserId) }
+            coVerify(exactly = 0) { pmRepository.unmuteGroupMember(any(), any()) }
         }
 
     @Test
-    fun `an own timed mute ends by itself at its end time with the chat open`() =
+    fun `an own timed mute ends by itself at its end time with the chat open, writing nothing`() =
         runTest {
             val mute = MuteInfo(mutedUserId = currentUserId, mutedAt = 0L, expiresAt = currentTimeMillis() + 60_000L)
             val vm = createGroupViewModelWithMutes(listOf(mute))
@@ -1652,17 +1652,17 @@ class PrivateChatViewModelTest {
             advanceTimeBy(60_001L)
             runCurrent()
             assertNull(vm.uiState.value.currentUserMuteInfo)
-            coVerify(exactly = 1) { pmRepository.unmuteGroupMember("group-mute", currentUserId) }
+            coVerify(exactly = 0) { pmRepository.unmuteGroupMember(any(), any()) }
         }
 
     @Test
-    fun `an own mute that already ended is cleared on opening`() =
+    fun `an own mute that already ended is not shown on opening and writes nothing`() =
         runTest {
             val mute = MuteInfo(mutedUserId = currentUserId, mutedAt = 0L, expiresAt = 1L)
             val vm = createGroupViewModelWithMutes(listOf(mute))
             runCurrent()
             assertNull(vm.uiState.value.currentUserMuteInfo)
-            coVerify(exactly = 1) { pmRepository.unmuteGroupMember("group-mute", currentUserId) }
+            coVerify(exactly = 0) { pmRepository.unmuteGroupMember(any(), any()) }
         }
 
     @Test
@@ -1674,7 +1674,7 @@ class PrivateChatViewModelTest {
             advanceTimeBy(120_000L)
             runCurrent()
             assertEquals(mute, vm.uiState.value.currentUserMuteInfo)
-            coVerify(exactly = 0) { pmRepository.unmuteGroupMember("group-mute", currentUserId) }
+            coVerify(exactly = 0) { pmRepository.unmuteGroupMember(any(), any()) }
         }
 
     // ===== Unmute Group Member =====
