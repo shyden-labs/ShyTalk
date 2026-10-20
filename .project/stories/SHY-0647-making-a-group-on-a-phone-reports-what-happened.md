@@ -53,10 +53,18 @@ fake repository, and j28's "Alice makes a group" is a Web step.
       skips in the file). On the old rules the creator was refused a
       member's row, the apps' whole batch, and a member's row after
       promoting an admin; its own row was allowed.
-- [ ] The owner holds every power an admin or mod holds (Shyden,
+- [x] The owner holds every power an admin or mod holds (Shyden,
       2026-10-20): the rules let the owner write members' `userSettings`
       rows, mute members and hide messages, as the apps already offer
       (`Conversation.isAdmin`, `isModOrAbove`); rules tests pin each.
+      **Done, 2026-10-20**: PR #2478 (squash 8f71a536c5a), PR Checks run
+      39348431926 on f2e7dfe99e3, every job and step green by name,
+      `PASS tests/firestore-rules/conversations-rules.test.js`; tests
+      "ALLOW: the owner of a group with no admins writes their own row",
+      "... writes a member's row", "the app's one batch of every member's
+      row", "... promoted another member to admin", "... mutes a member",
+      "... hides a message naming themself". Deployed to dev by Deploy To
+      Dev run 39353790977 (rules step and Dev Smoke Tests green).
 - [ ] Making a group on each phone reports success, opens the group, and
       shows it to the members.
 
@@ -77,9 +85,13 @@ fake repository, and j28's "Alice makes a group" is a Web step.
 
 ### Security
 
-- [ ] The rules stay as strict: no person may write another member's
+- [x] The rules stay as strict: no person may write another member's
       `userSettings` row unless they are that group's owner or admin; a
       member may not mute another member or hide a message.
+      **Done, 2026-10-20**: same run 39348431926; tests "DENY: a mod writes
+      another member's row", "DENY: a member writes another member's row",
+      "DENY: a member mutes another member", "DENY: a member hides a
+      message". Staff acting on the owner is SHY-0652.
 
 ### UX
 
