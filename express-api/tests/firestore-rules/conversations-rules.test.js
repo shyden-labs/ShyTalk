@@ -780,3 +780,88 @@ describe('SHY-0647 — the owner holds every power an admin or mod holds', () =>
     await assertFails(settingsRef(MEMBER, 'g-set-6', MEMBER_3).set(settingsRow(MEMBER_3)));
   });
 });
+
+// SHY-0653 — a group mute is `conversations/{id}/mutes/{mutedUserId}`. Both
+// apps write it as `userId`, `mutedAt` (epoch ms) and, for a timed mute,
+// `duration` (ms); a permanent mute has no `duration`. The rule lets the
+// muted member write their own row (the apps' auto-unmute once a mute ends),
+// and the message `create` rule never reads `mutes`. These tests pin what the
+// rules do TODAY; the cases named "TODAY" change verdict with the fix.
+const HOUR_MS = 60 * 60 * 1000;
+const lastingMute = (p) => ({ userId: id(p), mutedAt: Date.now(), duration: HOUR_MS });
+const endedMute = (p) => ({ userId: id(p), mutedAt: Date.now() - 2 * HOUR_MS, duration: HOUR_MS });
+const permanentMute = (p) => ({ userId: id(p), mutedAt: Date.now() });
+const muteRef = (persona, convId, muted) =>
+  dbFor(persona).doc(`conversations/${convId}/mutes/${id(muted)}`);
+const newMessage = (persona, convId) =>
+  dbFor(persona)
+    .collection(`conversations/${convId}/messages`)
+    .add({ senderId: id(persona), text: 'hola', type: 'TEXT' });
+
+describe('SHY-0653 — a group mute lasts exactly as long as it was set', () => {
+  test('ALLOW: a member who is not muted posts', async () => {
+    await seedConv('g-mp-1', groupDoc());
+    await assertSucceeds(newMessage(MEMBER, 'g-mp-1'));
+  });
+
+  test('TODAY ALLOW: a member under a timed mute posts', async () => {
+    await seedConv('g-mp-2', groupDoc());
+    await seedDoc(`conversations/g-mp-2/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertSucceeds(newMessage(MEMBER, 'g-mp-2'));
+  });
+
+  test('TODAY ALLOW: a member under a permanent mute posts', async () => {
+    await seedConv('g-mp-3', groupDoc());
+    await seedDoc(`conversations/g-mp-3/mutes/${id(MEMBER)}`, permanentMute(MEMBER));
+    await assertSucceeds(newMessage(MEMBER, 'g-mp-3'));
+  });
+
+  test('ALLOW: a member whose timed mute has ended posts', async () => {
+    await seedConv('g-mp-4', groupDoc());
+    await seedDoc(`conversations/g-mp-4/mutes/${id(MEMBER)}`, endedMute(MEMBER));
+    await assertSucceeds(newMessage(MEMBER, 'g-mp-4'));
+  });
+
+  test('ALLOW: a member posts while another member is muted', async () => {
+    await seedConv('g-mp-5', groupDoc());
+    await seedDoc(`conversations/g-mp-5/mutes/${id(MEMBER_3)}`, lastingMute(MEMBER_3));
+    await assertSucceeds(newMessage(MEMBER, 'g-mp-5'));
+  });
+
+  test('TODAY ALLOW: a muted member deletes their own timed mute before it ends', async () => {
+    await seedConv('g-mu-1', groupDoc());
+    await seedDoc(`conversations/g-mu-1/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertSucceeds(muteRef(MEMBER, 'g-mu-1', MEMBER).delete());
+  });
+
+  test('TODAY ALLOW: a muted member deletes their own permanent mute', async () => {
+    await seedConv('g-mu-2', groupDoc());
+    await seedDoc(`conversations/g-mu-2/mutes/${id(MEMBER)}`, permanentMute(MEMBER));
+    await assertSucceeds(muteRef(MEMBER, 'g-mu-2', MEMBER).delete());
+  });
+
+  test('TODAY ALLOW: a muted member shortens their own mute', async () => {
+    await seedConv('g-mu-3', groupDoc());
+    await seedDoc(`conversations/g-mu-3/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertSucceeds(
+      muteRef(MEMBER, 'g-mu-3', MEMBER).set({ ...lastingMute(MEMBER), duration: 1 }),
+    );
+  });
+
+  test('ALLOW: a member clears their own mute once it has ended', async () => {
+    await seedConv('g-mu-4', groupDoc());
+    await seedDoc(`conversations/g-mu-4/mutes/${id(MEMBER)}`, endedMute(MEMBER));
+    await assertSucceeds(muteRef(MEMBER, 'g-mu-4', MEMBER).delete());
+  });
+
+  test("ALLOW: the owner lifts a member's mute before it ends", async () => {
+    await seedConv('g-mu-5', groupDoc());
+    await seedDoc(`conversations/g-mu-5/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertSucceeds(muteRef(OWNER, 'g-mu-5', MEMBER).delete());
+  });
+
+  test('ALLOW: a mod mutes a member for an hour', async () => {
+    await seedConv('g-mu-6', groupDoc({ groupModIds: [id(MEMBER_3)] }));
+    await assertSucceeds(muteRef(MEMBER_3, 'g-mu-6', MEMBER).set(lastingMute(MEMBER)));
+  });
+});
