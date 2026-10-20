@@ -91,6 +91,93 @@ class MuteInfoFromMapTest {
         assertTrue(mute.isActive)
     }
 
+    // SHY-0653: both apps' muteGroupMember writes `userId`, `mutedAt` and, for a
+    // timed mute, `duration` (ms), never `expiresAt`. Such a row must read
+    // back ending at mutedAt + duration, or a timed mute never ends.
+    @Test
+    fun `fromMap reads a row saved with duration as ending at mutedAt plus duration`() {
+        val map =
+            mapOf<String, Any?>(
+                "userId" to "user-1",
+                "mutedAt" to 1_000_000L,
+                "duration" to 3_600_000L,
+            )
+        val mute = MuteInfo.fromMap(map, "user-1")
+        assertEquals(4_600_000L, mute.expiresAt)
+    }
+
+    @Test
+    fun `fromMap reads a row saved with no duration and no expiresAt as permanent`() {
+        val map =
+            mapOf<String, Any?>(
+                "userId" to "user-1",
+                "mutedAt" to 1_000_000L,
+            )
+        val mute = MuteInfo.fromMap(map, "user-1")
+        assertNull(mute.expiresAt)
+    }
+
+    @Test
+    fun `fromMap prefers expiresAt over a duration on the same row`() {
+        val map =
+            mapOf<String, Any?>(
+                "mutedAt" to 1_000_000L,
+                "duration" to 3_600_000L,
+                "expiresAt" to 9_000_000L,
+            )
+        assertEquals(9_000_000L, MuteInfo.fromMap(map, "user-1").expiresAt)
+    }
+
+    @Test
+    fun `starting a timed mute ends it at mutedAt plus duration`() {
+        val mute = MuteInfo.starting("user-1", "mod-1", "Mod", 1_000_000L, 3_600_000L, "spam")
+        assertEquals(4_600_000L, mute.expiresAt)
+        assertEquals("mod-1", mute.mutedBy)
+        assertEquals("Mod", mute.mutedByName)
+        assertEquals("spam", mute.reason)
+        assertTrue(mute.isActive)
+    }
+
+    @Test
+    fun `starting a mute with no duration is permanent`() {
+        val mute = MuteInfo.starting("user-1", "mod-1", "Mod", 1_000_000L, null, null)
+        assertNull(mute.expiresAt)
+    }
+
+    @Test
+    fun `toRow is toMap plus the muted member's userId`() {
+        val mute = MuteInfo.starting("user-1", "mod-1", "Mod", 1_000_000L, 3_600_000L, null)
+        assertEquals(mute.toMap() + ("userId" to "user-1"), mute.toRow())
+    }
+
+    @Test
+    fun `toRow read back by fromMap gives the same mute`() {
+        val mute = MuteInfo.starting("user-1", "mod-1", "Mod", 1_000_000L, 3_600_000L, "spam")
+        assertEquals(mute, MuteInfo.fromMap(mute.toRow(), "user-1"))
+    }
+
+    @Test
+    fun `a timed mute is in force one millisecond before it ends`() {
+        val mute = MuteInfo(mutedAt = 0L, expiresAt = 5_000L)
+        assertTrue(mute.isInForceAt(4_999L))
+    }
+
+    @Test
+    fun `a timed mute is not in force at the moment it ends`() {
+        val mute = MuteInfo(mutedAt = 0L, expiresAt = 5_000L)
+        assertEquals(false, mute.isInForceAt(5_000L))
+    }
+
+    @Test
+    fun `a permanent mute is in force at any time`() {
+        assertTrue(MuteInfo(mutedAt = 0L, expiresAt = null).isInForceAt(Long.MAX_VALUE))
+    }
+
+    @Test
+    fun `an inactive mute is not in force`() {
+        assertEquals(false, MuteInfo(expiresAt = null, isActive = false).isInForceAt(0L))
+    }
+
     @Test
     fun `fromMap handles inactive mute`() {
         val map =

@@ -780,3 +780,182 @@ describe('SHY-0647 — the owner holds every power an admin or mod holds', () =>
     await assertFails(settingsRef(MEMBER, 'g-set-6', MEMBER_3).set(settingsRow(MEMBER_3)));
   });
 });
+
+// SHY-0653 — a group mute is `conversations/{id}/mutes/{mutedUserId}`. Both
+// apps write it as `userId`, `mutedAt` (epoch ms) and, for a timed mute,
+// `duration` (ms); a permanent mute has no `duration`. Since the fix the apps
+// write `expiresAt` (epoch ms) instead. A mute in force stops its member
+// posting; only staff (owner, admins, mods) set, change or lift one; a member
+// writes no mutes row, not even their own once it has ended (Shyden,
+// 2026-10-20: a mute is a moderation action). Rows are seeded in both
+// shapes; the old shape is what is already stored.
+const HOUR_MS = 60 * 60 * 1000;
+const lastingMute = (p) => ({ userId: id(p), mutedAt: Date.now(), duration: HOUR_MS });
+const endedMute = (p) => ({ userId: id(p), mutedAt: Date.now() - 2 * HOUR_MS, duration: HOUR_MS });
+const permanentMute = (p) => ({ userId: id(p), mutedAt: Date.now() });
+// The shape both apps write since the fix (`MuteInfo.toRow`).
+const newShapeMute = (p, expiresAt) => ({
+  userId: id(p),
+  mutedBy: id(OWNER),
+  mutedByName: 'Owner',
+  reason: null,
+  mutedAt: Date.now() - HOUR_MS,
+  expiresAt,
+  isActive: true,
+});
+const muteRef = (persona, convId, muted) =>
+  dbFor(persona).doc(`conversations/${convId}/mutes/${id(muted)}`);
+const newMessage = (persona, convId) =>
+  dbFor(persona)
+    .collection(`conversations/${convId}/messages`)
+    .add({ senderId: id(persona), text: 'hola', type: 'TEXT' });
+
+describe('SHY-0653 — a group mute lasts exactly as long as it was set', () => {
+  test('ALLOW: a member who is not muted posts', async () => {
+    await seedConv('g-mp-1', groupDoc());
+    await assertSucceeds(newMessage(MEMBER, 'g-mp-1'));
+  });
+
+  test('DENY: a member under a timed mute posts', async () => {
+    await seedConv('g-mp-2', groupDoc());
+    await seedDoc(`conversations/g-mp-2/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertFails(newMessage(MEMBER, 'g-mp-2'));
+  });
+
+  test('DENY: a member under a permanent mute posts', async () => {
+    await seedConv('g-mp-3', groupDoc());
+    await seedDoc(`conversations/g-mp-3/mutes/${id(MEMBER)}`, permanentMute(MEMBER));
+    await assertFails(newMessage(MEMBER, 'g-mp-3'));
+  });
+
+  test('ALLOW: a member whose timed mute has ended posts', async () => {
+    await seedConv('g-mp-4', groupDoc());
+    await seedDoc(`conversations/g-mp-4/mutes/${id(MEMBER)}`, endedMute(MEMBER));
+    await assertSucceeds(newMessage(MEMBER, 'g-mp-4'));
+  });
+
+  test('ALLOW: a member posts while another member is muted', async () => {
+    await seedConv('g-mp-5', groupDoc());
+    await seedDoc(`conversations/g-mp-5/mutes/${id(MEMBER_3)}`, lastingMute(MEMBER_3));
+    await assertSucceeds(newMessage(MEMBER, 'g-mp-5'));
+  });
+
+  test('DENY: a muted member deletes their own timed mute before it ends', async () => {
+    await seedConv('g-mu-1', groupDoc());
+    await seedDoc(`conversations/g-mu-1/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertFails(muteRef(MEMBER, 'g-mu-1', MEMBER).delete());
+  });
+
+  test('DENY: a muted member deletes their own permanent mute', async () => {
+    await seedConv('g-mu-2', groupDoc());
+    await seedDoc(`conversations/g-mu-2/mutes/${id(MEMBER)}`, permanentMute(MEMBER));
+    await assertFails(muteRef(MEMBER, 'g-mu-2', MEMBER).delete());
+  });
+
+  test('DENY: a muted member shortens their own mute', async () => {
+    await seedConv('g-mu-3', groupDoc());
+    await seedDoc(`conversations/g-mu-3/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertFails(
+      muteRef(MEMBER, 'g-mu-3', MEMBER).set({ ...lastingMute(MEMBER), duration: 1 }),
+    );
+  });
+
+  // Shyden, 2026-10-20: a mute is a moderation action; a member writes
+  // nothing to the mutes rows, not even to tidy one that has ended.
+  test('DENY: a member deletes their own mute once it has ended', async () => {
+    await seedConv('g-mu-4', groupDoc());
+    await seedDoc(`conversations/g-mu-4/mutes/${id(MEMBER)}`, endedMute(MEMBER));
+    await assertFails(muteRef(MEMBER, 'g-mu-4', MEMBER).delete());
+  });
+
+  test("ALLOW: the owner lifts a member's mute before it ends", async () => {
+    await seedConv('g-mu-5', groupDoc());
+    await seedDoc(`conversations/g-mu-5/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertSucceeds(muteRef(OWNER, 'g-mu-5', MEMBER).delete());
+  });
+
+  test("ALLOW: an admin lifts a member's mute before it ends", async () => {
+    await seedConv('g-mu-5a', groupDoc({ groupAdminIds: [id(MEMBER_3)] }));
+    await seedDoc(`conversations/g-mu-5a/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertSucceeds(muteRef(MEMBER_3, 'g-mu-5a', MEMBER).delete());
+  });
+
+  test("ALLOW: a mod lifts a member's mute before it ends", async () => {
+    await seedConv('g-mu-5m', groupDoc({ groupModIds: [id(MEMBER_3)] }));
+    await seedDoc(`conversations/g-mu-5m/mutes/${id(MEMBER)}`, lastingMute(MEMBER));
+    await assertSucceeds(muteRef(MEMBER_3, 'g-mu-5m', MEMBER).delete());
+  });
+
+  test("DENY: a member lifts another member's ended mute", async () => {
+    await seedConv('g-mu-5d', groupDoc());
+    await seedDoc(`conversations/g-mu-5d/mutes/${id(MEMBER)}`, endedMute(MEMBER));
+    await assertFails(muteRef(MEMBER_3, 'g-mu-5d', MEMBER).delete());
+  });
+
+  test('ALLOW: a mod mutes a member for an hour', async () => {
+    await seedConv('g-mu-6', groupDoc({ groupModIds: [id(MEMBER_3)] }));
+    await assertSucceeds(muteRef(MEMBER_3, 'g-mu-6', MEMBER).set(lastingMute(MEMBER)));
+  });
+
+  test('DENY: a member under a new-shape mute that has not ended posts', async () => {
+    await seedConv('g-mp-6', groupDoc());
+    await seedDoc(
+      `conversations/g-mp-6/mutes/${id(MEMBER)}`,
+      newShapeMute(MEMBER, Date.now() + HOUR_MS),
+    );
+    await assertFails(newMessage(MEMBER, 'g-mp-6'));
+  });
+
+  test('DENY: a member under a new-shape permanent mute posts', async () => {
+    await seedConv('g-mp-7', groupDoc());
+    await seedDoc(`conversations/g-mp-7/mutes/${id(MEMBER)}`, newShapeMute(MEMBER, null));
+    await assertFails(newMessage(MEMBER, 'g-mp-7'));
+  });
+
+  test('ALLOW: a member whose new-shape mute has ended posts', async () => {
+    await seedConv('g-mp-8', groupDoc());
+    await seedDoc(
+      `conversations/g-mp-8/mutes/${id(MEMBER)}`,
+      newShapeMute(MEMBER, Date.now() - 1000),
+    );
+    await assertSucceeds(newMessage(MEMBER, 'g-mp-8'));
+  });
+
+  test('ALLOW: a member whose mute was switched off posts', async () => {
+    await seedConv('g-mp-9', groupDoc());
+    await seedDoc(`conversations/g-mp-9/mutes/${id(MEMBER)}`, {
+      ...newShapeMute(MEMBER, null),
+      isActive: false,
+    });
+    await assertSucceeds(newMessage(MEMBER, 'g-mp-9'));
+  });
+
+  test('ALLOW: a one-to-one message is not judged by a mutes row', async () => {
+    await seedConv('dm-mp-1', convDoc([MEMBER, MEMBER_3]));
+    await seedDoc(`conversations/dm-mp-1/mutes/${id(MEMBER)}`, permanentMute(MEMBER));
+    await assertSucceeds(newMessage(MEMBER, 'dm-mp-1'));
+  });
+
+  test('DENY: a member deletes their own new-shape mute once it has ended', async () => {
+    await seedConv('g-mu-7', groupDoc());
+    await seedDoc(
+      `conversations/g-mu-7/mutes/${id(MEMBER)}`,
+      newShapeMute(MEMBER, Date.now() - 1000),
+    );
+    await assertFails(muteRef(MEMBER, 'g-mu-7', MEMBER).delete());
+  });
+
+  test('DENY: a member writes a mute row for themselves', async () => {
+    await seedConv('g-mu-8', groupDoc());
+    await assertFails(
+      muteRef(MEMBER, 'g-mu-8', MEMBER).set(newShapeMute(MEMBER, Date.now() - 1000)),
+    );
+  });
+
+  test("ALLOW: the owner writes a mute in the apps' new shape", async () => {
+    await seedConv('g-mu-9', groupDoc());
+    await assertSucceeds(
+      muteRef(OWNER, 'g-mu-9', MEMBER).set(newShapeMute(MEMBER, Date.now() + HOUR_MS)),
+    );
+  });
+});

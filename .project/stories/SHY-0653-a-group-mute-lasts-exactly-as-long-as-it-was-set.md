@@ -42,9 +42,18 @@ Found on 2026-10-20 while preparing SHY-0652, reading `develop` at
 
 ### Happy path
 
-- [ ] First, rules tests prove or disprove gaps 2 and 3 on today's rules,
+- [x] First, rules tests prove or disprove gaps 2 and 3 on today's rules,
       and a unit test proves or disproves gap 1; each result is recorded
-      here before any fix.
+      here before any fix. **Proven, 2026-10-20**, all three:
+      gaps 2 and 3 by PR #2480 head 05db43ae3d2, PR Checks run 39360163266,
+      every job green by name, `PASS
+      tests/firestore-rules/conversations-rules.test.js` with 16,495 tests
+      (11 new): on today's rules a member under a timed or permanent mute
+      posted, deleted their own mute before it ended, and shortened it.
+      Gap 1 by `MuteInfoFromMapTest` "fromMap reads a row saved with
+      duration as ending at mutedAt plus duration", run on the laptop
+      before the fix: `expected:<4600000> but was:<null>` (12 tests, 1
+      failed; the permanent-row control passed).
 - [ ] A timed mute is saved with its end time (and who muted), on both
       phones, and reads back with the same end time.
 - [ ] A mute ends at its end time: the member can post again with no
@@ -61,7 +70,9 @@ Found on 2026-10-20 while preparing SHY-0652, reading `develop` at
 - [ ] A permanent mute (no end time) lasts until staff lift it.
 - [ ] A mute saved before the fix (`duration` only) is read as ending at
       `mutedAt + duration`, by the apps and the rules alike.
-- [ ] A member may clear their own mute once it has ended.
+- [ ] A member writes no mutes row at all, not even their own once it has
+      ended; an ended mute just stops showing (Shyden, 2026-10-20: a mute is
+      a moderation action; a member mutes only their own notifications).
 
 ### Performance
 
@@ -132,9 +143,14 @@ longer post until it does.
 ## Definition of Done
 
 - [ ] Every AC ticked with its proof; CI green by step name; merged to
-      `develop`; green on dev on both phones; Shyden signs off the phones.
+      `develop`; green on dev on both phones; Shyden signs off the phones;
+      in the group-roles release branch with SHY-0648, SHY-0647 and
+      SHY-0652.
 
 ## Notes
+
+- **2026-10-20**: Shyden: "this must be fixed". It joins the group-roles
+  hotfix release.
 
 - **2026-10-20**: Filed while preparing SHY-0652. P0: a defect (every defect
   is P0). MVP: a launch user in a group meets it. Scored 5: two rule clauses

@@ -605,22 +605,12 @@ class PrivateMessageRepositoryImpl(
 
     override suspend fun muteGroupMember(
         conversationId: String,
-        userId: String,
-        duration: Long?,
-        reason: String?,
+        mute: MuteInfo,
     ): Resource<Unit> =
         firebaseCall("Failed to mute member") {
-            val now = System.currentTimeMillis()
-            val data =
-                mutableMapOf<String, Any?>(
-                    "userId" to userId,
-                    "mutedAt" to now,
-                )
-            duration?.let { data["duration"] = it }
-            reason?.let { data["reason"] = it }
             firestore
-                .document("conversations/$conversationId/mutes/$userId")
-                .set(data)
+                .document("conversations/$conversationId/mutes/${mute.mutedUserId}")
+                .set(mute.toRow())
                 .await()
         }
 
