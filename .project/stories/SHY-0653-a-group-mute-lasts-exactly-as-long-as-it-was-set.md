@@ -10,6 +10,7 @@ type: bug
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
+blocked_by: [SHY-0656]
 ---
 
 # SHY-0653: A group mute lasts exactly as long as it was set
@@ -175,6 +176,10 @@ longer post until it does.
       SHY-0652.
 
 ## Notes
+
+- **2026-10-20**: Blocked by SHY-0656: neither app has a Mute button for a
+  group member (never built), so the phone walk cannot start a mute. Shyden
+  put SHY-0656 in the same hotfix.
 
 - **2026-10-20**: Shyden: "this must be fixed". It joins the group-roles
   hotfix release.
