@@ -155,3 +155,9 @@ run: it names no repository, so the router refuses it as the App).
 - Scored 3, like SHY-0551 (one workflow pattern, a guard and a check): two
   workflows labelled, one guard, one board check, one board item removed, and
   a possible UI step for Shyden.
+- **2026-10-20**: A second alert, #2474 ("Story sync to the board is
+  failing", opened by `github-actions` 2026-10-19 17:21 UTC, closed 20:31
+  UTC, no labels), was recorded on the ShyTalk Stories board by the
+  2026-10-19 session. Read 2026-10-20: it is closed and on no project;
+  what took it off is not recorded. A second alert reaching the board is
+  more evidence for this story.
