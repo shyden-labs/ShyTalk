@@ -10,7 +10,7 @@ type: bug
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
-blocked_by: [SHY-0656]
+blocked_by: [SHY-0656, SHY-0657]
 ---
 
 # SHY-0653: A group mute lasts exactly as long as it was set
@@ -150,8 +150,9 @@ longer post until it does.
 - Rules tests in `express-api/tests/firestore-rules/conversations-rules.test.js`
   (CI's rules suite), one per case.
 - Unit tests of the saved mute map and `MuteInfo.fromMap` (old and new rows).
-- The phone walk: Theo mutes Selma for the shortest offered time; Selma is
-  stopped, then posts once it ends. Needs phones.
+- The phone walk, on the two linked phones (SHY-0658): Alice (owner, Android)
+  mutes Theo (iPhone) for 15 minutes; Theo is stopped, then posts once it
+  ends. Needs phones.
 
 ## Out of Scope
 
