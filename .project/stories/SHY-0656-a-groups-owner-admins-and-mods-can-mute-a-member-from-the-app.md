@@ -96,11 +96,11 @@ straight from the members list.
 
 ## BDD Scenarios
 
-**Scenario: an admin mutes a member for an hour**
+**Scenario: the owner mutes a member for 15 minutes**
 
-- **Given** Theo is an admin of a group where admins may mute
-- **When** Theo opens the members list, taps Mute on Selma and picks 1 hour
-- **Then** Selma is muted for an hour and her row shows Unmute
+- **Given** Alice owns a group Theo is in
+- **When** Alice opens the members list, taps Mute on Theo and picks 15 minutes
+- **Then** Theo is muted for 15 minutes and his row shows Unmute
 
 **Scenario: no one is offered Mute on the owner**
 
@@ -112,8 +112,9 @@ straight from the members list.
 
 - Unit tests of the shared who-sees-Mute decision, one per case.
 - Compose test of the button and the length choice.
-- The phone walk, shared with SHY-0653: Theo mutes Selma for the shortest
-  length; Selma is stopped, then posts once it ends. Needs phones.
+- The phone walk, shared with SHY-0653, on the two linked phones (SHY-0658):
+  Alice (owner, Android) mutes Theo (iPhone) for 15 minutes; Theo is
+  stopped, then posts once it ends. Needs phones.
 
 ## Out of Scope
 

@@ -65,8 +65,18 @@ fake repository, and j28's "Alice makes a group" is a Web step.
       row", "... promoted another member to admin", "... mutes a member",
       "... hides a message naming themself". Deployed to dev by Deploy To
       Dev run 39353790977 (rules step and Dev Smoke Tests green).
-- [ ] Making a group on each phone reports success, opens the group, and
-      shows it to the members.
+- [x] Making a group on each phone reports success, opens the group, and
+      shows it to the members. **Done, 2026-10-20**, on dev (develop
+      690bd97d365, rules from Deploy To Dev run 39353790977). Android
+      (OnePlus CPH2653) on App Distribution 0.99.0-b383 as Alice: "QA0647
+      plain 2129" opened with 3 members (Firestore YgeBv7tYdwFERDq8dGjT,
+      createdBy 50000010); Theo and Selma each read it, a non-member read
+      nothing. iPhone (iPhone Air) as Theo: "QA0647 ios 2150" opened with 3
+      members (DYaSpSPrQXgati9r3zGv, createdBy 50000060); Alice and Selma
+      each read it, and Theo's Messages list showed both groups made on
+      Android. The iPhone ran a local Debug-Dev build (2822) of the same
+      commit 690bd97d365, not TestFlight 383: the TestFlight build carries
+      no test-persona credential by design, so no persona can sign in on it.
 
 ### Error paths
 
@@ -76,8 +86,13 @@ fake repository, and j28's "Alice makes a group" is a Web step.
 
 ### Edge cases
 
-- [ ] A group where the creator promoted a member to admin is made the same
-      way and reports the same success.
+- [x] A group where the creator promoted a member to admin is made the same
+      way and reports the same success. **Done, 2026-10-20**, same builds:
+      Android, Alice promoted Theo, "QA0647 admin 2140" opened with 3
+      members (WUWKxEHAuTLbEiqOuXIt, groupAdminIds [50000060]); iPhone, Theo
+      promoted Selma, "QA0647 iosadmin 2153" opened with 3 members
+      (e3dkcjS5sZzyEXvHpay9, groupAdminIds [50000080]). Every member read
+      each group; Theo's list showed the Android group with an Admin badge.
 
 ### Performance
 
@@ -95,7 +110,9 @@ fake repository, and j28's "Alice makes a group" is a Web step.
 
 ### UX
 
-- [ ] No failure message is shown for a group that was made.
+- [x] No failure message is shown for a group that was made. **Done,
+      2026-10-20**: none of the four groups above showed one; each opened
+      straight into the new group's chat.
 
 ### i18n
 

@@ -9,6 +9,7 @@ estimate: 8
 type: feature
 roadmap_ids: []
 mvp: true
+blocked_by: [SHY-0658]
 ---
 
 # SHY-0654: Rooms run by ShyTalk's approved hosts are open to every age group
@@ -136,7 +137,10 @@ of every age.
 - Unit (commonTest): the decision of whether a room is mixed and what an
   under-18 may do in it.
 - Journey (one definition, both phones): Bao hosts, Mia and Sam join; Mia
-  waits for the invite then speaks; Sam's message to Mia is refused.
+  waits for the invite then speaks; Sam's message to Mia is refused. Mia is
+  a minor and neither linked phone holds one, so the journey's phone step
+  unlinks a phone as Greta (P-12) and signs Mia in, then signs the phone's
+  own persona back in (SHY-0658).
 
 ## Out of Scope
 

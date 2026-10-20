@@ -53,7 +53,12 @@ skips the owner (`role != GroupRole.OWNER`).
 
 ### Edge cases
 
-- [ ] The owner may still write their own `mutes` and `userSettings` rows.
+- [ ] The owner may still write their own `userSettings` row.
+- [ ] No one writes a `mutes` row naming the owner: not an admin or mod
+      (this story), and not the owner either, since mutes are moderation
+      data written only by a group's staff about other members (Shyden,
+      2026-10-20: members never write moderation data). A rules test pins
+      each, seen RED first.
 - [ ] An admin or mod may still act on every other member, each other
       included, as the group's permissions allow.
 
