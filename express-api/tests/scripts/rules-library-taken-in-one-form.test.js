@@ -38,24 +38,65 @@ const MODULE_MOCKS = new Set([
   'requireActual',
   'unstable_mockModule',
 ]);
-const MOCK_CALL_TEXT = /\.(?:mock|doMock|setMock|requireMock|requireActual|unstable_mockModule)\(/;
 
 // A module mock whose module is computed could replace the rules library under a
 // name no literal shows; every module mock must name its module literally.
 function mockFindings(ast) {
   const out = [];
+  const at = (n) => `line ${n.loc.start.line}`;
+  // jest and every name bound to it (const j = jest; const k = j), to a fixed point.
+  const jestNames = new Set(['jest']);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    walk(ast, (n) => {
+      if (
+        n.type === 'VariableDeclarator' &&
+        n.id.type === 'Identifier' &&
+        n.init &&
+        n.init.type === 'Identifier' &&
+        jestNames.has(n.init.name) &&
+        !jestNames.has(n.id.name)
+      ) {
+        jestNames.add(n.id.name);
+        grew = true;
+      }
+    });
+  }
   walk(ast, (n) => {
+    if (n.type === 'CallExpression' && n.callee.type === 'MemberExpression') {
+      const { object, property, computed } = n.callee;
+      const name = computed
+        ? literalText(property)
+        : property.type === 'Identifier'
+          ? property.name
+          : null;
+      if (
+        name !== null &&
+        MODULE_MOCKS.has(name) &&
+        (!n.arguments[0] || literalText(n.arguments[0]) === null)
+      ) {
+        out.push(`${at(n)}: a module mock (${name}) whose module cannot be read`);
+      }
+      if (computed && name === null && object.type === 'Identifier' && jestNames.has(object.name)) {
+        out.push(`${at(n)}: a jest call the guard cannot read`);
+      }
+    }
     if (
-      n.type === 'CallExpression' &&
-      n.callee.type === 'MemberExpression' &&
-      !n.callee.computed &&
-      n.callee.property.type === 'Identifier' &&
-      MODULE_MOCKS.has(n.callee.property.name) &&
-      (!n.arguments[0] || literalText(n.arguments[0]) === null)
+      n.type === 'VariableDeclarator' &&
+      n.id.type === 'ObjectPattern' &&
+      n.init &&
+      n.init.type === 'Identifier' &&
+      jestNames.has(n.init.name)
     ) {
-      out.push(
-        `line ${n.loc.start.line}: a module mock (${n.callee.property.name}) whose module cannot be read`,
-      );
+      out.push(`${at(n)}: takes jest apart`);
+    }
+    if (
+      (n.type === 'CallExpression' || n.type === 'NewExpression') &&
+      n.callee.type === 'Identifier' &&
+      (n.callee.name === 'eval' || n.callee.name === 'Function')
+    ) {
+      out.push(`${at(n)}: runs code from a string (${n.callee.name})`);
     }
   });
   return out;
@@ -210,22 +251,21 @@ describe('each file takes the library in the one form', () => {
 });
 
 // A file that builds the library's name never names it, so this reads every
-// test file holding a module mock, not only the files above.
+// test file, not only the files above: a jest[m] call, an eval or a jest method
+// taken apart need not contain `.mock(` at all, so no text filter comes first.
 describe('no test file mocks a module it does not name', () => {
-  const mocking = testFilesUnder(TESTS_DIR)
-    .map((file) => ({
-      file,
-      rel: path.relative(TESTS_DIR, file),
-      source: fs.readFileSync(file, 'utf8'),
-    }))
-    .filter(({ source }) => MOCK_CALL_TEXT.test(source));
+  const mocking = testFilesUnder(TESTS_DIR).map((file) => ({
+    file,
+    rel: path.relative(TESTS_DIR, file),
+    source: fs.readFileSync(file, 'utf8'),
+  }));
 
-  test('reads the 200 test files that hold a module mock', () => {
+  test('reads all 588 test files', () => {
     // Measured 2026-10-21; SHY-0556 moves this figure to the floors record.
     const rels = mocking.map((m) => m.rel);
-    expect({ of: 'test files with a module mock', count: rels.length, files: rels }).toEqual({
-      of: 'test files with a module mock',
-      count: 200,
+    expect({ of: 'test files', count: rels.length, files: rels }).toEqual({
+      of: 'test files',
+      count: 588,
       files: rels,
     });
   });
@@ -320,6 +360,37 @@ describe('planted forms turn the check red', () => {
       'line 2: a module mock (requireMock) whose module cannot be read',
       'line 3: a module mock (unstable_mockModule) whose module cannot be read',
     ]);
+  });
+
+  // The gap named in d5425a561b8's message, closed rather than left open.
+  test('a module mock named by a literal property is read: jest["mock"](name)', () => {
+    expect(formFindings("jest['mock'](name);", 'p.test.js')).toEqual([
+      'line 1: a module mock (mock) whose module cannot be read',
+    ]);
+  });
+
+  test('a computed call on jest or an alias of it is caught', () => {
+    expect(formFindings('jest[m](name);\nconst j = jest;\nj[m](name);', 'p.test.js')).toEqual([
+      'line 1: a jest call the guard cannot read',
+      'line 3: a jest call the guard cannot read',
+    ]);
+  });
+
+  test('taking jest apart is caught', () => {
+    expect(formFindings('const { mock } = jest;\nmock(name);', 'p.test.js')).toEqual([
+      'line 1: takes jest apart',
+    ]);
+  });
+
+  test('eval and new Function are caught', () => {
+    expect(formFindings("eval('x');\nconst f = new Function('x');", 'p.test.js')).toEqual([
+      'line 1: runs code from a string (eval)',
+      'line 2: runs code from a string (Function)',
+    ]);
+  });
+
+  test("supertest's request(app)[verb](url) is not a jest call", () => {
+    expect(formFindings('request(app)[verb](url);', 'p.test.js')).toEqual([]);
   });
 
   test('the text count sees a mention the parser does not, and skips a comment', () => {
