@@ -65,9 +65,18 @@ The seeded personas include P-12, the dev admin.
 
 ### Error paths
 
-- [ ] A CI step after each Android build proves the built APK does not hold
+- [x] A CI step after each Android build proves the built APK does not hold
       the secret's value (it reads the secret in its own step, prints only
       found or not found), and goes RED on a planted APK that holds it.
+      Proof: PR Checks run 39524183782 (Build & Test, 4524619c2e3) ran it
+      after the devRelease and localDebug builds; Deploy To Dev run
+      39529836842 (f52d9e21bd1) ran it after "Build devRelease APK" and on
+      the APK it distributes; each printed "planted APK: the search finds the
+      secret, so it can see it" and then "the secret is not in any entry".
+      RED on a planted APK: the checker's unit tests and 9 checker mutants
+      (Notes). Not yet run in CI: deploy-prod's two copies (first run at the
+      release cut) and CodeQL's (only while `vars.ENABLE_CODEQL_KOTLIN` is
+      `'true'`; off today); the guard's rule 3 refuses any of them dropped.
 
 ### Edge cases
 
@@ -101,8 +110,17 @@ The seeded personas include P-12, the dev admin.
 
 ### Observability
 
-- [ ] The APK check's step summary names the APK it read and its size, so
-      an empty read cannot pass.
+- [x] The APK check's step summary names the APK it read and its size, so
+      an empty read cannot pass. Proof: the checker writes every line to the
+      log and to `$GITHUB_STEP_SUMMARY`. PR Checks run 39524183782:
+      "app-dev-release.apk: 41777902 bytes, 572 entries" and
+      "app-local-debug.apk: 200260677 bytes, 726 entries", each with "proofs
+      run: BuildConfig field, value search". Deploy To Dev run 39529836842:
+      the built "app-dev-release.apk: 41777886 bytes, 572 entries" (proofs:
+      BuildConfig field, value search) and the distributed
+      "dev-release-apk/app-dev-release.apk: 41777886 bytes, 572 entries"
+      (proofs: value search; a downloaded APK has no build tree, so its
+      `BUILD_CONFIG` input is empty by design).
 
 ## Announce
 
