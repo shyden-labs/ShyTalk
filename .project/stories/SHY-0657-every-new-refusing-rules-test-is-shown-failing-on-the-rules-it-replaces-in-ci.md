@@ -4,12 +4,13 @@ status: Draft
 owner: claude
 created: 2026-10-20
 priority: P0
-effort: M
-estimate: 5
+effort: L
+estimate: 13
 type: chore
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
+blocked_by: [SHY-0672]
 ---
 
 # SHY-0657: Every new refusing rules test is shown failing on the rules it replaces, in CI
