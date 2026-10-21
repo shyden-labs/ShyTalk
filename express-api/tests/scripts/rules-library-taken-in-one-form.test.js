@@ -393,6 +393,13 @@ describe('planted forms turn the check red', () => {
     expect(formFindings('request(app)[verb](url);', 'p.test.js')).toEqual([]);
   });
 
+  // Claimed in 8177e0c7d3e's message: a module mock is read on any object.
+  test('a module mock with a computed module is caught on any object, jest held in a field too', () => {
+    expect(formFindings('const o = { j: jest };\no.j.mock(name);', 'p.test.js')).toEqual([
+      'line 2: a module mock (mock) whose module cannot be read',
+    ]);
+  });
+
   test('the text count sees a mention the parser does not, and skips a comment', () => {
     expect(textMentions(`// ${lib}\nconst s = ${lib};`)).toBe(1);
     expect(literalMentions(`// ${lib}\nconst s = ${lib};`, 'p.test.js')).toBe(1);
