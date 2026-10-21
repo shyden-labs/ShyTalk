@@ -8,7 +8,7 @@
  * four refusals against the rules before its fix. Those old rules are weaker
  * than the live ones, so they must never reach a deploy. Rules deploys run
  * `firebase deploy`, which reads its rules path from firebase.json, so every
- * firebase*.json must name only the live `firestore.rules`, and nothing on
+ * Firebase config git sees must name only the live `firestore.rules`, and nothing on
  * the deploy side (.github, scripts, express-api/scripts) may name a fixture.
  * Each fixture's tests must exist as DENY tests, and its bytes must stay the
  * recorded ones.
@@ -18,23 +18,18 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { extractTests } = require('../firestore-rules/_helpers/rules-test-names.js');
+const { gitVisibleFiles } = require('../helpers/git-visible-files.js');
 
 const API = path.resolve(__dirname, '..', '..');
 const REPO = path.resolve(API, '..');
 const FIXTURES = path.join(API, 'tests', 'firestore-rules', 'red-first-fixtures.json');
 const fixtures = JSON.parse(fs.readFileSync(FIXTURES, 'utf8'));
+// A Firebase CLI config: firebase.json, or firebase.<name>.json passed by --config.
+const FIREBASE_CONFIG = /^firebase(\.[\w-]+)?\.json$/;
 
-// Files under `dir`; below it, dot folders (.git, .gradle, ...), node_modules and build output are skipped.
-const SKIPPED = new Set(['node_modules', 'build', 'dist', 'coverage']);
-function filesUnder(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      return SKIPPED.has(entry.name) || entry.name.startsWith('.') ? [] : filesUnder(full);
-    }
-    return [full];
-  });
-}
+// The files git tracks or would track (SHY-0642), so the population is CI's on
+// every machine: a git-ignored emulator export on the Mac never counts.
+const visible = (within) => [...gitVisibleFiles(REPO, within)].sort();
 
 // Every fixture rules path or file name `text` mentions.
 function namesAFixture(text) {
@@ -60,13 +55,24 @@ function fixtureFindings(fixture, sources) {
   return out;
 }
 
-describe('firebase*.json names only the live rules', () => {
-  const configs = filesUnder(REPO)
-    .filter((f) => /^firebase.*\.json$/.test(path.basename(f)))
-    .map((f) => path.relative(REPO, f));
+describe('every Firebase config names only the live rules', () => {
+  const configs = visible().filter((f) => FIREBASE_CONFIG.test(path.basename(f)));
 
   test('the population includes firebase.json', () => {
     expect(configs).toContain('firebase.json');
+  });
+
+  test('a config is firebase.json or firebase.<name>.json, never an emulator export', () => {
+    const names = [
+      'firebase.json',
+      'firebase.prod.json',
+      'firebase-export-metadata.json',
+      'firebase.json.bak',
+    ];
+    expect(names.filter((n) => FIREBASE_CONFIG.test(n))).toEqual([
+      'firebase.json',
+      'firebase.prod.json',
+    ]);
   });
 
   test.each(configs)('%s', (config) => {
@@ -80,9 +86,7 @@ describe('firebase*.json names only the live rules', () => {
 });
 
 describe('nothing on the deploy side names a fixture', () => {
-  const deploySide = ['.github', 'scripts', path.join('express-api', 'scripts')]
-    .flatMap((d) => filesUnder(path.join(REPO, d)))
-    .map((f) => path.relative(REPO, f));
+  const deploySide = visible(['.github', 'scripts', path.join('express-api', 'scripts')]);
 
   test('the scan covers every file that deploys rules', () => {
     expect(deploySide).toEqual(
