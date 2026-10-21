@@ -312,10 +312,10 @@ describe('scripts/sync-stories-to-issues.sh', () => {
       expect(stderr).toMatch(/unknown flag/);
     });
 
-    it('exits 2 when neither --all nor --story given', () => {
+    it('exits 2 when no mode (--all, --story, --changed) is given', () => {
       const { code, stderr } = runScript(['--verbose']);
       expect(code).toBe(2);
-      expect(stderr).toMatch(/specify --all, --story SHY-NNNN, or --rebuild/);
+      expect(stderr).toMatch(/specify --all, --story SHY-NNNN, --changed BASE HEAD, or --rebuild/);
     });
 
     it('exits 2 when --story given without an argument', () => {

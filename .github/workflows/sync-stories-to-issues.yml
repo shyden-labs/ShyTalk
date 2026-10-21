@@ -44,6 +44,10 @@ on:
       - ".project/stories/SHY-*.md"
       - "scripts/sync-stories-to-issues.sh"
       - ".github/workflows/sync-stories-to-issues.yml"
+  # SHY-0686: a push syncs only the stories it changed (--changed), so the
+  # whole corpus is re-checked once a day; a dispatch runs the full pass too.
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -83,7 +87,11 @@ jobs:
     # ~8 calls (draft-or-issue create + 6 field-sets) ≈ ~600 calls.
     # Full --rebuild: ≈75 item deletes + ≈10 issue deletes + the create run
     # ≈ ~330-700 calls ≈ ~2-3 min. 15 min ≈ 5× headroom.
-    timeout-minutes: 15
+    # SHY-0686: that estimate stopped holding: parsing costs ~1.4 s a story, so
+    # the full pass over 609 stories ran past 15 minutes on every push (runs
+    # 39587696742, 39635193459). A push now syncs only what it changed and keeps
+    # 15; the scheduled/dispatched full pass has its own measured limit.
+    timeout-minutes: ${{ github.event_name == 'push' && 15 || 45 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,12 +116,24 @@ jobs:
           GH_PAT_PROJECT: ${{ secrets.GH_PAT_PROJECT }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
           REBUILD: ${{ github.event.inputs.rebuild }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
         run: |
+          # SHY-0686: a sync that cannot run fails (and alerts); it never passes.
           if [ -z "${GH_PAT_PROJECT:-}" ]; then
-            echo "::warning::GH_PAT_PROJECT secret not set — sync will be a no-op until operator provisions it." >&2
-            exit 0
+            echo "::error::GH_PAT_PROJECT secret is not set: the story sync cannot run." >&2
+            exit 1
           fi
-          args=(--all)
+          # SHY-0686: a push syncs the stories it changed plus any with no board
+          # item; a new branch (before = 40 zeros), a schedule or a dispatch runs
+          # the full pass.
+          if [ "$EVENT" = "push" ] && [ -n "${BEFORE:-}" ] \
+             && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            git fetch --no-tags --depth=1 origin "$BEFORE"
+            args=(--changed "$BEFORE" "$(git rev-parse HEAD)")
+          else
+            args=(--all)
+          fi
           if [ "${REBUILD:-}" = "true" ]; then
             # SHY-0074 one-shot migration: the dispatch boolean IS the
             # operator sanction — it satisfies the script's confirm gate.
@@ -223,7 +243,7 @@ jobs:
   alert:
     name: Tell the operator the sync failed
     needs: [sync]
-    if: ${{ failure() }}
+    if: ${{ failure() || cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -241,7 +261,7 @@ jobs:
           set -euo pipefail
           title='Story sync to the board is failing'
           failed=$(gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs" --jq \
-            '[.jobs[] | select(.conclusion == "failure") | "\(.name): \([.steps[] | select(.conclusion == "failure") | .name] | join(", "))"] | join("; ")')
+            '[.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled") | "\(.name): \([.steps[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .name] | join(", "))"] | join("; ")')
           body_file=$(mktemp)
           {
             echo "The story sync failed, so stories merged to \`develop\` are not reaching the ShyTalk Stories board."
