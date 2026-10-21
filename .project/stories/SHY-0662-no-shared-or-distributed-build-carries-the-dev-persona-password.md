@@ -173,3 +173,10 @@ Not announced: an internal safety fix.
   No CI job used the CI-built picker: android-e2e uses `local-debug-apk`
   (hard-coded emulator value), the journey matrix signs in over the API, and
   dev device runs build their own APK (SHY-0525).
+- **2026-10-21**: PR Checks on e243a5571ad was green but skipped Build &
+  Test: Detect Changes set no Android flag for `.github/*` or `scripts/*`,
+  so the check had never run in CI. Detect Changes now routes the composite
+  action and `scripts/ci/apk-persona-check.js` to `android_app_changed`
+  (pinned in `pr-checks-app-changed-split.test.js`, RED 2/26 first). The
+  CodeQL copy runs only while `vars.ENABLE_CODEQL_KOTLIN` is `'true'`;
+  Analyze Kotlin was skipped on this PR, so it is off and builds nothing.

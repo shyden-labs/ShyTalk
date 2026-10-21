@@ -180,6 +180,14 @@ jobs:
               # express-api/tests/scripts/pr-checks-playwright-scope.test.js.
               express-api/tests/*) BACKEND_TESTS=true ;;
               express-api/*|firestore.rules|database.rules.json) BACKEND=true ;;
+              # SHY-0662. The APK persona-password check runs inside
+              # build-and-test, so a PR changing only the check must run that
+              # job; under the generic .github/* and scripts/* arms below it
+              # was skipped and the check first ran on develop. Matched before
+              # them (first match wins); the script keeps SCRIPTS so its unit
+              # tests still run in test-backend.
+              .github/actions/apk-holds-no-persona-password/*) ANDROID_APP=true; APP=true ;;
+              scripts/ci/apk-persona-check.js) ANDROID_APP=true; APP=true; SCRIPTS=true ;;
               # SHY-0284. Root `scripts/**` are CI/tooling scripts whose ONLY
               # automated coverage lives in express-api/tests/scripts/** (15 of
               # those suites exercise a root script). They previously fell to
