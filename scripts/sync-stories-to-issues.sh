@@ -1663,6 +1663,16 @@ report_sync_result() {
   # written (idempotent no-op diff when unchanged); the workflow commits it.
   write_board_items_sidecar
 
+  # SHY-0686: the run's time, and how much of its limit it used when the
+  # workflow passes the limit (SYNC_LIMIT_MINUTES), so a pass creeping toward
+  # its limit shows before it is cut short.
+  if [ -n "${SYNC_LIMIT_MINUTES:-}" ]; then
+    printf 'Sync took %d s of its %d-minute limit (%d%%)\n' "$SECONDS" "$SYNC_LIMIT_MINUTES" \
+      $(( SECONDS * 100 / (SYNC_LIMIT_MINUTES * 60) )) >&2
+  else
+    printf 'Sync took %d s\n' "$SECONDS" >&2
+  fi
+
   printf 'Sync result: %d created, %d updated, %d skipped, %d failed' \
     "$N_CREATED" "$N_UPDATED" "$N_SKIPPED" "$N_FAILED" >&2
   printf ' (labels deleted: %d; project items added: %d; project items deleted: %d; issues deleted: %d; issue types set: %d; issues closed: %d; issues reopened: %d; drafts migrated: %d; project fields updated: %d; status fields set: %d; bodies embedded: %d; bodies truncated: %d; sidecar overlay fills: %d; type-field auto-created: %s; estimate-field auto-created: %s)\n' \
@@ -1878,6 +1888,10 @@ main() {
 
   if [ -z "$MODE" ]; then
     fail_global "usage" "specify --all, --story SHY-NNNN, --changed BASE HEAD, or --rebuild" "$E_USAGE"
+  fi
+
+  if [ -n "${SYNC_LIMIT_MINUTES:-}" ] && ! printf '%s' "$SYNC_LIMIT_MINUTES" | grep -qE '^[1-9][0-9]*$'; then
+    fail_global "usage" "SYNC_LIMIT_MINUTES must be a whole number of minutes, not \"${SYNC_LIMIT_MINUTES}\"" "$E_USAGE"
   fi
 
   if [ "$DRY_RUN" != "1" ]; then
