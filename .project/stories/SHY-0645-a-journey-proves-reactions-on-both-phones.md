@@ -49,12 +49,16 @@ SHY-0614 must not reach production until this journey is green on dev
       test tag (`privateChat_reactMenuItem`, `privateChat_reactionPick_<n>`,
       `privateChat_reactionBadge_<messageId>_<n>`, `n` = the emoji's place in
       the picker), reachable in the Android and iPhone dumps.
-- [ ] j28 gains three scenarios: Theo and Selma each react to Alice's group
-      message and everyone sees both; Selma removes hers and Theo's stays; in
-      a one-to-one chat the recipient's reaction shows to the sender.
-- [ ] One runner journey walks those scenarios, run on Android (the phone is
-      Theo) and on iPhone (the phone is Selma) from the same definition; the
-      person not on the phone acts over the network as themselves.
+- [ ] j28 gains three scenarios. The phone holder and Selma each react to the
+      sender's group message, and both reactions show. The phone holder takes
+      theirs back by tapping it, and Selma's stays. In a one-to-one chat, the
+      recipient's reaction shows to the sender.
+- [ ] One runner journey walks those scenarios from the same definition, on
+      the phones as they are linked:
+      - Android: Alice holds the phone and Theo sends.
+      - iPhone: Theo holds the phone and Alice sends.
+      Selma and the sender act over the network as themselves, and the sender
+      reads the store.
 - [ ] Each claim is checked on the phone's screen AND in the stored message
       read back through `GET /api/conversations/:id/messages`.
 
@@ -103,21 +107,22 @@ Nothing: test tooling.
 
 **Scenario: two people react to a group message**
 
-- **Given** Alice, Theo and Selma are in a group and Alice has sent a message
-- **When** Theo reacts with ❤️ and Selma reacts with 👍
-- **Then** Alice, Theo and Selma all see ❤️ and 👍 under the message
+- **Given** Alice, Theo and Selma are in a group, and the sender (the one of
+  Alice and Theo not on the phone) has posted a message
+- **When** the phone holder taps ❤️ on it and Selma reacts with 👍
+- **Then** the sender reads ❤️ and 👍 on the message, and the phone shows both
 
 **Scenario: taking a reaction back**
 
-- **Given** Theo's ❤️ and Selma's 👍 are on Alice's message
-- **When** Selma taps her 👍 again
-- **Then** everyone sees ❤️ and no 👍
+- **Given** the phone holder's ❤️ and Selma's 👍 are on the sender's message
+- **When** the phone holder taps their ❤️ again
+- **Then** the sender reads only Selma's 👍, and the phone shows 👍 and no ❤️
 
 **Scenario: the recipient's reaction reaches the sender**
 
-- **Given** Alice has sent Theo a one-to-one message
-- **When** Theo reacts with 😂
-- **Then** Alice sees 😂 under her message
+- **Given** the sender has written to the phone holder one-to-one
+- **When** the phone holder reacts with 😂
+- **Then** the sender reads 😂 under their message, and the phone shows it
 
 ## Test Plan
 
@@ -153,3 +158,11 @@ Nothing: test tooling.
   Not MVP (test tooling). Scored 5, the same size as SHY-0643: three tags in
   one shared Compose file, one runner helper with unit tests, one journey and
   three scenarios, two phone runs.
+- **2026-10-22**: recast for the linked phones (memory: Alice on the Android
+  phone, Theo on the iPhone; signing anyone else in is refused). The phone
+  holder now taps both the reaction and the take-back on both platforms, where
+  the take-back tap used to run on iOS only. The sender (the other of Alice
+  and Theo) creates the group, which stays within the follow graph, and reads
+  the store.
+  The rest of j28 (its header, "Leaving a group" and the block scenarios) still
+  casts Theo on Android and Selma on the iPhone; that is SHY-0658's sweep (#2490).

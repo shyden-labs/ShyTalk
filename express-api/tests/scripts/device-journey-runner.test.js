@@ -341,10 +341,22 @@ describe('--debug dumps the screen on passing steps too', () => {
   });
 });
 
-describe('J28R puts Theo on Android and Selma on the iPhone (SHY-0645)', () => {
-  const { REACTION_PHONE_BY_PLATFORM: P } = require('../../scripts/device-journey-runner');
-  test('Android is Theo', () =>
-    expect(P.android).toEqual({ name: 'Theo', email: 'host@shytalk.dev', uid: '50000060' }));
-  test('iPhone is Selma', () =>
-    expect(P.ios).toEqual({ name: 'Selma', email: 'mc-singer@shytalk.dev', uid: '50000080' }));
+describe('J28R casts the linked phones: Alice on Android, Theo on the iPhone (SHY-0645)', () => {
+  // Each phone is linked to one account (signing anyone else in is refused:
+  // "This device is already linked to another account", measured 2026-10-20).
+  const { reactionCast } = require('../../scripts/device-journey-runner');
+  const ALICE = { name: 'Alice', email: 'adult-power@shytalk.dev', uid: '50000010' };
+  const THEO = { name: 'Theo', email: 'host@shytalk.dev', uid: '50000060' };
+  const SELMA = { name: 'Selma', email: 'mc-singer@shytalk.dev', uid: '50000080' };
+
+  test('on Android, Alice holds the phone and Theo sends', () =>
+    expect(reactionCast('android')).toEqual({ phone: ALICE, other: THEO, third: SELMA }));
+  test('on the iPhone, Theo holds the phone and Alice sends', () =>
+    expect(reactionCast('ios')).toEqual({ phone: THEO, other: ALICE, third: SELMA }));
+  test('Selma is never on a phone', () => {
+    expect(reactionCast('android').phone).not.toEqual(SELMA);
+    expect(reactionCast('ios').phone).not.toEqual(SELMA);
+  });
+  test('a platform with no linked phone is refused, naming it', () =>
+    expect(() => reactionCast('web')).toThrow('J28R has no linked phone for platform "web"'));
 });
