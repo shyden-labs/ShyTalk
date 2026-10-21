@@ -396,10 +396,11 @@ module.exports = {
   main,
 };
 
-if (require.main === module) {
-  const repoRoot = path.resolve(__dirname, '..', '..');
+// The real IO main runs on, with every outside thing passed in, so the unit
+// tests drive each branch with stand-ins and no process starts.
+function realDeps({ repoRoot, env, spawnSync: spawn, fs: files, stdout, listRulesTests }) {
   const run = (cmd, args, opts = {}) => {
-    const r = spawnSync(cmd, args, {
+    const r = spawn(cmd, args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'inherit'],
       ...opts,
@@ -413,15 +414,15 @@ if (require.main === module) {
     return r.stdout;
   };
   let jestRuns = 0;
-  process.exitCode = main({
-    env: process.env,
+  return {
+    env,
     repoRoot,
     git: {
       // Two-dot: the PR's base SHA is the base tip, and develop requires an up-to-date branch.
       changedFiles: (sha) => git(['diff', '--name-only', sha, 'HEAD']).split('\n').filter(Boolean),
       addBaseWorktree: (sha, dir) => {
         git(['worktree', 'add', '--detach', dir, sha]);
-        fs.symlinkSync(
+        files.symlinkSync(
           path.join(repoRoot, 'express-api', 'node_modules'),
           path.join(dir, 'express-api', 'node_modules'),
         );
@@ -429,18 +430,18 @@ if (require.main === module) {
     },
     population: (root) => {
       const api = path.join(root, 'express-api');
-      return rulesTestFiles(path.join(api, 'tests')).map((s) => path.relative(api, s.file));
+      return listRulesTests(path.join(api, 'tests')).map((t) => path.relative(api, t.file));
     },
-    exists: (p) => fs.existsSync(p),
-    readFile: (p) => fs.readFileSync(p, 'utf8'),
-    runJest: ({ cwd, files, pattern, env, setupFile }) => {
+    exists: (p) => files.existsSync(p),
+    readFile: (p) => files.readFileSync(p, 'utf8'),
+    runJest: ({ cwd, files: testFiles, pattern, env: runEnv, setupFile }) => {
       jestRuns += 1;
-      const outputFile = path.join(process.env.RUNNER_TEMP, `rules-red-first-${jestRuns}.json`);
+      const outputFile = path.join(env.RUNNER_TEMP, `rules-red-first-${jestRuns}.json`);
       const args = [
         '--experimental-vm-modules',
         'node_modules/.bin/jest',
         '--runTestsByPath',
-        ...files,
+        ...testFiles,
       ];
       if (setupFile) args.push(`--setupFilesAfterEnv=${setupFile}`);
       args.push(
@@ -454,19 +455,34 @@ if (require.main === module) {
       // jest exits 1 when a test fails, which is the point here: its exit code is never the verdict.
       run('node', args, {
         cwd,
-        env: { ...process.env, ...env },
+        env: { ...env, ...runEnv },
         stdio: ['ignore', 'inherit', 'inherit'],
       });
-      if (!fs.existsSync(outputFile)) throw new Error(`jest wrote no ${outputFile}`);
+      if (!files.existsSync(outputFile)) throw new Error(`jest wrote no ${outputFile}`);
       try {
-        return JSON.parse(fs.readFileSync(outputFile, 'utf8'));
+        return JSON.parse(files.readFileSync(outputFile, 'utf8'));
       } catch (err) {
         throw new Error(`jest's ${outputFile} does not parse: ${err.message}`, { cause: err });
       }
     },
-    write: (line) => process.stdout.write(`${line}\n`),
+    write: (line) => stdout.write(`${line}\n`),
     appendSummary: (md) => {
-      if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
+      if (env.GITHUB_STEP_SUMMARY) files.appendFileSync(env.GITHUB_STEP_SUMMARY, md);
     },
-  });
+  };
+}
+
+module.exports.realDeps = realDeps;
+
+if (require.main === module) {
+  process.exitCode = main(
+    realDeps({
+      repoRoot: path.resolve(__dirname, '..', '..'),
+      env: process.env,
+      spawnSync,
+      fs,
+      stdout: process.stdout,
+      listRulesTests: rulesTestFiles,
+    }),
+  );
 }

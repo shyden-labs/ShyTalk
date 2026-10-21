@@ -225,8 +225,9 @@ describe('the files that name the rules library', () => {
     const rels = files.map((f) => f.rel);
     expect({ of: 'test files naming the library', count: rels.length, files: rels }).toEqual({
       of: 'test files naming the library',
-      // 15 -> 16: red-first-refusal.unit.test.js names it in its header (SHY-0657).
-      count: 16,
+      // 15 -> 16: red-first-refusal.unit.test.js names it in its header; 16 -> 17:
+      // red-first-setup.test.js requires it (SHY-0657).
+      count: 17,
       files: rels,
     });
   });
@@ -261,13 +262,13 @@ describe('no test file mocks a module it does not name', () => {
     source: fs.readFileSync(file, 'utf8'),
   }));
 
-  test('reads all 589 test files', () => {
-    // Measured 2026-10-21 (588; 589 with red-first-refusal.unit.test.js); SHY-0556 moves it
+  test('reads all 590 test files', () => {
+    // Measured 2026-10-21 (588; 590 with red-first-refusal.unit.test.js and red-first-setup.test.js); SHY-0556 moves it
     // to the floors record.
     const rels = mocking.map((m) => m.rel);
     expect({ of: 'test files', count: rels.length, files: rels }).toEqual({
       of: 'test files',
-      count: 589,
+      count: 590,
       files: rels,
     });
   });

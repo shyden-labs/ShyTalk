@@ -24,6 +24,7 @@ const {
   inScope,
   summary,
   main,
+  realDeps,
 } = require('../../scripts/rules-red-first.js');
 
 const ROOT = '/w';
@@ -782,6 +783,17 @@ describe('main', () => {
     expect(out.join('\n')).toContain('jest wrote no /runner/tmp/out.json');
   });
 
+  test('a fixture list with no fixture fails closed', () => {
+    const { d, out } = deps({
+      changed: [`express-api/${CONV}`],
+      files: { [path.join(HEAD_API, 'tests/firestore-rules/red-first-fixtures.json')]: '[]' },
+    });
+    expect(main(d)).toBe(1);
+    expect(out.join('\n')).toContain(
+      'tests/firestore-rules/red-first-fixtures.json lists no fixture',
+    );
+  });
+
   test('BASE_SHA unset: exit 1 before anything runs', () => {
     const { d, calls } = deps();
     d.env = { RUNNER_TEMP: TMP };
@@ -794,5 +806,143 @@ describe('main', () => {
     main(d);
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toContain(SHA);
+  });
+});
+
+// The CLI's real IO, driven here with spawnSync and fs stood in: no process
+// starts and no file is touched.
+describe('realDeps', () => {
+  function rig({ spawn = () => ({ status: 0, stdout: '' }), disk = {}, env = {} } = {}) {
+    const spawned = [];
+    const written = [];
+    const appended = [];
+    const linked = [];
+    const fsStub = {
+      existsSync: (p) => Object.hasOwn(disk, p),
+      readFileSync: (p, enc) => {
+        if (!Object.hasOwn(disk, p)) throw new Error(`ENOENT ${p}`);
+        return enc === 'utf8' ? disk[p] : null;
+      },
+      appendFileSync: (p, text) => appended.push([p, text]),
+      symlinkSync: (from, to) => linked.push([from, to]),
+    };
+    const d = realDeps({
+      repoRoot: ROOT,
+      env: { RUNNER_TEMP: TMP, ...env },
+      spawnSync: (cmd, args, opts) => {
+        spawned.push({ cmd, args, opts });
+        return spawn(cmd, args, opts);
+      },
+      fs: fsStub,
+      stdout: { write: (text) => written.push(text) },
+      listRulesTests: (dir) => [{ file: path.join(dir, 'firestore-rules', 'a.test.js') }],
+    });
+    return { d, spawned, written, appended, linked };
+  }
+
+  test('changedFiles is the two-dot diff against the base, one path per line', () => {
+    const { d, spawned } = rig({
+      spawn: () => ({ status: 0, stdout: 'firestore.rules\n\nREADME.md\n' }),
+    });
+    expect(d.git.changedFiles(SHA)).toEqual(['firestore.rules', 'README.md']);
+    expect(spawned[0]).toMatchObject({ cmd: 'git', args: ['diff', '--name-only', SHA, 'HEAD'] });
+    expect(spawned[0].opts.cwd).toBe(ROOT);
+  });
+
+  test('a git command that exits non-zero throws naming the command', () => {
+    const { d } = rig({ spawn: () => ({ status: 128, stdout: '' }) });
+    expect(() => d.git.changedFiles(SHA)).toThrow(`git diff --name-only ${SHA} HEAD exited 128`);
+  });
+
+  test('a command that cannot start throws its error', () => {
+    const { d } = rig({ spawn: () => ({ error: new Error('spawn git ENOENT') }) });
+    expect(() => d.git.changedFiles(SHA)).toThrow('spawn git ENOENT');
+  });
+
+  test('addBaseWorktree adds a detached worktree, then links the head node_modules into it', () => {
+    const { d, spawned, linked } = rig();
+    d.git.addBaseWorktree(SHA, BASE);
+    expect(spawned[0].args).toEqual(['worktree', 'add', '--detach', BASE, SHA]);
+    expect(linked).toEqual([
+      [path.join(HEAD_API, 'node_modules'), path.join(BASE_API, 'node_modules')],
+    ]);
+  });
+
+  test('population is each rules test file relative to express-api', () => {
+    expect(rig().d.population(ROOT)).toEqual(['tests/firestore-rules/a.test.js']);
+  });
+
+  test('runJest runs jest by path with the name pattern and json output, and returns the json', () => {
+    const out1 = path.join(TMP, 'rules-red-first-1.json');
+    const { d, spawned } = rig({ disk: { [out1]: '{"testResults":[]}' } });
+    const json = d.runJest({ cwd: HEAD_API, files: [CONV], pattern: '^a$', env: { X: '1' } });
+    expect(json).toEqual({ testResults: [] });
+    expect(spawned[0].cmd).toBe('node');
+    expect(spawned[0].args).toEqual([
+      '--experimental-vm-modules',
+      'node_modules/.bin/jest',
+      '--runTestsByPath',
+      CONV,
+      '-t',
+      '^a$',
+      '--json',
+      `--outputFile=${out1}`,
+      '--coverage=false',
+      '--forceExit',
+    ]);
+    expect([spawned[0].opts.cwd, spawned[0].opts.env.X, spawned[0].opts.env.RUNNER_TEMP]).toEqual([
+      HEAD_API,
+      '1',
+      TMP,
+    ]);
+  });
+
+  test("runJest passes the setup file, and numbers each run's output file", () => {
+    const out1 = path.join(TMP, 'rules-red-first-1.json');
+    const out2 = path.join(TMP, 'rules-red-first-2.json');
+    const { d, spawned } = rig({ disk: { [out1]: '{}', [out2]: '{}' } });
+    d.runJest({ cwd: HEAD_API, files: [CONV], pattern: 'p', env: {} });
+    d.runJest({ cwd: HEAD_API, files: [CONV], pattern: 'p', env: {}, setupFile: '/s.js' });
+    expect(spawned[1].args).toContain('--setupFilesAfterEnv=/s.js');
+    expect(spawned[0].args.some((a) => a.startsWith('--setupFilesAfterEnv'))).toBe(false);
+    expect(spawned[1].args).toContain(`--outputFile=${out2}`);
+  });
+
+  test("jest's own exit code is never the verdict: a failing run still returns its json", () => {
+    const out1 = path.join(TMP, 'rules-red-first-1.json');
+    const { d } = rig({ spawn: () => ({ status: 1 }), disk: { [out1]: '{"ok":false}' } });
+    expect(d.runJest({ cwd: HEAD_API, files: [CONV], pattern: 'p', env: {} })).toEqual({
+      ok: false,
+    });
+  });
+
+  test('runJest throws when jest wrote no output file, or one that does not parse', () => {
+    const out1 = path.join(TMP, 'rules-red-first-1.json');
+    expect(() => rig().d.runJest({ cwd: HEAD_API, files: [CONV], pattern: 'p', env: {} })).toThrow(
+      `jest wrote no ${out1}`,
+    );
+    expect(() =>
+      rig({ disk: { [out1]: '{oops' } }).d.runJest({
+        cwd: HEAD_API,
+        files: [CONV],
+        pattern: 'p',
+        env: {},
+      }),
+    ).toThrow(`jest's ${out1} does not parse`);
+  });
+
+  test('write ends each line; appendSummary writes the step summary only when one is named', () => {
+    const plain = rig();
+    plain.d.write('a');
+    plain.d.appendSummary('# s');
+    expect([plain.written, plain.appended]).toEqual([['a\n'], []]);
+    const named = rig({ env: { GITHUB_STEP_SUMMARY: '/sum.md' } });
+    named.d.appendSummary('# s');
+    expect(named.appended).toEqual([['/sum.md', '# s']]);
+  });
+
+  test('readFile reads utf8 and exists asks the file system', () => {
+    const { d } = rig({ disk: { '/f': 'text' } });
+    expect([d.readFile('/f'), d.exists('/f'), d.exists('/g')]).toEqual(['text', true, false]);
   });
 });

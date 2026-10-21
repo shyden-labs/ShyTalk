@@ -14,8 +14,10 @@ function parseTestFile(source, file) {
   try {
     return parse(source, { sourceType: 'unambiguous', errorRecovery: false, tokens: true });
   } catch (err) {
-    const where = err.loc ? `${err.loc.line}:${err.loc.column}` : '?';
-    throw new Error(`${file}:${where} does not parse: ${err.message}`, { cause: err });
+    // A Babel syntax error always carries its location.
+    throw new Error(`${file}:${err.loc.line}:${err.loc.column} does not parse: ${err.message}`, {
+      cause: err,
+    });
   }
 }
 
@@ -228,10 +230,12 @@ function familyRegex(template) {
 const RULES_LIB = '@firebase/rules-unit-testing';
 
 // Every *.test.js under `dir`, node_modules skipped, by absolute path.
-function testFilesUnder(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+// `readdir` lists a directory's entries; the unit tests stand in a tree.
+function testFilesUnder(dir, readdir = (d) => fs.readdirSync(d, { withFileTypes: true })) {
+  return readdir(dir).flatMap((entry) => {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : testFilesUnder(full);
+    if (entry.isDirectory())
+      return entry.name === 'node_modules' ? [] : testFilesUnder(full, readdir);
     return entry.name.endsWith('.test.js') ? [full] : [];
   });
 }

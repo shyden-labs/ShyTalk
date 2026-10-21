@@ -15,6 +15,7 @@ const {
   calls,
   extractTests,
   familyRegex,
+  testFilesUnder,
 } = require('../firestore-rules/_helpers/rules-test-names.js');
 
 const F = 'x.test.js';
@@ -54,6 +55,17 @@ describe('extractTests', () => {
     expect(() => extractTests('describe(name, () => {});', F)).toThrow(
       'x.test.js:1 describe title is not a plain string',
     );
+  });
+
+  test('reads describe.skip like describe', () => {
+    expect(one("describe.skip('d', () => { test('DENY: a', () => {}); });").fullName).toBe(
+      'd DENY: a',
+    );
+  });
+
+  test('a test with no callback has no body, no code and asserts nothing', () => {
+    const t = one("test('DENY: a');");
+    expect([t.body, t.code, t.asserts]).toEqual(['', '', { fails: false, succeeds: false }]);
   });
 
   test('throws on test.todo and other test forms it does not read', () => {
@@ -171,6 +183,25 @@ describe('walk', () => {
   });
 });
 
+describe('testFilesUnder', () => {
+  // A stand-in directory tree: no file system is touched.
+  const tree = {
+    '/t': [
+      { name: 'a.test.js', isDirectory: () => false },
+      { name: 'b.js', isDirectory: () => false },
+      { name: 'sub', isDirectory: () => true },
+      { name: 'node_modules', isDirectory: () => true },
+    ],
+    '/t/sub': [{ name: 'c.test.js', isDirectory: () => false }],
+    '/t/node_modules': [{ name: 'd.test.js', isDirectory: () => false }],
+  };
+  const readdir = (dir) => tree[dir];
+
+  test('lists every *.test.js below, and never descends into node_modules', () => {
+    expect(testFilesUnder('/t', readdir)).toEqual(['/t/a.test.js', '/t/sub/c.test.js']);
+  });
+});
+
 describe('requires', () => {
   test('lists every require() literal, destructured or not', () => {
     const ast = parseTestFile(
@@ -178,6 +209,10 @@ describe('requires', () => {
       'a.test.js',
     );
     expect(requires(ast)).toEqual(['./x', 'y', 'z']);
+  });
+
+  test('ignores a require with no argument or more than one', () => {
+    expect(requires(parseTestFile("require();\nrequire('a', 'b');", 'a.test.js'))).toEqual([]);
   });
 
   test('ignores a require named only in a string or comment', () => {

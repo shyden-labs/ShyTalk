@@ -128,8 +128,9 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // fixtures-never-deployed and pr-checks-rules-red-first guards) (SHY-0657).
 // 2052 -> 2053: tests/scripts/rules-library-taken-in-one-form.test.js (SHY-0657).
 // 2053 -> 2056: tests/firestore-rules/_helpers/red-first-refusal.js, red-first-setup.js and
-// tests/scripts/red-first-refusal.unit.test.js (SHY-0657).
-const FILES_READ_FLOOR = 2056;
+// tests/scripts/red-first-refusal.unit.test.js (SHY-0657). 2056 -> 2057:
+// tests/scripts/red-first-setup.test.js (SHY-0657).
+const FILES_READ_FLOOR = 2057;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

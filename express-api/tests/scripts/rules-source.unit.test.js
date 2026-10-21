@@ -62,6 +62,13 @@ describe('loadRules', () => {
     expect(loadRules({ env, exists: existsOnly(OVERRIDE), readFile })).toBe('rules_version = "2";');
   });
 
+  test('with no arguments, reads the live rules from the real environment', () => {
+    // The unit run sets no override; if it ever did, this would say so.
+    expect(process.env.SHYTALK_RULES_UNDER_TEST).toBeUndefined();
+    expect(rulesPath()).toBe(LIVE_RULES_PATH);
+    expect(loadRules()).toContain('rules_version');
+  });
+
   test('throws naming the path when the file holds only whitespace', () => {
     const env = { SHYTALK_RULES_UNDER_TEST: OVERRIDE };
     expect(() => loadRules({ env, exists: existsOnly(OVERRIDE), readFile: () => ' \n' })).toThrow(

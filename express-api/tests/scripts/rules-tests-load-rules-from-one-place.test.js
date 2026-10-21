@@ -12,7 +12,7 @@
  * the live rules in that step and pass for the wrong reason.
  *
  * The population is derived from the filesystem and checked twice: files that
- * call initializeTestEnvironment must be exactly the files that require
+ * call initializeTestEnvironment must be exactly the files that take it from
  * @firebase/rules-unit-testing. Read as an AST, so a comment counts for nothing.
  */
 
@@ -23,11 +23,34 @@ const {
   walk,
   calls,
   requires,
+  literalText,
   testFilesUnder,
   RULES_LIB,
 } = require('../firestore-rules/_helpers/rules-test-names.js');
 
 const TESTS_DIR = path.resolve(__dirname, '..');
+
+// True when the file destructures initializeTestEnvironment from require(RULES_LIB),
+// the one form rules-library-taken-in-one-form.test.js allows.
+function takesEnvironment(ast) {
+  let found = false;
+  walk(ast, (n) => {
+    if (
+      n.type === 'VariableDeclarator' &&
+      n.id.type === 'ObjectPattern' &&
+      n.init &&
+      n.init.type === 'CallExpression' &&
+      n.init.callee.type === 'Identifier' &&
+      n.init.callee.name === 'require' &&
+      n.init.arguments[0] &&
+      literalText(n.init.arguments[0]) === RULES_LIB &&
+      n.id.properties.some((p) => p.key && p.key.name === 'initializeTestEnvironment')
+    ) {
+      found = true;
+    }
+  });
+  return found;
+}
 const LOADER = path.join(TESTS_DIR, 'firestore-rules', '_helpers', 'rules-source.js');
 
 function rulesValue(options) {
@@ -79,7 +102,7 @@ const scanned = testFilesUnder(TESTS_DIR).map((file) => {
     file,
     source,
     emulator: calls(ast, 'initializeTestEnvironment').length > 0,
-    importer: requires(ast).includes(RULES_LIB),
+    importer: takesEnvironment(ast),
   };
 });
 const rel = (file) => path.relative(TESTS_DIR, file);
@@ -96,7 +119,7 @@ describe('the emulator rules test population', () => {
     });
   });
 
-  test('equals the files that require @firebase/rules-unit-testing', () => {
+  test('equals the files that take initializeTestEnvironment from @firebase/rules-unit-testing', () => {
     const importers = scanned.filter((s) => s.importer).map((s) => rel(s.file));
     expect(emulatorFiles.map((s) => rel(s.file))).toEqual(importers);
   });
@@ -108,6 +131,24 @@ describe('each emulator rules test loads its rules through rules-source', () => 
       file: rel(s.file),
       findings: [],
     });
+  });
+});
+
+describe('takesEnvironment', () => {
+  const lib = `'${RULES_LIB}'`;
+  test('a file taking initializeTestEnvironment is counted', () => {
+    const src = `const { initializeTestEnvironment, assertFails } = require(${lib});`;
+    expect(takesEnvironment(parseTestFile(src, 'p.test.js'))).toBe(true);
+  });
+
+  test('a file taking only the assertions is not', () => {
+    const src = `const { assertFails, assertSucceeds } = require(${lib});`;
+    expect(takesEnvironment(parseTestFile(src, 'p.test.js'))).toBe(false);
+  });
+
+  test('initializeTestEnvironment taken from another module is not', () => {
+    const src = "const { initializeTestEnvironment } = require('./elsewhere');";
+    expect(takesEnvironment(parseTestFile(src, 'p.test.js'))).toBe(false);
   });
 });
 
