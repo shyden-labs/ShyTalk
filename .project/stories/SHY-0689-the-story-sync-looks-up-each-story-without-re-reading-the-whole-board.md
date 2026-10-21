@@ -5,7 +5,7 @@ owner: claude
 created: 2026-10-22
 priority: P1
 effort: M
-estimate: 3
+estimate: 5
 type: chore
 roadmap_ids: []
 mvp: false
@@ -50,6 +50,11 @@ and it grows with every story.
 
 ### Edge cases
 
+- [ ] A push validates only the story files it changed, and the full pass
+      validates all of them. Measured: run 39680861574 synced one story in
+      23 s, but its job took 101 s, because "Validate all stories before
+      sync" scanned all 609 (69 s). A malformed changed story still fails
+      before any sync.
 - [ ] Multi-line issue bodies survive the per-story form unchanged (the
       body-hash comparison reads them).
 - [ ] The script keeps running on the bash the tests use (macOS /bin/bash 3.2
@@ -121,3 +126,5 @@ None: operator tooling.
 - **2026-10-22**: filed from SHY-0686's measurement. P1: SHY-0686 removed the
   failure on pushes; this keeps the daily pass small. Scored 3: one function
   reshaped, a scaling test, a measured run.
+- **2026-10-22**: the per-push full validation (69 s of a 101 s one-story
+  job) added. Rescored 5: a workflow change with its tests on top of the 3.
