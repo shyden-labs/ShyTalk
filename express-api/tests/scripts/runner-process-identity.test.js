@@ -580,11 +580,11 @@ describe('require_repo asks git, so a worktree is a repository (found 2026-10-22
   };
   // cwd is the scratch root, so a path that leaked into a shell string would run
   // its `;touch pwned` there, where the metacharacter test looks for it.
-  const requireRepo = (repo) =>
+  const requireRepo = (repo, extraEnv = {}) =>
     spawnSync('/bin/bash', ['-c', 'source "$1"; require_repo && echo repo-ok', 'bash', LIB], {
       cwd: root,
       encoding: 'utf8',
-      env: { ...process.env, SHYTALK_REPO: repo },
+      env: { ...process.env, SHYTALK_REPO: repo, ...extraEnv },
     });
   let root;
   beforeAll(() => {
@@ -664,5 +664,42 @@ describe('require_repo asks git, so a worktree is a repository (found 2026-10-22
     const r = requireRepo(odd);
     expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
     expect(fs.existsSync(path.join(root, 'pwned'))).toBe(false);
+  });
+  // `cd` consults an exported CDPATH and git does not, so a relative name could
+  // reach two different folders, and `cd` prints the one it picked into $(...).
+  test('a relative path means the folder git sees, whatever CDPATH says', () => {
+    fs.mkdirSync(path.join(root, 'decoys', 'clone'), { recursive: true });
+    const r = requireRepo('clone', { CDPATH: path.join(root, 'decoys') });
+    expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
+  });
+  test('an accepted relative path is pinned to its absolute top level', () => {
+    // Every gauntlet command later runs `cd "$REPO"`; absolute, CDPATH cannot move it.
+    const r = spawnSync(
+      '/bin/bash',
+      ['-c', 'source "$1"; require_repo && printf "%s" "$REPO"', 'bash', LIB],
+      { cwd: root, encoding: 'utf8', env: { ...process.env, SHYTALK_REPO: 'clone' } },
+    );
+    expect([r.status, r.stdout]).toEqual([0, fs.realpathSync(path.join(root, 'clone'))]);
+  });
+  test('a path starting with a dash is a folder, not an option to cd', () => {
+    const dash = path.join(root, '-dash');
+    fs.mkdirSync(dash);
+    git(dash, 'init', '-q', '-b', 'main');
+    const r = requireRepo('-dash');
+    expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
+  });
+  test('the default REPO, sourced by a relative path, ignores CDPATH', () => {
+    // No SHYTALK_REPO: lib.sh finds the repo from its own path, which is relative
+    // here, so a CDPATH holding the same folders would otherwise be chosen.
+    const decoyRoot = path.join(root, 'cdpath-decoy');
+    fs.mkdirSync(path.join(decoyRoot, 'express-api', 'scripts', 'gauntlet'), { recursive: true });
+    const env = { ...process.env, CDPATH: decoyRoot };
+    delete env.SHYTALK_REPO;
+    const r = spawnSync(
+      '/bin/bash',
+      ['-c', 'source express-api/scripts/gauntlet/lib.sh; printf "%s" "$REPO"'],
+      { cwd: REPO_ROOT, encoding: 'utf8', env },
+    );
+    expect([r.status, r.stdout]).toEqual([0, REPO_ROOT]);
   });
 });
