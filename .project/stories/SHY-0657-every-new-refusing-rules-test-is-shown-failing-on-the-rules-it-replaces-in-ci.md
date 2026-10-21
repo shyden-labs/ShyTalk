@@ -169,6 +169,10 @@ None: an internal check with no change users can see.
   15 files), computed module mocks and the jest setup (pinned; 588 files
   read), and RTDB rules with no red-first proof (filed SHY-0665). Re-scored
   8 to 13 for the ALLOW proof path, the rules tokenizer and the guards.
+- **2026-10-21**: one residual left, recorded (Shyden, written options): a
+  computed method on an untracked alias of the test runner's module object,
+  called with a computed module, is not read by the library-form guard. None
+  exists in 590 test files; closing it would flag 11 supertest calls.
 - **2026-10-21**: a side note found the step planned only ADDED DENY tests,
   a call made alone and noted only in the design file. Shyden: rewritten
   DENY tests "should" meet the base rules too. Code is compared with
