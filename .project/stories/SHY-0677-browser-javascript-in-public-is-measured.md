@@ -40,7 +40,7 @@ Measured 2026-10-21: public/ holds 48 JavaScript files (public/js 14 and core 5,
 - [ ] The Playwright suites collect Chromium's JavaScript coverage for every page (`page.coverage.startJSCoverage`), converted with ast-v8-to-istanbul against the served source to lcov and joined into SHY-0674's report.
 - [ ] Code Jest already loads in-process (public/js/core) is joined with the browser runs, one entry per file.
 - [ ] SHY-0674's classification moves these files to "measured" and the
-      joined figure includes them, the figure file raised in the same PR.
+      their untested counts join the record, written in the same PR.
 
 ### Error paths
 
@@ -72,7 +72,7 @@ Measured 2026-10-21: public/ holds 48 JavaScript files (public/js 14 and core 5,
 
 ### Observability
 
-- [ ] CI prints this kind's measured file count, its figure and every file
+- [ ] CI prints this kind's measured file count, its untested counts and every file
       still classed unmeasured.
 
 ## Announce

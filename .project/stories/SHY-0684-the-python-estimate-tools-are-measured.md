@@ -39,7 +39,7 @@ Measured 2026-10-21: 4 Python files in .project/estimates (apicheck, calib, cens
 
 - [ ] A pytest unit suite covers the four tools, with coverage.py (`branch = true`) writing lcov joined into SHY-0674's report, and `gc.collect()` then `gc.freeze()` in `pytest_collection_finish` (the global Python rule) with a test red without it.
 - [ ] SHY-0674's classification moves these files to "measured" and the
-      joined figure includes them, the figure file raised in the same PR.
+      their untested counts join the record, written in the same PR.
 
 ### Error paths
 
@@ -71,7 +71,7 @@ Measured 2026-10-21: 4 Python files in .project/estimates (apicheck, calib, cens
 
 ### Observability
 
-- [ ] CI prints this kind's measured file count, its figure and every file
+- [ ] CI prints this kind's measured file count, its untested counts and every file
       still classed unmeasured.
 
 ## Announce

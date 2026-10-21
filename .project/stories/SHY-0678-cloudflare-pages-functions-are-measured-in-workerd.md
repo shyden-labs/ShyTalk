@@ -40,7 +40,7 @@ Measured 2026-10-21: functions/_middleware.js and functions/_lib/lockdown.js run
 - [ ] The Node tests that load these files include them in their coverage.
 - [ ] A suite runs the functions in workerd (wrangler's local Pages runtime) and collects their coverage over the inspector, converted to lcov and joined.
 - [ ] SHY-0674's classification moves these files to "measured" and the
-      joined figure includes them, the figure file raised in the same PR.
+      their untested counts join the record, written in the same PR.
 
 ### Error paths
 
@@ -72,7 +72,7 @@ Measured 2026-10-21: functions/_middleware.js and functions/_lib/lockdown.js run
 
 ### Observability
 
-- [ ] CI prints this kind's measured file count, its figure and every file
+- [ ] CI prints this kind's measured file count, its untested counts and every file
       still classed unmeasured.
 
 ## Announce
