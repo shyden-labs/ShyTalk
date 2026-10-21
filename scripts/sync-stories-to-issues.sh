@@ -1724,7 +1724,8 @@ sync_story() {
 }
 
 # ---- --changed BASE HEAD (SHY-0686) -----------------------------------------
-# A develop push used to sync every story (~1.4 s of parsing each) and ran
+# A develop push used to sync every story (each lookup re-reads the whole
+# items map with jq, ~1 s a story; SHY-0689) and ran
 # past its 15-minute limit, so the newest stories never reached the board.
 # --changed syncs the stories whose files the push changed, plus every story
 # on disk with no board item (so a story a cut-short run missed is created by

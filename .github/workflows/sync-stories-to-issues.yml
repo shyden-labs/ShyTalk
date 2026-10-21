@@ -87,11 +87,14 @@ jobs:
     # ~8 calls (draft-or-issue create + 6 field-sets) ≈ ~600 calls.
     # Full --rebuild: ≈75 item deletes + ≈10 issue deletes + the create run
     # ≈ ~330-700 calls ≈ ~2-3 min. 15 min ≈ 5× headroom.
-    # SHY-0686: that estimate stopped holding: parsing costs ~1.4 s a story, so
-    # the full pass over 609 stories ran past 15 minutes on every push (runs
-    # 39587696742, 39635193459). A push now syncs only what it changed and keeps
-    # 15; the scheduled/dispatched full pass has its own measured limit.
-    timeout-minutes: ${{ github.event_name == 'push' && 15 || 45 }}
+    # SHY-0686: that estimate stopped holding. Each story's lookup re-reads the
+    # whole items map (every issue body) with jq (SHY-0689), so the full pass
+    # over 609 stories ran past 15 minutes on every push (runs 39587696742,
+    # 39635193459). A push now syncs only what it changed and keeps 15. The
+    # full pass measured ~15 min (run 39635193459 reached ~588 of 609 stories
+    # in 13.5 min of its sync step; validation adds ~70 s; a dry run, which
+    # loads no items map, took 92 s), so it gets 30: twice the measured time.
+    timeout-minutes: ${{ github.event_name == 'push' && 15 || 30 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

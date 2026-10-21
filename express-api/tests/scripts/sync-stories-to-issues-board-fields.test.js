@@ -2515,7 +2515,7 @@ describe('SHY-0535: estimate: frontmatter reaches the board Estimate field (mock
 // ============================================================== SHY-0686 --changed mode
 
 describe('SHY-0686: --changed BASE HEAD syncs only the pushed stories plus any with no board item (mock-gh)', () => {
-  // A push synced all 609 stories (~1.4 s of parsing each) and hit the
+  // A push synced all 609 stories (each lookup re-reading the whole items map) and hit the
   // 15-minute limit, so the newest stories never reached the board.
   // --changed syncs the stories a push changed, plus every story on disk
   // with no board item. Spec: .project/stories/SHY-0686-the-story-sync-
