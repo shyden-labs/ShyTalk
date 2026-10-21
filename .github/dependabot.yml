@@ -96,6 +96,7 @@ updates:
     # by dependabot-composite-actions-coverage.test.js.
     directories:
       - "/"
+      - "/.github/actions/apk-holds-no-persona-password"
       - "/.github/actions/cleanup-ios-signing"
       - "/.github/actions/decode-google-services"
       - "/.github/actions/decode-keystore"
