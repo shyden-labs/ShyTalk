@@ -10,6 +10,7 @@ type: bug
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
+blocked_by: [SHY-0674, SHY-0676, SHY-0677, SHY-0678, SHY-0679, SHY-0680, SHY-0681, SHY-0682, SHY-0683, SHY-0684]
 ---
 
 # SHY-0656: A group's owner, admins and mods can mute a member from the app
@@ -124,7 +125,9 @@ straight from the members list.
 
 ## Dependencies
 
-- None to start. SHY-0652 makes the rules refuse a mute on the owner; this
+- EPIC-0016, every story (SHY-0674, SHY-0676, SHY-0677, SHY-0678, SHY-0679, SHY-0680, SHY-0681, SHY-0682, SHY-0683, SHY-0684): Shyden, 2026-10-21,
+  "Waits behind coverage" (the hotfix ships under the full coverage gate).
+- SHY-0652 is not a blocker: it makes the rules refuse a mute on the owner; this
   story hides the button on the owner either way.
 
 ## Risks & Mitigations
@@ -150,3 +153,6 @@ straight from the members list.
   group-roles hotfix** (over shipping without it or hiding the setting),
   and the lengths are **15 minutes, 1 hour, 1 day, 7 days and until
   lifted**.
+- **2026-10-21**: blocked by every EPIC-0016 story: Shyden chose "Waits
+  behind coverage" under the global ruling "Ratchet to 100%, unmeasured
+  fails now".

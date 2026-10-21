@@ -10,7 +10,7 @@ type: chore
 roadmap_ids: []
 mvp: true
 epic: EPIC-0015
-blocked_by: [SHY-0667]
+blocked_by: [SHY-0667, SHY-0675]
 ---
 
 # SHY-0668: utils, safety and middleware move to ES modules and Vitest
@@ -42,6 +42,35 @@ moved and unmoved areas run side by side until the last one moves.
 - [ ] The 88 source files use import/export; their callers still unmoved require them (Node require of ES modules).
 - [ ] Their tests (tests/utils 59, tests/safety 11, tests/middleware 16 and the unit tests that cover them) run on Vitest with vi.mock/vi.fn; 111 module-mock sites rewritten.
 
+### Runtime proof
+
+- [ ] Before any file moves, its CommonJS-only constructs are listed in
+      the PR and each one's ES-module form has a test. Measured 2026-10-21 by text search over the area (comments included, so
+      an upper bound; each file is re-measured before it moves): utils (71 files): `__dirname`/`__filename` in 2, function-scoped
+      `require()` in 6, `exports.x =` in 1, non-literal `require()` in 1
+      (two more matches are comments): `src/utils/firebase.js:79` loads the
+      service-account JSON, a branch only the deployed servers run (every
+      CI boot uses `NODE_ENV=local`); safety (8): function-scoped
+      `require()` in 2 (its one non-literal match is a comment); middleware
+      (9): function-scoped `require()` in 2.
+- [ ] Circular imports among the moved files are listed (static `import` is
+      hoisted, so a cycle a function-scoped `require()` tolerated can fail at
+      load); each is untangled, or proven by the boot checks below.
+- [ ] The server boots from `npm start` with the moved files in both CI boot
+      checks: local mode (Integration Tests' "Start Express API") and deployed
+      mode (SHY-0667's check: not `NODE_ENV=local`, a throwaway
+      service-account file, `/api/health` answering). A crash fails at the
+      stated ceiling and prints the server's own output.
+- [ ] The Integration Tests job is green on the PR's head SHA, read by step
+      name ("Start Express API", "Run integration tests").
+- [ ] After the merge, Deploy To Dev serves the merge SHA ("Verify dev API
+      health") and its "Dev Sanity Check" and "Dev Smoke Tests" jobs are green
+      on that run; a red one is fixed before the next area moves.
+- [ ] No production deploy carries this area until the journeys that exercise
+      it (each moved route or job mapped to its journey scenarios in the PR)
+      are green on dev for that SHA (the journey PROD GATE), and the prod
+      deploy's "Verify prod API health" and "Smoke Test (API)" pass.
+
 ### Error paths
 
 - [ ] A module still required by an unmoved file but using top-level await fails a guard (Node cannot require it).
@@ -62,7 +91,9 @@ moved and unmoved areas run side by side until the last one moves.
 
 ### UX
 
-- [x] Not applicable: developer tooling.
+- [ ] No change a user can see, proven by the Runtime proof ACs (dev
+      health, sanity and smoke runs, the journey PROD GATE), not assumed:
+      this story rewrites code the live API runs.
 
 ### i18n
 
@@ -75,7 +106,9 @@ moved and unmoved areas run side by side until the last one moves.
 
 ## Announce
 
-None: an internal tooling change with no change users can see.
+None, once the Runtime proof ACs show the deployed API unchanged. A change
+users can see that they find is a defect fixed before release, never
+announced.
 
 ## BDD Scenarios
 
@@ -100,6 +133,7 @@ None: an internal tooling change with no change users can see.
 ## Dependencies
 
 - SHY-0667
+- SHY-0675
 
 ## Risks & Mitigations
 
@@ -115,3 +149,8 @@ None: an internal tooling change with no change users can see.
 ## Notes
 
 - **2026-10-21**: filed from the Vitest ruling. Scored 8: 88 source files, ~86 test files, ~111 module-mock sites (measured).
+- **2026-10-21**: Runtime proof ACs added. The first draft proved only the
+  tests, though this story rewrites code the live API runs (found by a side
+  agent; Shyden: "proper checks are, of course, required").
+  Blocked by SHY-0675: the first ES module to reach the servers needs a Node
+  there that can require one, and the servers' Node is unmeasured.

@@ -42,6 +42,15 @@ moved and unmoved areas run side by side until the last one moves.
 - [ ] Those tests run on Vitest, the rules emulator tests included.
 - [ ] SHY-0657's step (express-api/scripts/rules-red-first.js) lists, selects and runs tests with Vitest's own options (name filter, JSON output, setup file), its unit tests updated, and its guards (jest setup pin, stub scanner categories, library-form rules) rewritten for Vitest.
 
+### Runtime proof
+
+- [ ] The moved red-first step is proven in CI by what it does, not only by
+      its unit tests: on a planted PR that changes the rules, a DENY test that
+      passes on the base rules turns the step red, and the real step goes
+      green, each read by step name in test-backend.
+- [ ] The rules emulator suites run in CI on Vitest against the real
+      emulators, with per-file test counts equal to the Jest run before.
+
 ### Error paths
 
 - [ ] The red-first step's fail-closed paths (no output, unparsable output, listing that ran a test) keep their tests.
@@ -115,3 +124,6 @@ None: an internal tooling change with no change users can see.
 ## Notes
 
 - **2026-10-21**: filed from the Vitest ruling. Scored 8: the remaining ~29 test files plus the red-first runner layer and its guards. SHY-0657 is blocked by this story.
+- **2026-10-21**: Runtime proof ACs added: the red-first step is CI tooling
+  every rules PR depends on, so it is proven on a planted rules PR, not only
+  by its unit tests.

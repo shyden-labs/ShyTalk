@@ -10,7 +10,7 @@ type: chore
 roadmap_ids: []
 mvp: true
 epic: EPIC-0015
-blocked_by: [SHY-0667]
+blocked_by: [SHY-0667, SHY-0675]
 ---
 
 # SHY-0669: cron, the entry point and the scripts move to ES modules and Vitest
@@ -42,6 +42,43 @@ moved and unmoved areas run side by side until the last one moves.
 - [ ] The 60 source files use import/export, including the CLI scripts run by CI (their `require.main === module` checks become import.meta checks).
 - [ ] tests/cron (17) and tests/scripts (270, mostly whole-tree guards) run on Vitest.
 
+### Runtime proof
+
+- [ ] Before any file moves, its CommonJS-only constructs are listed in
+      the PR and each one's ES-module form has a test. Measured 2026-10-21 by text search over the area (comments included, so
+      an upper bound; each file is re-measured before it moves): cron (15 files): `exports.x =` in 4; `src/index.js`: `__dirname` and one
+      function-scoped `require()`; scripts (43 JavaScript files by this
+      count): `__dirname`/`__filename` in 11, `require.main` in 12,
+      `require.cache` in 1, `require.resolve` in 1, a `.json` require in 1,
+      non-literal `require()` in 7 (the drivers' Playwright loads and
+      `driver-surface-report.js`'s module scan), function-scoped
+      `require()` in 16. Outside express-api, `scripts/sonar-verdict.js`
+      and `scripts/set-testflight-whats-new.js` require
+      `express-api/scripts/drivers/poll-until.js`, and
+      `delete-orphaned-message-history.yml` runs one script on a schedule.
+- [ ] Circular imports among the moved files are listed (static `import` is
+      hoisted, so a cycle a function-scoped `require()` tolerated can fail at
+      load); each is untangled, or proven by the boot checks below.
+- [ ] The server boots from `npm start` with the moved files in both CI boot
+      checks: local mode (Integration Tests' "Start Express API") and deployed
+      mode (SHY-0667's check: not `NODE_ENV=local`, a throwaway
+      service-account file, `/api/health` answering). A crash fails at the
+      stated ceiling and prints the server's own output.
+- [ ] The Integration Tests job is green on the PR's head SHA, read by step
+      name ("Start Express API", "Run integration tests").
+- [ ] After the merge, Deploy To Dev serves the merge SHA ("Verify dev API
+      health") and its "Dev Sanity Check" and "Dev Smoke Tests" jobs are green
+      on that run; a red one is fixed before the next area moves.
+- [ ] No production deploy carries this area until the journeys that exercise
+      it (each moved route or job mapped to its journey scenarios in the PR)
+      are green on dev for that SHA (the journey PROD GATE), and the prod
+      deploy's "Verify prod API health" and "Smoke Test (API)" pass.
+- [ ] The journey runner and its drivers, the PROD GATE's own tool, run on
+      the moved code: "QA Runner Driver Checks" green on the PR, and one
+      journey run on dev from the moved runner before the next prod deploy.
+- [ ] Each outside caller above runs once in CI on the moved code; the
+      scheduled script runs in its dry-run mode (no `apply`).
+
 ### Error paths
 
 - [ ] A CI workflow or hook that runs one of these scripts still runs it: each invocation found by a guard and run once in CI.
@@ -62,7 +99,9 @@ moved and unmoved areas run side by side until the last one moves.
 
 ### UX
 
-- [x] Not applicable: developer tooling.
+- [ ] No change a user can see, proven by the Runtime proof ACs (dev
+      health, sanity and smoke runs, the journey PROD GATE), not assumed:
+      this story rewrites code the live API runs.
 
 ### i18n
 
@@ -75,7 +114,9 @@ moved and unmoved areas run side by side until the last one moves.
 
 ## Announce
 
-None: an internal tooling change with no change users can see.
+None, once the Runtime proof ACs show the deployed API unchanged. A change
+users can see that they find is a defect fixed before release, never
+announced.
 
 ## BDD Scenarios
 
@@ -100,6 +141,7 @@ None: an internal tooling change with no change users can see.
 ## Dependencies
 
 - SHY-0667
+- SHY-0675
 
 ## Risks & Mitigations
 
@@ -115,3 +157,8 @@ None: an internal tooling change with no change users can see.
 ## Notes
 
 - **2026-10-21**: filed from the Vitest ruling. Scored 8: 60 source files, 287 test files mostly without mocks (measured: 38 module-mock sites).
+- **2026-10-21**: Runtime proof ACs added. The first draft proved only the
+  tests, though this story rewrites code the live API runs (found by a side
+  agent; Shyden: "proper checks are, of course, required").
+  Blocked by SHY-0675: the first ES module to reach the servers needs a Node
+  there that can require one, and the servers' Node is unmeasured.

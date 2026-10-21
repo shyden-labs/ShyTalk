@@ -122,3 +122,7 @@ Node 26.3.0 wedged the full Jest suite on 2026-06-09.
 - **2026-10-15**: Blocked by SHY-0595. On Node 26 (npm 11.20) `npm ci`
   warns about 5 undecided install scripts (`bcrypt` among them); warnings
   are build failures, so CI on Node 26 needs those decisions first.
+- **2026-10-21**: the API servers' own Node is SHY-0675 (this story pins the
+  repo; the servers, set up with Node 20 by `ORACLE-CLOUD-SETUP.md`, were
+  outside it). Shyden: "of course we should be running on the same node as
+  everywhere else".
