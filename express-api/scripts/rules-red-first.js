@@ -136,7 +136,10 @@ function verdict(json, planned, cwd) {
       return {
         test,
         result: 'passed',
-        detail: 'passes on these rules: it tests nothing the change made',
+        // Shyden, 2026-10-21: no way out for a tidied DENY test in a rules PR.
+        detail: p.rewritten
+          ? 'rewritten under its name and passes on these rules: it proves nothing the change made; if it was only tidied, move the tidy to its own PR'
+          : 'passes on these rules: it tests nothing the change made',
       };
     }
     if (a.status !== 'failed') return { test, result: 'skipped', detail: 'did not run' };
@@ -262,7 +265,10 @@ function main(deps) {
       const head = sides(deps, repoRoot);
       const base = sides(deps, baseDir);
       Object.assign(report, addedDenyTests(base, head));
-      const planned = [...report.added, ...report.rewritten];
+      const planned = [
+        ...report.added,
+        ...report.rewritten.map((t) => ({ ...t, rewritten: true })),
+      ];
       if (planned.length === 0) {
         write('::notice::firestore.rules changed and 0 added or rewritten DENY tests were found');
       } else {

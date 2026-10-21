@@ -232,6 +232,20 @@ describe('verdict', () => {
     });
   });
 
+  // Shyden, 2026-10-21: no way out for a tidied DENY test in a rules PR; the
+  // failure says what to do instead.
+  test('a rewritten test passing on the base rules says to move a tidy to its own PR', () => {
+    const json = jestJson(suite(HEAD_API, CONV, [['DENY: a', 'passed']]));
+    expect(verdict(json, [{ ...t(CONV, 'DENY: a'), rewritten: true }], HEAD_API).rows).toEqual([
+      {
+        test: `${CONV}: DENY: a`,
+        result: 'passed',
+        detail:
+          'rewritten under its name and passes on these rules: it proves nothing the change made; if it was only tidied, move the tidy to its own PR',
+      },
+    ]);
+  });
+
   test('a test failing for another reason is red for the wrong reason', () => {
     const got = one('failed', ['Error: connect ECONNREFUSED 127.0.0.1:8080\n    at x']);
     expect(got.ok).toBe(false);
@@ -529,6 +543,21 @@ describe('main', () => {
       pattern: namePattern(['DENY: a']),
       env: { SHYTALK_RULES_UNDER_TEST: path.join(BASE, 'firestore.rules') },
     });
+  });
+
+  test('a rewritten DENY test passing on the base rules fails the step, telling the PR to split', () => {
+    const tidied = "test('DENY: a', async () => { const op = x(); await assertFails(op); });";
+    const { d, out } = deps({
+      files: { [path.join(HEAD_API, CONV)]: tidied },
+      runs: [
+        listing(HEAD_API, ['DENY: a']),
+        listing(BASE_API, ['DENY: a']),
+        jestJson(suite(HEAD_API, CONV, [['DENY: a', 'passed']])),
+        fixtureRed,
+      ],
+    });
+    expect(main(d)).toBe(1);
+    expect(out.join('\n')).toContain('if it was only tidied, move the tidy to its own PR');
   });
 
   test('a comment-only change to a DENY test is not a rewrite: nothing runs on the base rules', () => {

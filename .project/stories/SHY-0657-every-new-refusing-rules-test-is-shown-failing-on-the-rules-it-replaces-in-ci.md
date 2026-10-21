@@ -66,6 +66,9 @@ in a branch meant for pushing.
 - [ ] A DENY test kept by name whose code changed is run against the base
       rules too and must fail there (Shyden, 2026-10-21: "they should");
       a change to its comments or whitespace alone is not a rewrite.
+      No way out (Shyden, 2026-10-21): a rewritten DENY test that passes on
+      the base rules fails the step, whose text says to move a tidy to its
+      own PR.
 - [ ] ALLOW tests are not run against the base rules by this step.
 
 ### Performance
