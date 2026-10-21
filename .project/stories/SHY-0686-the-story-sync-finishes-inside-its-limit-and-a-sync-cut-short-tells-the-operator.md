@@ -1,6 +1,6 @@
 ---
 id: SHY-0686
-status: Draft
+status: Done
 owner: claude
 created: 2026-10-21
 priority: P0
@@ -43,11 +43,11 @@ a sync that never ran shows green.
 
 ### Happy path
 
-- [ ] A develop push syncs only the stories whose files changed in that push
+- [x] A develop push syncs only the stories whose files changed in that push
       (the diff between the push's before and after SHAs), plus any story on
       develop with no issue yet. Measured: a one-story push finishes in under
       a minute.
-      _Proof so far: run 39672510270 (the #2519 merge push) synced its range plus the 15 stories with no issue, SHY-0675 to SHY-0689, in 136 s. The one-story timing comes from the next small push._
+      _Proof: run 39672510270 (the #2519 merge push) synced its range plus the 15 stories with no issue, SHY-0675 to SHY-0689, in 136 s. Run 39680861574 (the #2536 merge push, one story): "Sync took 23 s of its 15-minute limit (2%)". The whole job took 101 s, because the step before validates all 609 stories (69 s); that is SHY-0689's._
 - [x] A full `--all` pass runs on a schedule and on dispatch, inside its own
       measured limit (30 minutes: twice the ~15 minutes measured). Its
       per-story cost (each lookup re-reads the whole items map) is SHY-0689.
@@ -146,8 +146,9 @@ None: operator tooling.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; the planted timeout seen alerting; every
+- [x] Every AC ticked with its proof; the planted timeout seen alerting; every
       story on develop on the board; merged to `develop`.
+      _Proof: #2519 and #2536 merged; the planted cancel alerted (#2535); SHY-0675 to SHY-0689 read back on the board._
 
 ## Notes
 
@@ -163,3 +164,7 @@ None: operator tooling.
   92 s); it is map_lookup piping the whole items map, every issue body,
   through jq twice per story. A push now looks up only what it changed;
   the full pass keeps the per-story cost, filed as SHY-0689.
+- **2026-10-22**: Done. Shipped in #2519 (--changed, the alert on cancel, the
+  token check, the daily full pass) and #2536 (the time report). The
+  measured cost is map_lookup's per-story jq over the whole items map, not
+  story parsing, and it is filed as SHY-0689.

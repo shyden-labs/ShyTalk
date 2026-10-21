@@ -37,6 +37,11 @@ ticket reads the same once story files stop.
   <what>, so that <why>"), Context, numbered testable Acceptance criteria,
   Announce (what this lets us tell people once it closes, on the site,
   roadmap or release notes, or "nothing" and why) and Definition of done.
+- repo-template#20 landed 2026-10-21 (PR #53, 2739cdc). Its
+  `.github/ISSUE_TEMPLATE/story.yml` carries the five parts under a note
+  with the filing steps. Its `docs/project-board.md` has a "Filing a
+  ticket" section, and its filer is `node scripts/file-story.ts
+  <board-node-id> "<board title>" <story.json>`.
 - Asked whether the check accepts the old tickets' shape, Shyden chose,
   verbatim: *"add announce to all. consistency wins"*. No old ticket is
   exempt. Told that the story gate also checks Done and Cancelled stories,
@@ -60,7 +65,20 @@ ticket reads the same once story files stop.
       form.
 - [ ] 3. `scripts/file-story.ts` is the template's filer, pointed at the
       ShyTalk Stories board (node id from `app_manifest.py`, title asserted
-      before any write), acting as the ShyTalk App.
+      before any write), acting as the ShyTalk App. It runs as
+      `node scripts/file-story.ts <board-node-id> "<board title>" <story.json>`
+      and reads every field back.
+- [ ] 3a. The form keeps the template's steps note unchanged:
+      - search first;
+      - add the issue to the board, checking the board's title;
+      - Estimate 1/2/3/5/8/13;
+      - Priority P0-P5, a blocker at least the level of what waits;
+      - a Blocked-by link per blocker;
+      - the epic as parent;
+      - Refs, never a closing keyword.
+- [ ] 3b. ShyTalk's board doc (under `.project/`, where ShyTalk keeps its
+      docs) gains the template's "Filing a ticket" section, with the ShyTalk
+      board's node id and title.
 - [ ] 4. Every story file, open and closed (545 measured), gains an
       `## Announce` section: what closing it lets (or let) us tell people,
       or "nothing" and why. The sync carries each to its issue.
@@ -174,3 +192,6 @@ Nothing: operator tooling with no learner-facing change.
   (Shyden: "they ALL get it"), and the gate change is ordered with it.
   Estimate 8 -> 13: 199 more Announce sections, each written from a
   finished story's Notes and release.
+- **2026-10-22**: repo-template#20 landed (PR #53). ACs 3, 3a and 3b quote
+  its landed form, steps note, filing section and filer. Estimate unchanged
+  at 13: the two new ACs copy the template.

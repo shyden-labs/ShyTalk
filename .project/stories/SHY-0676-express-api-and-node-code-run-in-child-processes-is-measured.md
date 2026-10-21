@@ -39,6 +39,13 @@ Measured 2026-10-21: 90 express-api test files start a process (child_process, e
 
 - [ ] Every child Node process a test or suite starts writes V8 coverage (`NODE_V8_COVERAGE`), converted with ast-v8-to-istanbul to lcov and joined into SHY-0674's report.
 - [ ] The server started by the Integration Tests, e2e and Playwright suites is measured the same way, so the routes those suites call count as run.
+- [ ] Never Vitest's `coverage.autoAttachSubprocess`. It merges a file's
+      in-worker (Vite-transformed) and child-process (native) coverage by
+      URL, reads never-called functions as run, and lost 20 real lines in
+      shyden.co.uk's report (their PR #921, measured 2026-10-21). The
+      converter keeps only entries whose code is the file's own text.
+      Planted: a module a test imports and a child also runs, with a
+      rewritten import and an uncalled function, which must stay unrun.
 - [ ] Node scripts outside express-api that a test loads in-process are in the coverage `include`; the rest are measured as child processes.
 - [ ] SHY-0674's classification moves these files to "measured" and the
       their untested counts join the record, written in the same PR.
@@ -119,3 +126,5 @@ None: internal quality tooling with no change users can see.
   fails now" and Shyden's "Whole repo" choice for ShyTalk. P0: coverage tops
   the queue, and the group-roles hotfix waits on this epic. Scored 5
   from the measured counts above.
+- **2026-10-22**: the autoAttachSubprocess warning added, relayed by the
+  shyden.co.uk session from its measured PR #921.
