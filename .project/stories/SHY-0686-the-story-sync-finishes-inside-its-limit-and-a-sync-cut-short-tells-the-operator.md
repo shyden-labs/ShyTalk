@@ -48,8 +48,8 @@ a sync that never ran shows green.
       develop with no issue yet. Measured: a one-story push finishes in under
       a minute.
 - [ ] A full `--all` pass runs on a schedule and on dispatch, inside its own
-      measured limit, with the per-story reads cut to one bulk read of every
-      story issue.
+      measured limit (30 minutes: twice the ~15 minutes measured). Its
+      per-story cost (each lookup re-reads the whole items map) is SHY-0689.
 - [ ] After this merges, every story on develop has an issue and a board
       item with Estimate and Priority, read back (SHY-0675 to SHY-0686
       included).
@@ -148,3 +148,8 @@ None: operator tooling.
   board by owner and number, not its node id. Scored 5: the selection and
   sweep with their tests, the bulk read, two workflow conditions and two
   planted failures.
+- **2026-10-22**: corrected while building it. The cost is not reading or
+  parsing story files (a dry run, which loads no items map, did all 609 in
+  92 s); it is map_lookup piping the whole items map, every issue body,
+  through jq twice per story. A push now looks up only what it changed;
+  the full pass keeps the per-story cost, filed as SHY-0689.

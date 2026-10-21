@@ -2511,3 +2511,223 @@ describe('SHY-0535: estimate: frontmatter reaches the board Estimate field (mock
     expect(r.stderr).toMatch(/\[gh-error\] createProjectV2Field Estimate.*Resource not accessible/);
   });
 });
+
+// ============================================================== SHY-0686 --changed mode
+
+describe('SHY-0686: --changed BASE HEAD syncs only the pushed stories plus any with no board item (mock-gh)', () => {
+  // A push synced all 609 stories (each lookup re-reading the whole items map) and hit the
+  // 15-minute limit, so the newest stories never reached the board.
+  // --changed syncs the stories a push changed, plus every story on disk
+  // with no board item. Spec: .project/stories/SHY-0686-the-story-sync-
+  // finishes-inside-its-limit-and-a-sync-cut-short-tells-the-operator.md
+
+  function git(cwd, ...args) {
+    const r = spawnSync('git', args, { cwd, encoding: 'utf-8' });
+    if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
+    return r.stdout.trim();
+  }
+
+  function fixtureRepo() {
+    const repo = tempDir('sync686-');
+    git(repo, 'init', '-q', '-b', 'main');
+    git(repo, 'config', 'user.email', 'test@shytalk.dev');
+    git(repo, 'config', 'user.name', 'Test');
+    git(repo, 'config', 'commit.gpgsign', 'false');
+    const storiesDir = path.join(repo, 'stories');
+    fs.mkdirSync(storiesDir);
+    return { repo, storiesDir };
+  }
+
+  function commitAll(repo, message) {
+    git(repo, 'add', '-A');
+    git(repo, 'commit', '-q', '--allow-empty', '-m', message);
+    return git(repo, 'rev-parse', 'HEAD');
+  }
+
+  // Board items for `ids`, each with a STALE stored hash: processing any of
+  // them would record an updateIssue mutation, so an absent mutation proves
+  // the story was never processed.
+  function boardRules(dir, ids) {
+    const nodes = ids.map((id, i) =>
+      issueNode(
+        id,
+        `ITEM_${id}`,
+        10 + i,
+        'OPEN',
+        `${id}: Fixture story`,
+        `Synced earlier.\n\n${syncedFooter(`${id}-fixture-story`, 'Draft', STALE_HASH)}`,
+      ),
+    );
+    return createPathRules(dir, { items: itemsResponse(nodes) });
+  }
+
+  const updates = (lines, node) =>
+    lines.filter((l) => l.includes('updateIssue') && l.includes(` id=${node} `));
+  const creates = (lines, id) =>
+    lines.filter((l) => l.includes('createIssue') && l.includes(`title=${id}:`));
+
+  // BASE: SHY-0001 and SHY-0002 (both on the board as I_node_10, I_node_11).
+  // HEAD: SHY-0001 edited, SHY-0003 added (not on the board).
+  function editAndAdd() {
+    const { repo, storiesDir } = fixtureRepo();
+    makeStory(storiesDir, { id: 'SHY-0001' });
+    makeStory(storiesDir, { id: 'SHY-0002' });
+    const base = commitAll(repo, 'base');
+    makeStory(storiesDir, { id: 'SHY-0001', why: 'Edited in the pushed range.' });
+    makeStory(storiesDir, { id: 'SHY-0003' });
+    const head = commitAll(repo, 'head');
+    const mock = makePatternMockGh();
+    writeRules(mock.dir, boardRules(mock.dir, ['SHY-0001', 'SHY-0002']));
+    return { repo, storiesDir, base, head, mock };
+  }
+
+  it('syncs only the changed and the missing stories', () => {
+    const { storiesDir, base, head, mock } = editAndAdd();
+    const r = runScript(['--changed', base, head], baseEnv(mock.ghPath, storiesDir));
+    const lines = readRecording(mock.recording);
+    expect(r.code).toBe(0);
+    expect(updates(lines, 'I_node_10')).toHaveLength(1);
+    expect(creates(lines, 'SHY-0003')).toHaveLength(1);
+    expect(updates(lines, 'I_node_11')).toHaveLength(0);
+    expect(creates(lines, 'SHY-0001')).toHaveLength(0);
+  });
+
+  it('a push touching no story still creates a missing one', () => {
+    const { repo, storiesDir } = fixtureRepo();
+    for (const id of ['SHY-0001', 'SHY-0002', 'SHY-0003']) makeStory(storiesDir, { id });
+    const sha = commitAll(repo, 'only commit');
+    const mock = makePatternMockGh();
+    writeRules(mock.dir, boardRules(mock.dir, ['SHY-0001', 'SHY-0002']));
+    const r = runScript(['--changed', sha, sha], baseEnv(mock.ghPath, storiesDir));
+    const lines = readRecording(mock.recording);
+    expect(r.code).toBe(0);
+    expect(creates(lines, 'SHY-0003')).toHaveLength(1);
+    expect(lines.filter((l) => l.includes('updateIssue'))).toHaveLength(0);
+  });
+
+  it('a renamed story syncs once under its new path', () => {
+    const { repo, storiesDir } = fixtureRepo();
+    makeStory(storiesDir, { id: 'SHY-0001' });
+    const base = commitAll(repo, 'base');
+    git(repo, 'mv', 'stories/SHY-0001-fixture-story.md', 'stories/SHY-0001-renamed-story.md');
+    const head = commitAll(repo, 'rename');
+    const mock = makePatternMockGh();
+    writeRules(mock.dir, boardRules(mock.dir, ['SHY-0001']));
+    const r = runScript(['--changed', base, head], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(0);
+    expect(updates(readRecording(mock.recording), 'I_node_10')).toHaveLength(1);
+  });
+
+  it('a deleted story file fails naming it', () => {
+    const { repo, storiesDir } = fixtureRepo();
+    makeStory(storiesDir, { id: 'SHY-0001' });
+    makeStory(storiesDir, { id: 'SHY-0002' });
+    const base = commitAll(repo, 'base');
+    fs.rmSync(path.join(storiesDir, 'SHY-0002-fixture-story.md'));
+    const head = commitAll(repo, 'delete');
+    const mock = makePatternMockGh();
+    writeRules(mock.dir, boardRules(mock.dir, ['SHY-0001', 'SHY-0002']));
+    const r = runScript(['--changed', base, head], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(41);
+    expect(r.stderr).toContain('SHY-0002-fixture-story.md');
+    expect(r.stderr).toContain('Cancelled');
+  });
+
+  it('a non-story file is ignored', () => {
+    const { repo, storiesDir } = fixtureRepo();
+    makeStory(storiesDir, { id: 'SHY-0001' });
+    fs.writeFileSync(path.join(storiesDir, 'README.md'), 'one\n');
+    fs.writeFileSync(path.join(storiesDir, 'EPIC-0001-x.md'), 'one\n');
+    const base = commitAll(repo, 'base');
+    fs.writeFileSync(path.join(storiesDir, 'README.md'), 'two\n');
+    fs.writeFileSync(path.join(storiesDir, 'EPIC-0001-x.md'), 'two\n');
+    const head = commitAll(repo, 'docs');
+    const mock = makePatternMockGh();
+    writeRules(mock.dir, boardRules(mock.dir, ['SHY-0001']));
+    const r = runScript(['--changed', base, head], baseEnv(mock.ghPath, storiesDir));
+    const lines = readRecording(mock.recording);
+    expect(r.code).toBe(0);
+    expect(
+      lines.filter((l) => l.includes('updateIssue') || l.includes('createIssue')),
+    ).toHaveLength(0);
+  });
+
+  it('an unknown base fails as usage, naming the commit', () => {
+    const { storiesDir, head, mock } = editAndAdd();
+    const absent = 'deadbeef'.repeat(5);
+    const r = runScript(['--changed', absent, head], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain(`${absent} is not a commit`);
+    expect(r.stderr).toContain('fetch it first');
+  });
+
+  it('a story file in a subfolder is not a story (as for --all)', () => {
+    const { repo, storiesDir } = fixtureRepo();
+    makeStory(storiesDir, { id: 'SHY-0001' });
+    fs.mkdirSync(path.join(storiesDir, 'archive'));
+    const base = commitAll(repo, 'base');
+    makeStory(path.join(storiesDir, 'archive'), { id: 'SHY-0009' });
+    const head = commitAll(repo, 'nested');
+    const mock = makePatternMockGh();
+    writeRules(mock.dir, boardRules(mock.dir, ['SHY-0001']));
+    const r = runScript(['--changed', base, head], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(0);
+    expect(creates(readRecording(mock.recording), 'SHY-0009')).toHaveLength(0);
+  });
+
+  it('a changed story the symlink-safe lookup cannot resolve fails, naming it', () => {
+    // A story committed as a symlink: the diff names it, but the lookup refuses
+    // links (as --all does), so it must fail loudly rather than vanish.
+    const { repo, storiesDir } = fixtureRepo();
+    makeStory(storiesDir, { id: 'SHY-0001' });
+    const base = commitAll(repo, 'base');
+    fs.symlinkSync('SHY-0001-fixture-story.md', path.join(storiesDir, 'SHY-0005-linked-story.md'));
+    const head = commitAll(repo, 'a linked story');
+    const mock = makePatternMockGh();
+    writeRules(mock.dir, boardRules(mock.dir, ['SHY-0001', 'SHY-0005']));
+    const r = runScript(['--changed', base, head], baseEnv(mock.ghPath, storiesDir));
+    expect(r.code).toBe(40);
+    expect(r.stderr).toContain('SHY-0005');
+    expect(r.stderr).toContain('no story file');
+  });
+
+  it('dry-run previews only the changed stories, mutates nothing, and says the sweep is skipped', () => {
+    // A dry run reads no board (its items map is empty, as in --story), so
+    // every story previews as a CREATE, and the sweep for stories with no
+    // board item would list the whole corpus: it is skipped, and says so.
+    const { storiesDir, base, head, mock } = editAndAdd();
+    const r = runScript(['--changed', base, head, '--dry-run'], baseEnv(mock.ghPath, storiesDir));
+    const lines = readRecording(mock.recording);
+    expect(r.code).toBe(0);
+    expect(lines.filter((l) => l.includes('mutation'))).toHaveLength(0);
+    expect(r.stderr).toMatch(/DRY-RUN: SHY-0001: would CREATE/);
+    expect(r.stderr).toMatch(/DRY-RUN: SHY-0003: would CREATE/);
+    expect(r.stderr).not.toMatch(/DRY-RUN: SHY-0002/);
+    expect(r.stderr).toContain('the sweep for stories with no board item is skipped');
+    expect(r.stderr).not.toContain('jq: error');
+  });
+
+  it('--changed cannot combine with --all or --story', () => {
+    const { storiesDir, base, head, mock } = editAndAdd();
+    const env = baseEnv(mock.ghPath, storiesDir);
+    // The reason, not only the code: an unknown flag also exits 2.
+    const withAll = runScript(['--changed', base, head, '--all'], env);
+    expect(withAll.code).toBe(2);
+    expect(withAll.stderr).toContain('--changed and --all cannot be combined');
+    const withStory = runScript(['--changed', base, head, '--story', 'SHY-0001'], env);
+    expect(withStory.code).toBe(2);
+    expect(withStory.stderr).toContain('--changed and --story cannot be combined');
+  });
+
+  it('the id-map file is written in --changed mode', () => {
+    const { storiesDir, base, head, mock } = editAndAdd();
+    const sidecar = path.join(mock.dir, 'board-items-686.json');
+    const r = runScript(
+      ['--changed', base, head],
+      baseEnv(mock.ghPath, storiesDir, { BOARD_ITEMS_FILE: sidecar }),
+    );
+    expect(r.code).toBe(0);
+    const map = JSON.parse(fs.readFileSync(sidecar, 'utf-8'));
+    expect(Object.keys(map)).toEqual(expect.arrayContaining(['SHY-0001', 'SHY-0003']));
+  });
+});

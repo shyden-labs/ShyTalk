@@ -272,11 +272,14 @@ describe('SHY-0067: workflow YAML — Defect A (auth env propagation)', () => {
     // First run with 53+ SHYs creates ~33 labels + 53 issues + 53 board items
     // + 6 field-sets each. Rough budget ~3 min API time + overhead. 15-min
     // window gives 5× headroom; 10-min (pre-SHY-0067) was tight.
-    const timeoutMatch = yamlContent.match(/timeout-minutes:\s*(\d+)/);
-    expect(timeoutMatch).not.toBeNull();
-    if (timeoutMatch) {
-      expect(Number.parseInt(timeoutMatch[1], 10)).toBeGreaterThanOrEqual(15);
-    }
+    // Read the SYNC job's limit by name (SHY-0686: a first-match text search
+    // found the alert job's 5 once the sync's limit became an expression).
+    // A push sync keeps 15; the full pass's own limit is pinned in
+    // sync-stories-alert.test.js.
+    const sync = require('js-yaml').load(yamlContent).jobs.sync;
+    const pushLimit = String(sync['timeout-minutes']).match(/'push' && (\d+)/);
+    expect(pushLimit).not.toBeNull();
+    expect(Number.parseInt(pushLimit[1], 10)).toBeGreaterThanOrEqual(15);
   });
 
   test('workflow permissions block stays at contents: read (PAT carries write scopes)', () => {
