@@ -41,7 +41,7 @@ Measured 2026-10-21: 90 express-api test files start a process (child_process, e
 - [ ] The server started by the Integration Tests, e2e and Playwright suites is measured the same way, so the routes those suites call count as run.
 - [ ] Node scripts outside express-api that a test loads in-process are in the coverage `include`; the rest are measured as child processes.
 - [ ] SHY-0674's classification moves these files to "measured" and the
-      joined figure includes them, the figure file raised in the same PR.
+      their untested counts join the record, written in the same PR.
 
 ### Error paths
 
@@ -73,7 +73,7 @@ Measured 2026-10-21: 90 express-api test files start a process (child_process, e
 
 ### Observability
 
-- [ ] CI prints this kind's measured file count, its figure and every file
+- [ ] CI prints this kind's measured file count, its untested counts and every file
       still classed unmeasured.
 
 ## Announce

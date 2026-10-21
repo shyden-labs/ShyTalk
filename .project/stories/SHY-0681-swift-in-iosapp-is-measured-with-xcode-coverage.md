@@ -39,7 +39,7 @@ Measured 2026-10-21: iosApp holds 21 Swift files; ios-tests.yml builds and runs 
 
 - [ ] The iOS test runs enable code coverage (`-enableCodeCoverage YES`), and the result bundle is exported to lcov (`xcrun llvm-cov export` against the test binary) and joined into SHY-0674's report.
 - [ ] SHY-0674's classification moves these files to "measured" and the
-      joined figure includes them, the figure file raised in the same PR.
+      their untested counts join the record, written in the same PR.
 
 ### Error paths
 
@@ -71,7 +71,7 @@ Measured 2026-10-21: iosApp holds 21 Swift files; ios-tests.yml builds and runs 
 
 ### Observability
 
-- [ ] CI prints this kind's measured file count, its figure and every file
+- [ ] CI prints this kind's measured file count, its untested counts and every file
       still classed unmeasured.
 
 ## Announce

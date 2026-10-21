@@ -39,7 +39,7 @@ Measured 2026-10-21: firestore.rules and database.rules.json are tested against 
 
 - [ ] After the rules suites run, the Firestore emulator's rules coverage report and the Realtime Database emulator's coverage report are read, converted to per-line run/unrun for each rules file and joined into SHY-0674's report.
 - [ ] SHY-0674's classification moves these files to "measured" and the
-      joined figure includes them, the figure file raised in the same PR.
+      their untested counts join the record, written in the same PR.
 
 ### Error paths
 
@@ -71,7 +71,7 @@ Measured 2026-10-21: firestore.rules and database.rules.json are tested against 
 
 ### Observability
 
-- [ ] CI prints this kind's measured file count, its figure and every file
+- [ ] CI prints this kind's measured file count, its untested counts and every file
       still classed unmeasured.
 
 ## Announce

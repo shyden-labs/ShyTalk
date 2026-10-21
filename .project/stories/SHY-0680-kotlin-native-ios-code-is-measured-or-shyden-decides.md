@@ -40,7 +40,7 @@ Measured 2026-10-21: shared/src/iosMain holds 60 Kotlin files compiled by Kotlin
 - [ ] The compiler's coverage instrumentation is tried on a real iosMain test build in CI (iosTest via the simulator), with llvm-profdata and llvm-cov export to lcov, and joined into SHY-0674's report if it works.
 - [ ] If no tool can measure iosMain, the evidence (the commands, their output, the versions) goes to Shyden with options and costs before anything else is done; the files stay classed unmeasured until he decides.
 - [ ] SHY-0674's classification moves these files to "measured" and the
-      joined figure includes them, the figure file raised in the same PR.
+      their untested counts join the record, written in the same PR.
 
 ### Error paths
 
@@ -49,7 +49,7 @@ Measured 2026-10-21: shared/src/iosMain holds 60 Kotlin files compiled by Kotlin
 
 ### Edge cases
 
-- [ ] Code iosMain shares with commonMain through expect/actual is reported per actual, not merged with the JVM figures.
+- [ ] Code iosMain shares with commonMain through expect/actual is reported per actual, not merged with the JVM results.
 
 ### Performance
 
@@ -72,7 +72,7 @@ Measured 2026-10-21: shared/src/iosMain holds 60 Kotlin files compiled by Kotlin
 
 ### Observability
 
-- [ ] CI prints this kind's measured file count, its figure and every file
+- [ ] CI prints this kind's measured file count, its untested counts and every file
       still classed unmeasured.
 
 ## Announce
