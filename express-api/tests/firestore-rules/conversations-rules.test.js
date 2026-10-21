@@ -21,8 +21,7 @@
  * `localhost:8080`). Start it with `bash local/start.sh`.
  */
 
-const { readFileSync } = require('fs');
-const { join } = require('path');
+const { loadRules } = require('./_helpers/rules-source');
 const {
   initializeTestEnvironment,
   assertSucceeds,
@@ -30,7 +29,6 @@ const {
 } = require('@firebase/rules-unit-testing');
 const { firestoreHostPort, assertEmulatorReachable } = require('../helpers/firebase-emulator');
 
-const RULES_PATH = join(__dirname, '..', '..', '..', 'firestore.rules');
 const PROJECT_ID = `demo-shytalk-conv-rules-${process.env.JEST_WORKER_ID || '1'}`;
 
 // ── Realistic JWT claim shapes (uniqueId is a NUMBER in the claim, as Express
@@ -116,7 +114,7 @@ beforeAll(async () => {
   const { host, port } = firestoreHostPort();
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { host, port, rules: readFileSync(RULES_PATH, 'utf8') },
+    firestore: { host, port, rules: loadRules() },
   });
 });
 

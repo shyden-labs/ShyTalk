@@ -37,16 +37,13 @@
  * `npx firebase emulators:start --project=demo-shytalk --only firestore,auth`).
  */
 
-const { readFileSync } = require('fs');
-const { join } = require('path');
+const { loadRules } = require('./_helpers/rules-source');
 const {
   initializeTestEnvironment,
   assertSucceeds,
   assertFails,
 } = require('@firebase/rules-unit-testing');
 const { firestoreHostPort, assertEmulatorReachable } = require('../helpers/firebase-emulator');
-
-const RULES_PATH = join(__dirname, '..', '..', '..', 'firestore.rules');
 
 // Distinct demo-* projectId — keeps this suite's data out of the seeded
 // `demo-shytalk` namespace and away from the other rules suites' projects.
@@ -102,7 +99,7 @@ beforeAll(async () => {
   const { host, port } = firestoreHostPort();
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { host, port, rules: readFileSync(RULES_PATH, 'utf8') },
+    firestore: { host, port, rules: loadRules() },
   });
 });
 

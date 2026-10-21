@@ -47,8 +47,7 @@
  * `localhost:8080`). Start it with `bash local/start.sh`.
  */
 
-const { readFileSync } = require('fs');
-const { join } = require('path');
+const { loadRules } = require('./_helpers/rules-source');
 const firebase = require('firebase/compat/app');
 require('firebase/compat/firestore');
 const {
@@ -58,7 +57,6 @@ const {
 } = require('@firebase/rules-unit-testing');
 const { firestoreHostPort, assertEmulatorReachable } = require('../helpers/firebase-emulator');
 
-const RULES_PATH = join(__dirname, '..', '..', '..', 'firestore.rules');
 const PROJECT_ID = `demo-shytalk-follow-lists-${process.env.JEST_WORKER_ID || '1'}`;
 
 // Express mints `uniqueId` + `cohort` as custom claims on sign-in (UK OSA #17
@@ -103,7 +101,7 @@ beforeAll(async () => {
   const { host, port } = firestoreHostPort();
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { host, port, rules: readFileSync(RULES_PATH, 'utf8') },
+    firestore: { host, port, rules: loadRules() },
   });
 });
 
