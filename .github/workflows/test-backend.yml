@@ -18,6 +18,11 @@ on:
         description: 'Report environment: pr or deploy'
         type: string
         default: 'pr'
+      base_sha:
+        description: "The PR's base SHA, for the rules red-first step (SHY-0657); empty skips it"
+        type: string
+        required: false
+        default: ''
 
   workflow_dispatch:
     inputs:
@@ -113,6 +118,22 @@ jobs:
         run: |
           cd express-api && npm ci
           node --experimental-vm-modules node_modules/.bin/jest --coverage --coverageReporters=html --forceExit
+
+      # SHY-0657: every DENY rules test this PR adds must fail on the base
+      # branch's rules, for the reason assertFails gives when a request
+      # succeeds, and the recorded fixture cases (SHY-0653's pre-fix rules)
+      # must fail on theirs. It runs here because the emulators are already
+      # up; the base rules load through SHYTALK_RULES_UNDER_TEST as test input
+      # only and are never deployed. The job checks out at depth 1, so the base
+      # commit is fetched first. Required through PR Gate (Shyden, 2026-10-21).
+      # Pinned by express-api/tests/scripts/pr-checks-rules-red-first.test.js.
+      - name: 'Rules red-first: new DENY tests fail on the base rules'
+        if: inputs.base_sha != ''
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          node express-api/scripts/rules-red-first.js
 
       - name: Write metadata.json
         if: always()
