@@ -550,3 +550,88 @@ describe('SHY-0304 — a runner is identified by what it is, not what it mention
     });
   });
 });
+
+describe('require_repo asks git, so a worktree is a repository (found 2026-10-22, SHY-0645)', () => {
+  // `[ -d "$REPO/.git" ]` refused every git worktree, whose .git is a FILE, so the
+  // gauntlet (and these SHY-0304 tests) failed in any worktree, never in CI's clone.
+  const LIB = path.join(REPO_ROOT, 'express-api/scripts/gauntlet/lib.sh');
+  const git = (cwd, ...args) => {
+    const r = spawnSync('/usr/bin/git', args, { cwd, encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
+  };
+  const requireRepo = (repo) =>
+    spawnSync('/bin/bash', ['-c', 'source "$1"; require_repo && echo repo-ok', 'bash', LIB], {
+      encoding: 'utf8',
+      env: { ...process.env, SHYTALK_REPO: repo },
+    });
+  let root;
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'require-repo-'));
+    const clone = path.join(root, 'clone');
+    fs.mkdirSync(clone);
+    git(clone, 'init', '-q', '-b', 'main');
+    git(
+      clone,
+      '-c',
+      'user.email=t@shytalk.dev',
+      '-c',
+      'user.name=T',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      'base',
+    );
+    git(clone, 'worktree', 'add', '-q', path.join(root, 'wt'));
+    fs.mkdirSync(path.join(root, 'plain'));
+  });
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('a normal clone is a repository', () => {
+    const r = requireRepo(path.join(root, 'clone'));
+    expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
+  });
+  test('a git worktree (.git is a file) is a repository', () => {
+    expect(fs.statSync(path.join(root, 'wt', '.git')).isFile()).toBe(true);
+    const r = requireRepo(path.join(root, 'wt'));
+    expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
+  });
+  test('a folder inside a repository is not its top level, so it is refused', () => {
+    const sub = path.join(root, 'clone', 'sub');
+    fs.mkdirSync(sub, { recursive: true });
+    const r = requireRepo(sub);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`repo not found at ${sub}`);
+  });
+  test('a path that does not exist is refused, naming it', () => {
+    const gone = path.join(root, 'no-such-dir');
+    const r = requireRepo(gone);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`repo not found at ${gone}`);
+  });
+  test('a bare repository is refused: the gauntlet needs a working tree', () => {
+    const bare = path.join(root, 'bare.git');
+    git(root, 'init', '-q', '--bare', bare);
+    const r = requireRepo(bare);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`repo not found at ${bare}`);
+  });
+  test('a worktree whose main checkout is gone is refused', () => {
+    const lost = path.join(root, 'lost');
+    fs.mkdirSync(lost);
+    fs.writeFileSync(
+      path.join(lost, '.git'),
+      `gitdir: ${path.join(root, 'deleted', '.git', 'worktrees', 'x')}\n`,
+    );
+    const r = requireRepo(lost);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`repo not found at ${lost}`);
+  });
+  test('a plain folder is still refused, naming it', () => {
+    const r = requireRepo(path.join(root, 'plain'));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`repo not found at ${path.join(root, 'plain')}`);
+  });
+});

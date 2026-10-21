@@ -58,7 +58,15 @@ kill_port() {
   ok "freed :$port (${label})"
 }
 
-require_repo() { [ -d "$REPO/.git" ] || die "repo not found at $REPO (set SHYTALK_REPO)"; }
+# A repository's top level, asked of git: a worktree's .git is a file, so a
+# `[ -d .git ]` test refused every worktree. A folder inside a repository is not
+# its top level and is still refused (physical paths compared: /var vs /private/var).
+require_repo() {
+  local top here
+  top="$(git -C "$REPO" rev-parse --show-toplevel 2>/dev/null)" || top=""
+  here="$(cd "$REPO" 2>/dev/null && pwd -P)" || here=""
+  [ -n "$top" ] && [ "$top" = "$here" ] || die "repo not found at $REPO (set SHYTALK_REPO)"
+}
 
 # docker_ready — true when the Docker daemon answers.
 docker_ready() { docker info >/dev/null 2>&1; }
