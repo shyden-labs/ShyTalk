@@ -126,7 +126,8 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // tests/scripts files (rules-source, rules-test-names and rules-red-first
 // unit tests; the load-from-one-place, named-by-assertion,
 // fixtures-never-deployed and pr-checks-rules-red-first guards) (SHY-0657).
-const FILES_READ_FLOOR = 2052;
+// 2052 -> 2053: tests/scripts/rules-library-taken-in-one-form.test.js (SHY-0657).
+const FILES_READ_FLOOR = 2053;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

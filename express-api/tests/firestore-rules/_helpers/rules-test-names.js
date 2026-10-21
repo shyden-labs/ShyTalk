@@ -12,7 +12,7 @@ const { parse } = require('@babel/parser');
 
 function parseTestFile(source, file) {
   try {
-    return parse(source, { sourceType: 'unambiguous', errorRecovery: false });
+    return parse(source, { sourceType: 'unambiguous', errorRecovery: false, tokens: true });
   } catch (err) {
     const where = err.loc ? `${err.loc.line}:${err.loc.column}` : '?';
     throw new Error(`${file}:${where} does not parse: ${err.message}`, { cause: err });
@@ -132,19 +132,16 @@ const isDescribe = (call) =>
     call.callee.object.name === 'describe' &&
     READ_MODIFIERS.has(call.callee.property.name));
 
-// The source of `node` with every comment inside it removed and whitespace collapsed,
-// so a reworded comment or a reflow is not a change to what a test does.
-function codeOf(source, comments, node) {
-  let out = '';
-  let pos = node.start;
-  for (const c of comments) {
-    if (c.start >= node.start && c.end <= node.end) {
-      out += source.slice(pos, c.start);
-      pos = c.end;
-    }
-  }
-  out += source.slice(pos, node.end);
-  return out.replace(/\s+/g, ' ').trim();
+const COMMENT_TOKENS = new Set(['CommentLine', 'CommentBlock']);
+
+// The tokens of `node`, comments dropped, each as written and one space apart:
+// a reworded comment or a reflow is no change to what a test does, while every
+// character inside a string or template literal still is.
+function codeOf(source, tokens, node) {
+  return tokens
+    .filter((t) => t.start >= node.start && t.end <= node.end && !COMMENT_TOKENS.has(t.type))
+    .map((t) => source.slice(t.start, t.end))
+    .join(' ');
 }
 
 /**
@@ -156,7 +153,7 @@ function codeOf(source, comments, node) {
  */
 function extractTests(source, file) {
   const ast = parseTestFile(source, file);
-  const comments = [...(ast.comments ?? [])].sort((a, b) => a.start - b.start);
+  const tokens = ast.tokens;
   const fns = localFunctions(ast);
   const reach = { fails: reaching(ASSERTS.fails, fns), succeeds: reaching(ASSERTS.succeeds, fns) };
   const tests = [];
@@ -193,7 +190,7 @@ function extractTests(source, file) {
           fullName: [...describePath, title].join(' '),
           family: kind.family,
           body: fn ? source.slice(fn.start, fn.end) : '',
-          code: fn ? codeOf(source, comments, fn) : '',
+          code: fn ? codeOf(source, tokens, fn) : '',
           asserts: {
             fails: [...names].some((n) => reach.fails.has(n)),
             succeeds: [...names].some((n) => reach.succeeds.has(n)),

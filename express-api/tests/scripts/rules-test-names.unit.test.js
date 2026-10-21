@@ -68,11 +68,25 @@ describe('extractTests', () => {
     );
   });
 
-  test('gives the code: the callback with comments removed and whitespace collapsed', () => {
+  test('gives the code: the callback as its tokens, comments dropped, one space apart', () => {
     const t = one(
       "test('DENY: a', async () => {\n  // why\n  await assertFails(/* the op */ op('a // b'));\n});",
     );
-    expect(t.code).toBe("async () => { await assertFails( op('a // b')); }");
+    expect(t.code).toBe("async ( ) => { await assertFails ( op ( 'a // b' ) ) ; }");
+  });
+
+  // NO HOLES (2026-10-21): collapsing whitespace in the raw text also collapsed it
+  // inside string literals, so doc('a b') -> doc('a  b') read as no change.
+  test('whitespace inside a string literal is part of the code', () => {
+    const a = one("test('DENY: a', async () => { await assertFails(doc('a b')); });");
+    const b = one("test('DENY: a', async () => { await assertFails(doc('a  b')); });");
+    expect(b.code).not.toBe(a.code);
+  });
+
+  test('whitespace inside a template literal is part of the code', () => {
+    const a = one("test('DENY: a', async () => { await assertFails(doc(`a ${x} b`)); });");
+    const b = one("test('DENY: a', async () => { await assertFails(doc(`a ${x}  b`)); });");
+    expect(b.code).not.toBe(a.code);
   });
 
   test('two callbacks differing only in comments and whitespace have the same code', () => {
