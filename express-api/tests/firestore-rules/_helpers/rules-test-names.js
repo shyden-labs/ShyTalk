@@ -6,6 +6,8 @@
  * are not nodes, so nothing written in a comment can count as code.
  */
 
+const fs = require('fs');
+const path = require('path');
 const { parse } = require('@babel/parser');
 
 function parseTestFile(source, file) {
@@ -208,4 +210,63 @@ function familyRegex(template) {
   return new RegExp(`^${pattern}$`);
 }
 
-module.exports = { parseTestFile, walk, literalText, calls, requires, extractTests, familyRegex };
+const RULES_LIB = '@firebase/rules-unit-testing';
+
+// Every *.test.js under `dir`, node_modules skipped, by absolute path.
+function testFilesUnder(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : testFilesUnder(full);
+    return entry.name.endsWith('.test.js') ? [full] : [];
+  });
+}
+
+// True when the file destructures assertFails or assertSucceeds from require(RULES_LIB).
+function takesRulesAsserts(ast) {
+  let found = false;
+  walk(ast, (n) => {
+    if (
+      n.type === 'VariableDeclarator' &&
+      n.id.type === 'ObjectPattern' &&
+      n.init &&
+      n.init.type === 'CallExpression' &&
+      n.init.callee.type === 'Identifier' &&
+      n.init.callee.name === 'require' &&
+      n.init.arguments[0] &&
+      literalText(n.init.arguments[0]) === RULES_LIB &&
+      n.id.properties.some((p) => p.key && ['assertFails', 'assertSucceeds'].includes(p.key.name))
+    ) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+/**
+ * The rules test files under `testsDir`: emulator test files (they call
+ * initializeTestEnvironment) that take assertFails or assertSucceeds from
+ * @firebase/rules-unit-testing. Each as { file (absolute), source }.
+ */
+function rulesTestFiles(testsDir) {
+  return testFilesUnder(testsDir)
+    .map((file) => ({ file, source: fs.readFileSync(file, 'utf8') }))
+    .filter(({ source }) => source.includes('initializeTestEnvironment'))
+    .filter(({ file, source }) => {
+      const ast = parseTestFile(source, file);
+      return calls(ast, 'initializeTestEnvironment').length > 0 && takesRulesAsserts(ast);
+    });
+}
+
+module.exports = {
+  RULES_LIB,
+  parseTestFile,
+  walk,
+  literalText,
+  calls,
+  requires,
+  extractTests,
+  familyRegex,
+  testFilesUnder,
+  takesRulesAsserts,
+  rulesTestFiles,
+};

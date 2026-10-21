@@ -23,18 +23,12 @@ const {
   walk,
   calls,
   requires,
+  testFilesUnder,
+  RULES_LIB,
 } = require('../firestore-rules/_helpers/rules-test-names.js');
 
 const TESTS_DIR = path.resolve(__dirname, '..');
 const LOADER = path.join(TESTS_DIR, 'firestore-rules', '_helpers', 'rules-source.js');
-
-function testFiles(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : testFiles(full);
-    return entry.name.endsWith('.test.js') ? [full] : [];
-  });
-}
 
 function rulesValue(options) {
   if (!options || options.type !== 'ObjectExpression') return null;
@@ -75,7 +69,7 @@ function findings(source, file) {
   return out;
 }
 
-const scanned = testFiles(TESTS_DIR).map((file) => {
+const scanned = testFilesUnder(TESTS_DIR).map((file) => {
   const source = fs.readFileSync(file, 'utf8');
   if (!source.includes('initializeTestEnvironment') && !source.includes('rules-unit-testing')) {
     return { file, emulator: false, importer: false, source };
@@ -85,7 +79,7 @@ const scanned = testFiles(TESTS_DIR).map((file) => {
     file,
     source,
     emulator: calls(ast, 'initializeTestEnvironment').length > 0,
-    importer: requires(ast).includes('@firebase/rules-unit-testing'),
+    importer: requires(ast).includes(RULES_LIB),
   };
 });
 const rel = (file) => path.relative(TESTS_DIR, file);
