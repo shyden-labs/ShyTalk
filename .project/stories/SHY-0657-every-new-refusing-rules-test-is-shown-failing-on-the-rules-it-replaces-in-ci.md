@@ -5,7 +5,7 @@ owner: claude
 created: 2026-10-20
 priority: P0
 effort: L
-estimate: 8
+estimate: 13
 type: chore
 roadmap_ids: []
 mvp: true
@@ -52,8 +52,13 @@ in a branch meant for pushing.
 
 - [ ] A new DENY test that passes on the base rules fails the step, naming
       the test (it tests nothing the change made).
-- [ ] A PR changing `firestore.rules` with no new DENY test is reported as
-      such (the population is printed, count zero), never silently green.
+- [ ] A PR changing `firestore.rules` with no added or rewritten test that
+      fails on the base rules fails the step, the change named unproven
+      (Shyden, 2026-10-21: "should go red, yes"; then "Every change proven":
+      a DENY test failing for assertFails' reason proves a tightening, an
+      ALLOW test refused there proves a loosening, an ALLOW test passing
+      there is a control that proves nothing; an edit to the rules' comments
+      or spacing alone is no change).
 - [ ] A failure to load or parse the base rules fails the step (fails
       closed).
 
@@ -157,6 +162,13 @@ None: an internal check with no change users can see.
   also ruled the step is required through PR Gate, not its own ruleset
   context. Re-scored 5 to 8 for the rename and the naming guard. The loader
   population is 8 files (two migration-script tests also load the rules).
+- **2026-10-21**: Shyden "Every change proven" (written options, after a side
+  note found a rules change with no DENY test passed with a notice). Then the
+  global no-holes rule found more on this branch: string whitespace in test
+  code (now tokens), other ways to take the rules library (a form guard over
+  15 files), computed module mocks and the jest setup (pinned; 588 files
+  read), and RTDB rules with no red-first proof (filed SHY-0665). Re-scored
+  8 to 13 for the ALLOW proof path, the rules tokenizer and the guards.
 - **2026-10-21**: a side note found the step planned only ADDED DENY tests,
   a call made alone and noted only in the design file. Shyden: rewritten
   DENY tests "should" meet the base rules too. Code is compared with

@@ -22,7 +22,7 @@ const WORKFLOWS = path.resolve(__dirname, '..', '..', '..', '.github', 'workflow
 const load = (name) => yaml.load(fs.readFileSync(path.join(WORKFLOWS, name), 'utf8'));
 const backend = load('test-backend.yml');
 const prChecks = load('pr-checks.yml');
-const STEP = 'Rules red-first: new DENY tests fail on the base rules';
+const STEP = 'Rules red-first: every rules change is proven on the base rules';
 const lines = (run) =>
   String(run)
     .split('\n')

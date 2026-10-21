@@ -13,10 +13,12 @@
 const path = require('path');
 const {
   REASON,
+  ALLOW_REFUSED,
   NEVER,
   listed,
   attachBodies,
-  addedDenyTests,
+  plannedTests,
+  rulesCode,
   namePattern,
   verdict,
   inScope,
@@ -116,34 +118,43 @@ describe('attachBodies', () => {
   });
 });
 
-describe('addedDenyTests', () => {
+describe('plannedTests', () => {
   test('a DENY name new to the head is added', () => {
-    const got = addedDenyTests([t(CONV, 'DENY: a')], [t(CONV, 'DENY: a'), t(CONV, 'DENY: b')]);
+    const got = plannedTests([t(CONV, 'DENY: a')], [t(CONV, 'DENY: a'), t(CONV, 'DENY: b')]);
     expect(got).toEqual({ added: [t(CONV, 'DENY: b')], rewritten: [], renamed: [] });
   });
 
   // Shyden, 2026-10-21 ("they should"): a DENY test kept by name but rewritten
   // meets the base rules too, or a fix proven by editing one would go unproven.
   test('a DENY test keeping its name with new code is rewritten, and planned', () => {
-    const got = addedDenyTests([t(CONV, 'DENY: a', 'old')], [t(CONV, 'DENY: a', 'new')]);
+    const got = plannedTests([t(CONV, 'DENY: a', 'old')], [t(CONV, 'DENY: a', 'new')]);
     expect(got).toEqual({ added: [], rewritten: [t(CONV, 'DENY: a', 'new')], renamed: [] });
   });
 
   test('a DENY test whose code is unchanged is neither added nor rewritten', () => {
-    const got = addedDenyTests([t(CONV, 'DENY: a', 'same')], [t(CONV, 'DENY: a', 'same')]);
+    const got = plannedTests([t(CONV, 'DENY: a', 'same')], [t(CONV, 'DENY: a', 'same')]);
     expect(got).toEqual({ added: [], rewritten: [], renamed: [] });
   });
 
-  test('an ALLOW test new to the head, or rewritten, is not planned', () => {
-    const got = addedDenyTests(
+  // Every rules change proven (Shyden, 2026-10-21): an ALLOW test proves a loosening.
+  test('an ALLOW test new to the head, or rewritten, is planned too', () => {
+    const got = plannedTests(
       [t(CONV, 'ALLOW: b', 'old')],
       [t(CONV, 'ALLOW: a'), t(CONV, 'ALLOW: b', 'new')],
     );
-    expect(got).toEqual({ added: [], rewritten: [], renamed: [] });
+    expect(got).toEqual({
+      added: [t(CONV, 'ALLOW: a')],
+      rewritten: [t(CONV, 'ALLOW: b', 'new')],
+      renamed: [],
+    });
+  });
+
+  test('a test named neither DENY nor ALLOW is never planned', () => {
+    expect(plannedTests([], [t(CONV, 'x')])).toEqual({ added: [], rewritten: [], renamed: [] });
   });
 
   test('a DENY test renamed in place is a rename, not an addition', () => {
-    const got = addedDenyTests([t(CONV, 'DENY: old', 'same')], [t(CONV, 'DENY: new', 'same')]);
+    const got = plannedTests([t(CONV, 'DENY: old', 'same')], [t(CONV, 'DENY: new', 'same')]);
     expect(got).toEqual({
       added: [],
       rewritten: [],
@@ -152,12 +163,12 @@ describe('addedDenyTests', () => {
   });
 
   test('a DENY test renamed AND rewritten is added: its code matches no vanished test', () => {
-    const got = addedDenyTests([t(CONV, 'DENY: old', 'old')], [t(CONV, 'DENY: new', 'new')]);
+    const got = plannedTests([t(CONV, 'DENY: old', 'old')], [t(CONV, 'DENY: new', 'new')]);
     expect(got).toEqual({ added: [t(CONV, 'DENY: new', 'new')], rewritten: [], renamed: [] });
   });
 
   test('a DENY test moved into another describe or file is a rename', () => {
-    const got = addedDenyTests(
+    const got = plannedTests(
       [t(CONV, 'x DENY: a', 'B', 'DENY: a')],
       [t(ROOM, 'y DENY: a', 'B', 'DENY: a')],
     );
@@ -168,12 +179,42 @@ describe('addedDenyTests', () => {
   test('a new row in a test.each family shares its body but is added: no base name vanished', () => {
     const base = [t(CONV, 'DENY: (banned) a', 'F', 'DENY: (banned) %s')];
     const head = [...base, t(CONV, 'DENY: (banned) b', 'F', 'DENY: (banned) %s')];
-    expect(addedDenyTests(base, head)).toEqual({ added: [head[1]], rewritten: [], renamed: [] });
+    expect(plannedTests(base, head)).toEqual({ added: [head[1]], rewritten: [], renamed: [] });
   });
 
   test('every DENY test of a file absent at base is added', () => {
     const head = [t(ROOM, 'DENY: a'), t(ROOM, 'DENY: b')];
-    expect(addedDenyTests([], head).added).toEqual(head);
+    expect(plannedTests([], head).added).toEqual(head);
+  });
+});
+
+describe('rulesCode', () => {
+  test('comments and spacing are no change', () => {
+    const a = 'match /a/{x} { allow read: if true; }';
+    const b = '// why\nmatch  /a/{x} {\n  /* note */ allow read:   if true;\n}\n';
+    expect(rulesCode(b)).toBe(rulesCode(a));
+  });
+
+  // B1: an edit inside a string is a change.
+  test('an edit inside a string literal is a change, spacing in it included', () => {
+    expect(rulesCode("x == 'a b'")).not.toBe(rulesCode("x == 'a  b'"));
+    expect(rulesCode('x == "a"')).not.toBe(rulesCode('x == "b"'));
+  });
+
+  // B2: // inside a string is not a comment.
+  test('// and /* inside a string are not comments', () => {
+    expect(rulesCode("u == 'https://x' // c")).toBe("u == 'https://x'");
+    expect(rulesCode("u == '/* not */'")).toBe("u == '/* not */'");
+  });
+
+  test('an escaped quote stays inside its string', () => {
+    expect(rulesCode("a == 'it\\'s // here'")).toBe("a == 'it\\'s // here'");
+  });
+
+  // B3: fail closed.
+  test('an unterminated comment or string throws', () => {
+    expect(() => rulesCode('allow read /* open')).toThrow('firestore.rules: unterminated comment');
+    expect(() => rulesCode("x == 'open")).toThrow('firestore.rules: unterminated string');
   });
 });
 
@@ -244,6 +285,66 @@ describe('verdict', () => {
           'rewritten under its name and passes on these rules: it proves nothing the change made; if it was only tidied, move the tidy to its own PR',
       },
     ]);
+  });
+
+  describe('an ALLOW test', () => {
+    const allow = [t(CONV, 'ALLOW: a')];
+    const run = (status, failureMessages) =>
+      verdict(
+        jestJson(suite(HEAD_API, CONV, [['ALLOW: a', status, failureMessages]])),
+        allow,
+        HEAD_API,
+      );
+    const refused = `Error: ${ALLOW_REFUSED} false for 'create' @ L884`;
+
+    test('refused by the base rules under the marker is red: a loosening proven', () => {
+      expect(run('failed', [refused])).toEqual({
+        ok: true,
+        rows: [{ test: `${CONV}: ALLOW: a`, result: 'red', detail: '' }],
+      });
+    });
+
+    // B6: a control proves nothing, and is no failure either.
+    test('passing on the base rules is a control: allowed, proves nothing', () => {
+      expect(run('passed', [])).toEqual({
+        ok: true,
+        rows: [
+          {
+            test: `${CONV}: ALLOW: a`,
+            result: 'control',
+            detail: 'passes on these rules too: a positive control, not a proof',
+          },
+        ],
+      });
+    });
+
+    // B5: any other failure is not proof.
+    test('failing for another reason is red for the wrong reason', () => {
+      const got = run('failed', ['Error: connect ECONNREFUSED 127.0.0.1:8080']);
+      expect([got.ok, got.rows[0].result]).toEqual([false, 'wrong-reason']);
+    });
+
+    test("a DENY test's reason does not prove an ALLOW test", () => {
+      expect(run('failed', [red]).rows[0].result).toBe('wrong-reason');
+    });
+
+    // B12: every attempt must carry the marker.
+    test('red only when every retried attempt was refused', () => {
+      expect(run('failed', [refused, 'Error: socket hang up']).rows[0].result).toBe('wrong-reason');
+    });
+  });
+
+  // B13/B14: an expect() failure prints its expected value, so the proof text can
+  // appear in a failure that never met the rules. Only the first line counts.
+  test('an expect() failure quoting the DENY reason is the wrong reason', () => {
+    const fake = `Error: expect(received).toBe(expected)\n\nExpected: "${REASON}"`;
+    expect(one('failed', [fake]).rows[0].result).toBe('wrong-reason');
+  });
+
+  test('an expect() failure quoting the ALLOW marker is the wrong reason', () => {
+    const fake = `Error: expect(received).toBe(expected)\n\nExpected: "${ALLOW_REFUSED} x"`;
+    const json = jestJson(suite(HEAD_API, CONV, [['ALLOW: a', 'failed', [fake]]]));
+    expect(verdict(json, [t(CONV, 'ALLOW: a')], HEAD_API).rows[0].result).toBe('wrong-reason');
   });
 
   test('a test failing for another reason is red for the wrong reason', () => {
@@ -351,7 +452,7 @@ describe('summary', () => {
     });
     for (const want of [
       SHA,
-      '1 added DENY test, 1 rewritten DENY test',
+      '1 added rules test, 1 rewritten rules test',
       `| ${CONV}: DENY: a | red |`,
       `| ${CONV}: DENY: r | red |`,
       `${CONV}: DENY: old → ${CONV}: DENY: new`,
@@ -372,7 +473,7 @@ describe('summary', () => {
       rows: [],
       fixtureRuns: [],
     });
-    expect(md).toContain('0 added DENY tests, 0 rewritten DENY tests');
+    expect(md).toContain('0 added rules tests, 0 rewritten rules tests');
   });
 
   test('says the rules are unchanged when they are', () => {
@@ -397,6 +498,9 @@ describe('main', () => {
   const headSource =
     "test('DENY: a', async () => { await assertFails(x()); });\ntest('DENY: b', async () => { await assertFails(y()); });";
   const baseSource = "test('DENY: a', async () => { await assertFails(x()); });";
+  const BASE_RULES = 'rules_version = "2";';
+  const HEAD_RULES = 'rules_version = "2"; match /a/{x} { allow read: if false; }';
+  const SETUP = path.join(HEAD_API, 'tests/firestore-rules/_helpers/red-first-setup.js');
 
   function deps({
     changed = ['firestore.rules'],
@@ -410,7 +514,8 @@ describe('main', () => {
     const disk = {
       [path.join(HEAD_API, CONV)]: headSource,
       [path.join(BASE_API, CONV)]: baseSource,
-      [path.join(BASE, 'firestore.rules')]: 'rules_version = "2";',
+      [path.join(BASE, 'firestore.rules')]: BASE_RULES,
+      [path.join(ROOT, 'firestore.rules')]: HEAD_RULES,
       [path.join(HEAD_API, 'tests/firestore-rules/red-first-fixtures.json')]:
         JSON.stringify(fixtures),
       [path.join(HEAD_API, FIX)]: 'rules_version = "2"; // old',
@@ -484,6 +589,7 @@ describe('main', () => {
       files: [CONV],
       pattern: namePattern(['DENY: b']),
       env: { SHYTALK_RULES_UNDER_TEST: path.join(BASE, 'firestore.rules') },
+      setupFile: SETUP,
     });
     expect(jest[3]).toEqual({
       cwd: HEAD_API,
@@ -513,15 +619,75 @@ describe('main', () => {
     expect(calls.filter((c) => c[0] === 'jest')).toHaveLength(1);
   });
 
-  test('rules changed with no added or rewritten DENY test: exit 0 with a notice saying 0', () => {
+  // B8, Shyden 2026-10-21: every rules change is proven; none planned is red.
+  test('rules changed with no added or rewritten test: exit 1, the change unproven', () => {
     const { d, out } = deps({
       files: { [path.join(HEAD_API, CONV)]: baseSource },
       runs: [listing(HEAD_API, ['DENY: a']), listing(BASE_API, ['DENY: a']), fixtureRed],
     });
-    expect(main(d)).toBe(0);
-    expect(out).toContain(
-      '::notice::firestore.rules changed and 0 added or rewritten DENY tests were found',
+    expect(main(d)).toBe(1);
+    expect(out.join('\n')).toContain(
+      'FAIL (unproven): firestore.rules — it changed but no added or rewritten test fails on the base rules',
     );
+  });
+
+  // B9: a comment-only edit of the rules is no change.
+  test('a comment- or spacing-only edit of firestore.rules is no change: fixtures only', () => {
+    const { d, calls, out } = deps({
+      files: { [path.join(ROOT, 'firestore.rules')]: `// note\n${BASE_RULES}\n` },
+      runs: [fixtureRed],
+    });
+    expect(main(d)).toBe(0);
+    expect(calls.filter((c) => c[0] === 'jest')).toHaveLength(1);
+    expect(out.join('\n')).toContain('firestore.rules changed only in comments or spacing');
+  });
+
+  // B6: controls alone prove nothing.
+  test('rules changed and only an ALLOW control added: exit 1, unproven', () => {
+    const head = `${baseSource}\ntest('ALLOW: c', async () => { await assertSucceeds(y()); });`;
+    const { d } = deps({
+      files: { [path.join(HEAD_API, CONV)]: head },
+      runs: [
+        listing(HEAD_API, ['DENY: a', 'ALLOW: c']),
+        listing(BASE_API, ['DENY: a']),
+        jestJson(suite(HEAD_API, CONV, [['ALLOW: c', 'passed']])),
+        fixtureRed,
+      ],
+    });
+    expect(main(d)).toBe(1);
+  });
+
+  test('a loosening proven by an ALLOW test the base rules refuse: exit 0', () => {
+    const head = `${baseSource}\ntest('ALLOW: c', async () => { await assertSucceeds(y()); });`;
+    const { d } = deps({
+      files: { [path.join(HEAD_API, CONV)]: head },
+      runs: [
+        listing(HEAD_API, ['DENY: a', 'ALLOW: c']),
+        listing(BASE_API, ['DENY: a']),
+        jestJson(suite(HEAD_API, CONV, [['ALLOW: c', 'failed', [`Error: ${ALLOW_REFUSED} x`]]])),
+        fixtureRed,
+      ],
+    });
+    expect(main(d)).toBe(0);
+  });
+
+  test('a red DENY test beside an ALLOW control: exit 0', () => {
+    const head = `${headSource}\ntest('ALLOW: c', async () => { await assertSucceeds(y()); });`;
+    const { d } = deps({
+      files: { [path.join(HEAD_API, CONV)]: head },
+      runs: [
+        listing(HEAD_API, ['DENY: a', 'DENY: b', 'ALLOW: c']),
+        listing(BASE_API, ['DENY: a']),
+        jestJson(
+          suite(HEAD_API, CONV, [
+            ['DENY: b', 'failed', [red]],
+            ['ALLOW: c', 'passed'],
+          ]),
+        ),
+        fixtureRed,
+      ],
+    });
+    expect(main(d)).toBe(0);
   });
 
   test('rules changed and a DENY test rewritten under its name: it runs against the base rules', () => {
@@ -542,6 +708,7 @@ describe('main', () => {
       files: [CONV],
       pattern: namePattern(['DENY: a']),
       env: { SHYTALK_RULES_UNDER_TEST: path.join(BASE, 'firestore.rules') },
+      setupFile: SETUP,
     });
   });
 
@@ -560,15 +727,21 @@ describe('main', () => {
     expect(out.join('\n')).toContain('if it was only tidied, move the tidy to its own PR');
   });
 
-  test('a comment-only change to a DENY test is not a rewrite: nothing runs on the base rules', () => {
+  test('a comment-only change to a DENY test is not a rewrite: only the added test runs', () => {
     const commented =
-      "test('DENY: a', async () => {\n  // why it is refused\n  await assertFails(x());\n});";
+      "test('DENY: a', async () => {\n  // why it is refused\n  await assertFails(x());\n});\ntest('DENY: b', async () => { await assertFails(y()); });";
     const { d, calls } = deps({
       files: { [path.join(HEAD_API, CONV)]: commented },
-      runs: [listing(HEAD_API, ['DENY: a']), listing(BASE_API, ['DENY: a']), fixtureRed],
+      runs: [
+        listing(HEAD_API, ['DENY: a', 'DENY: b']),
+        listing(BASE_API, ['DENY: a']),
+        jestJson(suite(HEAD_API, CONV, [['DENY: b', 'failed', [red]]])),
+        fixtureRed,
+      ],
     });
     expect(main(d)).toBe(0);
-    expect(calls.filter((c) => c[0] === 'jest')).toHaveLength(3);
+    const jest = calls.filter((c) => c[0] === 'jest').map((c) => c[1]);
+    expect(jest[2].pattern).toBe(namePattern(['DENY: b']));
   });
 
   test('a fixture case passing on its old rules: exit 1', () => {

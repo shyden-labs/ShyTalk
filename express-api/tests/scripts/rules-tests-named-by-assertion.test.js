@@ -18,7 +18,18 @@
  */
 
 const path = require('path');
-const { extractTests, rulesTestFiles } = require('../firestore-rules/_helpers/rules-test-names.js');
+const fs = require('fs');
+const {
+  RULES_LIB,
+  parseTestFile,
+  walk,
+  literalText,
+  requires,
+  extractTests,
+  rulesTestFiles,
+} = require('../firestore-rules/_helpers/rules-test-names.js');
+const { REASON } = require('../../scripts/rules-red-first.js');
+const { ALLOW_REFUSED } = require('../firestore-rules/_helpers/red-first-refusal.js');
 
 const TESTS_DIR = path.resolve(__dirname, '..');
 
@@ -100,6 +111,126 @@ describe('each rules test is named by what it asserts', () => {
       file: s.rel,
       findings: [],
     });
+  });
+});
+
+// A rules test proves a change only through assertFails / assertSucceeds meeting
+// the rules (NO HOLES, 2026-10-21). Throwing, building an Error, rejecting by
+// hand, or reading which rules are loaded could fake the first line the
+// red-first step reads, so none is allowed; nor is a module beyond the five
+// they require today, whose local ones never hold either proof text.
+const ALLOWED_REQUIRES = [
+  '../helpers/firebase-emulator',
+  './_helpers/rules-source',
+  RULES_LIB,
+  'firebase/compat/app',
+  'firebase/compat/firestore',
+];
+const PROOF_TEXTS = [REASON, ALLOW_REFUSED];
+
+function fakeFindings(source, file) {
+  const ast = parseTestFile(source, file);
+  const out = [];
+  const at = (n) => `line ${n.loc.start.line}`;
+  walk(ast, (n) => {
+    if (n.type === 'ThrowStatement') out.push(`${at(n)}: throws`);
+    if (
+      (n.type === 'NewExpression' || n.type === 'CallExpression') &&
+      n.callee.type === 'Identifier' &&
+      /Error$/.test(n.callee.name)
+    ) {
+      out.push(`${at(n)}: builds a ${n.callee.name}`);
+    }
+    if (
+      n.type === 'MemberExpression' &&
+      !n.computed &&
+      n.object.type === 'Identifier' &&
+      n.object.name === 'Promise' &&
+      n.property.name === 'reject'
+    ) {
+      out.push(`${at(n)}: rejects by hand`);
+    }
+    if (n.type === 'MemberExpression' && n.object.type === 'MemberExpression') {
+      const o = n.object;
+      const isEnv =
+        o.object.type === 'Identifier' &&
+        o.object.name === 'process' &&
+        !o.computed &&
+        o.property.name === 'env';
+      const name = n.computed ? literalText(n.property) : n.property.name;
+      if (isEnv && name !== 'JEST_WORKER_ID')
+        out.push(`${at(n)}: reads process.env other than JEST_WORKER_ID`);
+    }
+  });
+  walk(ast, (n) => {
+    if (n.type === 'VariableDeclarator' && n.init && n.init.type === 'MemberExpression') {
+      const m = n.init;
+      if (
+        m.object.type === 'Identifier' &&
+        m.object.name === 'process' &&
+        m.property.name === 'env'
+      ) {
+        out.push(`${at(n)}: takes process.env whole`);
+      }
+    }
+  });
+  for (const r of requires(ast)) {
+    if (!ALLOWED_REQUIRES.includes(r)) out.push(`requires ${r}, beyond the five rules tests use`);
+  }
+  for (const text of PROOF_TEXTS)
+    if (source.includes(text)) out.push(`holds the proof text "${text}"`);
+  return out;
+}
+
+describe('a rules test cannot fake a proof', () => {
+  test.each(rulesFiles.map((s) => [s.rel, s]))('%s', (_name, s) => {
+    expect({ file: s.rel, findings: fakeFindings(s.source, s.file) }).toEqual({
+      file: s.rel,
+      findings: [],
+    });
+  });
+
+  test('the local modules rules tests require hold neither proof text', () => {
+    const local = [
+      '../helpers/firebase-emulator.js',
+      '../firestore-rules/_helpers/rules-source.js',
+    ];
+    const hits = local
+      .map((m) => ({ m, text: fs.readFileSync(path.resolve(__dirname, m), 'utf8') }))
+      .filter(({ text }) => PROOF_TEXTS.some((p) => text.includes(p)))
+      .map(({ m }) => m);
+    expect(hits).toEqual([]);
+  });
+
+  const lib = `'${RULES_LIB}'`;
+  test('a clean rules test has no findings', () => {
+    const clean = `const { assertFails } = require(${lib});\nconst ID = \`p-\${process.env.JEST_WORKER_ID}\`;\ntest('DENY: a', async () => { await assertFails(x()); });`;
+    expect(fakeFindings(clean, 'p.test.js')).toEqual([]);
+  });
+
+  test('every way to fake a proof is caught', () => {
+    const planted = [
+      "test('DENY: a', async () => { throw new Error('x'); });",
+      "test('DENY: b', async () => { await Promise.reject(TypeError('y')); });",
+      "test('ALLOW: c', async () => { if (process.env.SHYTALK_RULES_UNDER_TEST) await z(); });",
+      'const env = process.env;',
+      "const other = require('./sneaky');",
+    ].join('\n');
+    expect(fakeFindings(planted, 'p.test.js')).toEqual([
+      'line 1: throws',
+      'line 1: builds a Error',
+      'line 2: rejects by hand',
+      'line 2: builds a TypeError',
+      'line 3: reads process.env other than JEST_WORKER_ID',
+      'line 4: takes process.env whole',
+      'requires ./sneaky, beyond the five rules tests use',
+    ]);
+  });
+
+  test('a proof text held in a rules test is caught', () => {
+    expect(fakeFindings(`const s = '${REASON}';`, 'p.test.js')).toEqual([
+      `holds the proof text "${REASON}"`,
+    ]);
   });
 });
 

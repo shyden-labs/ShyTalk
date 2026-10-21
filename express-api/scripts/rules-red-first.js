@@ -1,25 +1,27 @@
 'use strict';
 
 /**
- * rules-red-first.js — SHY-0657. The CI step "Rules red-first: new DENY
- * tests fail on the base rules", run from test-backend.yml after the main
- * jest run, with the emulators already up.
+ * rules-red-first.js — SHY-0657. The CI step "Rules red-first: every rules
+ * change is proven on the base rules", run from test-backend.yml after the
+ * main jest run, with the emulators already up.
  *
- * On a PR that changes firestore.rules, every DENY rules test the PR adds, or
- * rewrites under the same name (Shyden, 2026-10-21), is run against the base
- * branch's rules (loaded through
- * SHYTALK_RULES_UNDER_TEST, as test input only) and must fail there for the
- * reason assertFails gives when a request succeeds. A test that passes there
- * tests nothing the change made; one that fails for any other reason proves
- * nothing either. The recorded fixture cases (red-first-fixtures.json) are
- * re-proved against their old rules whenever anything in scope changes.
+ * Every firestore.rules change is proven (Shyden, 2026-10-21). On a PR whose
+ * rules changed (comments and spacing aside), every rules test it adds, or
+ * rewrites under the same name, is run against the base branch's rules
+ * (loaded through SHYTALK_RULES_UNDER_TEST, as test input only). A DENY test
+ * must fail there for the reason assertFails gives when a request succeeds;
+ * an ALLOW test refused there (red-first-setup.js marks the refusal) proves a
+ * loosening, and one that passes there is a control that proves nothing. At
+ * least one test must fail there, or the change is unproven and the step
+ * fails. The recorded fixture cases (red-first-fixtures.json) are re-proved
+ * against their old rules whenever anything in scope changes.
  *
  * Tests are found by name: jest lists them on both sides (a run whose name
  * pattern matches nothing runs no hook and no test, measured), the base side
- * from a detached worktree of the base SHA. A DENY name that vanished from
- * the base and one that appeared in the head with the same code is a rename.
- * Code is compared with comments removed and whitespace collapsed, so a
- * reworded comment is neither a rewrite nor a new test.
+ * from a detached worktree of the base SHA. A rules test name that vanished
+ * from the base and one that appeared in the head with the same code is a
+ * rename. Code is compared as tokens with comments dropped, so a reworded
+ * comment is neither a rewrite nor a new test.
  * Every rules test is named by what it asserts, which a guard holds
  * (tests/scripts/rules-tests-named-by-assertion.test.js).
  *
@@ -35,6 +37,7 @@ const {
   rulesTestFiles,
 } = require('../tests/firestore-rules/_helpers/rules-test-names.js');
 const { RULES_OVERRIDE_ENV } = require('../tests/firestore-rules/_helpers/rules-source.js');
+const { ALLOW_REFUSED } = require('../tests/firestore-rules/_helpers/red-first-refusal.js');
 
 const REASON = 'Expected request to fail, but it succeeded.';
 const NEVER = '^(?!)$';
@@ -49,6 +52,11 @@ const SCOPE_FILES = [
   'express-api/scripts/rules-red-first.js',
 ];
 const DENY = 'DENY: ';
+const ALLOW = 'ALLOW: ';
+// Wraps assertSucceeds in the base run only, so an ALLOW refusal fails under ALLOW_REFUSED.
+const SETUP = 'tests/firestore-rules/_helpers/red-first-setup.js';
+const UNPROVEN =
+  'it changed but no added or rewritten test fails on the base rules (every rules change is proven, Shyden 2026-10-21)';
 
 const key = (t) => `${t.file}: ${t.fullName}`;
 const firstLine = (text) => String(text).split('\n')[0];
@@ -84,19 +92,60 @@ function attachBodies(list, extracted) {
   });
 }
 
-// The DENY tests a PR adds, and those it rewrites under the same name (Shyden,
-// 2026-10-21: "they should" meet the base rules too). Code is compared with
-// comments removed and whitespace collapsed, so a reworded comment is neither.
-// A vanished base DENY test with the same code as an appeared one is a rename.
-function addedDenyTests(base, head) {
+// firestore.rules as its code: comments dropped and spacing collapsed outside
+// strings, every character inside a string kept, so an edit to comments or
+// spacing alone is no rules change (Shyden, 2026-10-21). Fails closed on an
+// unterminated comment or string.
+function rulesCode(text) {
+  let out = '';
+  let i = 0;
+  let space = false;
+  const emit = (chunk) => {
+    if (space && out !== '') out += ' ';
+    space = false;
+    out += chunk;
+  };
+  while (i < text.length) {
+    const c = text[i];
+    if (c === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i++;
+      space = true;
+    } else if (c === '/' && text[i + 1] === '*') {
+      const end = text.indexOf('*/', i + 2);
+      if (end === -1) throw new Error('firestore.rules: unterminated comment');
+      i = end + 2;
+      space = true;
+    } else if (c === "'" || c === '"') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== c) j += text[j] === '\\' ? 2 : 1;
+      if (j >= text.length) throw new Error('firestore.rules: unterminated string');
+      emit(text.slice(i, j + 1));
+      i = j + 1;
+    } else if (/\s/.test(c)) {
+      space = true;
+      i++;
+    } else {
+      emit(c);
+      i++;
+    }
+  }
+  return out;
+}
+
+// The rules tests a PR adds, and those it rewrites under the same name (Shyden,
+// 2026-10-21: rewritten DENY tests "should" meet the base rules too; every
+// rules change is proven, a loosening by an ALLOW test). Code is compared as
+// tokens with comments dropped, so a reworded comment is neither. A vanished
+// base test with the same code as an appeared one is a rename.
+function plannedTests(base, head) {
   const baseByKey = new Map(base.map((t) => [key(t), t]));
   const headKeys = new Set(head.map(key));
-  const isDeny = (t) => t.title.startsWith(DENY);
-  const vanished = base.filter((t) => isDeny(t) && !headKeys.has(key(t)));
+  const isRulesTest = (t) => t.title.startsWith(DENY) || t.title.startsWith(ALLOW);
+  const vanished = base.filter((t) => isRulesTest(t) && !headKeys.has(key(t)));
   const added = [];
   const rewritten = [];
   const renamed = [];
-  for (const t of head.filter(isDeny)) {
+  for (const t of head.filter(isRulesTest)) {
     const before = baseByKey.get(key(t));
     if (before) {
       if (before.code !== t.code) rewritten.push(t);
@@ -132,6 +181,15 @@ function verdict(json, planned, cwd) {
     }
     const a = result && result.assertionResults.find((r) => r.fullName === p.fullName);
     if (!a) return { test, result: 'missing', detail: "not in jest's results" };
+    // A fixture entry has no title: every fixture case is a refusal.
+    const allow = typeof p.title === 'string' && p.title.startsWith(ALLOW);
+    if (allow && a.status === 'passed') {
+      return {
+        test,
+        result: 'control',
+        detail: 'passes on these rules too: a positive control, not a proof',
+      };
+    }
     if (a.status === 'passed') {
       return {
         test,
@@ -146,11 +204,21 @@ function verdict(json, planned, cwd) {
     if (a.failureMessages.length === 0)
       return { test, result: 'wrong-reason', detail: 'failed with no message' };
     // jest-retry-setup retries a failing test (SHY-0547): every attempt must fail for the reason.
-    const wrong = a.failureMessages.find((m) => !m.includes(REASON));
+    // Only the first line counts: an expect() failure prints its expected value
+    // further down, so the proof text there would prove nothing (NO HOLES).
+    const isReason = allow
+      ? (m) => firstLine(m).startsWith(`Error: ${ALLOW_REFUSED}`)
+      : (m) => firstLine(m) === `Error: ${REASON}`;
+    const wrong = a.failureMessages.find((m) => !isReason(m));
     if (wrong !== undefined) return { test, result: 'wrong-reason', detail: firstLine(wrong) };
     return { test, result: 'red', detail: '' };
   });
-  return { ok: rows.every((r) => r.result === 'red'), rows };
+  return { ok: rows.every(isPass), rows };
+}
+
+// red proves the change; a control is allowed beside a proof but proves nothing.
+function isPass(row) {
+  return row.result === 'red' || row.result === 'control';
 }
 
 // The changed files this step covers; `rulesFiles` are relative to express-api.
@@ -168,7 +236,7 @@ function table(rows) {
   ].join('\n');
 }
 
-const count = (n, what) => `${n} ${what} DENY test${n === 1 ? '' : 's'}`;
+const count = (n, what) => `${n} ${what} rules test${n === 1 ? '' : 's'}`;
 
 function summary({ baseSha, rulesChanged, added, rewritten, renamed, rows, fixtureRuns }) {
   const parts = [`## Rules red-first (base ${baseSha})`, ''];
@@ -179,7 +247,7 @@ function summary({ baseSha, rulesChanged, added, rewritten, renamed, rows, fixtu
     parts.push('', table(rows));
   } else {
     parts.push(
-      'firestore.rules is unchanged against the base: no added or rewritten DENY test needs to be shown red.',
+      'firestore.rules is unchanged against the base (comments and spacing aside): no rules change to prove.',
     );
   }
   if (renamed.length > 0) {
@@ -260,39 +328,48 @@ function main(deps) {
     }
     const baseRules = path.join(baseDir, 'firestore.rules');
     if (!exists(baseRules)) throw new Error(`firestore.rules is absent at base ${baseSha}`);
-    report.rulesChanged = changed.includes('firestore.rules');
+    const fileChanged = changed.includes('firestore.rules');
+    report.rulesChanged =
+      fileChanged &&
+      rulesCode(deps.readFile(path.join(repoRoot, 'firestore.rules'))) !==
+        rulesCode(deps.readFile(baseRules));
+    if (fileChanged && !report.rulesChanged) {
+      write('firestore.rules changed only in comments or spacing: no rules change to prove.');
+    }
     if (report.rulesChanged) {
       const head = sides(deps, repoRoot);
       const base = sides(deps, baseDir);
-      Object.assign(report, addedDenyTests(base, head));
+      Object.assign(report, plannedTests(base, head));
       const planned = [
         ...report.added,
         ...report.rewritten.map((t) => ({ ...t, rewritten: true })),
       ];
-      if (planned.length === 0) {
-        write('::notice::firestore.rules changed and 0 added or rewritten DENY tests were found');
-      } else {
+      if (planned.length > 0) {
         const files = [...new Set(planned.map((t) => t.file))];
         const json = deps.runJest({
           cwd: headApi,
           files,
           pattern: namePattern(planned.map((t) => t.fullName)),
           env: { [RULES_OVERRIDE_ENV]: baseRules },
+          setupFile: path.join(headApi, SETUP),
         });
         report.rows = verdict(json, planned, headApi).rows;
+      }
+      if (!report.rows.some((r) => r.result === 'red')) {
+        report.rows.push({ test: 'firestore.rules', result: 'unproven', detail: UNPROVEN });
       }
     }
     report.fixtureRuns = runFixtures(deps, headApi);
     const all = [...report.rows, ...report.fixtureRuns.flatMap((f) => f.rows)];
     for (const r of all)
       write(
-        `${r.result === 'red' ? 'red' : `FAIL (${r.result})`}: ${r.test}${r.detail ? ` — ${r.detail}` : ''}`,
+        `${isPass(r) ? r.result : `FAIL (${r.result})`}: ${r.test}${r.detail ? ` — ${r.detail}` : ''}`,
       );
     for (const r of report.renamed) write(`renamed, not counted: ${r.from} → ${r.to}`);
-    const ok = all.every((r) => r.result === 'red');
+    const ok = all.every(isPass);
     write(
       ok
-        ? 'Rules red-first: every case is red for the assertFails reason.'
+        ? 'Rules red-first: every case is red on the rules it replaces.'
         : 'Rules red-first: FAILED, see the cases above.',
     );
     appendSummary(summary(report));
@@ -306,10 +383,12 @@ function main(deps) {
 
 module.exports = {
   REASON,
+  ALLOW_REFUSED,
   NEVER,
   listed,
   attachBodies,
-  addedDenyTests,
+  plannedTests,
+  rulesCode,
   namePattern,
   verdict,
   inScope,
@@ -354,7 +433,7 @@ if (require.main === module) {
     },
     exists: (p) => fs.existsSync(p),
     readFile: (p) => fs.readFileSync(p, 'utf8'),
-    runJest: ({ cwd, files, pattern, env }) => {
+    runJest: ({ cwd, files, pattern, env, setupFile }) => {
       jestRuns += 1;
       const outputFile = path.join(process.env.RUNNER_TEMP, `rules-red-first-${jestRuns}.json`);
       const args = [
@@ -363,6 +442,7 @@ if (require.main === module) {
         '--runTestsByPath',
         ...files,
       ];
+      if (setupFile) args.push(`--setupFilesAfterEnv=${setupFile}`);
       args.push(
         '-t',
         pattern,
