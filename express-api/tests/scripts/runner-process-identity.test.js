@@ -210,13 +210,19 @@ describe('SHY-0304 — a runner is identified by what it is, not what it mention
       // NOT killed by this run's scoped kill, must not be reported as this
       // run's leftover. Today the machine-wide pgrep reports it and exits 1.
       const otherRun = `matrix-other-${process.pid}`;
-      spawnVisible(`node ${RUNNER} --matrix --report-dir=/tmp/${otherRun}/report`, otherRun);
+      const other = spawnVisible(
+        `node ${RUNNER} --matrix --report-dir=/tmp/${otherRun}/report`,
+        otherRun,
+      );
 
       makeRun('mine-a', deadPid());
       const r = runStop('mine-a');
 
       expectStatus(r, 0);
       expect(r.stdout).toMatch(/0 runners remain/);
+      // The harm, not only the verdict: with the scope dropped, stop KILLS the
+      // other run's runner and then truthfully finds none left (SHY-0302).
+      expect(commandOf(other.pid)).toContain(otherRun);
     });
 
     test('a runner from another run is still surfaced, attributed, not silently dropped', () => {
@@ -451,6 +457,19 @@ describe('SHY-0304 — a runner is identified by what it is, not what it mention
         `node jest tests/scripts/manual-qa-runner.test.js ${decoy}`,
         decoy,
       );
+
+      const { r, targets } = runCleanup();
+
+      expectStatus(r, 0);
+      expect(targets).not.toContain(String(child.pid));
+    });
+
+    test('does not target a reader holding the runner script itself', () => {
+      // Every other decoy names `manual-qa-runner.test.js`. This one names the
+      // runner's own path, as `tail -f` or an editor on it would, so only the
+      // predicate's `node` half spares it (found 2026-10-22, SHY-0302).
+      const decoy = `shy0302-reader-${process.pid}`;
+      const child = spawnVisible(`tail -f ${RUNNER} ${decoy}`, decoy);
 
       const { r, targets } = runCleanup();
 
