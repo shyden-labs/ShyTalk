@@ -52,6 +52,10 @@ const DENY = 'DENY: ';
 
 const key = (t) => `${t.file}: ${t.fullName}`;
 const firstLine = (text) => String(text).split('\n')[0];
+// A suite that could not load reports no test and says why in `message`. jest
+// also fills `message` whenever any test fails (measured, PR Checks run
+// 39558776688), so a message alone is not a load failure.
+const didNotLoad = (result) => result.assertionResults.length === 0 && Boolean(result.message);
 
 // Each test a name-only listing reported, as { file, fullName } relative to `cwd`.
 function listed(json, cwd, files) {
@@ -59,7 +63,7 @@ function listed(json, cwd, files) {
   return files.flatMap((file) => {
     const result = byFile.get(file);
     if (!result) throw new Error(`${file} is not in jest's results`);
-    if (result.message) throw new Error(`${file} did not load: ${firstLine(result.message)}`);
+    if (didNotLoad(result)) throw new Error(`${file} did not load: ${firstLine(result.message)}`);
     return result.assertionResults.map((a) => {
       if (a.status !== 'pending') throw new Error(`${file}: "${a.fullName}" ran while listing`);
       return { file, fullName: a.fullName };
@@ -119,7 +123,7 @@ function verdict(json, planned, cwd) {
   const rows = planned.map((p) => {
     const test = key(p);
     const result = byFile.get(p.file);
-    if (result && result.message) {
+    if (result && didNotLoad(result)) {
       return {
         test,
         result: 'missing',

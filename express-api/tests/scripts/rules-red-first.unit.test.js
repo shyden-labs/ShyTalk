@@ -205,6 +205,20 @@ describe('verdict', () => {
     });
   });
 
+  // Measured in PR Checks run 39558776688: jest fills a suite's `message` with
+  // its failing tests' text whenever any test fails, not only when it cannot
+  // load. Reading that as a load failure reported SHY-0653's four red cases
+  // as missing.
+  test("a loaded suite whose message holds its failing tests' text is read test by test", () => {
+    const json = jestJson(
+      suite(HEAD_API, CONV, [['DENY: a', 'failed', [red]]], `  ● DENY: a\n\n    ${REASON}`),
+    );
+    expect(verdict(json, planned, HEAD_API)).toEqual({
+      ok: true,
+      rows: [{ test: `${CONV}: DENY: a`, result: 'red', detail: '' }],
+    });
+  });
+
   test('a test passing on the base rules tests nothing, and fails the verdict', () => {
     expect(one('passed', [])).toEqual({
       ok: false,
