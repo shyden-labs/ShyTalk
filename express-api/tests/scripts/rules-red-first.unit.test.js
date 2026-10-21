@@ -44,11 +44,12 @@ const suite = (cwd, file, rows, message = '') => ({
 });
 const jestJson = (...suites) => ({ testResults: suites });
 const red = `Error: ${REASON}\n    at assertFails (node_modules/...)`;
-const t = (file, fullName, body = `body of ${fullName}`, title = fullName) => ({
+// `code` is a test's callback with comments removed and whitespace collapsed (extractTests).
+const t = (file, fullName, code = `code of ${fullName}`, title = fullName) => ({
   file,
   fullName,
   title,
-  body,
+  code,
 });
 
 describe('constants', () => {
@@ -89,8 +90,8 @@ describe('listed', () => {
 describe('attachBodies', () => {
   const extracted = {
     [CONV]: [
-      { fullName: 'd DENY: a', title: 'DENY: a', body: 'A', family: false },
-      { fullName: 'd DENY: (banned) %s', title: 'DENY: (banned) %s', body: 'F', family: true },
+      { fullName: 'd DENY: a', title: 'DENY: a', code: 'A', family: false },
+      { fullName: 'd DENY: (banned) %s', title: 'DENY: (banned) %s', code: 'F', family: true },
     ],
   };
 
@@ -102,7 +103,7 @@ describe('attachBodies', () => {
       ],
       extracted,
     );
-    expect(got.map((g) => [g.fullName, g.title, g.body])).toEqual([
+    expect(got.map((g) => [g.fullName, g.title, g.code])).toEqual([
       ['d DENY: a', 'DENY: a', 'A'],
       ['d DENY: (banned) users write', 'DENY: (banned) %s', 'F'],
     ]);
@@ -118,27 +119,41 @@ describe('attachBodies', () => {
 describe('addedDenyTests', () => {
   test('a DENY name new to the head is added', () => {
     const got = addedDenyTests([t(CONV, 'DENY: a')], [t(CONV, 'DENY: a'), t(CONV, 'DENY: b')]);
-    expect(got).toEqual({ added: [t(CONV, 'DENY: b')], renamed: [] });
+    expect(got).toEqual({ added: [t(CONV, 'DENY: b')], rewritten: [], renamed: [] });
   });
 
-  test('a test keeping its name with a new body is not added', () => {
+  // Shyden, 2026-10-21 ("they should"): a DENY test kept by name but rewritten
+  // meets the base rules too, or a fix proven by editing one would go unproven.
+  test('a DENY test keeping its name with new code is rewritten, and planned', () => {
     const got = addedDenyTests([t(CONV, 'DENY: a', 'old')], [t(CONV, 'DENY: a', 'new')]);
-    expect(got).toEqual({ added: [], renamed: [] });
+    expect(got).toEqual({ added: [], rewritten: [t(CONV, 'DENY: a', 'new')], renamed: [] });
   });
 
-  test('an ALLOW test new to the head is not added', () => {
-    expect(addedDenyTests([], [t(CONV, 'ALLOW: a')]).added).toEqual([]);
+  test('a DENY test whose code is unchanged is neither added nor rewritten', () => {
+    const got = addedDenyTests([t(CONV, 'DENY: a', 'same')], [t(CONV, 'DENY: a', 'same')]);
+    expect(got).toEqual({ added: [], rewritten: [], renamed: [] });
+  });
+
+  test('an ALLOW test new to the head, or rewritten, is not planned', () => {
+    const got = addedDenyTests(
+      [t(CONV, 'ALLOW: b', 'old')],
+      [t(CONV, 'ALLOW: a'), t(CONV, 'ALLOW: b', 'new')],
+    );
+    expect(got).toEqual({ added: [], rewritten: [], renamed: [] });
   });
 
   test('a DENY test renamed in place is a rename, not an addition', () => {
-    const got = addedDenyTests(
-      [t(CONV, 'DENY: old', 'same  body')],
-      [t(CONV, 'DENY: new', 'same body')],
-    );
+    const got = addedDenyTests([t(CONV, 'DENY: old', 'same')], [t(CONV, 'DENY: new', 'same')]);
     expect(got).toEqual({
       added: [],
+      rewritten: [],
       renamed: [{ from: `${CONV}: DENY: old`, to: `${CONV}: DENY: new` }],
     });
+  });
+
+  test('a DENY test renamed AND rewritten is added: its code matches no vanished test', () => {
+    const got = addedDenyTests([t(CONV, 'DENY: old', 'old')], [t(CONV, 'DENY: new', 'new')]);
+    expect(got).toEqual({ added: [t(CONV, 'DENY: new', 'new')], rewritten: [], renamed: [] });
   });
 
   test('a DENY test moved into another describe or file is a rename', () => {
@@ -153,7 +168,7 @@ describe('addedDenyTests', () => {
   test('a new row in a test.each family shares its body but is added: no base name vanished', () => {
     const base = [t(CONV, 'DENY: (banned) a', 'F', 'DENY: (banned) %s')];
     const head = [...base, t(CONV, 'DENY: (banned) b', 'F', 'DENY: (banned) %s')];
-    expect(addedDenyTests(base, head)).toEqual({ added: [head[1]], renamed: [] });
+    expect(addedDenyTests(base, head)).toEqual({ added: [head[1]], rewritten: [], renamed: [] });
   });
 
   test('every DENY test of a file absent at base is added', () => {
@@ -292,8 +307,12 @@ describe('summary', () => {
       baseSha: SHA,
       rulesChanged: true,
       added: [t(CONV, 'DENY: a')],
+      rewritten: [t(CONV, 'DENY: r')],
       renamed: [{ from: `${CONV}: DENY: old`, to: `${CONV}: DENY: new` }],
-      rows: [{ test: `${CONV}: DENY: a`, result: 'red', detail: '' }],
+      rows: [
+        { test: `${CONV}: DENY: a`, result: 'red', detail: '' },
+        { test: `${CONV}: DENY: r`, result: 'red', detail: '' },
+      ],
       fixtureRuns: [
         {
           story: 'SHY-0653',
@@ -304,8 +323,9 @@ describe('summary', () => {
     });
     for (const want of [
       SHA,
-      '1 added DENY test',
+      '1 added DENY test, 1 rewritten DENY test',
       `| ${CONV}: DENY: a | red |`,
+      `| ${CONV}: DENY: r | red |`,
       `${CONV}: DENY: old → ${CONV}: DENY: new`,
       'SHY-0653',
       `| ${CONV}: DENY: z | red |`,
@@ -314,16 +334,17 @@ describe('summary', () => {
     }
   });
 
-  test('says 0 added DENY tests out loud when the rules changed and none were added', () => {
+  test('says 0 added and 0 rewritten out loud when the rules changed and none were planned', () => {
     const md = summary({
       baseSha: SHA,
       rulesChanged: true,
       added: [],
+      rewritten: [],
       renamed: [],
       rows: [],
       fixtureRuns: [],
     });
-    expect(md).toContain('0 added DENY tests');
+    expect(md).toContain('0 added DENY tests, 0 rewritten DENY tests');
   });
 
   test('says the rules are unchanged when they are', () => {
@@ -331,6 +352,7 @@ describe('summary', () => {
       baseSha: SHA,
       rulesChanged: false,
       added: [],
+      rewritten: [],
       renamed: [],
       rows: [],
       fixtureRuns: [],
@@ -463,13 +485,47 @@ describe('main', () => {
     expect(calls.filter((c) => c[0] === 'jest')).toHaveLength(1);
   });
 
-  test('rules changed with no added DENY test: exit 0 with a notice saying 0', () => {
+  test('rules changed with no added or rewritten DENY test: exit 0 with a notice saying 0', () => {
     const { d, out } = deps({
       files: { [path.join(HEAD_API, CONV)]: baseSource },
       runs: [listing(HEAD_API, ['DENY: a']), listing(BASE_API, ['DENY: a']), fixtureRed],
     });
     expect(main(d)).toBe(0);
-    expect(out).toContain('::notice::firestore.rules changed and 0 added DENY tests were found');
+    expect(out).toContain(
+      '::notice::firestore.rules changed and 0 added or rewritten DENY tests were found',
+    );
+  });
+
+  test('rules changed and a DENY test rewritten under its name: it runs against the base rules', () => {
+    const rewritten = "test('DENY: a', async () => { await assertFails(z()); });";
+    const { d, calls } = deps({
+      files: { [path.join(HEAD_API, CONV)]: rewritten },
+      runs: [
+        listing(HEAD_API, ['DENY: a']),
+        listing(BASE_API, ['DENY: a']),
+        jestJson(suite(HEAD_API, CONV, [['DENY: a', 'failed', [red]]])),
+        fixtureRed,
+      ],
+    });
+    expect(main(d)).toBe(0);
+    const jest = calls.filter((c) => c[0] === 'jest').map((c) => c[1]);
+    expect(jest[2]).toEqual({
+      cwd: HEAD_API,
+      files: [CONV],
+      pattern: namePattern(['DENY: a']),
+      env: { SHYTALK_RULES_UNDER_TEST: path.join(BASE, 'firestore.rules') },
+    });
+  });
+
+  test('a comment-only change to a DENY test is not a rewrite: nothing runs on the base rules', () => {
+    const commented =
+      "test('DENY: a', async () => {\n  // why it is refused\n  await assertFails(x());\n});";
+    const { d, calls } = deps({
+      files: { [path.join(HEAD_API, CONV)]: commented },
+      runs: [listing(HEAD_API, ['DENY: a']), listing(BASE_API, ['DENY: a']), fixtureRed],
+    });
+    expect(main(d)).toBe(0);
+    expect(calls.filter((c) => c[0] === 'jest')).toHaveLength(3);
   });
 
   test('a fixture case passing on its old rules: exit 1', () => {

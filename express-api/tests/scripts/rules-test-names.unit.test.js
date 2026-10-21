@@ -68,6 +68,21 @@ describe('extractTests', () => {
     );
   });
 
+  test('gives the code: the callback with comments removed and whitespace collapsed', () => {
+    const t = one(
+      "test('DENY: a', async () => {\n  // why\n  await assertFails(/* the op */ op('a // b'));\n});",
+    );
+    expect(t.code).toBe("async () => { await assertFails( op('a // b')); }");
+  });
+
+  test('two callbacks differing only in comments and whitespace have the same code', () => {
+    const a = one("test('DENY: a', async () => { await assertFails(op()); });");
+    const b = one(
+      "test('DENY: a', async () => {\n  // reworded note\n  await   assertFails(op());\n});",
+    );
+    expect(b.code).toBe(a.code);
+  });
+
   test('sees assertFails and assertSucceeds called directly', () => {
     expect(
       one("test('DENY: a', async () => { await assertSucceeds(x()); await assertFails(y()); });")

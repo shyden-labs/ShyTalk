@@ -63,6 +63,9 @@ in a branch meant for pushing.
       rules (`1ca1299476d`) kept as a test fixture, and the run is recorded
       in SHY-0653's Security AC.
 - [ ] A PR that renames a DENY test is not counted as adding one.
+- [ ] A DENY test kept by name whose code changed is run against the base
+      rules too and must fail there (Shyden, 2026-10-21: "they should");
+      a change to its comments or whitespace alone is not a rewrite.
 - [ ] ALLOW tests are not run against the base rules by this step.
 
 ### Performance
@@ -151,3 +154,7 @@ None: an internal check with no change users can see.
   also ruled the step is required through PR Gate, not its own ruleset
   context. Re-scored 5 to 8 for the rename and the naming guard. The loader
   population is 8 files (two migration-script tests also load the rules).
+- **2026-10-21**: a side note found the step planned only ADDED DENY tests,
+  a call made alone and noted only in the design file. Shyden: rewritten
+  DENY tests "should" meet the base rules too. Code is compared with
+  comments stripped and whitespace collapsed (my call, stated to him).

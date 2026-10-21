@@ -132,14 +132,31 @@ const isDescribe = (call) =>
     call.callee.object.name === 'describe' &&
     READ_MODIFIERS.has(call.callee.property.name));
 
+// The source of `node` with every comment inside it removed and whitespace collapsed,
+// so a reworded comment or a reflow is not a change to what a test does.
+function codeOf(source, comments, node) {
+  let out = '';
+  let pos = node.start;
+  for (const c of comments) {
+    if (c.start >= node.start && c.end <= node.end) {
+      out += source.slice(pos, c.start);
+      pos = c.end;
+    }
+  }
+  out += source.slice(pos, node.end);
+  return out.replace(/\s+/g, ' ').trim();
+}
+
 /**
  * Every test in a jest file: its jest full name, title, describe path, body
- * source and whether it reaches assertFails / assertSucceeds. A `test.each`
- * family is one entry whose title is its template (`family: true`). Throws
- * naming file and line on anything whose name cannot be read from source.
+ * source, code (the body with comments removed and whitespace collapsed) and
+ * whether it reaches assertFails / assertSucceeds. A `test.each` family is one
+ * entry whose title is its template (`family: true`). Throws naming file and
+ * line on anything whose name cannot be read from source.
  */
 function extractTests(source, file) {
   const ast = parseTestFile(source, file);
+  const comments = [...(ast.comments ?? [])].sort((a, b) => a.start - b.start);
   const fns = localFunctions(ast);
   const reach = { fails: reaching(ASSERTS.fails, fns), succeeds: reaching(ASSERTS.succeeds, fns) };
   const tests = [];
@@ -176,6 +193,7 @@ function extractTests(source, file) {
           fullName: [...describePath, title].join(' '),
           family: kind.family,
           body: fn ? source.slice(fn.start, fn.end) : '',
+          code: fn ? codeOf(source, comments, fn) : '',
           asserts: {
             fails: [...names].some((n) => reach.fails.has(n)),
             succeeds: [...names].some((n) => reach.succeeds.has(n)),

@@ -5,8 +5,9 @@
  * tests fail on the base rules", run from test-backend.yml after the main
  * jest run, with the emulators already up.
  *
- * On a PR that changes firestore.rules, every DENY rules test the PR adds is
- * run against the base branch's rules (loaded through
+ * On a PR that changes firestore.rules, every DENY rules test the PR adds, or
+ * rewrites under the same name (Shyden, 2026-10-21), is run against the base
+ * branch's rules (loaded through
  * SHYTALK_RULES_UNDER_TEST, as test input only) and must fail there for the
  * reason assertFails gives when a request succeeds. A test that passes there
  * tests nothing the change made; one that fails for any other reason proves
@@ -16,7 +17,9 @@
  * Tests are found by name: jest lists them on both sides (a run whose name
  * pattern matches nothing runs no hook and no test, measured), the base side
  * from a detached worktree of the base SHA. A DENY name that vanished from
- * the base and one that appeared in the head with the same body is a rename.
+ * the base and one that appeared in the head with the same code is a rename.
+ * Code is compared with comments removed and whitespace collapsed, so a
+ * reworded comment is neither a rewrite nor a new test.
  * Every rules test is named by what it asserts, which a guard holds
  * (tests/scripts/rules-tests-named-by-assertion.test.js).
  *
@@ -49,7 +52,6 @@ const DENY = 'DENY: ';
 
 const key = (t) => `${t.file}: ${t.fullName}`;
 const firstLine = (text) => String(text).split('\n')[0];
-const normalise = (body) => body.replace(/\s+/g, ' ').trim();
 
 // Each test a name-only listing reported, as { file, fullName } relative to `cwd`.
 function listed(json, cwd, files) {
@@ -65,7 +67,7 @@ function listed(json, cwd, files) {
   });
 }
 
-// Gives each listed test its title and body from source; `extracted` maps file → extractTests().
+// Gives each listed test its title and code from source; `extracted` maps file → extractTests().
 function attachBodies(list, extracted) {
   return list.map(({ file, fullName }) => {
     const tests = extracted[file] ?? [];
@@ -74,19 +76,29 @@ function attachBodies(list, extracted) {
       tests.find((s) => s.family && familyRegex(s.fullName).test(fullName));
     if (!match)
       throw new Error(`${file}: jest lists "${fullName}", which no test in the source names`);
-    return { file, fullName, title: match.title, body: match.body };
+    return { file, fullName, title: match.title, code: match.code };
   });
 }
 
+// The DENY tests a PR adds, and those it rewrites under the same name (Shyden,
+// 2026-10-21: "they should" meet the base rules too). Code is compared with
+// comments removed and whitespace collapsed, so a reworded comment is neither.
+// A vanished base DENY test with the same code as an appeared one is a rename.
 function addedDenyTests(base, head) {
-  const baseKeys = new Set(base.map(key));
+  const baseByKey = new Map(base.map((t) => [key(t), t]));
   const headKeys = new Set(head.map(key));
   const isDeny = (t) => t.title.startsWith(DENY);
   const vanished = base.filter((t) => isDeny(t) && !headKeys.has(key(t)));
   const added = [];
+  const rewritten = [];
   const renamed = [];
-  for (const t of head.filter((h) => isDeny(h) && !baseKeys.has(key(h)))) {
-    const i = vanished.findIndex((v) => normalise(v.body) === normalise(t.body));
+  for (const t of head.filter(isDeny)) {
+    const before = baseByKey.get(key(t));
+    if (before) {
+      if (before.code !== t.code) rewritten.push(t);
+      continue;
+    }
+    const i = vanished.findIndex((v) => v.code === t.code);
     if (i === -1) {
       added.push(t);
     } else {
@@ -94,7 +106,7 @@ function addedDenyTests(base, head) {
       vanished.splice(i, 1);
     }
   }
-  return { added, renamed };
+  return { added, rewritten, renamed };
 }
 
 function namePattern(fullNames) {
@@ -149,22 +161,24 @@ function table(rows) {
   ].join('\n');
 }
 
-function summary({ baseSha, rulesChanged, added, renamed, rows, fixtureRuns }) {
+const count = (n, what) => `${n} ${what} DENY test${n === 1 ? '' : 's'}`;
+
+function summary({ baseSha, rulesChanged, added, rewritten, renamed, rows, fixtureRuns }) {
   const parts = [`## Rules red-first (base ${baseSha})`, ''];
   if (rulesChanged) {
     parts.push(
-      `firestore.rules changed: ${added.length} added DENY test${added.length === 1 ? '' : 's'}, each run against the base rules.`,
+      `firestore.rules changed: ${count(added.length, 'added')}, ${count(rewritten.length, 'rewritten')}; each run against the base rules.`,
     );
     parts.push('', table(rows));
   } else {
     parts.push(
-      'firestore.rules is unchanged against the base: no added DENY test needs to be shown red.',
+      'firestore.rules is unchanged against the base: no added or rewritten DENY test needs to be shown red.',
     );
   }
   if (renamed.length > 0) {
     parts.push(
       '',
-      'Renamed or moved (same body, not counted as added):',
+      'Renamed or moved (same code, not run):',
       ...renamed.map((r) => `- ${r.from} → ${r.to}`),
     );
   }
@@ -215,6 +229,7 @@ function main(deps) {
     baseSha,
     rulesChanged: false,
     added: [],
+    rewritten: [],
     renamed: [],
     rows: [],
     fixtureRuns: [],
@@ -243,17 +258,18 @@ function main(deps) {
       const head = sides(deps, repoRoot);
       const base = sides(deps, baseDir);
       Object.assign(report, addedDenyTests(base, head));
-      if (report.added.length === 0) {
-        write('::notice::firestore.rules changed and 0 added DENY tests were found');
+      const planned = [...report.added, ...report.rewritten];
+      if (planned.length === 0) {
+        write('::notice::firestore.rules changed and 0 added or rewritten DENY tests were found');
       } else {
-        const files = [...new Set(report.added.map((t) => t.file))];
+        const files = [...new Set(planned.map((t) => t.file))];
         const json = deps.runJest({
           cwd: headApi,
           files,
-          pattern: namePattern(report.added.map((t) => t.fullName)),
+          pattern: namePattern(planned.map((t) => t.fullName)),
           env: { [RULES_OVERRIDE_ENV]: baseRules },
         });
-        report.rows = verdict(json, report.added, headApi).rows;
+        report.rows = verdict(json, planned, headApi).rows;
       }
     }
     report.fixtureRuns = runFixtures(deps, headApi);
