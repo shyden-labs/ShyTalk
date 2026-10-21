@@ -166,9 +166,11 @@ describe('namePattern', () => {
   test('matches each name exactly, metacharacters included, and nothing longer', () => {
     const re = new RegExp(namePattern(['d DENY: a (b)? c.', 'DENY: [x]']));
     expect(['d DENY: a (b)? c.', 'DENY: [x]'].every((n) => re.test(n))).toBe(true);
-    expect(['d DENY: a (b)? c. longer', 'd DENY: a b c.', 'DENY: x'].some((n) => re.test(n))).toBe(
-      false,
-    );
+    expect(
+      ['d DENY: a (b)? c. longer', 'outer d DENY: a (b)? c.', 'd DENY: a b c.', 'DENY: x'].some(
+        (n) => re.test(n),
+      ),
+    ).toBe(false);
   });
 });
 
