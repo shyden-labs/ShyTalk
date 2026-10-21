@@ -48,12 +48,20 @@ The seeded personas include P-12, the dev admin.
 
 ### Happy path
 
-- [ ] No workflow passes `DEV_QA_PERSONAS_PASSWORD` to a step that builds
+- [x] No workflow passes `DEV_QA_PERSONAS_PASSWORD` to a step that builds
       an app (Android or iOS); the seeding and runner steps that sign in over
-      the API keep it.
-- [ ] Local builds keep the persona picker (`:app:installDevDebug`,
+      the API keep it. Proof: the env left pr-checks' devRelease build,
+      deploy-dev's devRelease build and its iOS archive step;
+      `express-api/tests/scripts/no-build-carries-persona-password.test.js`
+      rule 1 allows the name only at four literal sites (seed declaration,
+      seed preflight, seed action, journey runner) or the APK check's
+      `password` input, and rule 2 refuses any of them that builds.
+- [x] Local builds keep the persona picker (`:app:installDevDebug`,
       `scripts/ios/build-debug-dev.sh`, the password from
-      `~/.shytalk/dev-personas.env`).
+      `~/.shytalk/dev-personas.env`). Proof: `app/build.gradle.kts` and
+      `scripts/ios/build-debug-dev.sh` unchanged on this branch;
+      `build-debug-dev-secret-leak.unit.test.js` (password still reaches
+      `xcodebuild`) 4/4 green.
 
 ### Error paths
 
@@ -63,7 +71,10 @@ The seeded personas include P-12, the dev admin.
 
 ### Edge cases
 
-- [ ] The `dev-release-apk` artifact gets an explicit short retention.
+- [x] The `dev-release-apk` artifact gets an explicit short retention.
+      Proof: `retention-days: 7` (as `local-debug-apk`) and
+      `if-no-files-found: error`; the guard's rule 4 holds every APK/AAB
+      upload to 1-7 days and fail-on-empty (prod's two uploads gained it).
 - [ ] The persona picker in a CI-built or distributed dev build shows its
       existing "no test-persona credential" state, on both phones.
 
@@ -73,9 +84,12 @@ The seeded personas include P-12, the dev admin.
 
 ### Security
 
-- [ ] A workflow test fails if any app-building step's env names the
+- [x] A workflow test fails if any app-building step's env names the
       secret (one test per workflow file), each seen RED on today's files
-      first.
+      first. Proof: one test per workflow and action file (43); on develop
+      43e9ced4c73 it was RED for pr-checks, deploy-dev, deploy-prod and codeql
+      (and the whole-tree verdict), green on the other 38; 32 of 32 mutants
+      caught (see Notes).
 
 ### UX
 
@@ -137,3 +151,32 @@ Not announced: an internal safety fix.
   one workflow test per file, a new APK check with a planted mutant,
   retention, a phone check of the picker's empty state; the memory's earlier
   3 did not include the PR artifact or the APK check.
+- **2026-10-21 (Shyden)**: Dependabot runs get no secrets (measured: run
+  39208453897's build env shows the password empty), so the value search
+  cannot run there. Ruled: every check also proves the build's generated
+  `BuildConfig.java` field is the flavour's own value ('' dev and prod,
+  'localdev123' local; AGP 9.4.1 writes it as Java source, measured), which
+  needs no secret; on runs without the secret only that proof runs and the
+  step says so. The password is not added to the Dependabot secret store.
+- **2026-10-21**: built as composite action
+  `.github/actions/apk-holds-no-persona-password` over
+  `scripts/ci/apk-persona-check.js` (its own zip reader: stored and deflate,
+  refuses zip64 and other methods; UTF-8 and UTF-16LE search; a planted APK
+  holding the secret must be found first; refuses an empty folder, an empty
+  read, and a run where neither proof can run; prints sizes and entry
+  counts, never the secret or the field's value). It runs after every
+  Android build (pr-checks x2, deploy-dev, deploy-prod x2, codeql) and on the
+  APK deploy-dev distributes. Unit tests 39, RED 39/39 on throwing stubs.
+  Mutants (harness in `.superpowers/sdd/SHY-0662/`): 23 on the guard, 9 on
+  the checker, each turning its named plant red. Removing SHY-0416's
+  `dev-builds-share-persona-credential.test.js`, whose claim this reverses.
+  No CI job used the CI-built picker: android-e2e uses `local-debug-apk`
+  (hard-coded emulator value), the journey matrix signs in over the API, and
+  dev device runs build their own APK (SHY-0525).
+- **2026-10-21**: PR Checks on e243a5571ad was green but skipped Build &
+  Test: Detect Changes set no Android flag for `.github/*` or `scripts/*`,
+  so the check had never run in CI. Detect Changes now routes the composite
+  action and `scripts/ci/apk-persona-check.js` to `android_app_changed`
+  (pinned in `pr-checks-app-changed-split.test.js`, RED 2/26 first). The
+  CodeQL copy runs only while `vars.ENABLE_CODEQL_KOTLIN` is `'true'`;
+  Analyze Kotlin was skipped on this PR, so it is off and builds nothing.

@@ -47,9 +47,11 @@ const DEAD_NAMES = [/minio\/minio\b/gi, /minio\/mc\b/gi, /\/minio\/health\b/gi];
 // src/routes/conversation-message-edits.js (SHY-0614). 479 -> 481:
 // express-api/src/utils/delete-tree.js and
 // express-api/scripts/delete-orphaned-message-history.js (SHY-0631). 481 -> 482:
-// .github/workflows/delete-orphaned-message-history.yml (SHY-0631).
+// .github/workflows/delete-orphaned-message-history.yml (SHY-0631). 482 -> 484:
+// .github/actions/apk-holds-no-persona-password/action.yml and
+// scripts/ci/apk-persona-check.js (SHY-0662).
 // SHY-0556 moves this figure to the floors record.
-const FILES_READ_FLOOR = 482;
+const FILES_READ_FLOOR = 484;
 
 function findDeadNames(text) {
   return DEAD_NAMES.flatMap((re) => text.match(re) ?? []);

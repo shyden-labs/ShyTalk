@@ -1,0 +1,35 @@
+name: 'APK holds no persona password'
+description: >-
+  SHY-0662: proves the APKs and AABs in each folder do not hold the seeded dev
+  accounts' shared password. Two proofs: the build's BuildConfig field is the
+  flavour's expected value (needs no secret, so it also runs on Dependabot
+  PRs), and, when the run has the secret, every inflated entry is searched for
+  it after a planted APK shows the search can find it. Fails when neither
+  proof can run or a folder holds no app file. Never prints the secret.
+inputs:
+  dir:
+    description: 'Folders holding the .apk/.aab files to read, one per line'
+    required: true
+  password:
+    description: 'The seeded personas password; empty when the run has no secrets'
+    required: false
+    default: ''
+  build-config:
+    description: 'Path of the generated BuildConfig.java of the variant that was built'
+    required: false
+    default: ''
+  expected-field:
+    description: "The flavour's own value for the field: '' for dev and prod, 'localdev123' for local"
+    required: false
+    default: ''
+runs:
+  using: 'composite'
+  steps:
+    - name: Check the APK for the persona password
+      shell: bash
+      env:
+        APK_DIRS: ${{ inputs.dir }}
+        PERSONA_PASSWORD: ${{ inputs.password }}
+        BUILD_CONFIG: ${{ inputs.build-config }}
+        EXPECTED_FIELD: ${{ inputs.expected-field }}
+      run: node "$GITHUB_WORKSPACE/scripts/ci/apk-persona-check.js"

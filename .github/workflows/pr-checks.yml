@@ -180,6 +180,14 @@ jobs:
               # express-api/tests/scripts/pr-checks-playwright-scope.test.js.
               express-api/tests/*) BACKEND_TESTS=true ;;
               express-api/*|firestore.rules|database.rules.json) BACKEND=true ;;
+              # SHY-0662. The APK persona-password check runs inside
+              # build-and-test, so a PR changing only the check must run that
+              # job; under the generic .github/* and scripts/* arms below it
+              # was skipped and the check first ran on develop. Matched before
+              # them (first match wins); the script keeps SCRIPTS so its unit
+              # tests still run in test-backend.
+              .github/actions/apk-holds-no-persona-password/*) ANDROID_APP=true; APP=true ;;
+              scripts/ci/apk-persona-check.js) ANDROID_APP=true; APP=true; SCRIPTS=true ;;
               # SHY-0284. Root `scripts/**` are CI/tooling scripts whose ONLY
               # automated coverage lives in express-api/tests/scripts/** (15 of
               # those suites exercise a root script). They previously fell to
@@ -308,15 +316,21 @@ jobs:
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'android' }}
           LIVEKIT_URL: ${{ secrets.LIVEKIT_URL || 'wss://placeholder.livekit.cloud' }}
-          # Bake the persona-picker password into the dev APK so journey-based
-          # manual QA on dev variant can sign in as P-02..P-19 personas
-          # without OAuth. Must match the value the express-api provisioner
-          # used to create the dev Firebase Auth accounts (PERSONAS_PASSWORD).
-          # Falls back to empty → picker UI fails closed (BuildVariant.kt's
-          # isPersonaPickerAvailable returns false). See app/build.gradle.kts
-          # line 105 for the buildConfigField wiring.
-          DEV_QA_PERSONAS_PASSWORD: ${{ secrets.DEV_QA_PERSONAS_PASSWORD }}
+          # No persona password here (SHY-0662). This repository is public,
+          # so the dev-release-apk artifact below can be downloaded by anyone
+          # signed in to GitHub; an APK built with the password would hand
+          # them every seeded dev account. The CI-built picker shows its
+          # "no test-persona credential" state; phone tests use local builds.
         run: ./gradlew testDevDebugUnitTest :shared:jvmTest :shared:testAndroidHostTest :app:compileDevDebugAndroidTestKotlin detekt assembleDevRelease jacocoDevDebugUnitTestReport --parallel
+
+      # SHY-0662: the APK this job uploads holds no persona password. The
+      # password is read here only, to search the APK for it.
+      - name: Check devRelease APK holds no persona password
+        uses: ./.github/actions/apk-holds-no-persona-password
+        with:
+          dir: app/build/outputs/apk/dev/release
+          build-config: app/build/generated/source/buildConfig/dev/release/com/shyden/shytalk/BuildConfig.java
+          password: ${{ secrets.DEV_QA_PERSONAS_PASSWORD }}
 
       # Also build the local-flavor APK so AFK operators / automation
       # can install it on test devices without needing a local Firebase
@@ -333,6 +347,16 @@ jobs:
       # avoids misleading future maintainers.
       - name: Build localDebug APK
         run: ./gradlew assembleLocalDebug
+
+      # The local flavour's field is the emulator's hard-coded 'localdev123',
+      # never the dev secret (SHY-0662).
+      - name: Check localDebug APK holds no persona password
+        uses: ./.github/actions/apk-holds-no-persona-password
+        with:
+          dir: app/build/outputs/apk/local/debug
+          build-config: app/build/generated/source/buildConfig/local/debug/com/shyden/shytalk/BuildConfig.java
+          expected-field: localdev123
+          password: ${{ secrets.DEV_QA_PERSONAS_PASSWORD }}
 
       - name: Upload localDebug APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -359,6 +383,10 @@ jobs:
         with:
           name: dev-release-apk
           path: app/build/outputs/apk/dev/release/*.apk
+          if-no-files-found: error
+          # SHY-0662: a short life for a build anyone can download. 7 days,
+          # as local-debug-apk; deploy-dev builds afresh when it has gone.
+          retention-days: 7
 
       - name: Upload build outputs for SonarCloud
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
