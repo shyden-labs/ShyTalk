@@ -2731,3 +2731,32 @@ describe('SHY-0686: --changed BASE HEAD syncs only the pushed stories plus any w
     expect(Object.keys(map)).toEqual(expect.arrayContaining(['SHY-0001', 'SHY-0003']));
   });
 });
+
+describe('SHY-0686: a run reports its time, and its distance from its limit (mock-gh)', () => {
+  function run(extraEnv) {
+    const storiesDir = tempDir('sync686t-');
+    makeStory(storiesDir, { id: 'SHY-0001' });
+    const mock = makePatternMockGh();
+    writeRules(mock.dir, createPathRules(mock.dir));
+    return runScript(['--all'], baseEnv(mock.ghPath, storiesDir, extraEnv));
+  }
+
+  it('prints its time and how much of the limit it used, when given the limit', () => {
+    const r = run({ SYNC_LIMIT_MINUTES: '30' });
+    expect(r.code).toBe(0);
+    expect(r.stderr).toMatch(/Sync took \d+ s of its 30-minute limit \(\d+%\)/);
+  });
+
+  it('prints its time alone when no limit is given', () => {
+    const r = run({ SYNC_LIMIT_MINUTES: '' });
+    expect(r.code).toBe(0);
+    expect(r.stderr).toMatch(/Sync took \d+ s\n/);
+    expect(r.stderr).not.toContain('-minute limit');
+  });
+
+  it('a limit that is not a whole number fails as usage, naming it', () => {
+    const r = run({ SYNC_LIMIT_MINUTES: 'half an hour' });
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain('SYNC_LIMIT_MINUTES');
+  });
+});

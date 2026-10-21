@@ -121,6 +121,9 @@ jobs:
           REBUILD: ${{ github.event.inputs.rebuild }}
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
+          # The job's own limit (the same expression as timeout-minutes), so the
+          # run prints how much of it it used.
+          SYNC_LIMIT_MINUTES: ${{ github.event_name == 'push' && 15 || 30 }}
         run: |
           # SHY-0686: a sync that cannot run fails (and alerts); it never passes.
           if [ -z "${GH_PAT_PROJECT:-}" ]; then

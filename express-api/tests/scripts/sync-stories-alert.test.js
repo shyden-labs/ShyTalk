@@ -152,3 +152,11 @@ describe('SHY-0686 — the alert names a cut-short job and step', () => {
     expect(alertRun.match(either)).toHaveLength(2);
   });
 });
+
+describe('SHY-0686 — the sync step is told the limit it runs under', () => {
+  const doc = yaml.load(read(WORKFLOW));
+  const step = doc.jobs.sync.steps.find((s) => s.name === 'Sync stories to GitHub Issues');
+  test('SYNC_LIMIT_MINUTES is the job timeout, the same expression', () => {
+    expect(step.env.SYNC_LIMIT_MINUTES).toBe(String(doc.jobs.sync['timeout-minutes']));
+  });
+});
