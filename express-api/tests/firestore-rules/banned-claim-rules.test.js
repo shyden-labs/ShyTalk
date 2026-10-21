@@ -500,14 +500,14 @@ const OPS = [
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('banned token → DENIED on every gated user-write op (real rules engine)', () => {
-  test.each(OPS.map((o) => [o.label, o]))('DENY banned: %s', async (_label, entry) => {
+  test.each(OPS.map((o) => [o.label, o]))('DENY: (banned) %s', async (_label, entry) => {
     await entry.seed(BANNED);
     await assertFails(entry.op(dbFor(BANNED), BANNED));
   });
 });
 
 describe('clean token → the SAME ops succeed (denial above is the claim, not a precondition)', () => {
-  test.each(OPS.map((o) => [o.label, o]))('ALLOW clean: %s', async (_label, entry) => {
+  test.each(OPS.map((o) => [o.label, o]))('ALLOW: (clean) %s', async (_label, entry) => {
     await entry.seed(CLEAN);
     await assertSucceeds(entry.op(dbFor(CLEAN), CLEAN));
   });
@@ -518,7 +518,7 @@ describe('clean token → the SAME ops succeed (denial above is the claim, not a
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('banned token → reads UNCHANGED (gate is write-only)', () => {
-  test('banned user still reads their OWN users doc (ban screen needs the profile)', async () => {
+  test('ALLOW: banned user still reads their OWN users doc (ban screen needs the profile)', async () => {
     await seedDoc(`users/${BANNED.uniqueId}`, {
       firebaseUid: BANNED.uid,
       uniqueId: BANNED.uniqueId,
@@ -527,7 +527,7 @@ describe('banned token → reads UNCHANGED (gate is write-only)', () => {
     await assertSucceeds(dbFor(BANNED).doc(`users/${BANNED.uniqueId}`).get());
   });
 
-  test('banned user still reads a same-cohort profile', async () => {
+  test('ALLOW: banned user still reads a same-cohort profile', async () => {
     await seedDoc(`users/${PEER.uniqueId}`, {
       firebaseUid: PEER.uid,
       uniqueId: PEER.uniqueId,
@@ -536,7 +536,7 @@ describe('banned token → reads UNCHANGED (gate is write-only)', () => {
     await assertSucceeds(dbFor(BANNED).doc(`users/${PEER.uniqueId}`).get());
   });
 
-  test('banned owner still reads own stalkers entries', async () => {
+  test('ALLOW: banned owner still reads own stalkers entries', async () => {
     await seedDoc(`users/${BANNED.uniqueId}/stalkers/${sid(PEER)}`, {
       visitorId: sid(PEER),
       cohort: BANNED.cohort,
@@ -548,35 +548,35 @@ describe('banned token → reads UNCHANGED (gate is write-only)', () => {
     );
   });
 
-  test('banned user still reads a same-cohort room', async () => {
+  test('ALLOW: banned user still reads a same-cohort room', async () => {
     await seedDoc('rooms/r-read', { cohort: BANNED.cohort, ownerId: sid(PEER), state: 'OPEN' });
     await assertSucceeds(dbFor(BANNED).doc('rooms/r-read').get());
   });
 
-  test('banned user still reads same-cohort room messages', async () => {
+  test('ALLOW: banned user still reads same-cohort room messages', async () => {
     await seedDoc('rooms/r-read2', { cohort: BANNED.cohort, ownerId: sid(PEER), state: 'OPEN' });
     await seedDoc('rooms/r-read2/messages/m1', { senderId: sid(PEER), text: 'hi' });
     await assertSucceeds(dbFor(BANNED).doc('rooms/r-read2/messages/m1').get());
   });
 
-  test('banned user still reads same-cohort seatRequests', async () => {
+  test('ALLOW: banned user still reads same-cohort seatRequests', async () => {
     await seedDoc('rooms/r-read3', { cohort: BANNED.cohort, ownerId: sid(PEER), state: 'OPEN' });
     await seedDoc('rooms/r-read3/seatRequests/sr1', { userId: sid(PEER), seatIndex: 1 });
     await assertSucceeds(dbFor(BANNED).doc('rooms/r-read3/seatRequests/sr1').get());
   });
 
-  test('banned participant still GETs their conversation doc', async () => {
+  test('ALLOW: banned participant still GETs their conversation doc', async () => {
     await seedDoc('conversations/c-read', { participantIds: [sid(BANNED), sid(PEER)] });
     await assertSucceeds(dbFor(BANNED).doc('conversations/c-read').get());
   });
 
-  test('banned participant still reads conversation messages', async () => {
+  test('ALLOW: banned participant still reads conversation messages', async () => {
     await seedDoc('conversations/c-read2', { participantIds: [sid(BANNED), sid(PEER)] });
     await seedDoc('conversations/c-read2/messages/m1', { senderId: sid(PEER), text: 'hi' });
     await assertSucceeds(dbFor(BANNED).doc('conversations/c-read2/messages/m1').get());
   });
 
-  test('banned participant still reads own conversation userSettings', async () => {
+  test('ALLOW: banned participant still reads own conversation userSettings', async () => {
     await seedDoc('conversations/c-read3', { participantIds: [sid(BANNED), sid(PEER)] });
     await seedDoc(`conversations/c-read3/userSettings/${sid(BANNED)}`, { muted: false });
     await assertSucceeds(
@@ -586,7 +586,7 @@ describe('banned token → reads UNCHANGED (gate is write-only)', () => {
     );
   });
 
-  test('banned participant still reads own LEGACY conversation settings (read half of the split rule)', async () => {
+  test('ALLOW: banned participant still reads own LEGACY conversation settings (read half of the split rule)', async () => {
     await seedDoc('conversations/c-read4', { participantIds: [sid(BANNED), sid(PEER)] });
     await seedDoc(`conversations/c-read4/settings/${sid(BANNED)}`, { muted: false });
     await assertSucceeds(
@@ -596,7 +596,7 @@ describe('banned token → reads UNCHANGED (gate is write-only)', () => {
     );
   });
 
-  test('banned participant still reads conversation mutes', async () => {
+  test('ALLOW: banned participant still reads conversation mutes', async () => {
     await seedDoc('conversations/c-read5', { participantIds: [sid(BANNED), sid(PEER)] });
     await seedDoc(`conversations/c-read5/mutes/${sid(BANNED)}`, { mutedUntil: 1 });
     await assertSucceeds(
@@ -606,12 +606,12 @@ describe('banned token → reads UNCHANGED (gate is write-only)', () => {
     );
   });
 
-  test('banned user still reads a non-pending suggestion', async () => {
+  test('ALLOW: banned user still reads a non-pending suggestion', async () => {
     await seedDoc('suggestions/s-read', { submitterUid: sid(PEER), status: 'accepted' });
     await assertSucceeds(dbFor(BANNED).doc('suggestions/s-read').get());
   });
 
-  test('banned user still reads suggestion votes and comments', async () => {
+  test('ALLOW: banned user still reads suggestion votes and comments', async () => {
     await seedDoc('suggestions/s-read2', { submitterUid: sid(PEER), status: 'accepted' });
     await seedDoc('suggestions/s-read2/votes/v1', { voterId: sid(PEER), value: 1 });
     await seedDoc('suggestions/s-read2/comments/c1', { authorId: sid(PEER), text: 'c' });
@@ -619,17 +619,17 @@ describe('banned token → reads UNCHANGED (gate is write-only)', () => {
     await assertSucceeds(dbFor(BANNED).doc('suggestions/s-read2/comments/c1').get());
   });
 
-  test('banned user still reads suggestionDisputes', async () => {
+  test('ALLOW: banned user still reads suggestionDisputes', async () => {
     await seedDoc('suggestionDisputes/d-read', { submitterUid: sid(PEER), reason: 'r' });
     await assertSucceeds(dbFor(BANNED).doc('suggestionDisputes/d-read').get());
   });
 
-  test('banned user still reads their OWN suspension appeal', async () => {
+  test('ALLOW: banned user still reads their OWN suspension appeal', async () => {
     await seedDoc('suspensionAppeals/a-read', { uniqueId: sid(BANNED), message: 'm' });
     await assertSucceeds(dbFor(BANNED).doc('suspensionAppeals/a-read').get());
   });
 
-  test('banned user still reads their OWN subscription doc (read half of the split rule)', async () => {
+  test('ALLOW: banned user still reads their OWN subscription doc (read half of the split rule)', async () => {
     await seedDoc(`subscriptions/${sid(BANNED)}`, { fcmToken: 'tok' });
     await assertSucceeds(
       dbFor(BANNED)
@@ -638,12 +638,12 @@ describe('banned token → reads UNCHANGED (gate is write-only)', () => {
     );
   });
 
-  test('banned user still reads their OWN notifications', async () => {
+  test('ALLOW: banned user still reads their OWN notifications', async () => {
     await seedDoc('notifications/n-read', { uid: sid(BANNED), read: false });
     await assertSucceeds(dbFor(BANNED).doc('notifications/n-read').get());
   });
 
-  test('banned user still reads app config (ban screen boots through config)', async () => {
+  test('ALLOW: banned user still reads app config (ban screen boots through config)', async () => {
     await seedDoc('config/app', { minVersion: '1.0.0' });
     await assertSucceeds(dbFor(BANNED).doc('config/app').get());
   });
@@ -659,7 +659,7 @@ describe('banned outranks admin (user-write surface)', () => {
     await assertFails(dbFor(BANNED_ADMIN).doc('suggestions/s-adm').update({ status: 'accepted' }));
   });
 
-  test('control: the SAME admin-branch update succeeds for a clean admin', async () => {
+  test('ALLOW: control: the SAME admin-branch update succeeds for a clean admin', async () => {
     await seedDoc('suggestions/s-adm2', {
       submitterUid: sid(PEER),
       status: 'reviewed',
@@ -691,7 +691,7 @@ describe('banned outranks admin (user-write surface)', () => {
     await assertSucceeds(dbFor(ADMIN).doc('blockedTopics/t-adm').set({ topic: 'x' }));
   });
 
-  test('blockedTopics public read is unchanged for a banned caller', async () => {
+  test('ALLOW: blockedTopics public read is unchanged for a banned caller', async () => {
     await seedDoc('blockedTopics/t-read', { topic: 'x' });
     await assertSucceeds(dbFor(BANNED).doc('blockedTopics/t-read').get());
   });
@@ -714,12 +714,12 @@ describe('banned outranks admin (user-write surface)', () => {
     await assertSucceeds(dbFor(BANNED_ADMIN).doc('identityGraphs/g-read').get());
   });
 
-  test('banned admin READS are unchanged (cross-cohort admin read bypass intact)', async () => {
+  test('ALLOW: banned admin READS are unchanged (cross-cohort admin read bypass intact)', async () => {
     await seedDoc('rooms/r-badm-read', { cohort: 'minor', ownerId: sid(PEER), state: 'OPEN' });
     await assertSucceeds(dbFor(BANNED_ADMIN).doc('rooms/r-badm-read').get());
   });
 
-  test('banned admin still reads admin-only surfaces (deviceBans list for the console)', async () => {
+  test('ALLOW: banned admin still reads admin-only surfaces (deviceBans list for the console)', async () => {
     await seedDoc('deviceBans/d1', { deviceId: 'd1', reason: 'r' });
     await assertSucceeds(dbFor(BANNED_ADMIN).doc('deviceBans/d1').get());
   });
@@ -730,7 +730,7 @@ describe('banned outranks admin (user-write surface)', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('claim-shape semantics (`banned == true` — server-minted boolean)', () => {
-  test('post-unban token (banned: false) writes normally', async () => {
+  test('ALLOW: post-unban token (banned: false) writes normally', async () => {
     await assertSucceeds(
       dbFor(UNBANNED)
         .doc(`rooms/r-unb-${UNBANNED.uniqueId}`)
@@ -744,7 +744,7 @@ describe('claim-shape semantics (`banned == true` — server-minted boolean)', (
     );
   });
 
-  test('non-boolean claim value does NOT trip the gate (only the server-minted boolean true blocks)', async () => {
+  test('ALLOW: non-boolean claim value does NOT trip the gate (only the server-minted boolean true blocks)', async () => {
     // The server only ever mints booleans; a non-boolean here would mean a
     // foreign minting path. `== true` (no coercion in rules) keeps such a
     // token on the API-layer gate (SHY-0149) instead of guessing at intent.
@@ -774,7 +774,7 @@ describe('server-only collections stay fully locked (no accidental widening)', (
     ['identityMap write', (db) => db.doc('identityMap/i-x').set({ uid: 'u' })],
     ['users create (API-only)', (db) => db.doc('users/99999').set({ uniqueId: 99999 })],
     ['notifications create (server-only)', (db) => db.doc('notifications/n-x').set({ uid: 'u' })],
-  ])('%s → denied for clean AND banned', async (_label, op) => {
+  ])('DENY: %s → denied for clean AND banned', async (_label, op) => {
     await assertFails(op(dbFor(CLEAN)));
     await assertFails(op(dbFor(BANNED)));
   });

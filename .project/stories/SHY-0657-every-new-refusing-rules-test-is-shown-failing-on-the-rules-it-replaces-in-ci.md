@@ -4,8 +4,8 @@ status: Draft
 owner: claude
 created: 2026-10-20
 priority: P0
-effort: M
-estimate: 5
+effort: L
+estimate: 8
 type: chore
 roadmap_ids: []
 mvp: true
@@ -42,6 +42,11 @@ in a branch meant for pushing.
       each must fail there. The step prints every such test with its result.
 - [ ] The rules tests read their rules file from one place that accepts an
       override path, so the live `firestore.rules` is never swapped out.
+- [ ] Every rules test is named by what it asserts: a test reaching
+      `assertFails` is titled `DENY: …`, any other reaching `assertSucceeds`
+      is titled `ALLOW: …`, and a rules test reaching neither fails a guard
+      (Shyden, 2026-10-21: "consistency is important"). Only then does the
+      `DENY: ` prefix find every refusal.
 
 ### Error paths
 
@@ -67,8 +72,10 @@ in a branch meant for pushing.
 
 ### Security
 
-- [ ] The step is in `required_status_checks.contexts` (merge, require,
-      re-read); the live `firestore.rules` and its deploy are untouched.
+- [ ] The step is required through PR Gate, which develop's ruleset
+      requires (Shyden, 2026-10-21): PR Gate fails when the step fails, and
+      also when `firestore.rules` changed but `test-backend` did not succeed;
+      the live `firestore.rules` and its deploy are untouched.
 
 ### UX
 
@@ -137,3 +144,10 @@ None: an internal check with no change users can see.
   step with name-diffing, an override path in the rules test setup, a
   fixture, planted cases and a required-check change; level with SHY-0653
   and SHY-0656, above SHY-0652's 3.
+- **2026-10-21**: a side note measured that only 3 of the 10 rules test
+  files named refusals `DENY`; Shyden ruled "consistency is important", so
+  every rules test is renamed to `DENY: ` / `ALLOW: ` by what it asserts
+  (109 of 231 renamed, bodies byte-identical) and a guard keeps it. Shyden
+  also ruled the step is required through PR Gate, not its own ruleset
+  context. Re-scored 5 to 8 for the rename and the naming guard. The loader
+  population is 8 files (two migration-script tests also load the rules).

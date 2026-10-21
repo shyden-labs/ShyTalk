@@ -31,7 +31,7 @@ so a refused or failed write leaves the bubble unchanged with no message.
 
 This is live today: the production rules let only a message's sender and
 group staff update it, so every recipient's reaction is refused (seen in
-plant #2441, "ALLOW a recipient reacts" red against the old rules) and the
+plant #2441, "ALLOW: a recipient reacts" red against the old rules) and the
 person sees nothing happen. SHY-0614 PR 3 lets participants react; any
 failure that remains (no network, a banned account, a locked chat, SHY-0643's
 refusals) is still silent until this lands.

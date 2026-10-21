@@ -13,7 +13,119 @@ const {
   walk,
   requires,
   calls,
+  extractTests,
+  familyRegex,
 } = require('../firestore-rules/_helpers/rules-test-names.js');
+
+const F = 'x.test.js';
+const one = (source) => {
+  const tests = extractTests(source, F);
+  expect(tests).toHaveLength(1);
+  return tests[0];
+};
+
+describe('extractTests', () => {
+  test('gives the jest full name: describe titles then the title, space-joined', () => {
+    const t = one(
+      "describe('a', () => { describe('b c', () => { test('DENY: d', () => {}); }); });",
+    );
+    expect([t.fullName, t.title, t.describePath, t.file]).toEqual([
+      'a b c DENY: d',
+      'DENY: d',
+      ['a', 'b c'],
+      F,
+    ]);
+  });
+
+  test('reads it(), test.skip() and a template title with no ${}', () => {
+    const names = extractTests('it(`ALLOW: a`, () => {});\ntest.skip("DENY: b", () => {});', F).map(
+      (t) => t.fullName,
+    );
+    expect(names).toEqual(['ALLOW: a', 'DENY: b']);
+  });
+
+  test('throws naming file and line on a title with ${}', () => {
+    expect(() => extractTests('\ntest(`DENY: ${x}`, () => {});', F)).toThrow(
+      'x.test.js:2 test title is not a plain string',
+    );
+  });
+
+  test('throws naming file and line on a describe title that is not a plain string', () => {
+    expect(() => extractTests('describe(name, () => {});', F)).toThrow(
+      'x.test.js:1 describe title is not a plain string',
+    );
+  });
+
+  test('throws on test.todo and other test forms it does not read', () => {
+    expect(() => extractTests("test.todo('DENY: later');", F)).toThrow(
+      'x.test.js:1 test.todo is not read',
+    );
+  });
+
+  test('keeps the body source of the test callback', () => {
+    expect(one("test('DENY: a', async () => {\n  await assertFails(op());\n});").body).toBe(
+      'async () => {\n  await assertFails(op());\n}',
+    );
+  });
+
+  test('sees assertFails and assertSucceeds called directly', () => {
+    expect(
+      one("test('DENY: a', async () => { await assertSucceeds(x()); await assertFails(y()); });")
+        .asserts,
+    ).toEqual({
+      fails: true,
+      succeeds: true,
+    });
+  });
+
+  test('follows a local function declaration and a const arrow to a fixed point', () => {
+    const source = [
+      'async function denied(op) { await assertFails(op); }',
+      'const deniedTwice = async (op) => { await denied(op); await denied(op); };',
+      "test('DENY: a', async () => { await deniedTwice(x()); });",
+    ].join('\n');
+    expect(one(source).asserts).toEqual({ fails: true, succeeds: false });
+  });
+
+  test('a call to an unrelated helper asserts nothing', () => {
+    expect(one("function seed() {}\ntest('x', async () => { await seed(); });").asserts).toEqual({
+      fails: false,
+      succeeds: false,
+    });
+  });
+
+  test('reads test.each(table)(title, fn) as one family with its template', () => {
+    const t = one(
+      "describe('d', () => { test.each(ROWS)('DENY: banned %s', async (_l, e) => { await assertFails(e.op()); }); });",
+    );
+    expect([t.family, t.title, t.fullName, t.asserts.fails]).toEqual([
+      true,
+      'DENY: banned %s',
+      'd DENY: banned %s',
+      true,
+    ]);
+  });
+});
+
+describe('familyRegex', () => {
+  test('matches each row name jest prints for a %s family, and no other', () => {
+    const re = familyRegex('d DENY: banned %s (x)');
+    expect(
+      ['d DENY: banned users write (x)', 'd DENY: banned a.b (x)'].every((n) => re.test(n)),
+    ).toBe(true);
+    expect(
+      ['d DENY: banned users write (y)', 'e DENY: banned a (x)', 'd DENY: banned  (x) more'].some(
+        (n) => re.test(n),
+      ),
+    ).toBe(false);
+  });
+
+  test('reads %d %i %p %j %o %# as row values and %% as a literal percent', () => {
+    const re = familyRegex('a %d %i %p %j %o %# 100%%');
+    expect(re.test('a 1 2 "p" {} {} 0 100%')).toBe(true);
+    expect(re.test('a 1 2 "p" {} {} 0 100%%')).toBe(false);
+  });
+});
 
 describe('parseTestFile', () => {
   test('throws naming the file on a syntax error', () => {

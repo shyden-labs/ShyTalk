@@ -130,13 +130,13 @@ beforeEach(async () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('users/{uniqueId} single-document reads — the rule behaves as designed', () => {
-  test('the viewer can read their OWN profile document', async () => {
+  test('ALLOW: the viewer can read their OWN profile document', async () => {
     // This is why the profile screen opens at all while its lists sit empty:
     // the own-doc carve-out is decidable from the path alone.
     await assertSucceeds(dbFor(VIEWER).doc(`users/${VIEWER.uniqueId}`).get());
   });
 
-  test('the viewer can read a SAME-COHORT user one document at a time', async () => {
+  test('ALLOW: the viewer can read a SAME-COHORT user one document at a time', async () => {
     // The people in the follow list ARE readable individually. Nothing about
     // this user is secret from this viewer — which is what makes the query
     // refusal below a defect rather than the rule doing its job.
@@ -149,7 +149,7 @@ describe('users/{uniqueId} single-document reads — the rule behaves as designe
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('users batch QUERY — the SHY-0338 defect', () => {
-  test('CONTROL: a batch where every named user is same-cohort SUCCEEDS', async () => {
+  test('ALLOW: (control) a batch where every named user is same-cohort SUCCEEDS', async () => {
     // Establishes what "working" looks like, and rules out the explanation I
     // first assumed. A `documentId() in [...]` query names exact paths, so the
     // engine CAN evaluate the rule per document — it is not the blanket
@@ -165,7 +165,7 @@ describe('users batch QUERY — the SHY-0338 defect', () => {
     );
   });
 
-  test('ONE member with no cohort field REFUSES THE WHOLE BATCH — the defect', async () => {
+  test('DENY: ONE member with no cohort field REFUSES THE WHOLE BATCH — the defect', async () => {
     // `cohort` arrived with UK OSA #17. Any user document written before it, or
     // by a path that does not stamp it, reads as the 'minor' default — so an
     // adult viewer fails the gate on that ONE document.
@@ -190,33 +190,29 @@ describe('users batch QUERY — the SHY-0338 defect', () => {
     );
   });
 
-  test('the readable member is NOT returned on its own — it is all or nothing', async () => {
+  test('DENY: the readable member is NOT returned on its own — it is all or nothing', async () => {
     // The consequence that makes this "not working at all" rather than
     // "sometimes incomplete". A partial result would show most of the list;
     // instead the caller gets an exception, and both platforms turn that into
-    // emptyList().
+    // emptyList(). assertFails requires that exception to be PERMISSION_DENIED
+    // itself, never a partial result and never another error.
     await seedDoc(`users/${FOLLOWED_B.uniqueId}`, {
       firebaseUid: FOLLOWED_B.uid,
       uniqueId: FOLLOWED_B.uniqueId,
       displayName: 'Legacy user with no cohort field',
     });
-    let error = null;
-    try {
-      await dbFor(VIEWER)
+    await assertFails(
+      dbFor(VIEWER)
         .collection('users')
         .where(firebase.firestore.FieldPath.documentId(), 'in', [
           String(FOLLOWED_A.uniqueId),
           String(FOLLOWED_B.uniqueId),
         ])
-        .get();
-    } catch (e) {
-      error = e;
-    }
-    expect(error).not.toBeNull();
-    expect(String(error)).toMatch(/permission|PERMISSION_DENIED|insufficient/i);
+        .get(),
+    );
   });
 
-  test('a genuinely CROSS-COHORT member refuses the whole batch too', async () => {
+  test('DENY: a genuinely CROSS-COHORT member refuses the whole batch too', async () => {
     // The same all-or-nothing behaviour when the cohort gate is doing its
     // intended job. Even here the outcome is wrong: hiding one minor from an
     // adult should hide THAT PERSON, not the adult's entire follow list.
@@ -239,7 +235,7 @@ describe('users batch QUERY — the SHY-0338 defect', () => {
 });
 
 describe('stalkers subcollection QUERY — the same defect, second surface', () => {
-  test('the ordered stalkers query getStalkers() issues is REFUSED even for your own stalkers', async () => {
+  test('DENY: the ordered stalkers query getStalkers() issues is REFUSED even for your own stalkers', async () => {
     // getStalkers() reads users/{id}/stalkers ordered by lastVisitedAt. The
     // rule is `callerUniqueId() == int(uniqueId) && cohortMatchesCaller()`.
     // The first clause is decidable from the path; the second reads
@@ -257,7 +253,7 @@ describe('stalkers subcollection QUERY — the same defect, second surface', () 
     );
   });
 
-  test('even a single stalker document read one at a time is refused for an adult viewer', async () => {
+  test('DENY: even a single stalker document read one at a time is refused for an adult viewer', async () => {
     // The second, INDEPENDENT reason stalkers cannot work: a stalker document
     // carries no `cohort` field, so cohortMatchesCaller() compares the adult
     // caller's 'adult' claim against the 'minor' default and never matches.
