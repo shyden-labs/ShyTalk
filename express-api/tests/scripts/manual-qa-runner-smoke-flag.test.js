@@ -104,7 +104,7 @@ describe('buildDriverFactories — exported helper', () => {
     // would break under any transformation; behavior testing won't.
     jest.resetModules();
     const createWebDriver = jest.fn(async () => ({ close: jest.fn() }));
-    jest.doMock(path.join(REPO_ROOT, 'express-api/scripts/drivers/web-playwright-driver'), () => ({
+    jest.doMock('../../scripts/drivers/web-playwright-driver', () => ({
       createWebDriver,
     }));
     const { buildDriverFactories: bdf } = require(RUNNER_PATH);
@@ -113,7 +113,7 @@ describe('buildDriverFactories — exported helper', () => {
     expect(createWebDriver).toHaveBeenCalledWith(
       expect.objectContaining({ headless: false, browser: 'chromium', baseURL: 'https://x.test' }),
     );
-    jest.unmock(path.join(REPO_ROOT, 'express-api/scripts/drivers/web-playwright-driver'));
+    jest.unmock('../../scripts/drivers/web-playwright-driver');
     jest.resetModules();
   });
 
@@ -121,14 +121,14 @@ describe('buildDriverFactories — exported helper', () => {
     // Companion to the headed=true test — pins the negation path.
     jest.resetModules();
     const createWebDriver = jest.fn(async () => ({ close: jest.fn() }));
-    jest.doMock(path.join(REPO_ROOT, 'express-api/scripts/drivers/web-playwright-driver'), () => ({
+    jest.doMock('../../scripts/drivers/web-playwright-driver', () => ({
       createWebDriver,
     }));
     const { buildDriverFactories: bdf } = require(RUNNER_PATH);
     const factories = bdf({ headed: false });
     await factories.chromium({ baseURL: 'https://x.test' });
     expect(createWebDriver).toHaveBeenCalledWith(expect.objectContaining({ headless: true }));
-    jest.unmock(path.join(REPO_ROOT, 'express-api/scripts/drivers/web-playwright-driver'));
+    jest.unmock('../../scripts/drivers/web-playwright-driver');
     jest.resetModules();
   });
 

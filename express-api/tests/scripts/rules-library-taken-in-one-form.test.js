@@ -29,11 +29,42 @@ const {
 
 const TESTS_DIR = path.resolve(__dirname, '..');
 const LIBRARY_NAMES = new Set(['assertFails', 'assertSucceeds', 'initializeTestEnvironment']);
+// Calls that replace or hand over a module, read on any object (an alias of jest too).
+const MODULE_MOCKS = new Set([
+  'mock',
+  'doMock',
+  'setMock',
+  'requireMock',
+  'requireActual',
+  'unstable_mockModule',
+]);
+const MOCK_CALL_TEXT = /\.(?:mock|doMock|setMock|requireMock|requireActual|unstable_mockModule)\(/;
+
+// A module mock whose module is computed could replace the rules library under a
+// name no literal shows; every module mock must name its module literally.
+function mockFindings(ast) {
+  const out = [];
+  walk(ast, (n) => {
+    if (
+      n.type === 'CallExpression' &&
+      n.callee.type === 'MemberExpression' &&
+      !n.callee.computed &&
+      n.callee.property.type === 'Identifier' &&
+      MODULE_MOCKS.has(n.callee.property.name) &&
+      (!n.arguments[0] || literalText(n.arguments[0]) === null)
+    ) {
+      out.push(
+        `line ${n.loc.start.line}: a module mock (${n.callee.property.name}) whose module cannot be read`,
+      );
+    }
+  });
+  return out;
+}
 
 // Every way `source` takes the rules library other than the one form; empty when it holds.
 function formFindings(source, file) {
   const ast = parseTestFile(source, file);
-  const out = [];
+  const out = mockFindings(ast);
   const at = (n) => `line ${n.loc.start.line}`;
   walk(ast, (n) => {
     if (n.type === 'ImportDeclaration' && n.source.value === RULES_LIB) {
@@ -178,6 +209,35 @@ describe('each file takes the library in the one form', () => {
   });
 });
 
+// A file that builds the library's name never names it, so this reads every
+// test file holding a module mock, not only the files above.
+describe('no test file mocks a module it does not name', () => {
+  const mocking = testFilesUnder(TESTS_DIR)
+    .map((file) => ({
+      file,
+      rel: path.relative(TESTS_DIR, file),
+      source: fs.readFileSync(file, 'utf8'),
+    }))
+    .filter(({ source }) => MOCK_CALL_TEXT.test(source));
+
+  test('reads the 200 test files that hold a module mock', () => {
+    // Measured 2026-10-21; SHY-0556 moves this figure to the floors record.
+    const rels = mocking.map((m) => m.rel);
+    expect({ of: 'test files with a module mock', count: rels.length, files: rels }).toEqual({
+      of: 'test files with a module mock',
+      count: 200,
+      files: rels,
+    });
+  });
+
+  test('none mocks a module whose name is computed', () => {
+    const hits = mocking
+      .map((m) => ({ file: m.rel, findings: mockFindings(parseTestFile(m.source, m.file)) }))
+      .filter((h) => h.findings.length > 0);
+    expect(hits).toEqual([]);
+  });
+});
+
 describe('planted forms turn the check red', () => {
   const lib = `'${RULES_LIB}'`;
 
@@ -236,8 +296,140 @@ describe('planted forms turn the check red', () => {
     ]);
   });
 
+  // Claimed caught in 2a506c004c8's message without a test; tested here.
+  test('a mock through an alias of jest still names the library, and is caught', () => {
+    expect(formFindings(`const j = jest;\nj.mock(${lib}, () => ({}));`, 'p.test.js')).toEqual([
+      `line 2: names ${RULES_LIB} outside a destructuring require`,
+    ]);
+  });
+
+  test('a module mock whose module is computed is caught', () => {
+    const planted =
+      "jest.mock('@firebase/' + 'rules-unit-testing', () => ({}));\njest.doMock(name);";
+    expect(formFindings(planted, 'p.test.js')).toEqual([
+      'line 1: a module mock (mock) whose module cannot be read',
+      'line 2: a module mock (doMock) whose module cannot be read',
+    ]);
+  });
+
+  test('every module-replacing jest call is read: setMock, requireMock, unstable_mockModule', () => {
+    const planted =
+      'jest.setMock(a, {});\njest.requireMock(b);\njest.unstable_mockModule(c, () => ({}));';
+    expect(formFindings(planted, 'p.test.js')).toEqual([
+      'line 1: a module mock (setMock) whose module cannot be read',
+      'line 2: a module mock (requireMock) whose module cannot be read',
+      'line 3: a module mock (unstable_mockModule) whose module cannot be read',
+    ]);
+  });
+
   test('the text count sees a mention the parser does not, and skips a comment', () => {
     expect(textMentions(`// ${lib}\nconst s = ${lib};`)).toBe(1);
     expect(literalMentions(`// ${lib}\nconst s = ${lib};`, 'p.test.js')).toBe(1);
+  });
+});
+
+// Config that could hand every test a stand-in for the library without touching
+// a test file: a module map, extra resolution paths, a resolver, a setup file
+// that mocks it, a Babel plugin rewriting test code, or a committed
+// node_modules folder that Node would resolve first. Pinned to today's
+// measured config (2026-10-21): any new key is a finding until reviewed.
+const JEST_KEYS = [
+  'testEnvironment',
+  'maxWorkers',
+  'workerIdleMemoryLimit',
+  'testTimeout',
+  'setupFiles',
+  'globalSetup',
+  'restoreMocks',
+  'clearMocks',
+  'resetMocks',
+  'testMatch',
+  'testPathIgnorePatterns',
+  'coverageDirectory',
+  'coverageReporters',
+  'collectCoverageFrom',
+  'transform',
+];
+const TRANSFORM = {
+  'public[\\\\/]js[\\\\/]core[\\\\/].*\\.js$': '<rootDir>/tests/client-core/esm-transform.js',
+  '\\.js$': 'babel-jest',
+};
+const BABEL_CONFIG = /(^|\/)(\.babelrc(\.\w+)?|babel\.config\.\w+)$/;
+
+// Every way the jest setup could replace the library; empty when it holds.
+function configFindings({ config, setupSources, tracked, pkg }) {
+  const out = [];
+  for (const k of Object.keys(config))
+    if (!JEST_KEYS.includes(k)) out.push(`jest config key ${k} is not reviewed`);
+  if (JSON.stringify(config.transform) !== JSON.stringify(TRANSFORM))
+    out.push('jest transform changed');
+  for (const [name, source] of Object.entries(setupSources)) {
+    if (source.includes(RULES_LIB)) out.push(`${name} names ${RULES_LIB}`);
+    for (const f of mockFindings(parseTestFile(source, name))) out.push(`${name}: ${f}`);
+  }
+  for (const p of tracked) {
+    if (p.split('/').includes('node_modules')) out.push(`${p} is a committed node_modules file`);
+    if (BABEL_CONFIG.test(p)) out.push(`${p} is a Babel config`);
+  }
+  if (pkg.babel !== undefined) out.push('package.json has a babel key');
+  if (pkg.jest !== undefined) out.push('package.json has a jest key');
+  return out;
+}
+
+describe('the jest setup cannot hand tests a stand-in for the library', () => {
+  const API = path.resolve(__dirname, '..', '..');
+  const { gitVisibleFiles } = require('../helpers/git-visible-files.js');
+  const config = require('../../jest.config.js');
+  const setupNames = [
+    config.setupFiles,
+    config.setupFilesAfterEnv,
+    config.globalSetup,
+    config.globalTeardown,
+  ]
+    .flat()
+    .filter(Boolean);
+  const setupSources = Object.fromEntries(
+    setupNames.map((n) => [n, fs.readFileSync(path.resolve(API, n), 'utf8')]),
+  );
+  const tracked = [...gitVisibleFiles(API)].map((p) => p.split(path.sep).join('/'));
+
+  test('reads the two setup files and every file git sees in express-api', () => {
+    expect(setupNames).toEqual([
+      './tests/_helpers/jest-retry-setup.js',
+      './tests/_helpers/jest-git-env-isolation.js',
+    ]);
+    expect(tracked).toEqual(expect.arrayContaining(['jest.config.js', 'package.json']));
+  });
+
+  test('today it holds', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(API, 'package.json'), 'utf8'));
+    expect(configFindings({ config, setupSources, tracked, pkg })).toEqual([]);
+  });
+
+  test('every planted form is caught', () => {
+    const planted = {
+      config: { ...config, moduleNameMapper: {}, transform: { '\\.js$': 'x' } },
+      setupSources: {
+        'a.js': `jest.mock('${RULES_LIB}', () => ({}));`,
+        'b.js': 'jest.doMock(name);',
+      },
+      tracked: [
+        'tests/node_modules/@firebase/rules-unit-testing/index.js',
+        'babel.config.js',
+        '.babelrc',
+      ],
+      pkg: { babel: {}, jest: {} },
+    };
+    expect(configFindings(planted)).toEqual([
+      'jest config key moduleNameMapper is not reviewed',
+      'jest transform changed',
+      `a.js names ${RULES_LIB}`,
+      'b.js: line 1: a module mock (doMock) whose module cannot be read',
+      'tests/node_modules/@firebase/rules-unit-testing/index.js is a committed node_modules file',
+      'babel.config.js is a Babel config',
+      '.babelrc is a Babel config',
+      'package.json has a babel key',
+      'package.json has a jest key',
+    ]);
   });
 });
