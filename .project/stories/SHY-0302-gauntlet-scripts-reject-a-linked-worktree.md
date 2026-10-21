@@ -197,7 +197,9 @@ FROM a worktree, which is the failure that surfaced this;
       checkout.
 - [x] Whole-repo sweep for the same `[ -d .git ]` shape, with the result
       recorded either way.
-- [ ] `code-reviewer` 100% clean; `Reviewed-up-to:` recorded.
+- [x] `code-reviewer` 100% clean; `Reviewed-up-to:` recorded.
+      Reviewed-up-to: bb9172bca34 (inline, 2026-10-22: one defect found and
+      fixed, see the running log).
 - [ ] Status → In Review → judgment-merge → deploy develop to dev.
 
 ## Notes (running log)
@@ -248,4 +250,15 @@ FROM a worktree, which is the failure that surfaced this;
     runner. Both are now tested.
 
   - Sweep: no other `[ -d … .git ]` shape in the repo.
-  - Left: `code-reviewer`, then In Review.
+  - **Inline review (2026-10-22)** found one defect, now fixed (bb9172bca34).
+    `cd "$REPO"` consults an exported CDPATH and reads a leading dash as an
+    option; `git -C` does neither. So a relative name could reach two
+    different folders, and `cd` printed its pick into the result. lib.sh's
+    default REPO had the same flaw when it was sourced by a relative path.
+    Measured: REPO came out as the decoy's path twice, on two lines. Both
+    cds are now `CDPATH='' cd --`, and REPO is pinned to git's absolute
+    top level once accepted. Four tests were red first. 13 mutants, all
+    killed, cover the four new ones: the CDPATH dropped (in each of the two
+    places), the `--` dropped, and the pin removed. The same idiom at 24
+    other sites is SHY-0690.
+  - Left: In Review.
