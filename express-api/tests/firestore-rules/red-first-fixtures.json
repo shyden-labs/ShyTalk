@@ -1,0 +1,25 @@
+[
+  {
+    "story": "SHY-0653",
+    "why": "Test input only, never deployed: the rules as they were before SHY-0653's fix (#2480, 690bd97d365), byte-identical to firestore.rules at its parent 1ca1299476d. The four refusals the fix added never ran on those rules; the red-first step shows each failing there for the assertFails reason (SHY-0657).",
+    "rules": "tests/firestore-rules/fixtures/firestore.rules.pre-shy-0653",
+    "tests": [
+      {
+        "file": "tests/firestore-rules/conversations-rules.test.js",
+        "fullName": "SHY-0653 — a group mute lasts exactly as long as it was set DENY: a member under a new-shape mute that has not ended posts"
+      },
+      {
+        "file": "tests/firestore-rules/conversations-rules.test.js",
+        "fullName": "SHY-0653 — a group mute lasts exactly as long as it was set DENY: a member under a new-shape permanent mute posts"
+      },
+      {
+        "file": "tests/firestore-rules/conversations-rules.test.js",
+        "fullName": "SHY-0653 — a group mute lasts exactly as long as it was set DENY: a member deletes their own new-shape mute once it has ended"
+      },
+      {
+        "file": "tests/firestore-rules/conversations-rules.test.js",
+        "fullName": "SHY-0653 — a group mute lasts exactly as long as it was set DENY: a member writes a mute row for themselves"
+      }
+    ]
+  }
+]

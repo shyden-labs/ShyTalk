@@ -1,0 +1,982 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper: get caller's stable uniqueId from custom claims ───
+    // The Express API sets this via admin.auth().setCustomUserClaims()
+    // after user creation or sign-in. Client must force-refresh token.
+    function callerUniqueId() {
+      return request.auth.token.uniqueId;
+    }
+
+    // ── Helper: cohort gate (UK OSA #17 — age-based segregation) ──
+    // Compares the caller's `cohort` claim (set by Express on sign-in
+    // / signup / admin-DOB-modify per PR 2) to `resource.data.cohort`
+    // of the doc being read. Null on either side defaults to 'minor'
+    // — the rollout-safety knob. While PR 1's per-user backfill and
+    // PR 2's claim-mint are still propagating across active sessions,
+    // legacy callers + legacy docs both resolve to 'minor' and the
+    // gate stays open. Once both sides catch up the gate tightens
+    // automatically with no rules-rev needed.
+    //
+    // Helper is intentionally zero-arg: Firestore rules scope
+    // `resource` to whichever doc the surrounding `match` block is
+    // evaluating, so the same helper works for users / rooms /
+    // stalkers / giftRankings without parameterisation.
+    function cohortMatchesCaller() {
+      return request.auth.token.get('cohort', 'minor')
+          == resource.data.get('cohort', 'minor');
+    }
+
+    // ── Helper: admin claim with safe default ────────────────────
+    // Firestore rules throw (not return false) on property access
+    // when the key is absent. `request.auth.token.admin == true`
+    // is safe only when admin existence is guaranteed on every
+    // success path. New cohort gates evaluate admin AFTER own-doc
+    // and AFTER cohort, so a non-admin caller would otherwise crash
+    // the rule. Use `.get('admin', false)` for the safe default.
+    function isAdmin() {
+      return request.auth.token.get('admin', false) == true;
+    }
+
+    // ── Helper: ban gate (SHY-0150, EPIC-0005) ───────────────────
+    // A server-minted `banned` custom claim (set by the Express
+    // `syncBannedClaim` chokepoint on ban/unban/suspend and lazily by
+    // authMiddleware when a ban verdict meets a stale token) denies
+    // create/update/delete on every user-writable collection below.
+    // READS are deliberately unchanged — the ban screen still renders
+    // the caller's own profile/config. TOKEN-ONLY on purpose: no
+    // `get()`, so a denied write costs zero document reads and the
+    // gate works even when no user doc exists. `== true` (rules do
+    // not coerce): only the server-minted boolean blocks; the ≤1h
+    // stale-token window is bounded by refresh-token revocation and
+    // backstopped per-request by the SHY-0149 API gate. `banned`
+    // OUTRANKS `admin` on every client-writable rule (user-write AND
+    // admin-write surfaces) — the admin console mutates via the Admin
+    // SDK (bypasses rules), never client-side.
+    // An UNLINKED network ban has no enumerable target at ban time,
+    // so its claim arrives via the lazy middleware path when the
+    // banned IP next calls the API (structural limit, documented in
+    // express-api/src/utils/banned-claim.js).
+    function isBanned() {
+      return request.auth.token.get('banned', false) == true;
+    }
+
+    // ── Users (keyed by uniqueId, not Firebase UID) ──────────────
+    match /users/{uniqueId} {
+      // Authed users can read profiles in their own cohort. Own-doc
+      // and admin reads bypass the gate (own-doc carve-out handles
+      // the age-up race: at midnight the user's `cohort` field flips
+      // before the client force-refreshes its token, so the stale
+      // claim doesn't match the new doc cohort — the carve-out lets
+      // the app keep rendering its own profile screen while the
+      // claim catches up). UK OSA #17 — PR 3.
+      allow read: if request.auth != null
+        && (callerUniqueId() == int(uniqueId)
+            || cohortMatchesCaller()
+            || isAdmin());
+      // Owner can update non-economy fields — verified via firebaseUid field
+      allow create: if false; // API only (atomic uniqueId + identity map)
+      allow update: if request.auth != null
+        && !isBanned()
+        && resource.data.firebaseUid == request.auth.uid
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['shyCoins', 'shyBeans', 'isSuperShy', 'superShyExpiry', 'superShyTier',
+                     'gcsLastDeductionAt', 'isSuspended', 'suspensionReason',
+                     'suspensionEndDate', 'userType', 'uniqueId', 'firebaseUid', 'providers',
+                     'pinHash', 'pinSetAt', 'pinAttempts', 'pinLockedUntil', 'pinLockoutCount',
+                     'deletionScheduledAt', 'deletionReason', 'deletionExecuteAt',
+                     'dataExportStatus', 'dataExportR2Key', 'dataExportExpiresAt',
+                     'lastDataExportRequestedAt',
+                     'gcsScore', 'gcs_score', 'gcs_last_deduction_at',
+                     'warningCount', 'warning_count', 'hasActiveWarning', 'has_active_warning',
+                     'hasNewWarning', 'warningReason', 'warning_reason', 'warningIssuedAt',
+                     // Acknowledgement audit — written server-side only (SHY-0097
+                     // acknowledge endpoint, Admin SDK). A client must not forge an
+                     // acknowledgement (would falsify the moderation record).
+                     'warningAcknowledged', 'warning_acknowledged',
+                     'warningAcknowledgedAt', 'warning_acknowledged_at',
+                     'suspensionStartDate', 'suspension_start_date', 'suspensionCanAppeal',
+                     'suspendedBy', 'is_suspended', 'suspensionReason', 'suspension_reason',
+                     'preSuspensionDisplayName', 'preSuspensionProfilePhotoUrl',
+                     'preSuspensionCoverPhotoUrl', 'roleChanged',
+                     'unique_id', 'firebase_uid',
+                     'fcmTokens',
+                     'pmNotificationsEnabled',
+                     // Age verification — server-only, set by Express on
+                     // admin approval. Clients writing these directly
+                     // would bypass the manual ID review and unlock 18+
+                     // gated features. See `2026-05-03-age-verification.md`.
+                     // Both camel and snake variants — matches the
+                     // dual-read pattern other server-only fields use
+                     // (e.g. `gcsScore` / `gcs_score`) so a future
+                     // legacy-compat fallback can't open the gate.
+                     'ageVerified', 'ageVerifiedAt', 'ageVerificationMethod',
+                     'age_verified', 'age_verified_at', 'age_verification_method',
+                     // PM-lock state (PR 11). Sub-18 users have these
+                     // set by the migration / modify-DOB handler / cron;
+                     // a client write to either bypasses the lock and
+                     // re-grants PM access. Both camelCase and
+                     // snake_case for the dual-read defence.
+                     'pmLocked', 'lastPmLockCheck',
+                     'pm_locked', 'last_pm_lock_check',
+                     // Segregation cohort (UK OSA #17, PR 1). The
+                     // server-side first-of-day check writes `cohort`
+                     // from the same `>=18y` predicate that drives
+                     // pmLocked; a client write would let a minor
+                     // user re-tag as adult and bypass every
+                     // cross-cohort gate. cohortOverride is admin-only
+                     // (also server-only). Both camel + snake variants
+                     // denied — defence against a future legacy-compat
+                     // dual-read path that could open the gate.
+                     'cohort', 'cohortOverride',
+                     'cohort_override']);
+
+      // Backpack — read own, write only via API
+      match /backpack/{giftId} {
+        allow read: if request.auth != null
+          && callerUniqueId() == int(uniqueId);
+        allow write: if false;
+      }
+
+      // Warnings — server only
+      match /warnings/{warningId} {
+        allow read: if false;
+        allow write: if false;
+      }
+
+      // Gift Wall — same-cohort auth read, write only via API.
+      // Subcollection rules do NOT inherit from the parent users gate;
+      // they must re-evaluate cohort explicitly. Without this, a
+      // minor could read the gift wall (= public received-gift list,
+      // including sender uniqueIds + gift types + timestamps) of any
+      // adult profile by direct path, bypassing the parent user-doc
+      // cohort gate. UK OSA #17 — PR 3.
+      match /giftWall/{giftId} {
+        allow read: if request.auth != null
+          && (callerUniqueId() == int(uniqueId)
+              || isAdmin()
+              || request.auth.token.get('cohort', 'minor')
+                 == get(/databases/$(database)/documents/users/$(uniqueId))
+                    .data.get('cohort', 'minor'));
+        allow write: if false;
+      }
+
+      // Transactions — owner or admin read, write only via API
+      match /transactions/{txId} {
+        allow read: if request.auth != null
+                    && (callerUniqueId() == int(uniqueId) || isAdmin());
+        allow write: if false;
+      }
+
+      // Stalkers (profile visitors) — owner reads, visitors create own entry.
+      // Cohort gate layers ON TOP of the owner-only gate. Pre-segregation
+      // visits could leave cross-cohort entries on a profile; the gate
+      // hides them post-PR3 even from the owner. Defence-in-depth: the
+      // discovery + profile-view gates above SHOULD already prevent
+      // cross-cohort visits, but the rules layer guarantees correctness
+      // if any higher gate slips. UK OSA #17 — PR 3.
+      match /stalkers/{visitorId} {
+        allow read: if request.auth != null
+          && callerUniqueId() == int(uniqueId)
+          && cohortMatchesCaller();
+        allow create: if request.auth != null
+          && !isBanned()
+          && string(callerUniqueId()) == visitorId;
+        allow update, delete: if false;
+      }
+
+      // Private data — server only (TOTP secrets, encrypted keys)
+      match /private/{docId} {
+        allow read, write: if false;
+      }
+    }
+
+    // ── Identity Map — server-only read/write ────────────────────
+    // SECURITY: previously open to any authed user. Combined with the
+    // deterministic DM conversation ID format (`dm_<smallerUid>_<largerUid>`),
+    // any user could enumerate the UID↔uniqueId mapping and forge
+    // private-conversation IDs. The Express API uses Admin SDK
+    // (bypasses rules); no client path references identityMap directly
+    // (verified by grep across shared/src, app/src/main, public/).
+    match /identityMap/{docId} {
+      allow read, write: if false;
+    }
+
+    // ── Counters — server only ───────────────────────────────────
+    match /counters/{counterId} {
+      allow read, write: if false;
+    }
+
+    // ── Rooms ────────────────────────────────────────────────────
+    match /rooms/{roomId} {
+      // Same-cohort read gate. Admin bypass for moderation. Room
+      // create writes `cohort` from the owner's resolved cohort at
+      // creation time; rooms never change cohort after create, so
+      // this is a one-shot tag. UK OSA #17 — PR 3 + PR 7.
+      allow read: if request.auth != null
+        && (cohortMatchesCaller() || isAdmin());
+
+      // UK OSA #17 PR 7 — create requires `cohort` to be present AND
+      // to equal the caller's JWT cohort claim. Binding the stamped
+      // value to the claim defeats client-side cohort forging: the
+      // JWT is server-signed via custom claim mint (PR 2), so the
+      // only way a minor caller can put `cohort: 'adult'` on a new
+      // room is to also forge the JWT — which they can't. The owner
+      // must also be the caller (single-source-of-truth: no proxy
+      // rooms), and the rules helper `cohortMatchesCaller()` cannot
+      // be used here because it reads `resource.data` (only valid
+      // for update/read) — create-time the new doc is at
+      // `request.resource.data`.
+      //
+      // Cron-elim PR A0 — `ownerFirebaseUid` is bound to
+      // `request.auth.uid` (the Firebase Auth uid baked into the
+      // server-signed JWT). The owner-left RTDB listener attests
+      // ownerLeft signals against this field; binding it to the
+      // signed JWT uid here makes it unspoofable.
+      //
+      // SHY-0029 (2026-07-08) — TIGHTENED to strict present-and-matching. The
+      // default is '' (NOT request.auth.uid): a create that omits the field ->
+      // '' != auth.uid -> DENIED. Previously the request.auth.uid default let a
+      // field-missing create pass (default matched itself), producing a room
+      // with no ownerFirebaseUid and silently breaking the owner-left RTDB
+      // attestation that reads room.ownerFirebaseUid. Removed the legacy
+      // pre-cron-elim shim: safe now — pre-public (no legacy clients in the
+      // wild) and the current app always writes the field (HomeViewModel ->
+      // createRoom). Outcomes: absent -> deny; empty -> deny;
+      // present-and-forged -> deny; present-and-matching -> allow.
+      allow create: if request.auth != null
+        && !isBanned()
+        && request.resource.data.get('cohort', '')
+            == request.auth.token.get('cohort', 'minor')
+        && (request.resource.data.get('cohort', '') == 'adult'
+            || request.resource.data.get('cohort', '') == 'minor')
+        && string(callerUniqueId()) == request.resource.data.ownerId
+        && request.resource.data.get('ownerFirebaseUid', '')
+            == request.auth.uid;
+
+      // POST-LOCKDOWN (PR #858 server-authz cutover, this PR): client-side
+      // room-doc UPDATEs are denied. ALL room-doc mutations now route through
+      // the Admin-SDK Express endpoints in
+      // `express-api/src/routes/room-mutations.js`, which enforce the ChatRoom
+      // role/state gates server-side and apply seat changes transactionally
+      // (the Admin SDK bypasses these rules).
+      //
+      // What still goes through this `match /rooms/{roomId}` block:
+      //   - read  (same-cohort gate above) — unchanged
+      //   - create (validated cohort + owner==caller) — unchanged
+      //   - delete (owner-only, below)        — unchanged; rarely used,
+      //     closeRoom writes `state: 'CLOSED'` rather than deleting
+      //
+      // What MOVED to server endpoints (formerly granted by the old, complex
+      // update rule with its joiner / participant / owner branches):
+      //   POST   /api/rooms/:id/seats/:i/{claim,accept-invite,leave,remove,move}
+      //   PATCH  /api/rooms/:id/seats/:i/mute
+      //   POST   /api/rooms/:id/{kick,hosts,owner-away,owner-returned,close,
+      //                          join,decline-invite,leave,disconnect-user,
+      //                          first-join}
+      //   PATCH  /api/rooms/:id/{name,require-approval}
+      //   DELETE /api/rooms/:id/hosts/:userId
+      //
+      // `currentRoomId` remains a SELF-write on the user-doc (see the
+      // `users/{uniqueId}` update rule above — `currentRoomId` is not in the
+      // server-only deny-list) so joinRoom / leaveRoom / acceptInvite can keep
+      // setting/clearing it client-side after their corresponding endpoint
+      // call. Subcollections (messages, seat-requests, etc.) keep their
+      // existing rules — only the room DOC's update verb is locked down here.
+      // Deploy evidence (SHY-0004, 2026-06-10): the owning server path
+      // express-api/src/routes/room-mutations.js is live on prod
+      // (byte-match to commit 267d2af7e74 / PR #863), so this lockdown is
+      // safe — clients mutate rooms via the Express endpoints.
+      allow update: if false;
+      // Delete: only owner
+      allow delete: if request.auth != null
+        && !isBanned()
+        && string(callerUniqueId()) == resource.data.ownerId;
+
+      // Room chat messages — same-cohort read (must mirror the parent
+      // rooms cohort gate so a known roomId can't bypass discovery).
+      // CREATE must be a participant or the owner. Without this gate,
+      // any authenticated user could spam arbitrary rooms via direct
+      // Firestore writes bypassing the API.
+      // UK OSA #17 — PR 3 added the read-side cohort gate.
+      match /messages/{messageId} {
+        allow read: if request.auth != null
+          && (isAdmin()
+              || request.auth.token.get('cohort', 'minor')
+                 == get(/databases/$(database)/documents/rooms/$(roomId))
+                    .data.get('cohort', 'minor'));
+        allow create: if request.auth != null
+          && !isBanned()
+          && (string(callerUniqueId()) == get(/databases/$(database)/documents/rooms/$(roomId)).data.ownerId
+              || string(callerUniqueId()) in get(/databases/$(database)/documents/rooms/$(roomId)).data.participantIds);
+        allow update, delete: if request.auth != null
+          && !isBanned()
+          && string(callerUniqueId()) == resource.data.senderId;
+      }
+
+      // Seat requests — owner can approve/deny, requester can cancel own.
+      // Same-cohort read gate — must mirror the parent rooms gate so a
+      // cross-cohort caller can't enumerate seat-request metadata
+      // (who's queueing for which room) by direct path.
+      // SECURITY: create MUST bind userId to the caller; otherwise any
+      // authed user could file a seat request attributed to ANOTHER
+      // user, causing the room owner to promote the wrong account.
+      // UK OSA #17 — PR 3 added the read-side cohort gate.
+      match /seatRequests/{requestId} {
+        allow read: if request.auth != null
+          && (isAdmin()
+              || request.auth.token.get('cohort', 'minor')
+                 == get(/databases/$(database)/documents/rooms/$(roomId))
+                    .data.get('cohort', 'minor'));
+        allow create: if request.auth != null
+          && !isBanned()
+          && request.resource.data.userId == string(callerUniqueId());
+        allow update: if request.auth != null
+          && !isBanned()
+          && (string(callerUniqueId()) == get(/databases/$(database)/documents/rooms/$(roomId)).data.ownerId
+              || string(callerUniqueId()) == resource.data.userId);
+      }
+    }
+
+    // ── Conversations ────────────────────────────────────────────
+    // SECURITY: `get` MUST gate on participants — without the
+    // participantIds check, any authed user could read any DM by
+    // guessing or enumerating conversation IDs (deterministic id
+    // format: `dm_<smallerUid>_<largerUid>` is trivial to construct).
+    match /conversations/{conversationId} {
+      // Cohort gate for conversations is structural rather than tag-
+      // based: pre-segregation DMs / groups between an adult and a
+      // minor get `crossCohortAtMigration: true` set at migration.
+      // The participants-membership rule still passes, but the
+      // additional gate locks the read so the parties no longer see
+      // history. New post-PR-3 conversations never get the flag
+      // (their creation flow rejects cross-cohort pairs). UK OSA #17.
+      allow get: if request.auth != null
+                  && string(callerUniqueId()) in resource.data.participantIds
+                  && resource.data.get('crossCohortAtMigration', false) != true;
+      allow list: if request.auth != null
+                  && string(callerUniqueId()) in resource.data.participantIds
+                  && resource.data.get('crossCohortAtMigration', false) != true;
+      // UK OSA #17 PR 8 — create gate. Caller MUST be in
+      // participantIds (no proxy creation), MUST NOT stamp the
+      // server-only migration flags (defence against pre-emptive
+      // griefing via flagged-thread create on deterministic
+      // dm_<a>_<b> IDs), AND:
+      //   • 1:1 (size == 2 and isGroup != true): exactly 2 distinct
+      //     participants, and the OTHER participant's current cohort
+      //     claim must match the caller's. The other-id is derived by
+      //     removing the caller from participantIds — a single
+      //     `get()` resolves the cohort. Caller's cohort comes from
+      //     the server-signed JWT claim (PR 2), so client-side cohort
+      //     forging requires forging the JWT — which they cannot.
+      //   • Group (isGroup == true): the stamped `cohort` field must
+      //     equal the caller's claim AND be in the enum
+      //     ['adult','minor'] (future-cohort-name corruption
+      //     defence). The group MUST be created with the caller as
+      //     the SOLE participant (size == 1) — additional members
+      //     are added one-at-a-time via the update path, where the
+      //     per-add cohort gate fires. Rules cannot iterate
+      //     participantIds within the 10-get-per-eval budget, so
+      //     bulk-create with cross-cohort members is closed
+      //     structurally by forcing single-member create.
+      allow create: if request.auth != null
+        && !isBanned()
+        && string(callerUniqueId()) in request.resource.data.participantIds
+        && request.resource.data.get('crossCohortAtMigration', false) == false
+        && request.resource.data.get('frozenAtMigration', false) == false
+        && (
+          request.resource.data.get('isGroup', false) == true
+            ? (
+              request.resource.data.get('cohort', '')
+                == request.auth.token.get('cohort', 'minor')
+              && request.resource.data.get('cohort', '') in ['adult', 'minor']
+              && request.resource.data.participantIds.size() == 1
+            )
+            : (
+              request.resource.data.participantIds.size() == 2
+              && request.resource.data.participantIds[0]
+                 != request.resource.data.participantIds[1]
+              && get(/databases/$(database)/documents/users/$(
+                   request.resource.data.participantIds.removeAll([string(callerUniqueId())])[0]
+                 )).data.get('cohort', 'minor')
+                 == request.auth.token.get('cohort', 'minor')
+            )
+        );
+
+      // SHY-0648 — who may change a conversation. The apps offer each
+      // change only to one role (GroupSettingsSheet); these rules make the
+      // same check, so a direct write cannot skip it. Owner = `createdBy`;
+      // admin = owner or in `groupAdminIds`; mod = in `groupModIds`; the
+      // rest follow the group's `permissions` (defaults as GroupPermissions).
+      // Only the fields the apps write may change: an allow-list, so a field
+      // added later is refused until a rule names it. Reads only
+      // `resource.data`, so no document read is billed.
+      function isGroupOwner() {
+        return string(callerUniqueId()) == resource.data.get('createdBy', '');
+      }
+      function isGroupAdmin() {
+        return isGroupOwner()
+          || string(callerUniqueId()) in resource.data.get('groupAdminIds', []);
+      }
+      function isGroupStaff() {
+        return isGroupAdmin()
+          || string(callerUniqueId()) in resource.data.get('groupModIds', []);
+      }
+      // A GroupPermissions.PermissionLevel name. ADMINS_AND_MODS is the old
+      // name the apps still read as MODS_AND_ABOVE.
+      function levelAllows(level) {
+        return level == 'EVERYONE'
+          || (level in ['MODS_AND_ABOVE', 'ADMINS_AND_MODS'] && isGroupStaff())
+          || (level == 'ADMINS_ONLY' && isGroupAdmin())
+          || (level == 'OWNER_ONLY' && isGroupOwner());
+      }
+      // As GroupPermissions.parseLevel: a missing or unknown level reads as
+      // that permission's default, so the rules allow what the apps offer.
+      function permissionAllows(key, fallback) {
+        let level = resource.data.get('permissions', {}).get(key, fallback);
+        let known = ['EVERYONE', 'MODS_AND_ABOVE', 'ADMINS_AND_MODS', 'ADMINS_ONLY', 'OWNER_ONLY'];
+        return (level in known && levelAllows(level))
+          || (!(level in known) && levelAllows(fallback));
+      }
+      function groupChangeAllowed(changed, removed, added, leavingOnly) {
+        return changed.hasOnly(['participantIds', 'groupName', 'groupDescription',
+                                'groupPhotoUrl', 'isClosed', 'groupAdminIds',
+                                'groupModIds', 'createdBy', 'permissions',
+                                'systemMessageConfig', 'modNotifyMode'])
+          && (!changed.hasAny(['createdBy', 'groupAdminIds', 'groupModIds', 'permissions',
+                               'systemMessageConfig', 'modNotifyMode'])
+              || isGroupOwner())
+          && (!('createdBy' in changed)
+              || request.resource.data.createdBy in request.resource.data.participantIds)
+          && (!('isClosed' in changed) || isGroupAdmin())
+          && (!changed.hasAny(['groupName', 'groupDescription', 'groupPhotoUrl'])
+              || permissionAllows('whoCanEditInfo', 'EVERYONE'))
+          && (added.size() == 0 || permissionAllows('whoCanAddMembers', 'EVERYONE'))
+          && (leavingOnly
+              || (permissionAllows('whoCanRemoveMembers', 'ADMINS_ONLY')
+                  && !(resource.data.get('createdBy', '') in removed)));
+      }
+      // A one-to-one is never updated by a phone (created only); its one
+      // allowed change is a participant removing themselves. It cannot
+      // grow, become a group or take group fields.
+      function conversationChangeAllowed() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        let removed = resource.data.participantIds
+          .removeAll(request.resource.data.participantIds);
+        let added = request.resource.data.participantIds
+          .removeAll(resource.data.participantIds);
+        let leavingOnly = removed.hasOnly([string(callerUniqueId())]);
+        return (resource.data.get('isGroup', false) == true
+                && groupChangeAllowed(changed, removed, added, leavingOnly))
+          || (resource.data.get('isGroup', false) != true
+              && changed.hasOnly(['participantIds'])
+              && added.size() == 0
+              && leavingOnly);
+      }
+
+      // UK OSA #17 PR 8 — update gate. Caller must be a participant,
+      // AND:
+      //   • Migration flags (crossCohortAtMigration, frozenAtMigration,
+      //     frozenAtMigrationAt) are SERVER-ONLY — clients cannot
+      //     mutate them (set, clear, or change). Migration writes
+      //     via Admin SDK which bypasses these rules. Without this
+      //     `hasNone` guard, a participant could clear
+      //     crossCohortAtMigration to un-hide a migrated 1:1, or set
+      //     it to grief a counterpart, or clear frozenAtMigration to
+      //     unfreeze a group then bulk-add members.
+      //   • Participant-list growth is constrained:
+      //       - `frozenAtMigration: true` blocks ALL participant
+      //         additions ("preserved but cannot grow further").
+      //       - Growth limited to one id per update (the
+      //         `removeAll(...).size() <= 1` cap) — bulk-add in a
+      //         single update would slip cross-cohort ids past the
+      //         per-add cohort `get()`.
+      //       - The added id's current cohort must match the
+      //         caller's JWT claim.
+      // Removals (size == 0) pass the growth gate — members can leave /
+      // be kicked from frozen groups. Who may make each change, removals
+      // included, is `conversationChangeAllowed()` (SHY-0648) below the
+      // growth gate.
+      allow update: if request.auth != null
+        && !isBanned()
+        && string(callerUniqueId()) in resource.data.participantIds
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(['crossCohortAtMigration', 'frozenAtMigration', 'frozenAtMigrationAt'])
+        && (
+          // No growth (shrinkage, no-op, or non-participantIds-only
+          // edit): always allowed. `new.removeAll(old).size() == 0`
+          // means new is a subset of old — covers both unchanged and
+          // shrinkage. Frozen groups can shrink (members can leave /
+          // be kicked); only growth is gated.
+          request.resource.data.participantIds
+            .removeAll(resource.data.participantIds).size() == 0
+          || (
+            // Growth path: blocked when frozen, one-at-a-time,
+            // cohort-matched. Bulk cross-cohort adds would slip past
+            // the per-add `get()` if size were unbounded.
+            resource.data.get('frozenAtMigration', false) != true
+            && request.resource.data.participantIds
+                 .removeAll(resource.data.participantIds).size() == 1
+            && get(/databases/$(database)/documents/users/$(
+                 request.resource.data.participantIds
+                   .removeAll(resource.data.participantIds)[0]
+               )).data.get('cohort', 'minor')
+               == request.auth.token.get('cohort', 'minor')
+          )
+        )
+        && conversationChangeAllowed();
+
+      // Subcollection reads MUST propagate the `crossCohortAtMigration`
+      // flag from the parent conversation doc — otherwise a participant
+      // in a flagged cross-cohort thread is blocked from reading the
+      // parent doc but can still read messages / edits / userSettings /
+      // mutes / mod_log directly by path, leaking the full thread
+      // contents. UK OSA #17 — PR 3.
+      //
+      // UK OSA #17 PR 8 — `create` MUST also propagate the flag:
+      // without the migration-flag check on messages.create, a
+      // participant in a flagged 1:1 thread could still POST messages
+      // by direct Firestore SDK, bypassing the Express route gate.
+      // The flag's full contract per design § Migration is "no further
+      // messages can be sent" — the rules layer enforces this so the
+      // Express route is defence-in-depth, not the load-bearing gate.
+      match /messages/{messageId} {
+        allow read: if request.auth != null
+          && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
+        allow create: if request.auth != null
+          && !isBanned()
+          && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
+        // SHY-0614: text, edit fields and recall are written only by the
+        // server routes (conversation-message-edits.js). A phone may add a
+        // reaction (any participant) or hide a message naming itself (group
+        // staff); each shape lists the only fields it may change. The
+        // conversation `get()` is cached per request (one read billed).
+        // SHY-0647: staff includes the owner (`createdBy`), who holds every
+        // power an admin or mod holds.
+        allow update: if request.auth != null
+          && !isBanned()
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
+          && (
+            (
+              string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+            )
+            || (
+              (string(callerUniqueId()) == get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('createdBy', '')
+                || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('groupAdminIds', [])
+                || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('groupModIds', []))
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isHidden', 'hiddenBy'])
+              && request.resource.data.isHidden == true
+              && request.resource.data.hiddenBy == string(callerUniqueId())
+            )
+          );
+        allow delete: if false;
+
+        match /edits/{editId} {
+          allow read: if request.auth != null
+            && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+            && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
+          // SHY-0614: history is written only by the server routes.
+          allow write: if false;
+        }
+
+        // SHY-0614: a recalled message's words, kept for moderators only.
+        match /recall/{docId} {
+          allow read: if request.auth != null && isAdmin();
+          allow write: if false;
+        }
+      }
+
+      // User-specific conversation settings — own settings, or the group's
+      // owner or an admin (SHY-0647: making a group writes every member's row).
+      // UK OSA #17 PR 8 — `write` MUST propagate crossCohortAtMigration
+      // (sibling of the `read` gate one line up). Otherwise a
+      // participant in a migration-hidden 1:1 can still mute/unmute,
+      // toggle preferences, etc. inside the locked thread — a
+      // data-hygiene leak and potential observable-side-channel.
+      match /userSettings/{settingsId} {
+        allow read: if request.auth != null
+          && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
+        allow write: if request.auth != null
+          && !isBanned()
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
+          && (string(callerUniqueId()) == settingsId
+              || string(callerUniqueId()) == get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('createdBy', '')
+              || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupAdminIds);
+      }
+
+      // Legacy settings path. Read/write split by SHY-0150: the ban gate
+      // covers the write half only — reads stay exactly as before.
+      match /settings/{settingsId} {
+        allow read: if request.auth != null
+          && string(callerUniqueId()) == settingsId;
+        allow write: if request.auth != null
+          && !isBanned()
+          && string(callerUniqueId()) == settingsId;
+      }
+
+      // Mutes — participants read, the owner/admins/mods can mute/unmute members.
+      // UK OSA #17 PR 8 — `write` MUST propagate crossCohortAtMigration
+      // (sibling of the `read` gate). Otherwise an admin/mod in a
+      // hidden cross-cohort group can still mute members, leaking
+      // observable state writes into a thread the rules layer says
+      // does not exist for the affected participants.
+      match /mutes/{muteId} {
+        allow read: if request.auth != null
+          && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
+        allow write: if request.auth != null
+          && !isBanned()
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true
+          && (string(callerUniqueId()) == muteId
+              || string(callerUniqueId()) == get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('createdBy', '')
+              || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupAdminIds
+              || string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.groupModIds);
+      }
+
+      // Mod log — participants read; no phone writes it
+      match /mod_log/{logId} {
+        allow read: if request.auth != null
+          && string(callerUniqueId()) in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+          && get(/databases/$(database)/documents/conversations/$(conversationId)).data.get('crossCohortAtMigration', false) != true;
+        // SHY-0614: nothing writes the group log today; SHY-0629 gives it a
+        // server writer. No phone may write one.
+        allow write: if false;
+      }
+    }
+
+    // ── App config — auth read, server write ─────────────────────
+    match /config/{configId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── Device bindings — auth read OWN, API creates ─────────────
+    // Client writes "userId" field, API writes "uniqueId" — accept either.
+    // SECURITY: previously `allow read: if request.auth != null`,
+    // exposing every device↔user binding to any authed user (useful
+    // for device-fingerprinting / ban-evasion correlation). Now
+    // gated to the device's owner OR an admin.
+    // deviceBindings — SERVER-ONLY (SHY-0170, EPIC-0006). The device-lock
+    // (anti-abuse / ban-evasion) binding is owned entirely by the Express API
+    // (POST /api/devices/lock-check + /api/device-info) via the Admin SDK, which
+    // BYPASSES these rules. No client reads or writes it directly — not the app
+    // (migrated to the API) nor the admin console (reads via /api/admin/devices).
+    // Deny ALL client access so a tampered client cannot read or forge a binding
+    // to bypass the device lock. This is defence-in-depth behind the API authz.
+    match /deviceBindings/{deviceId} {
+      allow read, write: if false;
+    }
+
+    // ── Gift catalog — auth read, server write ───────────────────
+    match /gifts/{giftId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── Gift rankings — same-cohort auth read, server write ──────
+    // Server (PR 4+) writes one ranking doc per (giftId, cohort) pair
+    // tagged with `cohort`. Cohort gate lets adults see adult rankings
+    // and minors see minor rankings only. Admin bypass for ops/moderation.
+    // UK OSA #17 — PR 3.
+    match /giftRankings/{giftId} {
+      allow read: if request.auth != null
+        && (cohortMatchesCaller() || isAdmin());
+      allow write: if false;
+    }
+
+    // ── Broadcasts — auth read, server write ─────────────────────
+    match /broadcasts/{broadcastId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── Coin packages — auth read, server write ──────────────────
+    match /coinPackages/{packageId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── Reports — admin reads, server writes ─────────────────────
+    match /reports/{reportId} {
+      allow read: if request.auth != null && isAdmin();
+      allow create: if false;
+      allow update: if false;
+    }
+
+    // ── Archived reports — server only ───────────────────────────
+    match /reportsArchive/{reportId} {
+      allow read, write: if false;
+    }
+
+    // ── Suspension appeals ───────────────────────────────────────
+    // SECURITY: create MUST bind to the caller's uniqueId — without
+    // this, any authenticated user could file an appeal on behalf of
+    // ANOTHER user (forge an appeal record under their identity).
+    match /suspensionAppeals/{appealId} {
+      allow read: if request.auth != null
+        && resource.data.uniqueId == string(callerUniqueId());
+      // SHY-0150: gated like every user write. No client writes this
+      // collection directly (grep: appeals go through the Express routes,
+      // which are ban-exempt by design and write via the Admin SDK) — the
+      // gate only closes the direct-SDK path a tampered client could use.
+      allow create: if request.auth != null
+        && !isBanned()
+        && request.resource.data.uniqueId == string(callerUniqueId());
+    }
+
+    // ── Banners — auth read, server write ────────────────────────
+    match /banners/{bannerId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── Admin tokens — server only ───────────────────────────────
+    match /adminTokens/{tokenId} {
+      allow read, write: if false;
+    }
+
+    // ── Admin audit log — admin read, server write ───────────────
+    match /adminAuditLog/{logId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── Report locks — server only ───────────────────────────────
+    match /reportLocks/{lockId} {
+      allow read, write: if false;
+    }
+
+    // ── Logs — admin reads, server writes ────────────────────────
+    match /logs/{logId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── Log config — any auth read, server write ─────────────────
+    match /logConfig/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── Log stats — any auth read, server write ──────────────────
+    match /logStats/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── Device bans — admin read, server write ───────────────────
+    match /deviceBans/{deviceId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── Network bans — admin read, server write ──────────────────
+    match /networkBans/{banId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── Alerts — admin read, server write ────────────────────────
+    match /alerts/{alertId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── Alert config — admin read, server write ──────────────────
+    match /alertConfig/{docId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── OTP codes — server-only (Admin SDK bypasses rules) ──────
+    match /otpCodes/{email} {
+      allow read, write: if false;
+    }
+
+    // ── TOTP recovery codes — server-only ──────────────────────
+    match /totpRecoveryCodes/{email} {
+      allow read, write: if false;
+    }
+
+    // ── Biometric keys — server-only ────────────────────────────
+    match /biometricKeys/{keyId} {
+      allow read, write: if false;
+    }
+
+    // ── Email metrics — server-only ─────────────────────────────
+    match /emailMetrics/{docId} {
+      allow read, write: if false;
+    }
+
+    // ── Purchase receipts — server-only (IAP dedup) ─────────────
+    match /purchaseReceipts/{receiptId} {
+      allow read, write: if false;
+    }
+
+    // ── Suggestions — public read (non-pending), auth create ────
+    match /suggestions/{suggestionId} {
+      allow read: if resource.data.status != 'pending'
+                  || (request.auth != null && string(callerUniqueId()) == resource.data.submitterUid)
+                  || (request.auth != null && isAdmin());
+      allow create: if request.auth != null && !isBanned();
+      // SHY-0150: `!isBanned()` sits OUTSIDE the branch parens so a banned
+      // ADMIN is denied too (banned outranks admin on user-write surfaces;
+      // the admin console mutates via the Admin SDK, which bypasses rules).
+      allow update: if request.auth != null
+                    && !isBanned()
+                    && ((string(callerUniqueId()) == resource.data.submitterUid && resource.data.status == 'pending')
+                        || isAdmin());
+      allow delete: if request.auth != null
+                    && !isBanned()
+                    && string(callerUniqueId()) == resource.data.submitterUid
+                    && resource.data.status == 'pending';
+
+      match /votes/{voteId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+                      && !isBanned()
+                      && request.resource.data.voterId == string(callerUniqueId());
+        allow update: if request.auth != null
+                      && !isBanned()
+                      && resource.data.voterId == string(callerUniqueId());
+        allow delete: if request.auth != null
+                      && !isBanned()
+                      && resource.data.voterId == string(callerUniqueId());
+      }
+
+      match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && !isBanned();
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Blocked topics — admin write, public read ───────────────
+    // SHY-0150: banned outranks admin here too — the admin console
+    // mutates via Express + Admin SDK (bypasses rules), so gating the
+    // client-side admin write costs legitimate moderation nothing.
+    match /blockedTopics/{topicId} {
+      allow read: if true;
+      allow write: if request.auth != null && !isBanned() && isAdmin();
+    }
+
+    // ── Suggestion disputes — submitter create, admin resolve ───
+    // SECURITY: create MUST bind submitterUid to the caller; otherwise
+    // any authed user could file a dispute attributed to ANOTHER user,
+    // spoofing the complainant identity.
+    match /suggestionDisputes/{disputeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && !isBanned()
+        && request.resource.data.submitterUid == string(callerUniqueId());
+      // SHY-0150: admin resolve gated too (banned outranks admin; the
+      // console's real path is Express + Admin SDK, which bypasses rules).
+      allow update: if request.auth != null && !isBanned() && isAdmin();
+    }
+
+    // ── Subscriptions — owner-only read/write ───────────────────
+    // Read/write split by SHY-0150: the ban gate covers the write half
+    // only — a banned owner still reads their own subscription doc.
+    match /subscriptions/{uid} {
+      allow read: if request.auth != null && string(callerUniqueId()) == uid;
+      allow write: if request.auth != null
+        && !isBanned()
+        && string(callerUniqueId()) == uid;
+    }
+
+    // ── Notifications — owner read/update, server create ────────
+    match /notifications/{notifId} {
+      allow read: if request.auth != null
+                  && resource.data.uid == string(callerUniqueId());
+      allow update: if request.auth != null
+                    && !isBanned()
+                    && resource.data.uid == string(callerUniqueId());
+      allow create, delete: if false;
+    }
+
+    // ── Identity graphs — admin-only ────────────────────────────
+    // Read/write split by SHY-0150 (mirrors settings/subscriptions):
+    // the ban gate covers the write half only — a banned admin still
+    // READS the graph surface; their client-side writes are denied
+    // (banned outranks admin; Admin-SDK moderation is unaffected).
+    match /identityGraphs/{graphId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if request.auth != null && !isBanned() && isAdmin();
+    }
+
+    // ── Notification queue — server-only ────────────────────────
+    match /notificationQueue/{docId} {
+      allow read, write: if false;
+    }
+
+    // ── Audit log — admin read, server write ──────────────────
+    match /auditLog/{logId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── Moderation log — admin read, server write ─────────────
+    match /moderationLog/{logId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── Apple notifications dedup — server-only (webhook idempotency)
+    match /appleNotifications/{notificationUUID} {
+      allow read, write: if false;
+    }
+
+    // ── Orphan refunds worklist — admin read, server write ─────
+    // Apple-side refunds with no matching purchaseReceipt. Ops resolves
+    // these manually; the admin panel surfaces them via this collection.
+    match /orphanRefunds/{notificationUUID} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── Pending refund reversals — admin read, server write ────
+    // Apple REFUND_REVERSED events (customer charged back the refund or
+    // App Review reversed it). Auto-restoration of entitlement is risky
+    // for money-affecting paths, so the webhook delegates to ops via
+    // this worklist + a critical alert.
+    match /pendingRefundReversals/{notificationUUID} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── Age verification submissions — admin read, server write ──
+    // Apple-content-guideline 18+ enforcement (PR #441 plan). Holds
+    // the in-flight ID-review submission per user (status: pending /
+    // approved / rejected / dob_modified). The doc references an R2
+    // image key; the image itself is deleted on admin decision so
+    // the doc is the only persistent record.
+    //
+    // Clients DO NOT read or write this collection directly — both
+    // sides go through Express. The submitter's user doc surfaces
+    // their verification status via the `ageVerified` field instead.
+    // Admin reads via the Express admin route (which uses Firebase
+    // Admin SDK; rules are bypassed).
+    match /ageVerificationSubmissions/{submissionId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+
+    // ── Segregation events — admin read, server write ────────────
+    // UK OSA #17 — PR 3. Audit log for every cross-cohort enforcement
+    // action: the Express `requireSameCohort` middleware (PR 4) emits
+    // a doc per blocked request (route, actor cohort, target cohort,
+    // outcome). Admin reads via the admin panel for compliance
+    // reporting. Writes are server-only — even admin sessions must
+    // route through Express so the payload shape is canonical and
+    // actor/route/cohort fields are server-controlled.
+    match /segregationEvents/{evtId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
+    }
+  }
+}
