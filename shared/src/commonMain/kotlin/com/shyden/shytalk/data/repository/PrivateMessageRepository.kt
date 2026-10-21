@@ -177,11 +177,11 @@ interface PrivateMessageRepository {
     ): Resource<Unit>
 
     // Mod actions
+
+    /** Writes [mute] as `mutes/{mute.mutedUserId}` ([MuteInfo.toRow]). */
     suspend fun muteGroupMember(
         conversationId: String,
-        userId: String,
-        duration: Long?,
-        reason: String?,
+        mute: MuteInfo,
     ): Resource<Unit>
 
     suspend fun unmuteGroupMember(

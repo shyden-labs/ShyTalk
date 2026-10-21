@@ -10,6 +10,7 @@ type: bug
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
+blocked_by: [SHY-0674, SHY-0676, SHY-0677, SHY-0678, SHY-0679, SHY-0680, SHY-0681, SHY-0682, SHY-0683, SHY-0684, SHY-0687, SHY-0688]
 ---
 
 # SHY-0647: Making a group on a phone reports what happened
@@ -44,17 +45,39 @@ fake repository, and j28's "Alice makes a group" is a Web step.
 
 ### Happy path
 
-- [ ] First, a rules test proves or disproves it: the creator of a new group
+- [x] First, a rules test proves or disproves it: the creator of a new group
       with no admins writes a member's `userSettings` row (expected refused)
       and their own row (expected allowed). The result is recorded here
-      before any fix.
-- [ ] If refused: the apps make a group without asking for writes the rules
-      refuse (the server already writes each recipient's row when a message
-      is sent, `express-api/src/routes/conversations.js`), and making a group
-      on each phone reports success, opens the group, and shows it to the
-      members.
-- [ ] If allowed: this story records why, and closes with the rules test as
-      its guard.
+      before any fix. **Proven, 2026-10-20**: PR #2478 commit e2ddf13b54f,
+      PR Checks run 39345714276, step "Run Express API tests with coverage"
+      green, `PASS tests/firestore-rules/conversations-rules.test.js` (no
+      skips in the file). On the old rules the creator was refused a
+      member's row, the apps' whole batch, and a member's row after
+      promoting an admin; its own row was allowed.
+- [x] The owner holds every power an admin or mod holds (Shyden,
+      2026-10-20): the rules let the owner write members' `userSettings`
+      rows, mute members and hide messages, as the apps already offer
+      (`Conversation.isAdmin`, `isModOrAbove`); rules tests pin each.
+      **Done, 2026-10-20**: PR #2478 (squash 8f71a536c5a), PR Checks run
+      39348431926 on f2e7dfe99e3, every job and step green by name,
+      `PASS tests/firestore-rules/conversations-rules.test.js`; tests
+      "ALLOW: the owner of a group with no admins writes their own row",
+      "... writes a member's row", "the app's one batch of every member's
+      row", "... promoted another member to admin", "... mutes a member",
+      "... hides a message naming themself". Deployed to dev by Deploy To
+      Dev run 39353790977 (rules step and Dev Smoke Tests green).
+- [x] Making a group on each phone reports success, opens the group, and
+      shows it to the members. **Done, 2026-10-20**, on dev (develop
+      690bd97d365, rules from Deploy To Dev run 39353790977). Android
+      (OnePlus CPH2653) on App Distribution 0.99.0-b383 as Alice: "QA0647
+      plain 2129" opened with 3 members (Firestore YgeBv7tYdwFERDq8dGjT,
+      createdBy 50000010); Theo and Selma each read it, a non-member read
+      nothing. iPhone (iPhone Air) as Theo: "QA0647 ios 2150" opened with 3
+      members (DYaSpSPrQXgati9r3zGv, createdBy 50000060); Alice and Selma
+      each read it, and Theo's Messages list showed both groups made on
+      Android. The iPhone ran a local Debug-Dev build (2822) of the same
+      commit 690bd97d365, not TestFlight 383: the TestFlight build carries
+      no test-persona credential by design, so no persona can sign in on it.
 
 ### Error paths
 
@@ -64,8 +87,13 @@ fake repository, and j28's "Alice makes a group" is a Web step.
 
 ### Edge cases
 
-- [ ] A group where the creator promoted a member to admin is made the same
-      way and reports the same success.
+- [x] A group where the creator promoted a member to admin is made the same
+      way and reports the same success. **Done, 2026-10-20**, same builds:
+      Android, Alice promoted Theo, "QA0647 admin 2140" opened with 3
+      members (WUWKxEHAuTLbEiqOuXIt, groupAdminIds [50000060]); iPhone, Theo
+      promoted Selma, "QA0647 iosadmin 2153" opened with 3 members
+      (e3dkcjS5sZzyEXvHpay9, groupAdminIds [50000080]). Every member read
+      each group; Theo's list showed the Android group with an Admin badge.
 
 ### Performance
 
@@ -73,12 +101,19 @@ fake repository, and j28's "Alice makes a group" is a Web step.
 
 ### Security
 
-- [ ] The rules stay as strict: no person may write another member's
-      `userSettings` row unless they are that group's admin.
+- [x] The rules stay as strict: no person may write another member's
+      `userSettings` row unless they are that group's owner or admin; a
+      member may not mute another member or hide a message.
+      **Done, 2026-10-20**: same run 39348431926; tests "DENY: a mod writes
+      another member's row", "DENY: a member writes another member's row",
+      "DENY: a member mutes another member", "DENY: a member hides a
+      message". Staff acting on the owner is SHY-0652.
 
 ### UX
 
-- [ ] No failure message is shown for a group that was made.
+- [x] No failure message is shown for a group that was made. **Done,
+      2026-10-20**: none of the four groups above showed one; each opened
+      straight into the new group's chat.
 
 ### i18n
 
@@ -110,10 +145,12 @@ when the group was made.
 
 ## Test Plan
 
-- Rules test in `express-api/tests/firestore-rules/` (CI's rules suite):
-  creator writes a member's row in a no-admin group; creator writes own row.
-- Shared/Android unit tests of the repository with the Firestore client
-  stood in: the writes it asks for.
+- Rules tests in `express-api/tests/firestore-rules/` (CI's rules suite):
+  the owner of a no-admin group writes a member's row, its own row and the
+  apps' whole batch, mutes a member and hides a message; a member and a mod
+  are refused the same.
+- No repository unit tests: the apps' writes do not change (owner ruling,
+  2026-10-20).
 - A runner journey step makes a group on each phone (one definition, both
   phones).
 
@@ -124,7 +161,8 @@ when the group was made.
 
 ## Dependencies
 
-- None.
+- EPIC-0016, every story (SHY-0674, SHY-0676, SHY-0677, SHY-0678, SHY-0679, SHY-0680, SHY-0681, SHY-0682, SHY-0683, SHY-0684, SHY-0687, SHY-0688): Shyden, 2026-10-21,
+  "Waits behind coverage" (the hotfix ships under the full coverage gate).
 
 ## Risks & Mitigations
 
@@ -142,3 +180,17 @@ when the group was made.
   proven (every defect is P0). MVP: a launch user making a group meets it.
   Scored 5: one rules test, the same change in two repository files, unit
   tests, one journey step on two phones.
+- **2026-10-20**: Shyden ruled the owner holds every power an admin or mod
+  holds ("they're the overlords with full permissions, more so than
+  admins"). So the fix is in the rules, not the apps: `userSettings`
+  write, `mutes` write and message hide each now admit `createdBy` (the
+  apps already offered the owner mute and hide, and the rules refused
+  them). No app code changes. Shyden also chose a NEW release branch
+  carrying SHY-0648 and this fix together, in place of the frozen
+  `release/2026-10-19-group-roles-hotfix`. Live (v0.99.0) has an older
+  message rule (sender, admins, mods may update or delete), so the cut
+  adds the owner there by hand. Estimate stays 5: the apps' change
+  becomes rules on three paths plus the release cut.
+- **2026-10-21**: blocked by every EPIC-0016 story: Shyden chose "Waits
+  behind coverage" under the global ruling "Ratchet to 100%, unmeasured
+  fails now".

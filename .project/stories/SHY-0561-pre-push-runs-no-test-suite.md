@@ -64,6 +64,12 @@ Three tests pin the hook today: `actionlint-shellcheck-invocation.test.js`,
       SHY-0517). The large-file check still compares with `main`.
 - [ ] Each planted runner form (`npx playwright test`, `jest`,
       `./gradlew …Test`, `npm test`, `xcodebuild test`) turns the pin red.
+- [ ] The hook prints no warning on a clean push: the three
+      `echo "$X" | grep -q…` sites (`.husky/pre-push` lines 116, 154, 230)
+      print `echo: write error: Broken pipe` on every push, because `grep -q`
+      exits at its first match; each reads its input without a pipe the
+      reader can close, and a test runs the hook's checks and finds no
+      warning in its output.
 
 ### Performance
 
@@ -147,3 +153,6 @@ Three tests pin the hook today: `actionlint-shellcheck-invocation.test.js`,
   story, and SHY-0517 is folded into it: its remaining part is the
   pushed-range edge case above. Estimate unchanged.
 - **2026-10-18**: Blocked by SHY-0625 (the SonarCloud check passes only when the scan ran and passed); the GitHub "Blocked by" link already exists.
+- **2026-10-22**: the Broken-pipe AC added. Seen on every push in session
+  shytalk-82 (all five pushes; it predates that session's Python switch).
+  Estimate unchanged: three one-line changes and one test.

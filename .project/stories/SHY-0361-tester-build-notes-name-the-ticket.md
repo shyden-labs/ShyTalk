@@ -3,7 +3,7 @@ id: SHY-0361
 status: In Review
 owner: claude
 created: 2026-08-20
-priority: P1
+priority: P0
 effort: S
 estimate: 3
 type: infra
@@ -55,6 +55,18 @@ carry the ticket.
 - [ ] If the last ticket cannot be determined, the notes say so plainly and still
       give branch and sha — never a blank or misleading note.
 - [ ] A malformed story file does not fail the deploy; the notes degrade.
+- [ ] A ticket whose code changed in the build is described by what changed
+      and what to test, whatever its story status. Today `entryBlock` in
+      `scripts/tester-notes.js` tests `story.status === 'Draft'` before
+      `code` (and the "testable" pick skips Draft stories the same way),
+      and ShyTalk stories stay Draft until In Review, so the notes for
+      build 383 (Deploy To Dev 39382577693, develop 690bd97d365, the merge
+      of SHY-0653, which changed `MuteInfo`, both repositories and
+      `PrivateChatViewModel`) told testers on both phones "nothing new for
+      this app since the last dev build ... SHY-0653 ... Filed, not built
+      yet: nothing to test". A unit test per case: Draft with code, Draft
+      without code, In Review with code. (Found on the SHY-0647 phone
+      walk, 2026-10-20.)
 
 ### Edge cases
 
@@ -216,3 +228,8 @@ fails against the current workflow.
   nothing new to test", and the first line names the newest ticket with
   something to test (added 2026-10-15). Mutation-verified: 9 mutants, each run
   against both whole test files, all red.
+- **2026-10-21**: the SHY-0647 phone walk (2026-10-20) found build 383's
+  notes calling SHY-0653's merged app code "Filed, not built yet": the
+  Draft check runs before the code check. New Error-paths AC. Priority P1 ->
+  P0 (every defect is P0). Estimate stays 3: one reordered check and three
+  unit cases.

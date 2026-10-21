@@ -2,6 +2,14 @@ package com.shyden.shytalk.core.util
 
 import kotlinx.coroutines.CancellationException
 
+// Test-injectable sink for a failed call: the action the caller named
+// ("Failed to update roles") and the exception the backend threw (a rules
+// refusal arrives as PERMISSION_DENIED). @PublishedApi because the public
+// inline [firebaseCall] below is inlined into callers and must reach it.
+@PublishedApi
+internal var firebaseCallErrorLogger: (action: String, error: Exception) -> Unit =
+    { action, error -> logE("firebaseCall", action, error) }
+
 /**
  * Wraps a suspend block in a try-catch and returns [Resource.Success] or [Resource.Error].
  * Eliminates the repeated try-catch-Resource.Error boilerplate across repositories.
@@ -20,7 +28,7 @@ suspend inline fun <T> firebaseCall(
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        logE("firebaseCall", errorMessage, e)
+        firebaseCallErrorLogger(errorMessage, e)
         // Fall back to `errorMessage` when the exception's own message is null OR
         // empty. A bare `?:` only catches null, but an empty-string message gives
         // the user no actionable information either — so empty must also fall back

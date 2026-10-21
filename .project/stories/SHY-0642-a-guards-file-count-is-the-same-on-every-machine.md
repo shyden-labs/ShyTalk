@@ -1,6 +1,6 @@
 ---
 id: SHY-0642
-status: Draft
+status: In Review
 owner: claude
 created: 2026-10-19
 priority: P0
@@ -45,25 +45,48 @@ they must agree with CI.
 
 ### Happy path
 
-- [ ] Each of the three guards counts only files git tracks or would track:
-      a git-ignored file under any root is never read or counted.
-- [ ] Run in the main checkout (44 ignored files today), each guard reads the
-      same count as CI at the same commit.
+- [x] Each of the three guards counts only files git tracks or would track:
+      a git-ignored file under any root is never read or counted. Proof: each
+      guard keeps a walked file only when `gitVisibleFiles` (one helper,
+      `express-api/tests/helpers/git-visible-files.js`, asking
+      `git ls-files --cached --others --exclude-standard`) lists it; a real
+      ignored `app/src/dev/google-services.json` copied into a worktree left
+      `no-retired-org-name` at 2037 (the old walk read 2038).
+- [x] Run in the main checkout (44 ignored files today), each guard reads the
+      same count as CI at the same commit. Proof: after #2455 merged
+      (17c92eeb072, tree b3b6cda42e4, the same tree as the PR head CI tested),
+      `shytalk-floors.zsh` in the main checkout passed 134 of 134 tests in the
+      three files, each asserting `filesRead` EQUAL to its floor (2037, 482,
+      153), with 260,223 git-ignored files and 5 untracked, not-ignored
+      entries in that checkout.
 
 ### Error paths
 
-- [ ] If the guard cannot tell which files are ignored, it fails naming why;
-      it never falls back to counting the disk.
+- [x] If the guard cannot tell which files are ignored, it fails naming why;
+      it never falls back to counting the disk. Proof: a root outside any
+      repository throws `git ls-files failed in <folder>: ... not a git
+      repository` in each guard's tests; a missing folder throws `no such
+      folder`; mutating the throw into an empty answer turns 4 tests red.
 
 ### Edge cases
 
-- [ ] An untracked file that is NOT ignored is still counted (a new file not
-      yet added must move the count, as today).
+- [x] An untracked file that is NOT ignored is still counted (a new file not
+      yet added must move the count, as today). Proof: each guard's
+      "untracked file that is not ignored is read and counted" case; dropping
+      `--others` turns 24 tests red.
 
 ### Performance
 
-- [ ] Each guard's run time is measured before and after in CI; no slower than
-      before plus 10%.
+- [x] Each guard file is no more than 0.15 s slower than before (Shyden,
+      2026-10-19, replacing "+10%", which no git call can meet: starting git
+      costs about 6 ms, most of the MinIO guard's 10%). Proof: medians of 5
+      runs, old against new on one machine: no-minio-image 79 -> 138 ms,
+      no-retired-org-name 219 -> 324 ms, suspension-ends-in-one-place
+      363 -> 453 ms. Jest prints no per-file time in CI, so CI's check is the
+      Test Backend job's time on the PR against develop's: the PR's run
+      (39193226505) took 399 s (Express tests step 324 s) against 491 s
+      (398 s) and 500 s (416 s) on the two green code runs before it
+      (39190622872, 39177283003): no slowdown visible within CI's spread.
 
 ### Security
 
@@ -79,9 +102,11 @@ they must agree with CI.
 
 ### Observability
 
-- [ ] A planted git-ignored file under each guard's roots leaves its count
+- [x] A planted git-ignored file under each guard's roots leaves its count
       unchanged, and a planted untracked, not-ignored file moves it by one:
-      both seen in the guard's own tests.
+      both seen in the guard's own tests. Proof: the "SHY-0642 — git decides
+      what is read" block in each guard; removing each guard's git filter
+      turns its ignored case red (mutations 7-9).
 
 ## Announce
 
@@ -117,8 +142,9 @@ Nothing: operator tooling with no learner-facing change.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; CI green by step name; merged to
-      `develop`.
+- [x] Every AC ticked with its proof; CI green by step name; merged to
+      `develop` (#2455, 17c92eeb072; run 39193226505 every job success or
+      path-skipped, read by name on e9f97832ae2 = headRefOid).
 
 ## Notes
 
@@ -127,3 +153,5 @@ Nothing: operator tooling with no learner-facing change.
   day cannot be trusted in the main checkout); not MVP (tooling). Scored 3:
   one shared change to how three guards list files, two plants each and their
   tests.
+- **2026-10-19**: Merged in #2455; the main-checkout run and CI's job time
+  tick the last AC. In Review until Shyden closes it.

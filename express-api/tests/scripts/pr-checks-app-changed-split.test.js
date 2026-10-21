@@ -402,5 +402,27 @@ describe('pr-checks.yml — APP_CHANGED granular-split contract', () => {
       expect(result.ANDROID_APP).toBe('true');
       expect(result.IOS_APP).toBe('true');
     });
+
+    // SHY-0662: the APK persona-password check runs inside build-and-test. A PR
+    // changing only the check must run that job, or the check first runs on
+    // develop (PR #2495 skipped Build & Test: .github/* set no flag).
+    test('APK persona-password composite action → ANDROID only, not the backend', () => {
+      const result = classifyFiles(yamlText, [
+        '.github/actions/apk-holds-no-persona-password/action.yml',
+      ]);
+      expect(result.ANDROID_APP).toBe('true');
+      expect(result.APP).toBe('true');
+      expect(result.IOS_APP).toBe('false');
+      expect(result.BACKEND).toBe('false');
+    });
+
+    test('APK persona-password checker script → ANDROID and SCRIPTS (its unit tests run in test-backend)', () => {
+      const result = classifyFiles(yamlText, ['scripts/ci/apk-persona-check.js']);
+      expect(result.ANDROID_APP).toBe('true');
+      expect(result.APP).toBe('true');
+      expect(result.SCRIPTS).toBe('true');
+      expect(result.IOS_APP).toBe('false');
+      expect(result.BACKEND).toBe('false');
+    });
   });
 });

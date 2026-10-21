@@ -51,6 +51,7 @@ import com.shyden.shytalk.core.model.SystemMessageConfig
 import com.shyden.shytalk.core.model.User
 import com.shyden.shytalk.core.ui.UserAvatar
 import com.shyden.shytalk.core.util.Constants
+import com.shyden.shytalk.core.util.currentTimeMillis
 import com.shyden.shytalk.resources.*
 import com.shyden.shytalk.resources.Res
 import org.jetbrains.compose.resources.stringResource
@@ -313,7 +314,7 @@ private fun MembersTab(
         ) {
             items(participants, key = { it.uid }) { user ->
                 val role = conversation?.roleOf(user.uid) ?: GroupRole.MEMBER
-                val isMuted = groupMutes.any { it.mutedUserId == user.uid && it.isActive }
+                val isMuted = groupMutes.any { it.mutedUserId == user.uid && it.isInForceAt(currentTimeMillis()) }
 
                 Row(
                     modifier =

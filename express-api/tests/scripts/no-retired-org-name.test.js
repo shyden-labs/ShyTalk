@@ -1,3 +1,7 @@
+/* eslint-disable sonarjs/no-os-command-from-path --
+ * Spawns the hardcoded binary `git` with literal argv (`init`, `add`) to build
+ * a throwaway repository for the planted cases; no user-controlled command and
+ * no PATH manipulation. Matches the firebase-admin-namespace-surface convention. */
 /**
  * no-retired-org-name.test.js — SHY-0545.
  *
@@ -17,9 +21,11 @@
  * verdict carries the number of files read beside the findings, so a walk
  * that silently reads nothing cannot pass.
  */
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { gitVisibleFiles } = require('../helpers/git-visible-files');
 
 const REPO = path.resolve(__dirname, '../../..');
 const RETIRED_LOGIN = ['shyden', 'ltd'].join('-');
@@ -109,7 +115,14 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 2032 -> 2034: shared/.../data/remote/PrivateMessageEditApi.kt and its
 // commonTest (SHY-0614). 2034 -> 2035:
 // tests/firestore-rules/message-history-rules.test.js (SHY-0614).
-const FILES_READ_FLOOR = 2039;
+// 2035 -> 2037: tests/helpers/git-visible-files.js and its test (SHY-0642).
+// Since SHY-0642 a git-ignored file is never counted, so this is CI's
+// figure on every machine.
+// 2037 -> 2038: shared/.../core/util/FirebaseCallLoggingTest.kt (SHY-0648).
+// 2038 -> 2041: .github/actions/apk-holds-no-persona-password/action.yml,
+// scripts/ci/apk-persona-check.js and two tests added, one test removed
+// (SHY-0662).
+const FILES_READ_FLOOR = 2041;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
@@ -128,12 +141,18 @@ function walk(repoRoot, rel, out) {
   return out;
 }
 
-function scan(repoRoot, roots) {
+// SHY-0642: a walked file is read only when git tracks or would track it, so
+// the count is CI's on every machine. `visible` defaults to git's answer for
+// the roots and the READMEs, which throws when git cannot say.
+function scan(repoRoot, roots, visible) {
   const top = fs
     .readdirSync(repoRoot, { withFileTypes: true })
     .filter((entry) => entry.isFile() && ROOT_FILES.test(entry.name))
     .map((entry) => entry.name);
-  const files = [...top, ...roots.flatMap((root) => walk(repoRoot, root, []))];
+  const seen = visible ?? gitVisibleFiles(repoRoot, [...roots, ...top]);
+  const files = [...top, ...roots.flatMap((root) => walk(repoRoot, root, []))].filter((rel) =>
+    seen.has(rel),
+  );
   const findings = files.flatMap((rel) =>
     findRetiredName(fs.readFileSync(path.join(repoRoot, rel), 'utf8')).map(
       (name) => `${rel}: ${name}`,
@@ -196,6 +215,11 @@ describe('SHY-0545 — findRetiredName recognises every spelling', () => {
   });
 });
 
+// The plants about kinds and pruning are not about ignore rules: they pass a
+// stand-in that sees every file, so they start no git. Git's answer is tested
+// in the SHY-0642 block below.
+const EVERY_FILE = { has: () => true };
+
 describe('SHY-0545 — a planted name in a scanned file turns the verdict red', () => {
   let root;
   beforeEach(() => {
@@ -211,7 +235,7 @@ describe('SHY-0545 — a planted name in a scanned file turns the verdict red', 
     ['README.md', `[repo](https://github.com/${RETIRED_LOGIN}/ShyTalk)\n`],
   ])('a planted %s is reported by path', (rel, body) => {
     fs.writeFileSync(path.join(root, rel), body);
-    const { files, findings } = scan(root, ['scripts']);
+    const { files, findings } = scan(root, ['scripts'], EVERY_FILE);
     expect({ filesRead: files.length, findings: findings.map((f) => f.split(':')[0]) }).toEqual({
       filesRead: 2,
       findings: [path.join(...rel.split('/'))],
@@ -221,7 +245,7 @@ describe('SHY-0545 — a planted name in a scanned file turns the verdict red', 
   test.each(['node_modules', 'build', '.gradle'])('a file under %s is not read', (dir) => {
     fs.mkdirSync(path.join(root, 'scripts', dir), { recursive: true });
     fs.writeFileSync(path.join(root, 'scripts', dir, 'x.js'), `${RETIRED_LOGIN}\n`);
-    expect(scan(root, ['scripts'])).toEqual({
+    expect(scan(root, ['scripts'], EVERY_FILE)).toEqual({
       files: [path.join('scripts', 'clean.sh')],
       findings: [],
     });
@@ -230,7 +254,7 @@ describe('SHY-0545 — a planted name in a scanned file turns the verdict red', 
   test('an extensionless git hook under .husky is read', () => {
     fs.mkdirSync(path.join(root, '.husky'));
     fs.writeFileSync(path.join(root, '.husky', 'pre-push'), `gh api orgs/${RETIRED_LOGIN}\n`);
-    expect(scan(root, ['.husky']).findings).toEqual([
+    expect(scan(root, ['.husky'], EVERY_FILE).findings).toEqual([
       `${path.join('.husky', 'pre-push')}: ${RETIRED_LOGIN}`,
     ]);
   });
@@ -239,7 +263,7 @@ describe('SHY-0545 — a planted name in a scanned file turns the verdict red', 
     fs.mkdirSync(path.join(root, '.husky', '_'), { recursive: true });
     fs.writeFileSync(path.join(root, '.husky', 'pre-push'), 'npm test\n');
     fs.writeFileSync(path.join(root, '.husky', '_', 'h'), `${RETIRED_LOGIN}\n`);
-    expect(scan(root, ['.husky'])).toEqual({
+    expect(scan(root, ['.husky'], EVERY_FILE)).toEqual({
       files: [path.join('.husky', 'pre-push')],
       findings: [],
     });
@@ -248,21 +272,78 @@ describe('SHY-0545 — a planted name in a scanned file turns the verdict red', 
   test('a folder named _ outside .husky is read', () => {
     fs.mkdirSync(path.join(root, 'scripts', '_'));
     fs.writeFileSync(path.join(root, 'scripts', '_', 'x.sh'), `${RETIRED_LOGIN}\n`);
-    expect(scan(root, ['scripts']).findings).toEqual([
+    expect(scan(root, ['scripts'], EVERY_FILE).findings).toEqual([
       `${path.join('scripts', '_', 'x.sh')}: ${RETIRED_LOGIN}`,
     ]);
   });
 
   test('an extensionless file elsewhere is not read', () => {
     fs.writeFileSync(path.join(root, 'scripts', 'LICENSE'), `${RETIRED_LOGIN}\n`);
-    expect(scan(root, ['scripts']).files).toEqual([path.join('scripts', 'clean.sh')]);
+    expect(scan(root, ['scripts'], EVERY_FILE).files).toEqual([path.join('scripts', 'clean.sh')]);
   });
 
   test('a top-level file that is not a README is not read', () => {
     fs.writeFileSync(path.join(root, 'HANDOVER.md'), `${RETIRED_LOGIN}\n`);
+    expect(scan(root, ['scripts'], EVERY_FILE)).toEqual({
+      files: [path.join('scripts', 'clean.sh')],
+      findings: [],
+    });
+  });
+});
+
+// SHY-0642: the cases about ignore rules ask the real git, in one repository
+// built once; each case removes what it planted, so the next starts clean.
+describe("SHY-0642 — git decides what is read, so the count is CI's", () => {
+  let root;
+  let planted = [];
+  const plant = (rel, body) => {
+    fs.writeFileSync(path.join(root, rel), body);
+    planted.push(rel);
+  };
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0642-'));
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    fs.mkdirSync(path.join(root, 'scripts', 'nested'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'scripts', 'clean.sh'), 'OWNER=shyden-labs\n');
+  });
+  afterEach(() => {
+    for (const rel of planted) fs.rmSync(path.join(root, rel));
+    planted = [];
+  });
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('a git-ignored file under a scanned root is neither read nor counted', () => {
+    plant('.gitignore', 'google-services.json\n');
+    plant(path.join('scripts', 'google-services.json'), `${RETIRED_LOGIN}\n`);
     expect(scan(root, ['scripts'])).toEqual({
       files: [path.join('scripts', 'clean.sh')],
       findings: [],
     });
+  });
+
+  test('an untracked file that is not ignored is read and counted', () => {
+    plant(path.join('scripts', 'nested', 'new.sh'), `${RETIRED_LOGIN}\n`);
+    expect(scan(root, ['scripts'])).toEqual({
+      files: [path.join('scripts', 'clean.sh'), path.join('scripts', 'nested', 'new.sh')],
+      findings: [`${path.join('scripts', 'nested', 'new.sh')}: ${RETIRED_LOGIN}`],
+    });
+  });
+
+  test('an ignored README at the top is neither read nor counted', () => {
+    plant('.gitignore', 'README.md\n');
+    plant('README.md', `${RETIRED_LOGIN}\n`);
+    expect(scan(root, ['scripts']).files).toEqual([path.join('scripts', 'clean.sh')]);
+  });
+
+  test('a root outside any repository fails rather than counting the disk', () => {
+    const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'shy0642-bare-'));
+    try {
+      fs.mkdirSync(path.join(bare, 'scripts'));
+      expect(() => scan(bare, ['scripts'])).toThrow(
+        /git ls-files failed in .*not a git repository/i,
+      );
+    } finally {
+      fs.rmSync(bare, { recursive: true, force: true });
+    }
   });
 });

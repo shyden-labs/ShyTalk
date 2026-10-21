@@ -1,6 +1,6 @@
 services:
   livekit:
-    image: livekit/livekit-server:v1.13.9
+    image: livekit/livekit-server:v1.13.10
     # Resource diet 2026-05-21: cap to 256m. livekit-server is a Go
     # binary, ~50-100MB steady-state. The cap prevents balloon under
     # peer-connection spikes during voice-room test scenarios. Pinned
@@ -50,7 +50,7 @@ services:
     command: --health /health posix /data
 
   mailpit:
-    image: axllent/mailpit:v1.31.4
+    image: axllent/mailpit:v1.31.6
     # Tiny in-memory SMTP sink. memswap_limit pinned equal to disable
     # swap (no balloon possible).
     mem_limit: 128m

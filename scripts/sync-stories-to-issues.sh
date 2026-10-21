@@ -92,6 +92,7 @@
 #   33  story file failed frontmatter validation
 #   34  --story <ID> story file not found
 #   40  one or more sync operations failed (N_FAILED > 0)
+#   41  --changed found a deleted story file (set its status to Cancelled instead)
 
 set -euo pipefail
 
@@ -104,11 +105,14 @@ E_USAGE=2
 E_AUTH=30
 E_NOT_FOUND=34
 E_API=40
+E_DELETED=41
 
 VERBOSE=0
 DRY_RUN=0
 MODE=""
 SINGLE_ID=""
+CHANGED_BASE=""
+CHANGED_HEAD=""
 REBUILD=0
 
 GH="${GH:-gh}"
@@ -184,12 +188,17 @@ sync-stories-to-issues.sh ${VERSION}
 USAGE
   sync-stories-to-issues.sh --all
   sync-stories-to-issues.sh --story SHY-NNNN
+  sync-stories-to-issues.sh --changed BASE HEAD
   sync-stories-to-issues.sh --rebuild        (requires REBUILD_CONFIRM=yes)
   sync-stories-to-issues.sh --help
 
 FLAGS
   --all              Iterate every SHY-NNNN-*.md file in .project/stories/
   --story SHY-NNNN   Process only the named story
+  --changed BASE HEAD
+                     Process the stories whose files changed between two
+                     commits, plus every story with no board item (SHY-0686:
+                     a develop push syncs only what it changed)
   --rebuild          DESTRUCTIVE one-shot migration: delete every Project v2
                      board item + every story-labeled issue, then run a
                      fresh --all sync (every story type as a real typed
@@ -205,6 +214,7 @@ EXIT CODES
   33  story file failed frontmatter validation
   34  --story <ID> not found
   40  one or more sync operations failed (N_FAILED > 0)
+  41  --changed found a deleted story file (set its status to Cancelled instead)
 
 ENV VARS
   GH_PAT_PROJECT          PAT with issues:write + pull-requests:write +
@@ -1643,9 +1653,25 @@ sync_all() {
       'with_entries(select(.key as $k | $live | index($k) != null))')"
   fi
 
+  report_sync_result
+}
+
+# The end of a multi-story run (--all, --changed): the sidecar, the summary
+# line and the GitHub step summary.
+report_sync_result() {
   # SHY-0079: rewrite the sidecar from the post-run board state. Always
   # written (idempotent no-op diff when unchanged); the workflow commits it.
   write_board_items_sidecar
+
+  # SHY-0686: the run's time, and how much of its limit it used when the
+  # workflow passes the limit (SYNC_LIMIT_MINUTES), so a pass creeping toward
+  # its limit shows before it is cut short.
+  if [ -n "${SYNC_LIMIT_MINUTES:-}" ]; then
+    printf 'Sync took %d s of its %d-minute limit (%d%%)\n' "$SECONDS" "$SYNC_LIMIT_MINUTES" \
+      $(( SECONDS * 100 / (SYNC_LIMIT_MINUTES * 60) )) >&2
+  else
+    printf 'Sync took %d s\n' "$SECONDS" >&2
+  fi
 
   printf 'Sync result: %d created, %d updated, %d skipped, %d failed' \
     "$N_CREATED" "$N_UPDATED" "$N_SKIPPED" "$N_FAILED" >&2
@@ -1707,7 +1733,109 @@ sync_story() {
   write_board_items_sidecar
 }
 
+# ---- --changed BASE HEAD (SHY-0686) -----------------------------------------
+# A develop push used to sync every story (each lookup re-reads the whole
+# items map with jq, ~1 s a story; SHY-0689) and ran
+# past its 15-minute limit, so the newest stories never reached the board.
+# --changed syncs the stories whose files the push changed, plus every story
+# on disk with no board item (so a story a cut-short run missed is created by
+# the next push, whatever it changed).
+
+# Sets CHANGED_IDS (sorted, unique) to the IDs of story files added or
+# modified between $1 and $2. A rename is a delete plus an add of one ID, so
+# it syncs once. A story file deleted outright fails the run: a story is
+# cancelled, never deleted. Not run in $(...): fail_global must end the script.
+CHANGED_IDS=()
+changed_story_ids() {
+  local base="$1" head="$2" sha status path id diff_out entry
+  local -a added=() deleted=()
+  for sha in "$base" "$head"; do
+    git -C "$STORIES_DIR" cat-file -e "${sha}^{commit}" 2>/dev/null \
+      || fail_global "usage" "--changed: ${sha} is not a commit in the repository of ${STORIES_DIR} (fetch it first)" "$E_USAGE"
+  done
+  diff_out="$(git -C "$STORIES_DIR" diff --name-status --no-renames --relative "$base" "$head" -- .)" \
+    || fail_global "usage" "--changed: git diff ${base} ${head} failed" "$E_USAGE"
+  while IFS=$'\t' read -r status path; do
+    [ -z "$status" ] && continue
+    id="$(printf '%s' "$path" | sed -nE 's/^(SHY-[0-9]{4})-.*\.md$/\1/p')"
+    [ -z "$id" ] && continue
+    if [ "$status" = "D" ]; then
+      deleted+=("${id}|${path}")
+    else
+      added+=("$id")
+    fi
+  done <<<"$diff_out"
+  for entry in ${deleted[@]+"${deleted[@]}"}; do
+    if ! printf '%s\n' "${added[@]+"${added[@]}"}" | grep -qx "${entry%%|*}"; then
+      fail_global "deleted" "${entry#*|}: a story file was deleted; set its status to Cancelled instead" "$E_DELETED"
+    fi
+  done
+  CHANGED_IDS=()
+  while IFS= read -r id; do
+    if [ -n "$id" ]; then CHANGED_IDS+=("$id"); fi
+  done < <(printf '%s\n' "${added[@]+"${added[@]}"}" | LC_ALL=C sort -u)
+}
+
+# Prints the IDs of story files on disk with no entry in the items map, sorted.
+missing_story_ids() {
+  local disk
+  disk="$(find -P "$STORIES_DIR" -maxdepth 1 -type f ! -type l \
+            -name 'SHY-[0-9][0-9][0-9][0-9]-*.md' \
+            | sed -E 's|.*/(SHY-[0-9]{4})-.*|\1|' | jq -R . | jq -s .)"
+  printf '%s' "$ITEMS_MAP_JSON" | jq -r --argjson disk "$disk" '. as $map | $disk[] as $id | select($map | has($id) | not) | $id' \
+    | LC_ALL=C sort -u
+}
+
+sync_changed() {
+  local base="$1" head="$2" id match
+  if [ ! -d "$STORIES_DIR" ]; then
+    fail_global "config" "stories directory not found: $STORIES_DIR" "$E_USAGE"
+  fi
+  changed_story_ids "$base" "$head"
+  # SHY-0074: create-vs-update decisions need the items map (see sync_all).
+  load_items_map \
+    || fail_global "project" "items-map query failed — aborting before any mutations" "$E_API"
+  setup_pre_sync
+  remove_duplicated_label_families
+  # Captured, not read through <(...): a failure here must stop the run (set -e),
+  # never quietly yield no missing stories. A dry run reads no board (its items
+  # map is empty), so every story would look missing: it skips the sweep.
+  local missing=""
+  if [ "$DRY_RUN" = "1" ]; then
+    printf 'sync --changed: dry-run reads no board, so the sweep for stories with no board item is skipped\n' >&2
+  else
+    missing="$(missing_story_ids)"
+  fi
+  local -a ids=()
+  while IFS= read -r id; do
+    if [ -n "$id" ]; then ids+=("$id"); fi
+  done < <( { printf '%s\n' "${CHANGED_IDS[@]+"${CHANGED_IDS[@]}"}"; printf '%s\n' "$missing"; } | sed '/^$/d' | LC_ALL=C sort -u)
+  printf 'sync --changed %s..%s: %d stories (%d changed, the rest without a board item)\n' \
+    "$base" "$head" "${#ids[@]}" "${#CHANGED_IDS[@]}" >&2
+  for id in ${ids[@]+"${ids[@]}"}; do
+    match="$(find -P "$STORIES_DIR" -maxdepth 1 -type f ! -type l -name "${id}-*.md" | head -n 1)"
+    if [ -z "$match" ]; then
+      # The diff named it, but no regular file resolves (a symlink, which the
+      # lookup refuses as --all does): fail loudly, never skip it silently.
+      emit "$id" "not-found" "no story file at ${STORIES_DIR}/${id}-*.md (symlinks are refused)"
+      N_FAILED=$((N_FAILED + 1))
+      continue
+    fi
+    sync_one "$match"
+  done
+  report_sync_result
+}
+
 # ============================================================== main
+
+# One mode per run: --all, --story or --changed (a second, different one is
+# refused rather than silently winning).
+set_mode() {
+  if [ -n "$MODE" ] && [ "$MODE" != "$1" ]; then
+    fail_global "usage" "--${MODE} and --$1 cannot be combined" "$E_USAGE"
+  fi
+  MODE="$1"
+}
 
 main() {
   if [ "$#" -eq 0 ]; then
@@ -1719,15 +1847,24 @@ main() {
       --help|-h) usage; exit 0 ;;
       --verbose) VERBOSE=1; shift ;;
       --dry-run) DRY_RUN=1; shift ;;
-      --all) MODE="all"; shift ;;
+      --all) set_mode all; shift ;;
       --rebuild) REBUILD=1; shift ;;
       --story)
         if [ "$#" -lt 2 ]; then
           fail_global "usage" "--story requires SHY-NNNN argument" "$E_USAGE"
         fi
-        MODE="story"
+        set_mode story
         SINGLE_ID="$2"
         shift 2
+        ;;
+      --changed)
+        if [ "$#" -lt 3 ]; then
+          fail_global "usage" "--changed requires BASE and HEAD commits" "$E_USAGE"
+        fi
+        set_mode changed
+        CHANGED_BASE="$2"
+        CHANGED_HEAD="$3"
+        shift 3
         ;;
       *) fail_global "usage" "unknown flag: $1; see --help" "$E_USAGE" ;;
     esac
@@ -1738,8 +1875,8 @@ main() {
   # story-labeled issue. --dry-run previews are allowed without the gate
   # (zero mutations possible).
   if [ "$REBUILD" = "1" ]; then
-    if [ "$MODE" = "story" ]; then
-      fail_global "usage" "--rebuild cannot combine with --story" "$E_USAGE"
+    if [ "$MODE" = "story" ] || [ "$MODE" = "changed" ]; then
+      fail_global "usage" "--rebuild cannot combine with --${MODE}" "$E_USAGE"
     fi
     MODE="all"
     if [ "$DRY_RUN" != "1" ] && [ "${REBUILD_CONFIRM:-}" != "yes" ]; then
@@ -1750,7 +1887,11 @@ main() {
   fi
 
   if [ -z "$MODE" ]; then
-    fail_global "usage" "specify --all, --story SHY-NNNN, or --rebuild" "$E_USAGE"
+    fail_global "usage" "specify --all, --story SHY-NNNN, --changed BASE HEAD, or --rebuild" "$E_USAGE"
+  fi
+
+  if [ -n "${SYNC_LIMIT_MINUTES:-}" ] && ! printf '%s' "$SYNC_LIMIT_MINUTES" | grep -qE '^[1-9][0-9]*$'; then
+    fail_global "usage" "SYNC_LIMIT_MINUTES must be a whole number of minutes, not \"${SYNC_LIMIT_MINUTES}\"" "$E_USAGE"
   fi
 
   if [ "$DRY_RUN" != "1" ]; then
@@ -1760,6 +1901,7 @@ main() {
   case "$MODE" in
     all)   sync_all ;;
     story) sync_story "$SINGLE_ID" ;;
+    changed) sync_changed "$CHANGED_BASE" "$CHANGED_HEAD" ;;
   esac
 
   # SHY-0067: propagate N_FAILED > 0 to non-zero exit (Defect C).

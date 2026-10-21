@@ -174,7 +174,7 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0328](SHY-0328-local-matrix-persona-password-mismatch.md) | P0 | S | bug | The local journey matrix cannot pass on any branch, because it seeds with one password and signs in with another | 🔍 In Review | — | — |
 | [SHY-0359](SHY-0359-remove-relationships-feature.md) | P1 | S | chore | The roadmap advertises paid relationship tiers, which reads as dating on a language-learning platform | 🔍 In Review | — | [#1858](https://github.com/Shyden-Ltd/ShyTalk/pull/1858) |
 | [SHY-0360](SHY-0360-board-roadmap-two-way-sync.md) | P1 | L | infra | A change on the project board never reaches the roadmap pages | ❌ Cancelled | — | — |
-| [SHY-0361](SHY-0361-tester-build-notes-name-the-ticket.md) | P1 | S | infra | Tester build notes do not say what changed | 👀 In Review | — | — |
+| [SHY-0361](SHY-0361-tester-build-notes-name-the-ticket.md) | P0 | S | infra | Tester build notes do not say what changed | 👀 In Review | — | — |
 | [SHY-0362](SHY-0362-develop-carries-two-ktlint-errors.md) | P0 | XS | bug | develop carries two ktlint errors, so every app-touching PR fails lint | 🔍 In Review | — | [#1860](https://github.com/Shyden-Ltd/ShyTalk/pull/1860) |
 | [SHY-0363](SHY-0363-gradle10-deprecated-kotlin-dsl.md) | P2 | XS | chore | Every Gradle build warns that the project is incompatible with Gradle 10 | 🔍 In Review | — | [#1861](https://github.com/Shyden-Ltd/ShyTalk/pull/1861) |
 | [SHY-0373](SHY-0373-chat-composer-bar-above-the-keyboard.md) | P2  | M      | feature      | A chat composer bar that sits above the keyboard | 📝 Draft       |                  |                                                          |
@@ -472,6 +472,22 @@ Live backlog of every piece of work captured under the Agile way of working ([[f
 | [SHY-0644](SHY-0644-a-reaction-that-does-not-save-says-so.md) | P0 | S | bug | A reaction that does not save says so | 📝 Draft | — |  |
 | [SHY-0645](SHY-0645-a-journey-proves-reactions-on-both-phones.md) | P0 | M | infra | A journey proves reactions on both phones | 📝 Draft | — |  |
 | [SHY-0646](SHY-0646-merged-work-keeps-its-story-in-progress-until-it-closes.md) | P2 | S | infra | Merged work keeps its story In Progress until the story closes | 📝 Draft | — |  |
+| [SHY-0647](SHY-0647-making-a-group-on-a-phone-reports-what-happened.md) | P0 | M | bug | Making a group on a phone reports what happened | 📝 Draft | — |  |
+| [SHY-0648](SHY-0648-a-group-member-cannot-give-themselves-powers.md) | P0 | L | bug | A group member cannot give themselves powers | 📝 Draft | — |  |
+| [SHY-0649](SHY-0649-an-admin-who-leaves-a-group-only-leaves.md) | P0 | S | bug | An admin who leaves a group only leaves | 📝 Draft | — |  |
+| [SHY-0650](SHY-0650-a-bot-merge-does-not-throw-away-a-prs-tests.md) | P2 | M | infra | A bot's merge does not throw away a PR's tests | 📝 Draft | — |  |
+| [SHY-0651](SHY-0651-every-test-checks-one-case.md) | P2 | L | infra | Every test checks one case, so a failure names the case | 📝 Draft | — |  |
+| [SHY-0653](SHY-0653-a-group-mute-lasts-exactly-as-long-as-it-was-set.md) | P0 | M | bug | A group mute lasts exactly as long as it was set | 📝 Draft | — |  |
+| [SHY-0652](SHY-0652-no-admin-or-mod-can-act-on-a-groups-owner.md) | P0 | S | bug | No admin or mod can act on a group's owner | 📝 Draft | — |  |
+| [SHY-0654](SHY-0654-rooms-run-by-shytalks-approved-hosts-are-open-to-every-age-group.md) | P1 | L | feature | Rooms run by ShyTalk's approved hosts are open to every age group | 📝 Draft | — |  |
+| [SHY-0655](SHY-0655-a-groups-who-can-send-setting-is-kept-by-the-rules-not-only-the-app.md) | P0 | S | bug | A group's "who can send" setting is kept by the rules, not only the app | 📝 Draft | — |  |
+| [SHY-0656](SHY-0656-a-groups-owner-admins-and-mods-can-mute-a-member-from-the-app.md) | P0 | M | bug | A group's owner, admins and mods can mute a member from the app | 📝 Draft | — |  |
+| [SHY-0657](SHY-0657-every-new-refusing-rules-test-is-shown-failing-on-the-rules-it-replaces-in-ci.md) | P0 | M | chore | Every new refusing rules test is shown failing on the rules it replaces, in CI | 📝 Draft | — |  |
+| [SHY-0658](SHY-0658-every-phone-test-runs-on-the-two-linked-phones-unlinking-a-phone-only-when-a-test-needs-someone-else.md) | P0 | L | chore | Every phone test runs on the two linked phones, unlinking a phone only when a test needs someone else | 📝 Draft | — |  |
+| [SHY-0659](SHY-0659-the-shytalk-system-thread-is-named-not-unknown.md) | P0 | S | bug | The ShyTalk system thread is named, not "Unknown" | 📝 Draft | — |  |
+| [SHY-0660](SHY-0660-the-floating-bubble-prompt-stops-returning-on-every-sign-in.md) | P0 | S | bug | The floating-bubble prompt stops returning on every sign-in | 📝 Draft | — |  |
+| [SHY-0661](SHY-0661-the-preview-badge-never-hides-a-screens-top-right-icons.md) | P0 | S | bug | The preview badge never hides a screen's top-right icons | 📝 Draft | — |  |
+| [SHY-0662](SHY-0662-no-shared-or-distributed-build-carries-the-dev-persona-password.md) | P0 | M | bug | No shared or distributed build carries the dev persona password | 📝 Draft | — |  |
 
 ## Done
 
