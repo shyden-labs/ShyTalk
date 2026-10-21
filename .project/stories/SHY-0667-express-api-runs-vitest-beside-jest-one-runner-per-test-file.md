@@ -4,8 +4,8 @@ status: Draft
 owner: claude
 created: 2026-10-21
 priority: P0
-effort: M
-estimate: 5
+effort: L
+estimate: 8
 type: chore
 roadmap_ids: []
 mvp: true
@@ -41,6 +41,31 @@ moved and unmoved areas run side by side until the last one moves.
 - [ ] vitest and @vitest/coverage-v8 are dev dependencies pinned to the same exact version, with a test pinning both and a Dependabot group moving them together.
 - [ ] vitest.config mirrors jest.config (test files, the node environment, the global setup, the public/js/core transform); the retry setup is not carried over (no retries, SHY-0547).
 - [ ] test-backend runs both runners; a guard proves every test file is claimed by exactly one runner, from a recorded list of moved files that only grows.
+
+### Runtime proof
+
+- [ ] A deployed-mode boot check runs in CI on every PR that changes
+      express-api: `npm start` with `NODE_ENV` not `local`, a throwaway
+      service-account file made in the job and a stand-in
+      `FIREBASE_DATABASE_URL`, and `/api/health` must answer. The
+      service-account load (`src/utils/firebase.js:79`) runs only on the
+      deployed servers today, since every CI boot uses `NODE_ENV=local`; this
+      proves it before merge. Planted: the load broken, the check red.
+- [ ] The three "Start Express API" steps (`integration-tests.yml:86`,
+      `e2e-tests.yml:195`, `playwright-tests.yml:219`) wait for `/api/health`
+      with no ceiling (`until curl …; do sleep 1; done`), so a server that
+      crashes at boot shows as a hung job. Each fails at a measured ceiling,
+      or as soon as the server process exits, printing the server's own
+      output. Planted: a boot crash, each step red within its ceiling.
+- [ ] How moved files are marked as ES modules (`.mjs`, or `"type": "module"`
+      with `.cjs` for the rest) is chosen in the plan. Before any change that
+      makes Node read a `.js` file as an ES module, the servers' pm2
+      `ecosystem.config.js` (on the servers only, not in git:
+      `ORACLE-CLOUD-SETUP.md` §11) is brought into git as `.cjs` and the
+      deploy restarts pm2 from it.
+- [ ] No ES module reaches the servers in this story: the deploy tarball's
+      express-api files are all CommonJS, checked by a guard over the
+      files the deploy packs (planted: one `.mjs` source, the guard red).
 
 ### Error paths
 
@@ -116,3 +141,7 @@ None: an internal tooling change with no change users can see.
 ## Notes
 
 - **2026-10-21**: filed from the Vitest ruling. P0: SHY-0657 (P0) waits on this epic, so the epic takes its level. Scored 5: config, CI, the one-runner guard and its floor.
+- **2026-10-21**: Runtime proof ACs added (a side agent found the epic proved
+  only tests; Shyden: "proper checks are, of course, required"). Rescored 8:
+  the deployed-mode boot check, three bounded server waits and the pm2 config
+  in git, each with a planted failure, on top of the 5 above.

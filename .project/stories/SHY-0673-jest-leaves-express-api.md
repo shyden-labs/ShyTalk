@@ -43,6 +43,17 @@ moved and unmoved areas run side by side until the last one moves.
 - [ ] Coverage is @vitest/coverage-v8, lcov kept for SonarCloud and the html report kept for publishing.
 - [ ] SHY-0548's limits run on Vitest.
 
+### Runtime proof
+
+- [ ] The deploy's `npm install --omit=dev` and `pm2 restart` still serve the
+      API with Jest gone: Deploy To Dev's "Verify dev API health" serves the
+      merge SHA and its "Dev Sanity Check" and "Dev Smoke Tests" jobs are green.
+- [ ] Files removed from express-api are removed from the servers too: today
+      the deploy extracts the tarball over the old tree, so a deleted file
+      stays; the deploy replaces the tree, proven by a planted removed file
+      absent after a dev deploy.
+- [ ] Both CI boot checks (local and deployed mode) stay green.
+
 ### Error paths
 
 - [ ] A workflow or hook still calling jest fails a guard naming it.
@@ -63,7 +74,9 @@ moved and unmoved areas run side by side until the last one moves.
 
 ### UX
 
-- [x] Not applicable: developer tooling.
+- [ ] No change a user can see, proven by the Runtime proof ACs (dev
+      health, sanity and smoke runs, the journey PROD GATE), not assumed:
+      this story rewrites code the live API runs.
 
 ### i18n
 
@@ -76,7 +89,9 @@ moved and unmoved areas run side by side until the last one moves.
 
 ## Announce
 
-None: an internal tooling change with no change users can see.
+None, once the Runtime proof ACs show the deployed API unchanged. A change
+users can see that they find is a defect fixed before release, never
+announced.
 
 ## BDD Scenarios
 
@@ -116,3 +131,6 @@ None: an internal tooling change with no change users can see.
 ## Notes
 
 - **2026-10-21**: filed from the Vitest ruling. Scored 5: removal, coverage provider, scanner and SonarCloud wiring.
+- **2026-10-21**: Runtime proof ACs added. The first draft proved only the
+  tests, though this story rewrites code the live API runs (found by a side
+  agent; Shyden: "proper checks are, of course, required").
