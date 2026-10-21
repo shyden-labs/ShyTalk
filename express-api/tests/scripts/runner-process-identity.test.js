@@ -559,8 +559,11 @@ describe('require_repo asks git, so a worktree is a repository (found 2026-10-22
     const r = spawnSync('/usr/bin/git', args, { cwd, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
   };
+  // cwd is the scratch root, so a path that leaked into a shell string would run
+  // its `;touch pwned` there, where the metacharacter test looks for it.
   const requireRepo = (repo) =>
     spawnSync('/bin/bash', ['-c', 'source "$1"; require_repo && echo repo-ok', 'bash', LIB], {
+      cwd: root,
       encoding: 'utf8',
       env: { ...process.env, SHYTALK_REPO: repo },
     });
@@ -633,5 +636,14 @@ describe('require_repo asks git, so a worktree is a repository (found 2026-10-22
     const r = requireRepo(path.join(root, 'plain'));
     expect(r.status).toBe(1);
     expect(r.stderr).toContain(`repo not found at ${path.join(root, 'plain')}`);
+    expect(r.stderr).toContain('(set SHYTALK_REPO)');
+  });
+  test('a path with a space and shell metacharacters reaches git as one argument', () => {
+    const odd = path.join(root, 'odd dir;touch pwned');
+    fs.mkdirSync(odd);
+    git(odd, 'init', '-q', '-b', 'main');
+    const r = requireRepo(odd);
+    expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
+    expect(fs.existsSync(path.join(root, 'pwned'))).toBe(false);
   });
 });
