@@ -37,9 +37,9 @@ Measured 2026-10-21: shared holds 528 Kotlin files; its jvmTest and testAndroidH
 
 ### Happy path
 
-- [ ] JaCoCo measures shared's jvmTest and testAndroidHostTest (commonMain, androidMain and jvmMain sources) and the instrumented suite, and their reports join app's in SHY-0674's figure.
+- [ ] JaCoCo measures shared's jvmTest and testAndroidHostTest (commonMain, androidMain and jvmMain sources) and the instrumented suite, and their reports join app's in SHY-0674's record.
 - [ ] SHY-0674's classification moves these files to "measured" and the
-      joined figure includes them, the figure file raised in the same PR.
+      their untested counts join the record, written in the same PR.
 
 ### Error paths
 
@@ -71,7 +71,7 @@ Measured 2026-10-21: shared holds 528 Kotlin files; its jvmTest and testAndroidH
 
 ### Observability
 
-- [ ] CI prints this kind's measured file count, its figure and every file
+- [ ] CI prints this kind's measured file count, its untested counts and every file
       still classed unmeasured.
 
 ## Announce

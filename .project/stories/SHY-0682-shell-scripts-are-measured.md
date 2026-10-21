@@ -40,7 +40,7 @@ Measured 2026-10-21: 63 shell scripts are tracked (scripts 33, express-api 15, l
 - [ ] Shell scripts run by any test or CI suite are measured by bashcov (MIT; kcov is GPL and refused by the licence rule), converted to lcov and joined into SHY-0674's report.
 - [ ] A script no test runs gets a test that runs it, in the suite its kind belongs to.
 - [ ] SHY-0674's classification moves these files to "measured" and the
-      joined figure includes them, the figure file raised in the same PR.
+      their untested counts join the record, written in the same PR.
 
 ### Error paths
 
@@ -72,7 +72,7 @@ Measured 2026-10-21: 63 shell scripts are tracked (scripts 33, express-api 15, l
 
 ### Observability
 
-- [ ] CI prints this kind's measured file count, its figure and every file
+- [ ] CI prints this kind's measured file count, its untested counts and every file
       still classed unmeasured.
 
 ## Announce

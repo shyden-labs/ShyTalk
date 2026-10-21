@@ -10,7 +10,7 @@ type: bug
 roadmap_ids: []
 mvp: true
 epic: EPIC-0001
-blocked_by: [SHY-0674, SHY-0676, SHY-0677, SHY-0678, SHY-0679, SHY-0680, SHY-0681, SHY-0682, SHY-0683, SHY-0684]
+blocked_by: [SHY-0674, SHY-0676, SHY-0677, SHY-0678, SHY-0679, SHY-0680, SHY-0681, SHY-0682, SHY-0683, SHY-0684, SHY-0687, SHY-0688]
 ---
 
 # SHY-0648: A group member cannot give themselves powers
@@ -196,7 +196,7 @@ it and who is in it.
 
 ## Dependencies
 
-- EPIC-0016, every story (SHY-0674, SHY-0676, SHY-0677, SHY-0678, SHY-0679, SHY-0680, SHY-0681, SHY-0682, SHY-0683, SHY-0684): Shyden, 2026-10-21,
+- EPIC-0016, every story (SHY-0674, SHY-0676, SHY-0677, SHY-0678, SHY-0679, SHY-0680, SHY-0681, SHY-0682, SHY-0683, SHY-0684, SHY-0687, SHY-0688): Shyden, 2026-10-21,
   "Waits behind coverage" (the hotfix ships under the full coverage gate).
 - SHY-0629 builds on it (not a blocker).
 
