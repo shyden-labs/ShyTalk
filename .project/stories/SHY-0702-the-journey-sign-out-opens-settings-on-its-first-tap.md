@@ -59,25 +59,31 @@ the first attempt failed after J08 in 2 of 2 runs.
 - [ ] The cause is measured on the phone (a dump and screenshot just
       before and after the gear tap, with the time since the profile tab
       was tapped) and named in this story.
-- [ ] The sign-out opens settings on its first tap in 10 of 10 runs after
-      J08 on the Android phone, and on the iPhone.
+- [ ] The sign-out completes after J08 in 10 of 10 runs on the Android
+      phone and on the iPhone: a reward sheet arriving mid-flow is dismissed
+      and a tap it swallowed is made again.
 
 ### Error paths
 
-- [ ] When settings does not open, the step fails naming what was on
-      screen after the tap, never a silent retry.
+- [ ] When the next screen does not come, the step fails at its deadline
+      naming the target, the taps, the screen, what was dismissed and the
+      last tap error. A tap is made again only while the target is still
+      on screen and never within 3 s of the last, so a slow screen is not
+      tapped twice; never a silent retry.
 
 ### Edge cases
 
 - [ ] A persona whose profile is still loading (gift wall, wallet) is
       covered.
 - [ ] A journey that ended inside a chat or room (no tab bar on screen)
-      is covered: the flow reaches a tab bar before tapping a tab.
+      is covered: the flow reaches a tab bar before tapping a tab (today by
+      restarting the app; without a restart is SHY-0703).
 
 ### Performance
 
-- [ ] "Reach SignIn" from a signed-in persona is measured before and after;
-      the fallback restart is not needed in the 10 runs.
+- [ ] "Reach SignIn" after J08 is measured before and after on each
+      phone. Removing the restart that J08's ending screen forces moved to
+      SHY-0703 (2026-10-23).
 
 ### Security
 
@@ -141,5 +147,11 @@ None: test harness only.
 
 - **2026-10-23**: found during #2454's green runs on dev. Raised P2 -> P0 the
   same day: it blocks SHY-0645's (P0) J28R-GROUP green on the iPhone, and a
-  blocker takes the top level of what waits on it. Scored 2:
+  blocker takes the top level of what waits on it.
+- **2026-10-23, later**: the trials showed two causes, not one. The
+  reward sheet arriving mid-flow (fixed here: each tap is driven until the
+  next screen is there) and J08 ending on New Message with no tab bar,
+  which forces a 20 s wait and an app restart. The restart path now
+  completes; making it unnecessary is SHY-0703. ACs reworded to what was
+  measured (the title's "first tap" was the first guess). Scored 2:
   measure on the phone, one harness change, two 10-run proofs.
