@@ -55,8 +55,10 @@ describe('SHY-0545 — a failed sync tells the operator', () => {
     expect(alert.permissions).toEqual({ issues: 'write', actions: 'read' });
   });
 
-  test('the workflow-level permissions are unchanged and the sync job adds none', () => {
-    expect(doc.permissions).toEqual({ contents: 'read' });
+  test('the workflow-level permissions are exactly these and the sync job adds none', () => {
+    // SHY-0691 added actions: read: the job's own token lists this
+    // workflow's runs to find the last completed sync.
+    expect(doc.permissions).toEqual({ contents: 'read', actions: 'read' });
     expect(doc.jobs.sync.permissions).toBeUndefined();
   });
 
@@ -117,20 +119,13 @@ describe('SHY-0686 — a push syncs only what it changed, and a full pass runs d
     expect(branch).not.toContain('exit 0');
   });
 
-  test('a push passes its before commit and the checked-out head to --changed', () => {
-    expect(syncStep.env.BEFORE).toBe('${{ github.event.before }}');
+  // SHY-0691 replaced the push's own `before` with the last completed sync:
+  // the range, its fetch-before-diff order and the full-pass fallbacks are
+  // run, not matched, in sync-stories-queue.test.js.
+  test('a push reads its event and never its own before commit (SHY-0691)', () => {
     expect(syncStep.env.EVENT).toBe('${{ github.event_name }}');
-    expect(script).toMatch(/args=\(--changed "\$BEFORE" "\$\(git rev-parse HEAD\)"\)/);
-  });
-
-  test('the before commit is fetched before the diff', () => {
-    expect(script).toMatch(
-      /git fetch --no-tags --depth=1 origin "\$BEFORE"[\s\S]*args=\(--changed/,
-    );
-  });
-
-  test('a push with no before commit (a new branch, all zeros) runs the full pass', () => {
-    expect(script).toMatch(/0{40}[\s\S]*args=\(--all\)/);
+    expect(syncStep.env).not.toHaveProperty('BEFORE');
+    expect(script).not.toContain('$BEFORE');
   });
 
   test('a daily full pass runs on a schedule', () => {

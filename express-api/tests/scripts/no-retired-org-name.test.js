@@ -122,10 +122,11 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 2038 -> 2041: .github/actions/apk-holds-no-persona-password/action.yml,
 // scripts/ci/apk-persona-check.js and two tests added, one test removed
 // (SHY-0662).
-// 2041 -> 2045: express-api/scripts/lib/firestore-as-person.js, its test,
+// 2041 -> 2044 on develop (SHY-0691, #2538).
+// 2044 -> 2048: express-api/scripts/lib/firestore-as-person.js, its test,
 // tests/scripts/device-journey-wait-for-id-gone.test.js and
 // shared/.../feature/messaging/ReactionTagsTest.kt (SHY-0645).
-const FILES_READ_FLOOR = 2045;
+const FILES_READ_FLOOR = 2048;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

@@ -65,12 +65,23 @@ on:
 # board concurrently and race duplicate issues. cancel-in-progress: false
 # because we never want to cancel an in-flight sync mid-API-call — that
 # would leave issues in inconsistent state.
+# SHY-0691: queue: max. GitHub's default (single) keeps one pending run and
+# cancels the one it replaces, so the middle of three quick merges never ran.
+# max holds up to 100 pending runs, one at a time. A run that still finds the
+# queue full is cancelled, so each push syncs from the last COMPLETED sync
+# (scripts/sync-start-commit.sh), never from its own `before`. actionlint
+# 1.7.x does not know the key yet: .github/actionlint.yaml ignores that one
+# message for this file only.
 concurrency:
   group: sync-stories
   cancel-in-progress: false
+  queue: max
 
+# SHY-0691: actions: read lets the job's GITHUB_TOKEN list this workflow's
+# runs (the start-commit lookup); the board writes use GH_PAT_PROJECT.
 permissions:
   contents: read
+  actions: read
 
 jobs:
   sync:
@@ -120,7 +131,9 @@ jobs:
           DRY_RUN: ${{ github.event.inputs.dry_run }}
           REBUILD: ${{ github.event.inputs.rebuild }}
           EVENT: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
+          # SHY-0691: the start-commit lookup reads this workflow's runs with
+          # the job's own token (actions: read), not the project PAT.
+          SYNC_LOOKUP_TOKEN: ${{ github.token }}
           # The job's own limit (the same expression as timeout-minutes), so the
           # run prints how much of it it used.
           SYNC_LIMIT_MINUTES: ${{ github.event_name == 'push' && 15 || 30 }}
@@ -131,12 +144,32 @@ jobs:
             exit 1
           fi
           # SHY-0686: a push syncs the stories it changed plus any with no board
-          # item; a new branch (before = 40 zeros), a schedule or a dispatch runs
-          # the full pass.
-          if [ "$EVENT" = "push" ] && [ -n "${BEFORE:-}" ] \
-             && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
-            git fetch --no-tags --depth=1 origin "$BEFORE"
-            args=(--changed "$BEFORE" "$(git rev-parse HEAD)")
+          # item; a schedule or a dispatch runs the full pass.
+          # SHY-0691: "changed" means since the last COMPLETED sync on develop,
+          # so a run GitHub cancelled in the queue is covered by the next one.
+          if [ "$EVENT" = "push" ]; then
+            head_sha="$(git rev-parse HEAD)"
+            start="$(GH_TOKEN="$SYNC_LOOKUP_TOKEN" bash scripts/sync-start-commit.sh "$head_sha")"
+            case "$start" in
+              "range "*)
+                start_sha="${start#range }"
+                echo "sync: syncing ${start_sha}..${head_sha} (from the last completed sync)"
+                git fetch --no-tags --depth=1 origin "$start_sha"
+                args=(--changed "$start_sha" "$head_sha")
+                ;;
+              covered)
+                echo "sync: nothing to sync: a newer completed sync already covered ${head_sha}"
+                exit 0
+                ;;
+              "full "*)
+                echo "sync: full pass: ${start#full }"
+                args=(--all)
+                ;;
+              *)
+                echo "::error::sync-start-commit.sh answered '${start}', which this step does not know." >&2
+                exit 1
+                ;;
+            esac
           else
             args=(--all)
           fi

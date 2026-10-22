@@ -1,6 +1,6 @@
 ---
 id: SHY-0691
-status: Draft
+status: Done
 owner: claude
 created: 2026-10-22
 priority: P0
@@ -46,42 +46,75 @@ release v1.7.12, 2026-03-30).
 
 ### Happy path
 
-- [ ] The sync workflow's concurrency group sets `queue: max`, with
+- [x] The sync workflow's concurrency group sets `queue: max`, with
       `cancel-in-progress` unset or false. A workflow test pins both.
-- [ ] A push sync syncs from the last commit a sync completed on develop
+      Proof: #2538 (a60cec2d1e5); `sync-stories-queue.test.js` (parsed
+      YAML), mutants W1 and W2 killed.
+- [x] A push sync syncs from the last commit a sync completed on develop
       (the head SHA of the newest successful push or scheduled run of this
-      workflow on develop, read through the API as the App) to its own
-      head. A run lost for any reason is then covered by the next one.
-- [ ] Proven live: three develop merges land inside one sync's run time,
-      each editing a different story. Each edit is read back on the board,
-      and the runs' records show all three ran, none cancelled.
+      workflow on develop, read through the API with the job's own token)
+      to its own head. A run lost for any reason is then covered by the
+      next one. Proof: run 39709662060 printed "last completed sync is
+      f4e95481a92 (run 39681855262, push)" and synced f4e95481a92..a60cec2d1e5.
+- [x] Proven live (amended 2026-10-22, Shyden "Two proofs instead":
+      develop's ruleset is strict, so three merges cannot land inside one
+      sync's run time). (1) Queue: three dry-run dispatches back to back,
+      39714983936, 39714987708, 39715036637: two pending at once, all
+      success, run one after another (03:06:01-03:08:56, 03:08:58-03:11:34,
+      03:11:36-03:14:31), none cancelled. (2) Lost run: #2542 merged
+      (4c1063a744d) while dispatch 39716272552 held the group; its push sync
+      39716296139 was cancelled while pending and started no job; SHY-0695
+      was then absent from the board. #2543 merged (ba3943d952d): its sync
+      39717168088 printed "last completed sync is a60cec2d1e5 (run
+      39709662060, push)" and synced a60cec2d1e5..ba3943d952d; SHY-0695
+      became #2544 and #2543's edits were read back on #2539 and #2540.
 
 ### Error paths
 
-- [ ] No completed sync found, or a last-synced SHA that is not an
+- [x] No completed sync found, or a last-synced SHA that is not an
       ancestor of this run's head, falls back to a full pass and says so.
-- [ ] The API lookup failing fails the run, naming the call (fails closed;
-      never a silent fall back to BEFORE).
+      Proof: `sync-start-commit.test.js` (none found, diverged), mutants
+      M6 and M16 killed; the step's `full` case in
+      `sync-stories-queue.test.js`.
+- [x] The API lookup failing fails the run, naming the call (fails closed;
+      never a silent fall back to BEFORE). Proof: runs and compare failures,
+      unreadable answers, unknown status (mutants M7, M8, M14, M15, W5, W7
+      killed); the step no longer reads `before` (pinned in
+      `sync-stories-alert.test.js`).
 
 ### Edge cases
 
-- [ ] A run whose head is already covered (the last-synced SHA is its head
+- [x] A run whose head is already covered (the last-synced SHA is its head
       or a descendant of it: a newer run finished first) syncs nothing,
       says so, and succeeds. It never writes older story text over newer.
-- [ ] A dry-run dispatch never counts as a completed sync.
+      Proof: identical and behind give `covered` (mutant M5 killed); the
+      step exits 0 without syncing (mutant W4 killed); the checkout stays
+      `ref: develop`.
+- [x] A dry-run dispatch never counts as a completed sync. Proof: test
+      "a dispatch run never counts" (mutant M1 killed); live, #2543's sync
+      skipped dispatches 39714983936-39716272552 and started from the push
+      run 39709662060.
 
 ### Performance
 
-- [ ] The lookup adds one API call per run; the run's time report still
-      prints.
+- [x] The lookup adds two API calls per run (amended: the runs listing,
+      then compare, which tells ahead, behind and diverged apart); a run
+      that syncs prints its time report; a covered run syncs nothing and
+      prints why instead.
 
 ### Security
 
-- [ ] actionlint's refusal of `queue` is silenced only for that message in
+- [x] actionlint's refusal of `queue` is silenced only for that message in
       that one file, in `.github/actionlint.yaml`, with the upstream PR
       named. A test fails if the ignore matches any other file or message.
       A ticket drops it once an actionlint release accepts the key.
-- [ ] The lookup uses the App's token, never a personal one.
+      Proof: actionlint 1.7.7 (CI's pin, checksum verified) clean with the
+      ignore, red on `queue: max` without it, and CI's Lint job green on
+      #2538; mutants C1-C3 and the widened path killed; SHY-0694 (#2541).
+- [x] The lookup uses the job's own GITHUB_TOKEN with `actions: read`
+      (amended: narrower than the App's token), never a personal one.
+      Proof: pinned in `sync-stories-queue.test.js` (mutant W3 killed);
+      live runs 39709662060 and 39717168088 read the runs list with it.
 
 ### UX
 
@@ -93,9 +126,10 @@ release v1.7.12, 2026-03-30).
 
 ### Observability
 
-- [ ] Each run prints the range it synced and where its start came from:
+- [x] Each run prints the range it synced and where its start came from:
       the last completed sync, a full-pass fallback (with the reason), or
-      already covered.
+      already covered. Proof: the live lines quoted above; tests of all
+      three step cases (mutant W8 killed).
 
 ## Announce
 
@@ -142,8 +176,9 @@ None: operator tooling.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; CI green by step name; merged to
-      `develop`; the live proof recorded.
+- [x] Every AC ticked with its proof; CI green by step name (PR Checks
+      39706932267 on 796a9f99a61); merged to `develop` (#2538,
+      a60cec2d1e5); the live proof recorded above.
 
 ## Notes
 
@@ -152,3 +187,8 @@ None: operator tooling.
   start-commit choice with six tested cases, a scoped lint ignore with its
   test, and a live proof. Sources: GitHub Docs (concurrency), GitHub
   changelog 2026-05-07, rhysd/actionlint#654 and its releases page.
+- **2026-10-22 (Done)**: merged in #2538 and proven live (two proofs, see
+  the ACs). Three ACs amended with the reason beside each: the token, the
+  call count, and the live-proof method. Filed on the way: SHY-0692 to
+  SHY-0696. This file moved to develop ahead of #2454 (held for its phone
+  run), which also adds it: take develop's copy when #2454 merges develop.
