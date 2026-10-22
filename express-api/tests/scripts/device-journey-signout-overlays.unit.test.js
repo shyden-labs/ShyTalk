@@ -137,6 +137,11 @@ describe('signOutFlow never taps through a sheet that comes up mid-flow (SHY-070
     await onFakeClock(signOutFlow(device));
     expect(device.taps).toEqual([DISMISS, PROFILE_TAB, GEAR, SIGN_OUT, CONFIRM_BUTTON]);
   });
+  test('a sheet that comes up as the gear is tapped is dismissed before signing out', async () => {
+    const device = deviceServing([HOME, PROFILE, SHEET, SETTINGS, CONFIRM, SIGN_IN]);
+    await onFakeClock(signOutFlow(device));
+    expect(device.taps).toEqual([PROFILE_TAB, GEAR, DISMISS, SIGN_OUT, CONFIRM_BUTTON]);
+  });
   test('with no sheet the flow is the four taps it always was', async () => {
     const device = deviceServing([HOME, PROFILE, SETTINGS, CONFIRM, SIGN_IN]);
     await onFakeClock(signOutFlow(device));
