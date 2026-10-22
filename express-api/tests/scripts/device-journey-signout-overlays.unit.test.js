@@ -148,3 +148,47 @@ describe('signOutFlow never taps through a sheet that comes up mid-flow (SHY-070
     expect(device.taps).toEqual([PROFILE_TAB, GEAR, SIGN_OUT, CONFIRM_BUTTON]);
   });
 });
+
+describe('ensureAtSignIn says which way it reached SignIn (SHY-0702)', () => {
+  // Its first sign-out attempt used to fail silently: the restart rescued the
+  // run and the reason was thrown away, so a fallback looked like a clean
+  // sign-out in the report.
+  const { ensureAtSignIn } = require('../../scripts/device-journey-runner');
+
+  /** As deviceServing, plus an app restart that shows `afterRestart`. */
+  function restartable(frames, afterRestart) {
+    const device = deviceServing(frames);
+    const queue = [...frames];
+    device.dumpXml = async () => queue[0];
+    device.tap = async (x, y) => {
+      device.taps.push({ x, y });
+      if (queue.length > 1) queue.shift();
+    };
+    device.forceStop = async () => {
+      device.taps.push('forceStop');
+      queue.splice(0, queue.length, ...afterRestart);
+    };
+    device.launch = async () => {
+      device.taps.push('launch');
+    };
+    return device;
+  }
+
+  test('already at SignIn: says so, and touches nothing', async () => {
+    const device = restartable([SIGN_IN], [SIGN_IN]);
+    expect(await onFakeClock(ensureAtSignIn(device, 'pkg'))).toBe('already at SignIn');
+    expect(device.taps).toEqual([]);
+  });
+  test('signed in on Home: signs out and says so', async () => {
+    const device = restartable([HOME, PROFILE, SETTINGS, CONFIRM, SIGN_IN], [SIGN_IN]);
+    expect(await onFakeClock(ensureAtSignIn(device, 'pkg'))).toBe('signed out from Home');
+  });
+  test('a sign-out that fails names its reason, then the restart path', async () => {
+    const device = restartable([HOME, OTHER], [SIGN_IN]);
+    expect(await onFakeClock(ensureAtSignIn(device, 'pkg'))).toBe(
+      'sign-out from Home failed (timed out (6000ms) waiting for #main_settingsButton; ' +
+        'screen showed: privateChat_messageInput); restarted the app; already at SignIn',
+    );
+    expect(device.taps).toEqual([PROFILE_TAB, 'forceStop', 'launch']);
+  });
+});

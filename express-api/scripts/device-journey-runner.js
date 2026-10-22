@@ -2356,6 +2356,10 @@ async function restoreSession(email) {
 // Get to the SignIn screen regardless of where the app currently sits. A
 // signed-in relaunch lands on Home, so settle to a stable anchor first, then
 // sign out if we're signed in.
+//
+// Returns which way it got there (SHY-0702). The first sign-out's failure
+// used to be thrown away when the restart rescued the run, so a fallback read
+// as a clean sign-out in the report; now the step detail names it.
 async function ensureAtSignIn(device, pkg) {
   // The first settle is allowed to FAIL. The app may have been left on any
   // screen at all by a previous run -- a half-filled support form, a dialog, a
@@ -2364,6 +2368,7 @@ async function ensureAtSignIn(device, pkg) {
   // could only ever recover from the states it had already expected. A journey
   // that cannot start from an unknown screen is a journey nobody can re-run.
   let nodes;
+  let before;
   try {
     // 20s, deliberately. Shortening this to 8s was tried on 2026-08-24 and made
     // the matrix WORSE -- 544s to 1019s -- because it gives up on a screen that
@@ -2371,19 +2376,21 @@ async function ensureAtSignIn(device, pkg) {
     // is far more expensive than waiting. Two journeys went from 37s and 96s to
     // 301s and 367s on that change alone.
     nodes = await settle(device, 20000);
-  } catch (_e) {
+  } catch (e) {
     nodes = null;
+    before = `no SignIn or Home on screen (${e.message})`;
   }
-  if (nodes && atSignIn(nodes)) return;
+  if (nodes && atSignIn(nodes)) return 'already at SignIn';
   if (nodes && anyMainTab(nodes)) {
     try {
       await signOutFlow(device);
-      return;
-    } catch (_e) {
+      return 'signed out from Home';
+    } catch (e) {
       // Falls through to the restart below rather than failing the journey.
       // This function's whole job is to ARRIVE at SignIn, and it has a stronger
       // way of doing that a few lines down; refusing to use it because the
       // polite route was slow is how a timeout became a red journey.
+      before = `sign-out from Home failed (${e.message})`;
     }
   }
   await device.forceStop(pkg);
@@ -2393,8 +2400,10 @@ async function ensureAtSignIn(device, pkg) {
   await device.launch(pkg);
   await sleep(1500);
   nodes = await settle(device, 45000);
-  if (atSignIn(nodes)) return;
-  if (anyMainTab(nodes)) await signOutFlow(device);
+  if (atSignIn(nodes)) return `${before}; restarted the app; already at SignIn`;
+  // settle() returns only SignIn or Home, so this is Home.
+  await signOutFlow(device);
+  return `${before}; restarted the app; signed out from Home`;
 }
 
 /**
@@ -2944,8 +2953,8 @@ async function signInAs(device, reporter, ctx, email, { expectHome = true } = {}
     device,
     `Reach SignIn (for ${email})`,
     async () => {
-      await ensureAtSignIn(device, ctx.pkg);
-      return 'at SignIn (persona picker available)';
+      const how = await ensureAtSignIn(device, ctx.pkg);
+      return `at SignIn (persona picker available): ${how}`;
     },
     { preamble: true },
   );
@@ -5824,6 +5833,7 @@ module.exports = {
   // SHY-0702: the sign-out flow and its overlay-clearing wait.
   signOutFlow,
   waitForIdClearingOverlays,
+  ensureAtSignIn,
   handleRewardCalendar,
   REWARD_SHEET_BUTTON_IDS,
   watchForText,
