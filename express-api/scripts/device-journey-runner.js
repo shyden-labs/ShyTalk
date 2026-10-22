@@ -854,8 +854,14 @@ class Reporter {
 
   // Wrap a unit of work: time it, capture a screenshot + screen summary,
   // record pass/fail. On failure it throws so the journey aborts cleanly.
-  async step(device, name, fn, { preamble = false } = {}) {
-    const rec = { name, status: 'running', startedAt: Date.now(), preamble };
+  //
+  // `check: true` marks an independent check (SHY-0645): its failure is
+  // recorded and the journey carries on, so an earlier red can never hide a
+  // later check; `assertNoFailedChecks` then fails the journey naming every
+  // failed one. A red-first run that stopped at its first failure proved one
+  // of J28R's three recipient writes and none of the rest (2026-10-22).
+  async step(device, name, fn, { preamble = false, check = false } = {}) {
+    const rec = { name, status: 'running', startedAt: Date.now(), preamble, check };
     // Snapshot the counter so this step is credited only with what IT did.
     const uiOpsBefore = uiOps.count;
     const overlaysBefore = overlays.cleared.length;
@@ -910,10 +916,10 @@ class Reporter {
       if (rec.screen)
         console.log(`     on-screen testTags: ${rec.screen.testTags.join(', ') || '(none)'}`);
     } else {
-      console.log(`✗ ${rec.detail}`);
+      console.log(`✗ ${check ? '(check; the journey carries on) ' : ''}${rec.detail}`);
       if (rec.screen)
         console.log(`     on-screen testTags: ${rec.screen.testTags.join(', ') || '(none)'}`);
-      throw caught;
+      if (!check) throw caught;
     }
   }
 
@@ -1035,6 +1041,41 @@ const overlays = { cleared: [] };
 
 /** The kinds a journey may declare. Closed set: an unknown kind is a bug. */
 const JOURNEY_KINDS = Object.freeze(['ui', 'api-contract']);
+
+/**
+ * Fail a journey whose independent checks did not all pass (SHY-0645),
+ * naming every failed one with its reason, in run order. A failed plain step
+ * is not counted here: it already stopped the journey with its own error.
+ */
+function assertNoFailedChecks(journeyId, steps) {
+  const failed = (steps ?? []).filter((st) => st.check && st.status === 'fail');
+  if (failed.length === 0) return;
+  const noun = failed.length === 1 ? 'check' : 'checks';
+  throw new Error(
+    `${journeyId}: ${failed.length} ${noun} failed: ` +
+      failed.map((st) => `${st.name} (${st.detail})`).join('; '),
+  );
+}
+
+/**
+ * Run one journey and record its verdict. Exported so the verdict's wiring is
+ * tested by behaviour, not by a source match a definition would also satisfy.
+ */
+async function runOneJourney(j, device, reporter, ctx) {
+  reporter.startJourney(j.id, j.title);
+  try {
+    await j.run(device, reporter, ctx);
+    // Every independent check is judged before anything else (SHY-0645).
+    assertNoFailedChecks(j.id, reporter.current?.steps ?? []);
+    // Checked AFTER the journey's own assertions and before it is called a
+    // pass: every step can be true and the run still prove nothing about
+    // the product if the phone was never touched (SHY-0457).
+    assertJourneyTouchedTheUi({ ...j, steps: reporter.current?.steps ?? [] });
+    reporter.endJourney('pass');
+  } catch (e) {
+    reporter.endJourney('fail', e.message);
+  }
+}
 
 /**
  * Did this journey actually use the product?
@@ -4951,59 +4992,58 @@ const THUMBS = 2;
 const QUICK = ['❤️', '😂', '👍'];
 const STORE_WAIT_MS = 15000;
 
-const J28R = {
-  id: 'J28R',
-  kind: 'ui',
-  title:
-    'j28 — reactions: two people react in a group, one takes it back, a recipient reacts one-to-one',
-  async run(device, reporter, ctx) {
-    const { phone, other, third } = reactionCast(device.kind);
-    const { firestoreDocumentsUrl } = requireActiveApi();
-    const stamp = Date.now();
-    const groupName = `JR-J28R-${stamp}`;
-    const groupText = `JR-J28R-GROUP-${stamp}`;
-    const dmText = `JR-J28R-DM-${stamp}`;
-    const tokens = {};
-    const fsOf = {};
-    let group;
-    let groupMsg;
-    let dmConv;
-    let dmMsg;
+// The j28 reaction scenarios share one world: the cast, their tokens, the
+// store reader and the phone's taps. Each scenario is its own journey
+// (SHY-0645): one test per case, so a red in one can never hide another. The
+// first red-first run walked all three as one journey, stopped at its first
+// failure, and proved one of the three recipient writes (2026-10-22).
+function reactionWorld(device, reporter, ctx) {
+  const { phone, other, third } = reactionCast(device.kind);
+  const { firestoreDocumentsUrl } = requireActiveApi();
+  const stamp = Date.now();
+  const tokens = {};
+  const fsOf = {};
 
-    // The sender reads the store with their own token, never the phone's.
-    const stored = (convId, msgId) => async () => {
-      const r = await apiCall('GET', `/api/conversations/${convId}/messages?limit=50`, {
-        token: tokens[other.name],
-      });
-      if (r.status !== 200) {
-        throw new Error(
-          `GET messages of ${convId} as ${other.name} expected 200; got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`,
-        );
-      }
-      const m = Array.isArray(r.body) ? r.body.find((x) => x.id === msgId) : undefined;
-      if (!m) throw new Error(`message ${msgId} is not among the last 50 of ${convId}`);
-      return m.reactions || {};
-    };
-    const expectStored = (convId, msgId, want, what) =>
-      waitForStored(
-        stored(convId, msgId),
-        (got) => canonicalReactions(got) === canonicalReactions(want),
-        {
-          timeoutMs: STORE_WAIT_MS,
-          what,
-          describe: canonicalReactions,
-        },
+  // The sender reads the store with their own token, never the phone's.
+  const stored = (convId, msgId) => async () => {
+    const r = await apiCall('GET', `/api/conversations/${convId}/messages?limit=50`, {
+      token: tokens[other.name],
+    });
+    if (r.status !== 200) {
+      throw new Error(
+        `GET messages of ${convId} as ${other.name} expected 200; got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`,
       );
-    const phoneReacts = async (msgId, place) => {
-      await tapId(device, `privateChat_msgTarget_${msgId}`);
-      await waitForId(device, 'privateChat_reactMenuItem', 10000);
-      await tapId(device, 'privateChat_reactMenuItem');
-      await waitForId(device, `privateChat_reactionPick_${place}`, 10000);
-      await tapId(device, `privateChat_reactionPick_${place}`);
-    };
-    const badge = (msgId, place) => `privateChat_reactionBadge_${msgId}_${place}`;
+    }
+    const m = Array.isArray(r.body) ? r.body.find((x) => x.id === msgId) : undefined;
+    if (!m) throw new Error(`message ${msgId} is not among the last 50 of ${convId}`);
+    return m.reactions || {};
+  };
+  const expectStored = (convId, msgId, want, what) =>
+    waitForStored(
+      stored(convId, msgId),
+      (got) => canonicalReactions(got) === canonicalReactions(want),
+      { timeoutMs: STORE_WAIT_MS, what, describe: canonicalReactions },
+    );
+  // One emoji's own entry, whatever else the message carries: an independent
+  // check must not fail because a different person's write was refused.
+  const expectEmoji = (convId, msgId, emoji, uids, what) =>
+    waitForStored(
+      stored(convId, msgId),
+      (got) =>
+        canonicalReactions({ [emoji]: got[emoji] || [] }) === canonicalReactions({ [emoji]: uids }),
+      { timeoutMs: STORE_WAIT_MS, what, describe: canonicalReactions },
+    );
+  const phoneReacts = async (msgId, place) => {
+    await tapId(device, `privateChat_msgTarget_${msgId}`);
+    await waitForId(device, 'privateChat_reactMenuItem', 10000);
+    await tapId(device, 'privateChat_reactMenuItem');
+    await waitForId(device, `privateChat_reactionPick_${place}`, 10000);
+    await tapId(device, `privateChat_reactionPick_${place}`);
+  };
+  const badge = (msgId, place) => `privateChat_reactionBadge_${msgId}_${place}`;
 
-    await reporter.step(
+  const signInEveryone = () =>
+    reporter.step(
       device,
       'Setup: Alice, Theo and Selma each sign in to the network as themselves',
       async () => {
@@ -5019,30 +5059,37 @@ const J28R = {
       },
     );
 
+  const makeGroup = async (tag) => {
+    const out = { name: `JR-${tag}-${stamp}`, text: `JR-${tag}-GROUP-${stamp}` };
     await reporter.step(
       device,
-      `Setup: ${other.name} makes a new group "${groupName}" with ${phone.name} and ${third.name}, and posts in it`,
+      `Setup: ${other.name} makes a new group "${out.name}" with ${phone.name} and ${third.name}, and posts in it`,
       async () => {
-        group = await createGroupAs(fsOf[other.name], {
+        const group = await createGroupAs(fsOf[other.name], {
           creatorId: other.uid,
           cohort: 'adult',
           memberIds: [phone.uid, third.uid],
-          groupName,
+          groupName: out.name,
           now: stamp,
         });
+        out.id = group.id;
         const r = await apiCall('POST', `/api/conversations/${group.id}/messages`, {
           token: tokens[other.name],
-          body: { text: groupText, type: 'TEXT' },
+          body: { text: out.text, type: 'TEXT' },
         });
         if (r.status !== 200)
           throw new Error(
             `${other.name}'s group message expected 200; got ${r.status}: ${JSON.stringify(r.body)}`,
           );
-        groupMsg = r.body.id;
-        return `conversations/${group.id} with ${group.participantIds.join(', ')}; message ${groupMsg}`;
+        out.msgId = r.body.id;
+        return `conversations/${group.id} with ${group.participantIds.join(', ')}; message ${out.msgId}`;
       },
     );
+    return out;
+  };
 
+  const writeOneToOne = async (tag) => {
+    const out = { text: `JR-${tag}-DM-${stamp}` };
     await reporter.step(
       device,
       `Setup: ${other.name} writes to ${phone.name} one-to-one`,
@@ -5055,117 +5102,231 @@ const J28R = {
           throw new Error(
             `one-to-one chat expected 200; got ${c.status}: ${JSON.stringify(c.body)}`,
           );
-        dmConv = c.body.id;
-        const r = await apiCall('POST', `/api/conversations/${dmConv}/messages`, {
+        out.id = c.body.id;
+        const r = await apiCall('POST', `/api/conversations/${out.id}/messages`, {
           token: tokens[other.name],
-          body: { text: dmText, type: 'TEXT' },
+          body: { text: out.text, type: 'TEXT' },
         });
         if (r.status !== 200)
           throw new Error(
             `${other.name}'s one-to-one message expected 200; got ${r.status}: ${JSON.stringify(r.body)}`,
           );
-        dmMsg = r.body.id;
-        return `conversations/${dmConv}, new message ${dmMsg}`;
+        out.msgId = r.body.id;
+        return `conversations/${out.id}, new message ${out.msgId}`;
+      },
+    );
+    return out;
+  };
+
+  // Puts reactions on a message BEFORE the phone acts, so the write under test
+  // starts from the state its scenario names. On the local stack the
+  // emulator's admin handle writes them (it bypasses the rules: setup only, so
+  // a red-first run against old rules still reaches the phone's write); on dev
+  // each person writes their own, as the app would.
+  const placeReactions = (convId, msgId, reactions) =>
+    reporter.step(
+      device,
+      `Setup: ${Object.entries(reactions)
+        .map(([emoji, uids]) => `${emoji} by ${uids.join(', ')}`)
+        .join(' and ')} on the message before the phone acts`,
+      async () => {
+        if (ctx.state.db) {
+          await ctx.state.db.doc(`conversations/${convId}/messages/${msgId}`).update({ reactions });
+        } else {
+          for (const [emoji, uids] of Object.entries(reactions)) {
+            for (const uid of uids) {
+              const who = [ALICE, THEO, SELMA].find((p) => p.uid === uid);
+              await reactAs(fsOf[who.name], {
+                conversationId: convId,
+                messageId: msgId,
+                emoji,
+                uid,
+              });
+            }
+          }
+        }
+        const got = await expectStored(convId, msgId, reactions, 'the set-up reactions');
+        return `stored ${canonicalReactions(got)} via ${ctx.state.db ? 'the emulator admin (setup only)' : 'each person'}`;
       },
     );
 
-    await signInAs(device, reporter, ctx, phone.email);
+  const openChatByText = async (needle, label) => {
+    await tapId(device, 'main_messagesTab');
+    const pickRow = (nodes) =>
+      nodes.find((n) => n.center && `${n.text || ''} ${n.desc || ''}`.includes(needle));
+    const rows = await waitForText(device, needle, 15000);
+    const row = pickRow(rows);
+    if (!row)
+      throw new Error(
+        `${label} is not in ${phone.name}'s messages; on screen: ${summarizeScreen(rows).texts.slice(0, 12).join(' | ')}`,
+      );
+    await tapResolved(device, row, { label, relocate: pickRow });
+    await waitForId(device, 'privateChat_messageInput', 12000);
+  };
 
-    const openChatByText = async (needle, label) => {
-      await tapId(device, 'main_messagesTab');
-      const pickRow = (nodes) =>
-        nodes.find((n) => n.center && `${n.text || ''} ${n.desc || ''}`.includes(needle));
-      const rows = await waitForText(device, needle, 15000);
-      const row = pickRow(rows);
-      if (!row)
-        throw new Error(
-          `${label} is not in ${phone.name}'s messages; on screen: ${summarizeScreen(rows).texts.slice(0, 12).join(' | ')}`,
-        );
-      await tapResolved(device, row, { label, relocate: pickRow });
-      await waitForId(device, 'privateChat_messageInput', 12000);
-    };
-
-    await reporter.step(device, `UI: ${phone.name} opens the new group`, async () => {
-      await openChatByText(groupName, `the group "${groupName}"`);
-      await waitForId(device, `privateChat_msgTarget_${groupMsg}`, 12000);
+  const openGroup = (g) =>
+    reporter.step(device, `UI: ${phone.name} opens the new group`, async () => {
+      await openChatByText(g.name, `the group "${g.name}"`);
+      await waitForId(device, `privateChat_msgTarget_${g.msgId}`, 12000);
       return `${other.name}'s group message is on screen`;
     });
 
-    // Scenario: two people react to a group message.
-    // Each reaction is in the store before the next person acts: the network
-    // write is pinned to the message's updateTime, so acting while the
-    // phone's write is in flight would fail as a conflict at random. The
-    // store is read FIRST after a phone tap: a write the rules refuse shows
-    // nothing on screen (SHY-0644), so the screen alone would only time out.
+  return {
+    phone,
+    other,
+    third,
+    fsOf,
+    expectStored,
+    expectEmoji,
+    phoneReacts,
+    badge,
+    signInEveryone,
+    makeGroup,
+    writeOneToOne,
+    placeReactions,
+    openChatByText,
+    openGroup,
+    phoneSignsIn: () => signInAs(device, reporter, ctx, phone.email),
+  };
+}
+
+const J28R_GROUP = {
+  id: 'J28R-GROUP',
+  kind: 'ui',
+  title: 'j28 — reactions: two people react to a group message',
+  async run(device, reporter, ctx) {
+    const w = reactionWorld(device, reporter, ctx);
+    const { phone, other, third } = w;
+    await w.signInEveryone();
+    const g = await w.makeGroup('J28R-GROUP');
+    await w.phoneSignsIn();
+    await w.openGroup(g);
+
+    // Each write is its own check, judged on its own emoji, so a refusal of
+    // one never hides the other. The store is read FIRST after a phone tap: a
+    // write the rules refuse shows nothing on screen (SHY-0644).
     await reporter.step(
       device,
       `UI: ${phone.name} taps ❤️ on ${other.name}'s message (on the phone)`,
       async () => {
-        await phoneReacts(groupMsg, HEART);
-        const got = await expectStored(
-          group.id,
-          groupMsg,
-          { '❤️': [phone.uid] },
+        await w.phoneReacts(g.msgId, HEART);
+        const got = await w.expectEmoji(
+          g.id,
+          g.msgId,
+          '❤️',
+          [phone.uid],
           `${phone.name}'s ❤️ on the phone (a refused phone write shows no error: SHY-0644)`,
         );
         return `stored ${canonicalReactions(got)}`;
       },
+      { check: true },
     );
     await reporter.step(
       device,
       `API: ${third.name} reacts 👍 to ${other.name}'s message (over the network)`,
       async () => {
-        await reactAs(fsOf[third.name], {
-          conversationId: group.id,
-          messageId: groupMsg,
+        await reactAs(w.fsOf[third.name], {
+          conversationId: g.id,
+          messageId: g.msgId,
           emoji: QUICK[THUMBS],
           uid: third.uid,
         });
-        const got = await expectStored(
-          group.id,
-          groupMsg,
-          { '❤️': [phone.uid], '👍': [third.uid] },
-          `${third.name}'s 👍 over the network beside ${phone.name}'s ❤️`,
+        const got = await w.expectEmoji(
+          g.id,
+          g.msgId,
+          '👍',
+          [third.uid],
+          `${third.name}'s 👍 over the network`,
         );
         return `stored ${canonicalReactions(got)}`;
       },
+      { check: true },
+    );
+    // Each check judged one emoji; this judges the whole map, so a write that
+    // also changed someone else's reaction cannot pass.
+    await reporter.step(
+      device,
+      `Store: ${other.name} reads exactly ${phone.name}'s ❤️ and ${third.name}'s 👍`,
+      async () => {
+        const got = await w.expectStored(
+          g.id,
+          g.msgId,
+          { '❤️': [phone.uid], '👍': [third.uid] },
+          `exactly ${phone.name}'s ❤️ and ${third.name}'s 👍`,
+        );
+        return canonicalReactions(got);
+      },
     );
     await reporter.step(device, `UI: ${phone.name} sees ❤️ and 👍 under the message`, async () => {
-      await waitForId(device, badge(groupMsg, HEART), 15000);
-      await waitForId(device, badge(groupMsg, THUMBS), 15000);
+      await waitForId(device, w.badge(g.msgId, HEART), 15000);
+      await waitForId(device, w.badge(g.msgId, THUMBS), 15000);
       return 'both badges are on screen';
     });
+  },
+};
 
-    // Scenario: taking a reaction back (a tap on the phone, on both platforms)
+const J28R_UNDO = {
+  id: 'J28R-UNDO',
+  kind: 'ui',
+  title: 'j28 — reactions: taking a reaction back',
+  async run(device, reporter, ctx) {
+    const w = reactionWorld(device, reporter, ctx);
+    const { phone, other, third } = w;
+    await w.signInEveryone();
+    const g = await w.makeGroup('J28R-UNDO');
+    await w.placeReactions(g.id, g.msgId, { '❤️': [phone.uid], '👍': [third.uid] });
+    await w.phoneSignsIn();
+    await w.openGroup(g);
+    await reporter.step(
+      device,
+      `UI: ${phone.name} sees their ❤️ and ${third.name}'s 👍`,
+      async () => {
+        await waitForId(device, w.badge(g.msgId, HEART), 15000);
+        await waitForId(device, w.badge(g.msgId, THUMBS), 15000);
+        return 'both badges are on screen';
+      },
+    );
+
+    // The write under test: a tap on the phone, on both platforms.
     await reporter.step(device, `UI: ${phone.name} taps their ❤️ to take it back`, async () => {
-      await tapId(device, badge(groupMsg, HEART));
+      await tapId(device, w.badge(g.msgId, HEART));
       return `${phone.name} tapped their ❤️ badge`;
     });
     await reporter.step(device, `Store: ${other.name} reads only ${third.name}'s 👍`, async () => {
-      const got = await expectStored(
-        group.id,
-        groupMsg,
+      const got = await w.expectStored(
+        g.id,
+        g.msgId,
         { '👍': [third.uid] },
         `${phone.name}'s ❤️ taken back on the phone, ${third.name}'s 👍 kept (a refused phone write shows no error: SHY-0644)`,
       );
       return canonicalReactions(got);
     });
     await reporter.step(device, `UI: ${phone.name} sees 👍 and no ❤️`, async () => {
-      await waitForIdGone(device, badge(groupMsg, HEART), {
-        stays: badge(groupMsg, THUMBS),
+      await waitForIdGone(device, w.badge(g.msgId, HEART), {
+        stays: w.badge(g.msgId, THUMBS),
         timeoutMs: 15000,
       });
       return '❤️ gone, 👍 still there';
     });
+  },
+};
 
-    // Scenario: the recipient's reaction reaches the sender
+const J28R_DM = {
+  id: 'J28R-DM',
+  kind: 'ui',
+  title: "j28 — reactions: the recipient's reaction reaches the sender",
+  async run(device, reporter, ctx) {
+    const w = reactionWorld(device, reporter, ctx);
+    const { phone, other } = w;
+    await w.signInEveryone();
+    const dm = await w.writeOneToOne('J28R-DM');
+    await w.phoneSignsIn();
     await reporter.step(
       device,
       `UI: ${phone.name} opens ${other.name}'s one-to-one chat`,
       async () => {
-        await tapId(device, 'privateChat_backButton');
-        await openChatByText(dmText, `${other.name}'s one-to-one chat`);
-        await waitForId(device, `privateChat_msgTarget_${dmMsg}`, 12000);
+        await w.openChatByText(dm.text, `${other.name}'s one-to-one chat`);
+        await waitForId(device, `privateChat_msgTarget_${dm.msgId}`, 12000);
         return `${other.name}'s new message is on screen`;
       },
     );
@@ -5173,14 +5334,14 @@ const J28R = {
       device,
       `UI: ${phone.name} reacts 😂 to ${other.name}'s message`,
       async () => {
-        await phoneReacts(dmMsg, LAUGH);
+        await w.phoneReacts(dm.msgId, LAUGH);
         return 'tapped 😂';
       },
     );
     await reporter.step(device, `Store: ${other.name} reads ${phone.name}'s 😂`, async () => {
-      const got = await expectStored(
-        dmConv,
-        dmMsg,
+      const got = await w.expectStored(
+        dm.id,
+        dm.msgId,
         { '😂': [phone.uid] },
         `${phone.name}'s 😂 on ${other.name}'s message (a refused phone write shows no error: SHY-0644)`,
       );
@@ -5190,7 +5351,7 @@ const J28R = {
       device,
       `UI: ${phone.name} sees 😂 under ${other.name}'s message`,
       async () => {
-        await waitForId(device, badge(dmMsg, LAUGH), 15000);
+        await waitForId(device, w.badge(dm.msgId, LAUGH), 15000);
         return '😂 badge on screen';
       },
     );
@@ -5293,7 +5454,9 @@ function buildJourneys(ctx) {
     J04,
     J11,
     J07,
-    J28R,
+    J28R_GROUP,
+    J28R_UNDO,
+    J28R_DM,
     J09,
     J12,
     J05,
@@ -5516,17 +5679,7 @@ async function main() {
         continue;
       }
 
-      reporter.startJourney(j.id, j.title);
-      try {
-        await j.run(device, reporter, ctx);
-        // Checked AFTER the journey's own assertions and before it is called a
-        // pass: every step can be true and the run still prove nothing about
-        // the product if the phone was never touched (SHY-0457).
-        assertJourneyTouchedTheUi({ ...j, steps: reporter.current?.steps ?? [] });
-        reporter.endJourney('pass');
-      } catch (e) {
-        reporter.endJourney('fail', e.message);
-      }
+      await runOneJourney(j, device, reporter, ctx);
     }
   } finally {
     // `finally`, so a walk that throws still yields its video -- a FAILED run
@@ -5612,6 +5765,10 @@ module.exports = {
   JOURNEY_KINDS,
   journeyTouchedTheUi,
   assertJourneyTouchedTheUi,
+  // SHY-0645: independent checks, and the reporter that records them.
+  assertNoFailedChecks,
+  Reporter,
+  runOneJourney,
   dismissKeyboard,
   uiOps,
   overlays,

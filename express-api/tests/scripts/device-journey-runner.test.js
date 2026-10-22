@@ -360,3 +360,149 @@ describe('J28R casts the linked phones: Alice on Android, Theo on the iPhone (SH
   test('a platform with no linked phone is refused, naming it', () =>
     expect(() => reactionCast('web')).toThrow('J28R has no linked phone for platform "web"'));
 });
+
+describe('a check records its failure and the journey carries on (SHY-0645)', () => {
+  // A red-first run that stops at its first failure proves only that step:
+  // J28R's first red hid two later recipient writes (2026-10-22). A check
+  // lets each independent write be judged; the journey still fails, naming
+  // every failed check.
+  const { assertNoFailedChecks, Reporter } = require('../../scripts/device-journey-runner');
+  const os = require('node:os');
+  const path = require('node:path');
+  const fs = require('node:fs');
+
+  const pass = (name, check = false) => ({ name, status: 'pass', check });
+  const fail = (name, check = true) => ({ name, status: 'fail', check, detail: `${name} broke` });
+
+  test('every check passed: nothing is thrown', () =>
+    expect(() => assertNoFailedChecks('J-X', [pass('a', true), pass('b')])).not.toThrow());
+  test('one failed check fails the journey, naming it and its reason', () =>
+    expect(() => assertNoFailedChecks('J-X', [pass('a', true), fail('b')])).toThrow(
+      'J-X: 1 check failed: b (b broke)',
+    ));
+  test('every failed check is named, in run order', () =>
+    expect(() =>
+      assertNoFailedChecks('J-X', [fail('first'), pass('mid', true), fail('last')]),
+    ).toThrow('J-X: 2 checks failed: first (first broke); last (last broke)'));
+  test('a failed plain step is not a check (it already stopped the journey)', () =>
+    expect(() => assertNoFailedChecks('J-X', [fail('plain', false)])).not.toThrow());
+
+  const fakeDevice = { dumpXml: async () => '<hierarchy/>', screencap: async () => {} };
+  const reporterIn = () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reporter-check-'));
+    const r = new Reporter(dir, { target: 'local' });
+    r.startJourney('J-X', 'a journey');
+    return r;
+  };
+
+  test('a failing check resolves, and is recorded as a failed check', async () => {
+    const r = reporterIn();
+    await expect(
+      r.step(
+        fakeDevice,
+        'the write',
+        async () => {
+          throw new Error('refused');
+        },
+        { check: true },
+      ),
+    ).resolves.toBeUndefined();
+    expect(r.current.steps).toEqual([
+      expect.objectContaining({
+        name: 'the write',
+        status: 'fail',
+        check: true,
+        detail: 'refused',
+      }),
+    ]);
+  });
+  test('the step after a failed check still runs', async () => {
+    const r = reporterIn();
+    await r.step(
+      fakeDevice,
+      'one',
+      async () => {
+        throw new Error('refused');
+      },
+      { check: true },
+    );
+    await r.step(fakeDevice, 'two', async () => 'ran', { check: true });
+    expect(r.current.steps.map((s) => [s.name, s.status])).toEqual([
+      ['one', 'fail'],
+      ['two', 'pass'],
+    ]);
+  });
+  test('a failing plain step still throws its own error', async () => {
+    const r = reporterIn();
+    await expect(
+      r.step(fakeDevice, 'plain', async () => {
+        throw new Error('stop here');
+      }),
+    ).rejects.toThrow('stop here');
+  });
+});
+
+describe('the j28 reaction scenarios are one journey each (SHY-0645)', () => {
+  const { buildJourneys } = require('../../scripts/device-journey-runner');
+  const ids = buildJourneys({ reset: false, pkg: 'com.shyden.shytalk.local' }).map((j) => j.id);
+
+  test.each(['J28R-GROUP', 'J28R-UNDO', 'J28R-DM'])('%s is a journey', (id) =>
+    expect(ids).toContain(id),
+  );
+  test('the old single J28R is gone (a first red hid its later writes)', () =>
+    expect(ids).not.toContain('J28R'));
+});
+
+describe('runOneJourney judges every check before calling a journey a pass (SHY-0645)', () => {
+  const { runOneJourney, Reporter, uiOps } = require('../../scripts/device-journey-runner');
+  const os = require('node:os');
+  const path = require('node:path');
+  const fs = require('node:fs');
+
+  const fakeDevice = { dumpXml: async () => '<hierarchy/>', screencap: async () => {} };
+  const touch = async () => {
+    uiOps.count += 1; // what a real tap does, so the UI guard sees a touch
+    return 'tapped';
+  };
+  const refused = async () => {
+    throw new Error('refused');
+  };
+  const journey = (steps) => ({
+    id: 'J-FAKE',
+    kind: 'ui',
+    title: 'a fake journey',
+    async run(device, reporter) {
+      for (const [name, fn, opts] of steps) await reporter.step(device, name, fn, opts);
+    },
+  });
+  const verdict = async (steps) => {
+    const r = new Reporter(fs.mkdtempSync(path.join(os.tmpdir(), 'run-one-')), { target: 'local' });
+    await runOneJourney(journey(steps), fakeDevice, r, {});
+    return r.journeys[0];
+  };
+
+  test('a failed check fails the journey, naming it, though the UI was touched', async () =>
+    expect(
+      await verdict([
+        ['tap', touch],
+        ['the write', refused, { check: true }],
+        ['tap again', touch],
+      ]),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'fail',
+        error: 'J-FAKE: 1 check failed: the write (refused)',
+      }),
+    ));
+  test('every check passed and the UI was touched: a pass', async () =>
+    expect(
+      await verdict([
+        ['tap', touch],
+        ['the write', touch, { check: true }],
+      ]),
+    ).toEqual(expect.objectContaining({ status: 'pass' })));
+  test('a journey that never touched the UI still fails (the SHY-0457 guard keeps its place)', async () =>
+    expect(await verdict([['no tap', async () => 'nothing', { check: true }]])).toEqual(
+      expect.objectContaining({ status: 'fail' }),
+    ));
+});

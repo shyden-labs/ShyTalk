@@ -42,7 +42,7 @@ Feature: j28 — a conversation with more than two people in it
     When Selma on iOS replies
     Then Alice and Theo both see Selma's reply
 
-  # Walked by the runner journey J28R (SHY-0645). Each phone is linked to one
+  # Walked by the runner journey J28R-GROUP (SHY-0645). Each phone is linked to one
   # account: Alice holds the Android phone, Theo the iPhone. On each run, the
   # one of the two NOT holding the phone (the sender) acts over the network as
   # themselves, and reads the store. Selma is never on a phone.
@@ -52,14 +52,14 @@ Feature: j28 — a conversation with more than two people in it
     When the phone holder taps ❤️ on it and Selma reacts with 👍
     Then the sender reads ❤️ and 👍 on the message, and the phone shows both
 
-  # Walked by the runner journey J28R (SHY-0645).
+  # Walked by the runner journey J28R-UNDO (SHY-0645).
   @blocker @android-physical @ios-device
   Scenario: taking a reaction back
     Given the phone holder's ❤️ and Selma's 👍 are on the sender's message
     When the phone holder taps their ❤️ again
     Then the sender reads only Selma's 👍, and the phone shows 👍 and no ❤️
 
-  # Walked by the runner journey J28R (SHY-0645).
+  # Walked by the runner journey J28R-DM (SHY-0645).
   @blocker @android-physical @ios-device
   Scenario: the recipient's reaction reaches the sender
     Given the sender has written to the phone holder one-to-one
