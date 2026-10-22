@@ -44,12 +44,12 @@ runs_json="$(gh api "$runs_call")" || die "the runs call failed: gh api ${runs_c
 
 # Newest first: the first match is the last completed sync. The query already
 # asks for successful develop runs; the filter checks each again, so a run in
-# progress (this one) or on another branch can never be taken.
+# progress (this one: no conclusion yet) or on another branch can never be
+# taken. A success conclusion implies the run completed.
 last="$(jq -r '
   [ .workflow_runs[]
     | select((.event == "push" or .event == "schedule")
              and .head_branch == "develop"
-             and .status == "completed"
              and .conclusion == "success") ]
   | .[0] // empty
   | "\(.head_sha) \(.id) \(.event)"
