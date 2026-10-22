@@ -7,3 +7,13 @@
 # references a self-hosted label, actionlint will (correctly) flag it
 # as unknown — that's the desired behavior; the workflow should be
 # converted to a hosted runner instead.
+
+paths:
+  # SHY-0691: GitHub added `concurrency.queue` (changelog 2026-05-07);
+  # actionlint 1.7.x rejects it until rhysd/actionlint#654 is released. This
+  # ignores that one message in this one file, pinned by
+  # express-api/tests/scripts/sync-stories-queue.test.js. SHY-0694 drops it
+  # once a release accepts the key.
+  .github/workflows/sync-stories-to-issues.yml:
+    ignore:
+      - '^unexpected key "queue" for "concurrency" section'
