@@ -501,6 +501,24 @@ describe('runOneJourney judges every check before calling a journey a pass (SHY-
         ['the write', touch, { check: true }],
       ]),
     ).toEqual(expect.objectContaining({ status: 'pass' })));
+  test('a plain step failing after a failed check reports both, the checks included', async () =>
+    expect(
+      await verdict([
+        ['tap', touch],
+        ['the write', refused, { check: true }],
+        [
+          'the exact map',
+          async () => {
+            throw new Error('map wrong');
+          },
+        ],
+      ]),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'fail',
+        error: 'map wrong; and J-FAKE: 1 check failed: the write (refused)',
+      }),
+    ));
   test('a journey that never touched the UI still fails (the SHY-0457 guard keeps its place)', async () =>
     expect(await verdict([['no tap', async () => 'nothing', { check: true }]])).toEqual(
       expect.objectContaining({ status: 'fail' }),

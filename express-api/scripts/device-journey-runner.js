@@ -1043,18 +1043,23 @@ const overlays = { cleared: [] };
 const JOURNEY_KINDS = Object.freeze(['ui', 'api-contract']);
 
 /**
- * Fail a journey whose independent checks did not all pass (SHY-0645),
- * naming every failed one with its reason, in run order. A failed plain step
- * is not counted here: it already stopped the journey with its own error.
+ * Every failed independent check (SHY-0645) with its reason, in run order, or
+ * null when none failed. A failed plain step is not a check.
  */
-function assertNoFailedChecks(journeyId, steps) {
+function failedChecksSummary(journeyId, steps) {
   const failed = (steps ?? []).filter((st) => st.check && st.status === 'fail');
-  if (failed.length === 0) return;
+  if (failed.length === 0) return null;
   const noun = failed.length === 1 ? 'check' : 'checks';
-  throw new Error(
+  return (
     `${journeyId}: ${failed.length} ${noun} failed: ` +
-      failed.map((st) => `${st.name} (${st.detail})`).join('; '),
+    failed.map((st) => `${st.name} (${st.detail})`).join('; ')
   );
+}
+
+/** Fail a journey whose independent checks did not all pass, naming each. */
+function assertNoFailedChecks(journeyId, steps) {
+  const summary = failedChecksSummary(journeyId, steps);
+  if (summary) throw new Error(summary);
 }
 
 /**
@@ -1063,9 +1068,11 @@ function assertNoFailedChecks(journeyId, steps) {
  */
 async function runOneJourney(j, device, reporter, ctx) {
   reporter.startJourney(j.id, j.title);
+  let checksJudged = false;
   try {
     await j.run(device, reporter, ctx);
     // Every independent check is judged before anything else (SHY-0645).
+    checksJudged = true;
     assertNoFailedChecks(j.id, reporter.current?.steps ?? []);
     // Checked AFTER the journey's own assertions and before it is called a
     // pass: every step can be true and the run still prove nothing about
@@ -1073,7 +1080,10 @@ async function runOneJourney(j, device, reporter, ctx) {
     assertJourneyTouchedTheUi({ ...j, steps: reporter.current?.steps ?? [] });
     reporter.endJourney('pass');
   } catch (e) {
-    reporter.endJourney('fail', e.message);
+    // A plain step that stops the journey after failed checks must not hide
+    // them: the reason names both (SHY-0645).
+    const checks = checksJudged ? null : failedChecksSummary(j.id, reporter.current?.steps ?? []);
+    reporter.endJourney('fail', checks ? `${e.message}; and ${checks}` : e.message);
   }
 }
 
