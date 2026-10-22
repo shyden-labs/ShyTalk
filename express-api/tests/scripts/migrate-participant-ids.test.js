@@ -9,13 +9,11 @@
  * Requires the Firestore emulator (`bash local/start.sh`, default localhost:8080).
  */
 
-const { readFileSync } = require('fs');
-const { join } = require('path');
+const { loadRules } = require('../firestore-rules/_helpers/rules-source');
 const { initializeTestEnvironment } = require('@firebase/rules-unit-testing');
 const { firestoreHostPort, assertEmulatorReachable } = require('../helpers/firebase-emulator');
 const { migrateParticipantIds } = require('../../scripts/migrate-participant-ids');
 
-const RULES_PATH = join(__dirname, '..', '..', '..', 'firestore.rules');
 const PROJECT_ID = `demo-shytalk-migrate-pids-${process.env.JEST_WORKER_ID || '1'}`;
 
 let testEnv;
@@ -25,7 +23,7 @@ beforeAll(async () => {
   const { host, port } = firestoreHostPort();
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { host, port, rules: readFileSync(RULES_PATH, 'utf8') },
+    firestore: { host, port, rules: loadRules() },
   });
 });
 

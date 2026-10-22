@@ -88,8 +88,8 @@ suite; SHY-0626 stops messages being created under another person's name.
 - [x] Hiding a message stays a phone write, allowed only when `hiddenBy` is
       the caller and only `isHidden` and `hiddenBy` change.
       Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
-      Tests "ALLOW group admin hides naming themself", "group admin cannot hide
-      naming someone else", "group admin cannot change text while hiding";
+      Tests "ALLOW: group admin hides naming themself", "DENY: group admin cannot hide
+      naming someone else", "DENY: group admin cannot change text while hiding";
       the last two red against the old rules (plant #2441) and against mutants
       M3+M4 (plant #2442).
 - [x] A reaction stays a phone write by any participant, allowed only when
@@ -97,7 +97,7 @@ suite; SHY-0626 stops messages being created under another person's name.
       sender or group staff update a message, so a recipient's reaction is
       refused; read from the rule on 2026-10-18, proven by the new test.)
       Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
-      "ALLOW a recipient reacts" (red on the old rules, #2441), "a reaction
+      "ALLOW: a recipient reacts" (red on the old rules, #2441), "a reaction
       cannot carry a text change" (red on mutant M3) and "an outsider cannot
       react" (red on mutant M4, #2442). Whose ids the map lists: SHY-0643.
 
@@ -105,7 +105,7 @@ suite; SHY-0626 stops messages being created under another person's name.
 
 - [x] The rules refuse a client create on `edits` and on `mod_log`.
       Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
-      Both edits tests and "group admin cannot write mod_log" red on the old
+      Both edits tests and "DENY: group admin cannot write mod_log" red on the old
       rules (#2441); static pin "edits, recall and mod_log refuse every client
       write" red on mutant M2 (#2442).
 - [x] The rules refuse a client update that changes a message's `text`,
@@ -116,14 +116,14 @@ suite; SHY-0626 stops messages being created under another person's name.
 - [x] The rules refuse every client read and write of the recalled-text
       records except an admin's read.
       Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
-      "ALLOW admin reads the recall record" (red on the old rules, #2441);
-      "participant/sender cannot read the recall record" red on mutant M1 and
-      "nobody can write the recall record" red on mutant M2 (#2442); the old
+      "ALLOW: admin reads the recall record" (red on the old rules, #2441);
+      "DENY: participant/sender cannot read the recall record" red on mutant M1 and
+      "DENY: nobody can write the recall record" red on mutant M2 (#2442); the old
       rules refused these too (no rule matched), so only the mutants prove them.
 - [x] The rules refuse every client delete of a message (no app deletes one;
       a delete would erase the record).
       Proof: PR #2447 (merged 5667fdcbdaf), PR Checks run 39177283003 on head de462de2991, Test Backend step "Run Express API tests with coverage": 578 of 578 suites, 16400 passed, 4 skipped (SHY-0638, not these files); `message-history-rules.test.js` 25 tests and `banned-claim-rules-static.unit.test.js` 8 tests PASS, no skip in either.
-      "sender cannot delete a message" red on the old rules (#2441).
+      "DENY: sender cannot delete a message" red on the old rules (#2441).
 - [ ] The edit and recall routes refuse anyone but the sender, a banned
       user, a message already recalled, and a conversation flagged
       `crossCohortAtMigration`.
@@ -288,7 +288,7 @@ suite; SHY-0626 stops messages being created under another person's name.
   Orphaned `edits` after account deletion filed as SHY-0631.
 - **2026-10-19, rules**: plant #2441 ran the 20 rules tests against today's
   rules (run 39171598647): the 13 predicted red were red by name, among them
-  "ALLOW a recipient reacts". Five refusals are refused today too (recall
+  "ALLOW: a recipient reacts". Five refusals are refused today too (recall
   record read x2 and write, an outsider reacting, a reaction carrying a text
   change), so a second plant (#2442) runs four mutants of the locked rules to
   see those red before PR 3 opens. The locked rule cannot stop a participant

@@ -27,16 +27,13 @@
  * it never silently skips (a skip would be the soft-mock EPIC-0003 bans).
  */
 
-const { readFileSync } = require('fs');
-const { join } = require('path');
+const { loadRules } = require('./_helpers/rules-source');
 const {
   initializeTestEnvironment,
   assertSucceeds,
   assertFails,
 } = require('@firebase/rules-unit-testing');
 const { firestoreHostPort, assertEmulatorReachable } = require('../helpers/firebase-emulator');
-
-const RULES_PATH = join(__dirname, '..', '..', '..', 'firestore.rules');
 
 // A distinct demo-* projectId keeps this suite's data out of the seeded
 // `demo-shytalk` namespace (local/seed.js) and lets clearFirestore() wipe only
@@ -129,7 +126,7 @@ beforeAll(async () => {
   const { host, port } = firestoreHostPort();
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { host, port, rules: readFileSync(RULES_PATH, 'utf8') },
+    firestore: { host, port, rules: loadRules() },
   });
 });
 
@@ -149,15 +146,15 @@ beforeEach(async () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('rooms/{roomId} create — real rules engine', () => {
-  test('adult owner with a matching cohort claim CAN create an adult room (operator happy path)', async () => {
+  test('ALLOW: adult owner with a matching cohort claim CAN create an adult room (operator happy path)', async () => {
     await assertSucceeds(dbFor(ADULT).doc('rooms/r-create-1').set(roomDoc(ADULT)));
   });
 
-  test('minor owner with a matching cohort claim CAN create a minor room', async () => {
+  test('ALLOW: minor owner with a matching cohort claim CAN create a minor room', async () => {
     await assertSucceeds(dbFor(MINOR).doc('rooms/r-create-2').set(roomDoc(MINOR)));
   });
 
-  test('DENY (SHY-0029): a create that OMITS ownerFirebaseUid — no fieldless, owner-left-broken rooms', async () => {
+  test('DENY: (SHY-0029) a create that OMITS ownerFirebaseUid — no fieldless, owner-left-broken rooms', async () => {
     // Pre-SHY-0029 the `.get('ownerFirebaseUid', request.auth.uid)` default let a
     // field-missing create through, producing a room with NO ownerFirebaseUid —
     // which silently breaks the owner-left RTDB attestation (PresenceService reads
@@ -210,7 +207,7 @@ describe('rooms/{roomId} create — real rules engine', () => {
     );
   });
 
-  test('DENY (SHY-0029): empty-string ownerFirebaseUid (the client currentFirebaseUid ?: "" edge)', async () => {
+  test('DENY: (SHY-0029) empty-string ownerFirebaseUid (the client currentFirebaseUid ?: "" edge)', async () => {
     // An authenticated caller whose Firebase uid was momentarily unresolved would
     // stamp ''. `.get('ownerFirebaseUid', '') == request.auth.uid` denies it — no
     // unattributable-owner rooms. (Already denied pre-fix since '' != auth.uid;
@@ -222,7 +219,7 @@ describe('rooms/{roomId} create — real rules engine', () => {
     );
   });
 
-  test('DENY (SHY-0029): explicit-null ownerFirebaseUid (present key, null value — distinct .get() path from absent)', async () => {
+  test('DENY: (SHY-0029) explicit-null ownerFirebaseUid (present key, null value — distinct .get() path from absent)', async () => {
     // `.get('ownerFirebaseUid', '')` returns the present null (not the default) →
     // null != auth.uid → deny. Pins the null branch separately from field-absent.
     await assertFails(
@@ -232,7 +229,7 @@ describe('rooms/{roomId} create — real rules engine', () => {
     );
   });
 
-  test('DENY (SHY-0029): whitespace-only ownerFirebaseUid', async () => {
+  test('DENY: (SHY-0029) whitespace-only ownerFirebaseUid', async () => {
     await assertFails(
       dbFor(ADULT)
         .doc('rooms/r-deny-4d')
@@ -240,7 +237,7 @@ describe('rooms/{roomId} create — real rules engine', () => {
     );
   });
 
-  test('DENY (SHY-0029): non-string ownerFirebaseUid (type confusion — rules == does not coerce)', async () => {
+  test('DENY: (SHY-0029) non-string ownerFirebaseUid (type confusion — rules == does not coerce)', async () => {
     await assertFails(
       dbFor(ADULT)
         .doc('rooms/r-deny-4e')
@@ -248,7 +245,7 @@ describe('rooms/{roomId} create — real rules engine', () => {
     );
   });
 
-  test('DENY (repro): a freshly-signed-in caller whose claims have NOT propagated cannot create', async () => {
+  test('DENY: (repro) a freshly-signed-in caller whose claims have NOT propagated cannot create', async () => {
     // Reproduces the operator's "can't create rooms" path at the rules layer:
     // the client resolves the user as adult and stamps cohort:adult + ownerId,
     // but the JWT carries no uniqueId/cohort yet → `callerUniqueId()` throws and
@@ -267,7 +264,7 @@ describe('rooms/{roomId} create — real rules engine', () => {
     );
   });
 
-  test('DENY (partial-claims race): uniqueId landed but cohort has NOT, stamping cohort:adult', async () => {
+  test('DENY: (partial-claims race) uniqueId landed but cohort has NOT, stamping cohort:adult', async () => {
     // The second propagation-race state: `callerUniqueId()` resolves (uniqueId is
     // present, ownerId can match), so the deny is driven purely by the cohort
     // clause — the token cohort defaults to 'minor' while the stamp is 'adult'.
@@ -301,7 +298,7 @@ describe('rooms/{roomId} read — real rules engine (same-cohort gate)', () => {
     await seedRoom('r-minor', roomDoc(MINOR)); // cohort: 'minor'
   });
 
-  test('adult caller CAN read an adult room', async () => {
+  test('ALLOW: adult caller CAN read an adult room', async () => {
     await assertSucceeds(dbFor(ADULT_2).doc('rooms/r-adult').get());
   });
 
@@ -309,17 +306,17 @@ describe('rooms/{roomId} read — real rules engine (same-cohort gate)', () => {
     await assertFails(dbFor(MINOR).doc('rooms/r-adult').get());
   });
 
-  test('minor caller CAN read a minor room', async () => {
+  test('ALLOW: minor caller CAN read a minor room', async () => {
     await assertSucceeds(dbFor(MINOR).doc('rooms/r-minor').get());
   });
 
-  test('DENY (reverse direction): an adult caller cannot read a minor room', async () => {
+  test('DENY: (reverse direction) an adult caller cannot read a minor room', async () => {
     // OSA §17 segregation in BOTH directions — the adult→minor single-doc read
     // is denied too (the minor→adult case above is not sufficient on its own).
     await assertFails(dbFor(ADULT_2).doc('rooms/r-minor').get());
   });
 
-  test('admin CAN read across cohorts (moderation bypass)', async () => {
+  test('ALLOW: admin CAN read across cohorts (moderation bypass)', async () => {
     await assertSucceeds(dbFor(ADMIN).doc('rooms/r-adult').get());
   });
 
@@ -327,7 +324,7 @@ describe('rooms/{roomId} read — real rules engine (same-cohort gate)', () => {
     await assertFails(dbAnon().doc('rooms/r-adult').get());
   });
 
-  test('rollout-safety: a no-claims caller can read a no-cohort room (both default to minor)', async () => {
+  test('ALLOW: rollout-safety: a no-claims caller can read a no-cohort room (both default to minor)', async () => {
     await seedRoom('r-legacy', { ownerId: '50001', name: 'Legacy', state: 'OPEN' });
     await assertSucceeds(dbFor(NO_CLAIMS).doc('rooms/r-legacy').get());
   });
@@ -366,7 +363,7 @@ describe('rooms/{roomId} delete — owner-only', () => {
     await seedRoom('r-del', roomDoc(ADULT));
   });
 
-  test('owner CAN delete own room', async () => {
+  test('ALLOW: owner CAN delete own room', async () => {
     await assertSucceeds(dbFor(ADULT).doc('rooms/r-del').delete());
   });
 
@@ -402,11 +399,11 @@ describe('rooms/{roomId}/messages — real rules engine', () => {
 
   const msg = (sender) => ({ senderId: String(sender.uniqueId), text: 'hi', sentAt: 1 });
 
-  test('owner CAN post a message', async () => {
+  test('ALLOW: owner CAN post a message', async () => {
     await assertSucceeds(dbFor(ADULT).doc('rooms/r-msg/messages/m1').set(msg(ADULT)));
   });
 
-  test('a room participant CAN post a message', async () => {
+  test('ALLOW: a room participant CAN post a message', async () => {
     await assertSucceeds(dbFor(ADULT_2).doc('rooms/r-msg/messages/m2').set(msg(ADULT_2)));
   });
 
@@ -429,7 +426,7 @@ describe('rooms/{roomId}/messages — real rules engine', () => {
     await assertFails(dbAnon().doc('rooms/r-msg/messages/m4').set(msg(ADULT)));
   });
 
-  test('a same-cohort participant CAN read a message', async () => {
+  test('ALLOW: a same-cohort participant CAN read a message', async () => {
     await seedDoc('rooms/r-msg/messages/seeded', msg(ADULT));
     await assertSucceeds(dbFor(ADULT_2).doc('rooms/r-msg/messages/seeded').get());
   });
@@ -439,12 +436,12 @@ describe('rooms/{roomId}/messages — real rules engine', () => {
     await assertFails(dbFor(MINOR).doc('rooms/r-msg/messages/seeded').get());
   });
 
-  test('admin CAN read a message across cohorts', async () => {
+  test('ALLOW: admin CAN read a message across cohorts', async () => {
     await seedDoc('rooms/r-msg/messages/seeded', msg(ADULT));
     await assertSucceeds(dbFor(ADMIN).doc('rooms/r-msg/messages/seeded').get());
   });
 
-  test('the sender CAN edit own message', async () => {
+  test('ALLOW: the sender CAN edit own message', async () => {
     await seedDoc('rooms/r-msg/messages/seeded', msg(ADULT));
     await assertSucceeds(
       dbFor(ADULT).doc('rooms/r-msg/messages/seeded').update({ text: 'edited' }),
@@ -459,7 +456,7 @@ describe('rooms/{roomId}/messages — real rules engine', () => {
   // delete is the OTHER half of `allow update, delete: ... senderId` — a
   // distinct destructive verb (permanently removing message history), so it is
   // proven separately from update in every direction.
-  test('the sender CAN delete own message', async () => {
+  test('ALLOW: the sender CAN delete own message', async () => {
     await seedDoc('rooms/r-msg/messages/seeded', msg(ADULT));
     await assertSucceeds(dbFor(ADULT).doc('rooms/r-msg/messages/seeded').delete());
   });
@@ -502,12 +499,12 @@ describe('rooms/{roomId}/messages list (collection query)', () => {
     });
   });
 
-  test('a same-cohort participant CAN list all messages (no cohort filter needed)', async () => {
+  test('ALLOW: a same-cohort participant CAN list all messages (no cohort filter needed)', async () => {
     const snap = await assertSucceeds(dbFor(ADULT_2).collection('rooms/r-msg/messages').get());
     expect(snap.size).toBe(2);
   });
 
-  test('admin CAN list messages across cohorts (moderation bypass)', async () => {
+  test('ALLOW: admin CAN list messages across cohorts (moderation bypass)', async () => {
     const snap = await assertSucceeds(dbFor(ADMIN).collection('rooms/r-msg/messages').get());
     expect(snap.size).toBe(2);
   });
@@ -531,7 +528,7 @@ describe('rooms/{roomId}/seatRequests — real rules engine', () => {
     await seedRoom('r-seat', roomDoc(ADULT)); // owner = ADULT (50001), cohort adult
   });
 
-  test('a caller CAN file a seat request bound to their OWN uniqueId', async () => {
+  test('ALLOW: a caller CAN file a seat request bound to their OWN uniqueId', async () => {
     await assertSucceeds(
       dbFor(ADULT_2)
         .doc('rooms/r-seat/seatRequests/sr1')
@@ -558,7 +555,7 @@ describe('rooms/{roomId}/seatRequests — real rules engine', () => {
     );
   });
 
-  test('a same-cohort caller CAN read a seat request', async () => {
+  test('ALLOW: a same-cohort caller CAN read a seat request', async () => {
     await seedDoc('rooms/r-seat/seatRequests/seeded', { userId: String(ADULT_2.uniqueId) });
     await assertSucceeds(dbFor(ADULT_2).doc('rooms/r-seat/seatRequests/seeded').get());
   });
@@ -568,7 +565,7 @@ describe('rooms/{roomId}/seatRequests — real rules engine', () => {
     await assertFails(dbFor(MINOR).doc('rooms/r-seat/seatRequests/seeded').get());
   });
 
-  test('DENY (reverse direction): an adult cannot read a minor room’s seat request', async () => {
+  test('DENY: (reverse direction) an adult cannot read a minor room’s seat request', async () => {
     // OSA §17 segregation must hold in BOTH directions — the seatRequests read
     // rule mirrors the parent room cohort gate, so adult→minor is denied too.
     await seedRoom('r-seat-minor', roomDoc(MINOR));
@@ -576,19 +573,19 @@ describe('rooms/{roomId}/seatRequests — real rules engine', () => {
     await assertFails(dbFor(ADULT_2).doc('rooms/r-seat-minor/seatRequests/seeded').get());
   });
 
-  test('admin CAN read a seat request across cohorts (moderation bypass)', async () => {
+  test('ALLOW: admin CAN read a seat request across cohorts (moderation bypass)', async () => {
     await seedDoc('rooms/r-seat/seatRequests/seeded', { userId: String(ADULT_2.uniqueId) });
     await assertSucceeds(dbFor(ADMIN).doc('rooms/r-seat/seatRequests/seeded').get());
   });
 
-  test('the room owner CAN update a seat request (approve/deny)', async () => {
+  test('ALLOW: the room owner CAN update a seat request (approve/deny)', async () => {
     await seedDoc('rooms/r-seat/seatRequests/seeded', { userId: String(ADULT_2.uniqueId) });
     await assertSucceeds(
       dbFor(ADULT).doc('rooms/r-seat/seatRequests/seeded').update({ status: 'approved' }),
     );
   });
 
-  test('the requester CAN cancel their OWN seat request', async () => {
+  test('ALLOW: the requester CAN cancel their OWN seat request', async () => {
     await seedDoc('rooms/r-seat/seatRequests/seeded', { userId: String(ADULT_2.uniqueId) });
     await assertSucceeds(
       dbFor(ADULT_2).doc('rooms/r-seat/seatRequests/seeded').update({ status: 'cancelled' }),
@@ -663,24 +660,24 @@ describe('rooms list (collection query) — SHY-0102 contract', () => {
     await seedRoom('r-list-m1', roomDoc(MINOR, { state: 'ACTIVE' }));
   });
 
-  test('an adult member CAN list rooms when the query pins cohort==adult (the fix)', async () => {
+  test('ALLOW: an adult member CAN list rooms when the query pins cohort==adult (the fix)', async () => {
     const snap = await assertSucceeds(cohortRoomsQuery(dbFor(ADULT), 'adult'));
     // Only the adult rooms come back — the minor room is excluded by the filter.
     expect(snap.size).toBe(2);
   });
 
-  test('a minor member CAN list rooms when the query pins cohort==minor', async () => {
+  test('ALLOW: a minor member CAN list rooms when the query pins cohort==minor', async () => {
     const snap = await assertSucceeds(cohortRoomsQuery(dbFor(MINOR), 'minor'));
     expect(snap.size).toBe(1);
   });
 
-  test('an EMPTY cohort-pinned list returns empty, not PERMISSION_DENIED', async () => {
+  test('ALLOW: an EMPTY cohort-pinned list returns empty, not PERMISSION_DENIED', async () => {
     await testEnv.clearFirestore(); // zero rooms — a constrained list is still allowed
     const snap = await assertSucceeds(cohortRoomsQuery(dbFor(ADULT), 'adult'));
     expect(snap.size).toBe(0);
   });
 
-  test('SHY-0102 repro: the current state-only query (no cohort filter) is DENIED', async () => {
+  test('DENY: SHY-0102 repro: the current state-only query (no cohort filter) is DENIED', async () => {
     // This is exactly what the app sends today → the empty Rooms screen. The
     // rule is right to deny it (it cannot prove cohort segregation); the client
     // must add the cohort filter. Pinned so a regression that re-drops the
@@ -688,7 +685,7 @@ describe('rooms list (collection query) — SHY-0102 contract', () => {
     await assertFails(unfilteredRoomsQuery(dbFor(ADULT)));
   });
 
-  test('DENY (segregation): a minor pinning cohort==adult cannot list adult rooms', async () => {
+  test('DENY: (segregation) a minor pinning cohort==adult cannot list adult rooms', async () => {
     // The adversarial case the fix must NOT open: a repackaged minor client that
     // filters cohort==adult is still rejected — the rule needs the caller's
     // 'minor' claim to equal the room cohort, which 'adult' never will.

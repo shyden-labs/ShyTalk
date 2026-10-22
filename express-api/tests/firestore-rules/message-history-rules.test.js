@@ -14,8 +14,7 @@
  * `localhost:8080`): CI only.
  */
 
-const { readFileSync } = require('fs');
-const { join } = require('path');
+const { loadRules } = require('./_helpers/rules-source');
 const {
   initializeTestEnvironment,
   assertSucceeds,
@@ -23,7 +22,6 @@ const {
 } = require('@firebase/rules-unit-testing');
 const { firestoreHostPort, assertEmulatorReachable } = require('../helpers/firebase-emulator');
 
-const RULES_PATH = join(__dirname, '..', '..', '..', 'firestore.rules');
 const PROJECT_ID = `demo-shytalk-msg-history-rules-${process.env.JEST_WORKER_ID || '1'}`;
 
 // uniqueId is a NUMBER in the claim, as Express mints it.
@@ -57,7 +55,7 @@ beforeAll(async () => {
   const { host, port } = firestoreHostPort();
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { host, port, rules: readFileSync(RULES_PATH, 'utf8') },
+    firestore: { host, port, rules: loadRules() },
   });
 });
 
@@ -81,64 +79,64 @@ beforeEach(async () => {
 });
 
 describe('message text, edit and recall fields — server only', () => {
-  test('sender cannot change text directly', () =>
+  test('DENY: sender cannot change text directly', () =>
     assertFails(as(A).doc(M1).update({ text: 'bye' })));
-  test('sender cannot set isEdited directly', () =>
+  test('DENY: sender cannot set isEdited directly', () =>
     assertFails(as(A).doc(M1).update({ isEdited: true })));
-  test('sender cannot set editedAt directly', () =>
+  test('DENY: sender cannot set editedAt directly', () =>
     assertFails(as(A).doc(M1).update({ editedAt: 5 })));
-  test('sender cannot set editCount directly', () =>
+  test('DENY: sender cannot set editCount directly', () =>
     assertFails(as(A).doc(M1).update({ editCount: 9 })));
-  test('sender cannot recall directly', () =>
+  test('DENY: sender cannot recall directly', () =>
     assertFails(as(A).doc(M1).update({ isRecalled: true, text: '' })));
-  test('sender cannot delete a message', () => assertFails(as(A).doc(M1).delete()));
+  test('DENY: sender cannot delete a message', () => assertFails(as(A).doc(M1).delete()));
 });
 
 describe('edits history — server only, old entries still readable', () => {
-  test('sender cannot write an edits entry on own message', () =>
+  test('DENY: sender cannot write an edits entry on own message', () =>
     assertFails(as(A).doc(`${M1}/edits/e1`).set({ previousText: 'x', editedAt: 1 })));
-  test("participant cannot write an edits entry on another's message", () =>
+  test("DENY: participant cannot write an edits entry on another's message", () =>
     assertFails(as(B).doc(`${M1}/edits/e2`).set({ previousText: 'abuse', editedAt: 1 })));
-  test('ALLOW a participant reads an old-shape edits entry', async () => {
+  test('ALLOW: a participant reads an old-shape edits entry', async () => {
     await seed(`${M1}/edits/old1`, { previousText: 'v0', editedAt: 1 });
     await assertSucceeds(as(B).doc(`${M1}/edits/old1`).get());
   });
 });
 
 describe('recall record — admins read, nobody writes', () => {
-  test('participant cannot read the recall record', () =>
+  test('DENY: participant cannot read the recall record', () =>
     assertFails(as(B).doc(`${M1}/recall/record`).get()));
-  test('sender cannot read the recall record', () =>
+  test('DENY: sender cannot read the recall record', () =>
     assertFails(as(A).doc(`${M1}/recall/record`).get()));
-  test('ALLOW admin reads the recall record', () =>
+  test('ALLOW: admin reads the recall record', () =>
     assertSucceeds(as(ADMIN).doc(`${M1}/recall/record`).get()));
-  test('nobody can write the recall record', () =>
+  test('DENY: nobody can write the recall record', () =>
     assertFails(as(ADMIN).doc(`${M1}/recall/record`).set({ text: 'y' })));
 });
 
 describe('group admin hiding — own name only, text untouched', () => {
-  test('group admin cannot hide naming someone else', () =>
+  test('DENY: group admin cannot hide naming someone else', () =>
     assertFails(as(G).doc(M1).update({ isHidden: true, hiddenBy: '60002' })));
-  test('ALLOW group admin hides naming themself', () =>
+  test('ALLOW: group admin hides naming themself', () =>
     assertSucceeds(as(G).doc(M1).update({ isHidden: true, hiddenBy: '60003' })));
-  test('group admin cannot change text while hiding', () =>
+  test('DENY: group admin cannot change text while hiding', () =>
     assertFails(as(G).doc(M1).update({ isHidden: true, hiddenBy: '60003', text: 'x' })));
 });
 
 describe('reactions — participants only, nothing else changes', () => {
-  test('ALLOW a recipient reacts', () =>
+  test('ALLOW: a recipient reacts', () =>
     assertSucceeds(
       as(B)
         .doc(M1)
         .update({ reactions: { '👍': ['60002'] } }),
     ));
-  test('a reaction cannot carry a text change', () =>
+  test('DENY: a reaction cannot carry a text change', () =>
     assertFails(
       as(B)
         .doc(M1)
         .update({ reactions: { '👍': ['60002'] }, text: 'x' }),
     ));
-  test('an outsider cannot react', () =>
+  test('DENY: an outsider cannot react', () =>
     assertFails(
       as(OUT)
         .doc(M1)
@@ -148,7 +146,7 @@ describe('reactions — participants only, nothing else changes', () => {
   // The shapes both apps write: toggleReaction reads the map and writes the
   // whole map back, adding or removing the caller's id (Android
   // PrivateMessageRepositoryImpl, iOS IosPrivateMessageRepositoryImpl).
-  test('ALLOW a recipient reacts in a one-to-one chat', async () => {
+  test('ALLOW: a recipient reacts in a one-to-one chat', async () => {
     await seed('conversations/c2', { participantIds: ['60001', '60002'], isGroup: false });
     await seed('conversations/c2/messages/m2', { senderId: '60001', text: 'hi', type: 'TEXT' });
     await assertSucceeds(
@@ -157,13 +155,13 @@ describe('reactions — participants only, nothing else changes', () => {
         .update({ reactions: { '❤️': ['60002'] } }),
     );
   });
-  test('ALLOW the sender reacts to their own message', () =>
+  test('ALLOW: the sender reacts to their own message', () =>
     assertSucceeds(
       as(A)
         .doc(M1)
         .update({ reactions: { '😂': ['60001'] } }),
     ));
-  test("ALLOW a reaction is added beside someone else's", async () => {
+  test("ALLOW: a reaction is added beside someone else's", async () => {
     await seed(M1, {
       senderId: '60001',
       text: 'hello',
@@ -176,7 +174,7 @@ describe('reactions — participants only, nothing else changes', () => {
         .update({ reactions: { '👍': ['60001', '60002'] } }),
     );
   });
-  test('ALLOW a recipient removes their own reaction', async () => {
+  test('ALLOW: a recipient removes their own reaction', async () => {
     await seed(M1, {
       senderId: '60001',
       text: 'hello',
@@ -187,7 +185,7 @@ describe('reactions — participants only, nothing else changes', () => {
   });
   // Paired with "ALLOW a recipient reacts in a one-to-one chat": the same
   // seed but for `crossCohortAtMigration`, so this refusal is the flag's doing.
-  test('a reaction in a chat locked at the cohort migration is refused', async () => {
+  test('DENY: a reaction in a chat locked at the cohort migration is refused', async () => {
     await seed('conversations/c3', {
       participantIds: ['60001', '60002'],
       isGroup: false,
@@ -203,6 +201,6 @@ describe('reactions — participants only, nothing else changes', () => {
 });
 
 describe('mod_log — server only', () => {
-  test('group admin cannot write mod_log', () =>
+  test('DENY: group admin cannot write mod_log', () =>
     assertFails(as(G).doc('conversations/c1/mod_log/l1').set({ action: 'mute' })));
 });

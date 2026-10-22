@@ -21,8 +21,7 @@
  * `localhost:8080`). Start it with `bash local/start.sh`.
  */
 
-const { readFileSync } = require('fs');
-const { join } = require('path');
+const { loadRules } = require('./_helpers/rules-source');
 const {
   initializeTestEnvironment,
   assertSucceeds,
@@ -30,7 +29,6 @@ const {
 } = require('@firebase/rules-unit-testing');
 const { firestoreHostPort, assertEmulatorReachable } = require('../helpers/firebase-emulator');
 
-const RULES_PATH = join(__dirname, '..', '..', '..', 'firestore.rules');
 const PROJECT_ID = `demo-shytalk-conv-rules-${process.env.JEST_WORKER_ID || '1'}`;
 
 // ── Realistic JWT claim shapes (uniqueId is a NUMBER in the claim, as Express
@@ -116,7 +114,7 @@ beforeAll(async () => {
   const { host, port } = firestoreHostPort();
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { host, port, rules: readFileSync(RULES_PATH, 'utf8') },
+    firestore: { host, port, rules: loadRules() },
   });
 });
 
@@ -136,7 +134,7 @@ beforeEach(async () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('conversations/{id} get — real rules engine', () => {
-  test('a participant CAN get their own conversation', async () => {
+  test('ALLOW: a participant CAN get their own conversation', async () => {
     await seedConv('c-get-1', convDoc([ADULT, ADULT_2]));
     await assertSucceeds(dbFor(ADULT).doc('conversations/c-get-1').get());
   });
@@ -161,7 +159,7 @@ describe('conversations/{id} get — real rules engine', () => {
     await assertFails(dbFor(NO_CLAIMS).doc('conversations/c-get-5').get());
   });
 
-  test('a participant whose id is stored as a STRING is matched (numeric-claim vs string-data)', async () => {
+  test('ALLOW: a participant whose id is stored as a STRING is matched (numeric-claim vs string-data)', async () => {
     // The doc stores "50001" (string); the caller's claim uniqueId is 50001
     // (number). The rule `string(callerUniqueId()) in participantIds` bridges
     // them. This is the get-side mirror of the list bug.
@@ -175,7 +173,7 @@ describe('conversations/{id} get — real rules engine', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('conversations list (collection query) — SHY-0130 contract', () => {
-  test('a participant CAN list with a STRING array-contains query (the fix)', async () => {
+  test('ALLOW: a participant CAN list with a STRING array-contains query (the fix)', async () => {
     await seedConv('c-list-1', convDoc([ADULT, ADULT_2]));
     await seedConv('c-list-2', convDoc([ADULT, MINOR]));
     await assertSucceeds(listAsString(ADULT));
@@ -186,7 +184,7 @@ describe('conversations list (collection query) — SHY-0130 contract', () => {
     await assertFails(listAsLong(ADULT));
   });
 
-  test('an EMPTY result (participant has no threads) returns empty, not denied', async () => {
+  test('ALLOW: an EMPTY result (participant has no threads) returns empty, not denied', async () => {
     await testEnv.clearFirestore();
     await assertSucceeds(listAsString(ADULT));
   });
@@ -229,7 +227,7 @@ describe('conversations list (collection query) — SHY-0130 contract', () => {
 // writes must always stamp it). No rule change is possible (a rule cannot enforce a
 // field the query does not constrain).
 describe('conversations list — crossCohortAtMigration segregation (SHY-0132)', () => {
-  test('LEAK (pre-fix): an unconstrained list returns the migrated cross-cohort thread', async () => {
+  test('ALLOW: LEAK (pre-fix): an unconstrained list returns the migrated cross-cohort thread', async () => {
     // A normal thread (field present, false) + a migrated cross-cohort thread.
     await seedConv('cc-normal', convDoc([ADULT, ADULT_2], { crossCohortAtMigration: false }));
     await seedConv('cc-migrated', convDoc([ADULT, MINOR], { crossCohortAtMigration: true }));
@@ -241,7 +239,7 @@ describe('conversations list — crossCohortAtMigration segregation (SHY-0132)',
     expect(ids).toEqual(['cc-migrated', 'cc-normal']);
   });
 
-  test('FIX: list + where(crossCohortAtMigration == false) returns ONLY the non-migrated thread', async () => {
+  test('ALLOW: (fix) list + where(crossCohortAtMigration == false) returns ONLY the non-migrated thread', async () => {
     await seedConv('cc-normal', convDoc([ADULT, ADULT_2], { crossCohortAtMigration: false }));
     await seedConv('cc-migrated', convDoc([ADULT, MINOR], { crossCohortAtMigration: true }));
 
@@ -250,7 +248,7 @@ describe('conversations list — crossCohortAtMigration segregation (SHY-0132)',
     expect(ids).toEqual(['cc-normal']); // the migrated thread is excluded
   });
 
-  test('the == false filter EXCLUDES a doc with the field ABSENT (backfill is mandatory)', async () => {
+  test('ALLOW: the == false filter EXCLUDES a doc with the field ABSENT (backfill is mandatory)', async () => {
     // A legacy thread with NO crossCohortAtMigration field (pre-backfill).
     await seedConv('cc-legacy', convDoc([ADULT, ADULT_2])); // convDoc omits the field
     const before = await assertSucceeds(listWithCrossCohortFilter(ADULT));
@@ -267,7 +265,7 @@ describe('conversations list — crossCohortAtMigration segregation (SHY-0132)',
     expect(after.docs.map((d) => d.id)).toEqual(['cc-legacy']);
   });
 
-  test('a non-participant still cannot list another member’s threads via the filter', async () => {
+  test('DENY: a non-participant still cannot list another member’s threads via the filter', async () => {
     await seedConv('cc-normal', convDoc([ADULT, ADULT_2], { crossCohortAtMigration: false }));
     await assertFails(
       dbFor(OUTSIDER)

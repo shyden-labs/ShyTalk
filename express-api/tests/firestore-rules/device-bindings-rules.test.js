@@ -14,8 +14,7 @@
  * localhost:8080). Start it with `bash local/start.sh`.
  */
 
-const { readFileSync } = require('fs');
-const { join } = require('path');
+const { loadRules } = require('./_helpers/rules-source');
 const {
   initializeTestEnvironment,
   assertSucceeds,
@@ -23,7 +22,6 @@ const {
 } = require('@firebase/rules-unit-testing');
 const { firestoreHostPort, assertEmulatorReachable } = require('../helpers/firebase-emulator');
 
-const RULES_PATH = join(__dirname, '..', '..', '..', 'firestore.rules');
 const PROJECT_ID = `demo-shytalk-devbind-rules-${process.env.JEST_WORKER_ID || '1'}`;
 
 // uniqueId is a NUMBER in the claim (as Express mints it); the rule would
@@ -64,7 +62,7 @@ beforeAll(async () => {
   const { host, port } = firestoreHostPort();
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    firestore: { host, port, rules: readFileSync(RULES_PATH, 'utf8') },
+    firestore: { host, port, rules: loadRules() },
   });
 });
 
@@ -78,31 +76,31 @@ beforeEach(async () => {
 });
 
 describe('deviceBindings/{deviceId} — server-only, all client access denied (real rules engine)', () => {
-  test('the admin-bypass seed itself succeeds (sanity — the Admin SDK path still works)', async () => {
+  test('ALLOW: the admin-bypass seed itself succeeds (sanity — the Admin SDK path still works)', async () => {
     await assertSucceeds(seedBinding('d-sanity', OWNER.uniqueId));
   });
 
-  test('a signed-in user CANNOT read even their OWN device binding', async () => {
+  test('DENY: a signed-in user CANNOT read even their OWN device binding', async () => {
     await seedBinding('d-own', OWNER.uniqueId);
     await assertFails(dbFor(OWNER).doc('deviceBindings/d-own').get());
   });
 
-  test('a signed-in user CANNOT read ANOTHER user’s binding', async () => {
+  test('DENY: a signed-in user CANNOT read ANOTHER user’s binding', async () => {
     await seedBinding('d-other', OWNER.uniqueId);
     await assertFails(dbFor(OTHER).doc('deviceBindings/d-other').get());
   });
 
-  test('an ADMIN-claim client CANNOT read directly either (admin console uses the API)', async () => {
+  test('DENY: an ADMIN-claim client CANNOT read directly either (admin console uses the API)', async () => {
     await seedBinding('d-admin', OWNER.uniqueId);
     await assertFails(dbFor(ADMIN).doc('deviceBindings/d-admin').get());
   });
 
-  test('an anonymous caller CANNOT read', async () => {
+  test('DENY: an anonymous caller CANNOT read', async () => {
     await seedBinding('d-anon', OWNER.uniqueId);
     await assertFails(dbAnon().doc('deviceBindings/d-anon').get());
   });
 
-  test('a signed-in user CANNOT create a binding (bindDevice is server-only now)', async () => {
+  test('DENY: a signed-in user CANNOT create a binding (bindDevice is server-only now)', async () => {
     await assertFails(
       dbFor(OWNER)
         .doc('deviceBindings/d-create')
@@ -110,7 +108,7 @@ describe('deviceBindings/{deviceId} — server-only, all client access denied (r
     );
   });
 
-  test('a signed-in user CANNOT update an existing binding', async () => {
+  test('DENY: a signed-in user CANNOT update an existing binding', async () => {
     await seedBinding('d-update', OWNER.uniqueId);
     await assertFails(
       dbFor(OWNER)
@@ -119,7 +117,7 @@ describe('deviceBindings/{deviceId} — server-only, all client access denied (r
     );
   });
 
-  test('a signed-in user CANNOT delete a binding', async () => {
+  test('DENY: a signed-in user CANNOT delete a binding', async () => {
     await seedBinding('d-del', OWNER.uniqueId);
     await assertFails(dbFor(OWNER).doc('deviceBindings/d-del').delete());
   });

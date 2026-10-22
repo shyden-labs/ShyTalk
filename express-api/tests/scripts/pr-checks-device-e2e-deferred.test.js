@@ -136,7 +136,9 @@ function gateEvalScript() {
 // "regressed" script can exercise that tripwire directly. Returns the process
 // exit status. Uses pure string replace (no regex) to stay ReDoS-free, and
 // absolute `/bin/bash` to satisfy sonarjs/no-os-command-from-path + match the
-// runner's bash.
+// runner's bash. The one detect-changes output the gate reads,
+// `rules_changed` (SHY-0657), is substituted too, from `overrides.rules_changed`
+// (default 'false'); any other output still survives and trips the guard.
 function runGate(overrides = {}, source = gateEvalScript()) {
   let script = source;
   for (const job of RETAINED_GATE_JOBS) {
@@ -145,6 +147,9 @@ function runGate(overrides = {}, source = gateEvalScript()) {
       : 'success';
     script = script.split(`\${{ needs.${job}.result }}`).join(result);
   }
+  script = script
+    .split('${{ needs.detect-changes.outputs.rules_changed }}')
+    .join(overrides.rules_changed ?? 'false');
   if (script.includes('${{')) {
     throw new Error(`Unsubstituted expression remains in gate script:\n${script}`);
   }
@@ -255,6 +260,20 @@ describe('SHY-0163: device E2E deferred off the per-PR PR Gate', () => {
 
     test('a legitimately-skipped fast job among successes → gate passes (exit 0)', () => {
       expect(runGate({ sonarcloud: 'skipped', 'test-backend': 'skipped' })).toBe(0);
+    });
+
+    // SHY-0657 (Shyden, 2026-10-21): the rules red-first step is required
+    // through PR Gate, so a rules change needs test-backend to have succeeded.
+    test('firestore.rules changed and test-backend skipped → gate blocks (exit 1)', () => {
+      expect(runGate({ rules_changed: 'true', 'test-backend': 'skipped' })).toBe(1);
+    });
+
+    test('firestore.rules changed and test-backend succeeded → gate passes (exit 0)', () => {
+      expect(runGate({ rules_changed: 'true' })).toBe(0);
+    });
+
+    test('firestore.rules unchanged and test-backend skipped → gate passes (exit 0)', () => {
+      expect(runGate({ rules_changed: 'false', 'test-backend': 'skipped' })).toBe(0);
     });
 
     test('re-adding a device job to the gate is CAUGHT — its placeholder survives substitution and the harness throws (deferral regression tripwire)', () => {

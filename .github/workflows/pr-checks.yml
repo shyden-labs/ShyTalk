@@ -70,6 +70,9 @@ jobs:
       qa_runner_drivers_changed: ${{ steps.changes.outputs.qa_runner_drivers_changed }}
       scripts_changed: ${{ steps.changes.outputs.scripts_changed }}
       backend_tests_changed: ${{ steps.changes.outputs.backend_tests_changed }}
+      # SHY-0657: firestore.rules itself changed, so PR Gate requires test-backend
+      # (and its rules red-first step) to succeed.
+      rules_changed: ${{ steps.changes.outputs.rules_changed }}
       workflow_only: ${{ steps.changes.outputs.workflow_only }}
       skip_android_e2e: ${{ steps.changes.outputs.skip_android_e2e }}
       skip_ios_e2e: ${{ steps.changes.outputs.skip_ios_e2e }}
@@ -94,9 +97,11 @@ jobs:
           # retained for lint/sonarcloud/integration-tests which
           # cover both platforms; only the heavy build/E2E jobs
           # gate on the granular ANDROID_APP / IOS_APP flags.
-          ANDROID_APP=false IOS_APP=false APP=false BACKEND=false WEB=false INTEGRATION=false QA_RUNNER_DRIVERS=false SCRIPTS=false OTHER=false BACKEND_TESTS=false
+          ANDROID_APP=false IOS_APP=false APP=false BACKEND=false WEB=false INTEGRATION=false QA_RUNNER_DRIVERS=false SCRIPTS=false OTHER=false BACKEND_TESTS=false RULES=false
           while IFS= read -r file; do
             [ -z "$file" ] && continue
+            # Its own flag, set before the first-match case below can take the file.
+            [ "$file" = "firestore.rules" ] && RULES=true
             case "$file" in
               # Auto-bumped on every commit by .husky/pre-commit (regenerates
               # the lastUpdated date from .project/plans/...-roadmap.md). The
@@ -250,10 +255,10 @@ jobs:
             APP=true; ANDROID_APP=true; IOS_APP=true; WEB=true; INTEGRATION=true
             SKIP_ANDROID_E2E=false; SKIP_IOS_E2E=false
           fi
-          for v in app_changed=$APP android_app_changed=$ANDROID_APP ios_app_changed=$IOS_APP backend_changed=$BACKEND web_changed=$WEB integration_changed=$INTEGRATION qa_runner_drivers_changed=$QA_RUNNER_DRIVERS scripts_changed=$SCRIPTS backend_tests_changed=$BACKEND_TESTS workflow_only=$WORKFLOW_ONLY skip_android_e2e=$SKIP_ANDROID_E2E skip_ios_e2e=$SKIP_IOS_E2E; do
+          for v in app_changed=$APP android_app_changed=$ANDROID_APP ios_app_changed=$IOS_APP backend_changed=$BACKEND web_changed=$WEB integration_changed=$INTEGRATION qa_runner_drivers_changed=$QA_RUNNER_DRIVERS scripts_changed=$SCRIPTS backend_tests_changed=$BACKEND_TESTS rules_changed=$RULES workflow_only=$WORKFLOW_ONLY skip_android_e2e=$SKIP_ANDROID_E2E skip_ios_e2e=$SKIP_IOS_E2E; do
             echo "$v" >> "$GITHUB_OUTPUT"
           done
-          echo "Detection results: app=$APP android_app=$ANDROID_APP ios_app=$IOS_APP backend=$BACKEND web=$WEB integration=$INTEGRATION qa_runner_drivers=$QA_RUNNER_DRIVERS scripts=$SCRIPTS workflow_only=$WORKFLOW_ONLY skip_android_e2e=$SKIP_ANDROID_E2E skip_ios_e2e=$SKIP_IOS_E2E"
+          echo "Detection results: app=$APP android_app=$ANDROID_APP ios_app=$IOS_APP backend=$BACKEND web=$WEB integration=$INTEGRATION qa_runner_drivers=$QA_RUNNER_DRIVERS scripts=$SCRIPTS rules=$RULES workflow_only=$WORKFLOW_ONLY skip_android_e2e=$SKIP_ANDROID_E2E skip_ios_e2e=$SKIP_IOS_E2E"
 
   lint:
     needs: [detect-changes]
@@ -510,6 +515,8 @@ jobs:
     uses: ./.github/workflows/test-backend.yml
     with:
       ref: ${{ github.event.pull_request.head.sha }}
+      # SHY-0657: the rules red-first step runs the PR's new DENY tests on these rules.
+      base_sha: ${{ github.event.pull_request.base.sha }}
       report_env: pr
     secrets: inherit
 
@@ -713,4 +720,12 @@ jobs:
               exit 1
             fi
           done
+
+          # SHY-0657 (Shyden, 2026-10-21): the rules red-first step is required
+          # through this gate, so a rules change cannot pass with test-backend
+          # skipped, as the loop above allows for other changes.
+          if [ "${{ needs.detect-changes.outputs.rules_changed }}" = "true" ] && [ "${{ needs.test-backend.result }}" != "success" ]; then
+            echo "firestore.rules changed, so test-backend (rules red-first) must succeed: ${{ needs.test-backend.result }}"
+            exit 1
+          fi
           echo "All checks passed or were correctly skipped"

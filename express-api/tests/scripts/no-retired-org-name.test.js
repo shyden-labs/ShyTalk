@@ -121,8 +121,16 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 2037 -> 2038: shared/.../core/util/FirebaseCallLoggingTest.kt (SHY-0648).
 // 2038 -> 2041: .github/actions/apk-holds-no-persona-password/action.yml,
 // scripts/ci/apk-persona-check.js and two tests added, one test removed
-// (SHY-0662).
-const FILES_READ_FLOOR = 2041;
+// (SHY-0662). 2041 -> 2052: scripts/rules-red-first.js, the two
+// tests/firestore-rules/_helpers files, red-first-fixtures.json and seven
+// tests/scripts files (rules-source, rules-test-names and rules-red-first
+// unit tests; the load-from-one-place, named-by-assertion,
+// fixtures-never-deployed and pr-checks-rules-red-first guards) (SHY-0657).
+// 2052 -> 2053: tests/scripts/rules-library-taken-in-one-form.test.js (SHY-0657).
+// 2053 -> 2056: tests/firestore-rules/_helpers/red-first-refusal.js, red-first-setup.js and
+// tests/scripts/red-first-refusal.unit.test.js (SHY-0657). 2056 -> 2057:
+// tests/scripts/red-first-setup.test.js (SHY-0657).
+const FILES_READ_FLOOR = 2057;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
