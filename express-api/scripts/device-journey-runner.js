@@ -2356,6 +2356,10 @@ async function restoreSession(email) {
 // Get to the SignIn screen regardless of where the app currently sits. A
 // signed-in relaunch lands on Home, so settle to a stable anchor first, then
 // sign out if we're signed in.
+//
+// Returns which way it got there (SHY-0702). The first sign-out's failure
+// used to be thrown away when the restart rescued the run, so a fallback read
+// as a clean sign-out in the report; now the step detail names it.
 async function ensureAtSignIn(device, pkg) {
   // The first settle is allowed to FAIL. The app may have been left on any
   // screen at all by a previous run -- a half-filled support form, a dialog, a
@@ -2364,6 +2368,7 @@ async function ensureAtSignIn(device, pkg) {
   // could only ever recover from the states it had already expected. A journey
   // that cannot start from an unknown screen is a journey nobody can re-run.
   let nodes;
+  let before;
   try {
     // 20s, deliberately. Shortening this to 8s was tried on 2026-08-24 and made
     // the matrix WORSE -- 544s to 1019s -- because it gives up on a screen that
@@ -2371,19 +2376,21 @@ async function ensureAtSignIn(device, pkg) {
     // is far more expensive than waiting. Two journeys went from 37s and 96s to
     // 301s and 367s on that change alone.
     nodes = await settle(device, 20000);
-  } catch (_e) {
+  } catch (e) {
     nodes = null;
+    before = `no SignIn or Home on screen (${e.message})`;
   }
-  if (nodes && atSignIn(nodes)) return;
+  if (nodes && atSignIn(nodes)) return 'already at SignIn';
   if (nodes && anyMainTab(nodes)) {
     try {
       await signOutFlow(device);
-      return;
-    } catch (_e) {
+      return 'signed out from Home';
+    } catch (e) {
       // Falls through to the restart below rather than failing the journey.
       // This function's whole job is to ARRIVE at SignIn, and it has a stronger
       // way of doing that a few lines down; refusing to use it because the
       // polite route was slow is how a timeout became a red journey.
+      before = `sign-out from Home failed (${e.message})`;
     }
   }
   await device.forceStop(pkg);
@@ -2393,18 +2400,100 @@ async function ensureAtSignIn(device, pkg) {
   await device.launch(pkg);
   await sleep(1500);
   nodes = await settle(device, 45000);
-  if (atSignIn(nodes)) return;
-  if (anyMainTab(nodes)) await signOutFlow(device);
+  if (atSignIn(nodes)) return `${before}; restarted the app; already at SignIn`;
+  // settle() returns only SignIn or Home, so this is Home.
+  try {
+    await signOutFlow(device);
+  } catch (e) {
+    throw new Error(`${before}; restarted the app; then the sign-out failed: ${e.message}`, {
+      cause: e,
+    });
+  }
+  return `${before}; restarted the app; signed out from Home`;
 }
 
-// Profile tab -> settings -> sign out -> confirm -> back at SignIn.
+/** A target still on screen after a tap is not tapped again sooner than this. */
+const RETAP_AFTER_MS = 3000;
+
+/**
+ * Tap #id until `arrived(nodes)` holds, clearing overlays on every read
+ * (SHY-0702), in the drive-forward idiom of `advanceUntil`.
+ *
+ * The daily-reward sheet is presented a moment AFTER Home renders (SHY-0527),
+ * so it can arrive between any two reads or under a tap. A tap that lands as it
+ * arrives does nothing (Android sends it to the sheet; on the iPhone the
+ * covered element goes inaccessible mid-click): the sheet is dismissed and,
+ * the screen not having moved, the target is tapped again. Never sooner than
+ * RETAP_AFTER_MS after the last tap, so a screen that is merely slow to come
+ * is not tapped twice. Fails at the deadline naming everything it saw.
+ */
+async function tapUntilArrived(device, id, arrived, label, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  const cleared = [];
+  let last = [];
+  let taps = 0;
+  let lastTapAt = -Infinity;
+  let tapError = null;
+  while (Date.now() < deadline) {
+    const tick = Date.now();
+    const nodes = await dump(device);
+    const what = await clearOverlays(device, nodes, tick);
+    if (what) {
+      cleared.push(what);
+      continue;
+    }
+    if (arrived(nodes)) return nodes;
+    last = summarizeScreen(nodes).testTags;
+    const target = byId(nodes, id);
+    if (target && Date.now() - lastTapAt >= RETAP_AFTER_MS) {
+      lastTapAt = Date.now();
+      taps += 1;
+      try {
+        await tapResolved(device, target, { label: `#${id}`, nodes });
+        tapError = null;
+      } catch (e) {
+        // The element went away under the tap; the next read says what is there.
+        tapError = e.message;
+      }
+    }
+    await pollGap(tick, device);
+  }
+  throw new Error(
+    `${label} not reached within ${timeoutMs}ms after ${taps} tap${taps === 1 ? '' : 's'} on #${id}; ` +
+      `screen showed: ${last.join(', ') || '(none)'}` +
+      (cleared.length ? `; dismissed first: ${cleared.join(', ')}` : '') +
+      (tapError ? `; last tap failed: ${tapError}` : ''),
+  );
+}
+
+const signOutConfirmShown = (nodes) => !!byTextContains(nodes, 'Are you sure you want to sign out');
+
+// Profile tab -> settings -> sign out -> confirm -> back at SignIn. Each tap
+// is driven until the next screen is there (SHY-0702): tapping straight
+// through sent taps to a reward sheet that slid up mid-flow, measured on both
+// phones after J08, 2026-10-23.
 async function signOutFlow(device) {
-  await tapId(device, 'main_profileTab');
-  await waitForId(device, 'main_settingsButton', 6000);
-  await tapId(device, 'main_settingsButton');
-  await waitForId(device, 'settings_signOutButton', 6000);
-  await tapId(device, 'settings_signOutButton');
-  await waitForText(device, 'Are you sure you want to sign out', 6000);
+  await tapUntilArrived(
+    device,
+    'main_profileTab',
+    (n) => !!byId(n, 'main_settingsButton'),
+    'the profile',
+    20000,
+  );
+  await tapUntilArrived(
+    device,
+    'main_settingsButton',
+    (n) => !!byId(n, 'settings_signOutButton'),
+    'the settings',
+    10000,
+  );
+  await tapUntilArrived(
+    device,
+    'settings_signOutButton',
+    signOutConfirmShown,
+    'the sign-out confirmation',
+    10000,
+  );
   await tapLowestText(device, 'Sign Out');
   // 12s -> 45s. Signing out is a network round trip and a navigation, and on
   // the iPhone it routinely takes longer than twelve seconds. The symptom was
@@ -2911,8 +3000,8 @@ async function signInAs(device, reporter, ctx, email, { expectHome = true } = {}
     device,
     `Reach SignIn (for ${email})`,
     async () => {
-      await ensureAtSignIn(device, ctx.pkg);
-      return 'at SignIn (persona picker available)';
+      const how = await ensureAtSignIn(device, ctx.pkg);
+      return `at SignIn (persona picker available): ${how}`;
     },
     { preamble: true },
   );
@@ -5788,6 +5877,10 @@ module.exports = {
   // shared overlay pass, and the handler that closes the sheet by tag.
   confirmAccountOnDevice,
   clearOverlays,
+  // SHY-0702: the sign-out flow and its overlay-clearing wait.
+  signOutFlow,
+  tapUntilArrived,
+  ensureAtSignIn,
   handleRewardCalendar,
   REWARD_SHEET_BUTTON_IDS,
   watchForText,

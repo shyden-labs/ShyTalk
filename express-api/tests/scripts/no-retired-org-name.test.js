@@ -126,7 +126,8 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 2044 -> 2048: express-api/scripts/lib/firestore-as-person.js, its test,
 // tests/scripts/device-journey-wait-for-id-gone.test.js and
 // shared/.../feature/messaging/ReactionTagsTest.kt (SHY-0645).
-const FILES_READ_FLOOR = 2048;
+// 2048 -> 2049: tests/scripts/device-journey-signout-overlays.unit.test.js (SHY-0702).
+const FILES_READ_FLOOR = 2049;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];
