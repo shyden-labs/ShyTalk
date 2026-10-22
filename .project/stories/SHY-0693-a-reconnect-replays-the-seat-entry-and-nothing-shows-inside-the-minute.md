@@ -59,8 +59,12 @@ says (SHY-0692).
       (`VOICE_DISCONNECT_GRACE_PERIOD_MS` retired); it re-joins voice and
       restores its mic state from the server on reconnect.
 
-- [ ] Closing the app (swiped away, killed, phone restarted) never sends a
-      Leave or leave-seat; only the Leave and Close buttons do.
+- [ ] Swiping the app away (backgrounded, killed from the app switcher,
+      phone restarted) never sends a leave: it is a drop. Only an active
+      quit sends one: the Quit button, the Close button, or closing the
+      chat-head (Android, when enabled; today's leave confirmation stays).
+- [ ] After an active quit, reopening the app never takes the user back in
+      (SHY-0692 answers "no seat"); they rejoin only by choosing the room.
 - [ ] Opening the app again while the server still holds a seat for the
       user (SHY-0692's start-up answer) takes them straight into that room
       and onto that seat, no taps, with the entry animation and the

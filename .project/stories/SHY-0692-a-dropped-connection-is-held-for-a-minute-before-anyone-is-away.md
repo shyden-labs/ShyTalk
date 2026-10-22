@@ -49,7 +49,12 @@ Shyden: _"this also needs to work in case of the user accidently closing the
 app and rejoining the room. they should just reconnect as they originally
 were. the only time they wouldn't is if they've already been removed from
 the seat (after the grace period)"_; reopening the app takes them straight
-back in (his choice). Per
+back in (his choice). And: _"if the person swipes away to leave, they
+haven't actually left. it moves to the background. but they they actively
+choose to quit, by choosing the quit button. pressing the close button or
+closing the chat-head (if enabled) then they're not away, they have actively
+quit and should not be automatically rejoined. Also if they join another
+room they're automatically cancelled from the any other room"_; and the room-switch rules (another room, the owner's warning) are SHY-0696. Per
 "app draws, server decides" (2026-10-20), the server times and stores the
 minute and every decision after it; the apps only draw (SHY-0693).
 
@@ -79,6 +84,12 @@ minute and every decision after it; the apps only draw (SHY-0693).
       rejoin counts as a reconnect (record cleared, grace ended, owner's
       room back to `ACTIVE`), never as a new join. Once removed, the answer
       is "no seat" and a rejoin is an ordinary join.
+- [ ] An active quit (the app's Quit button, Close button, or closing the
+      chat-head) is a leave, at once: no minute, no grace beyond today's
+      leave rules (member: off the seat and out of the room; owner with
+      others seated: `OWNER_AWAY`; owner alone: the room closes), any
+      pending drop record cleared, and the start-up answer is "no seat", so
+      the app never rejoins them by itself.
 - [ ] The server, not any app, decides every step: no app removes a member,
       sets a room away or closes it on a connection signal. The routes the
       apps call today for that refuse it (or are retired), with tests.
@@ -97,7 +108,12 @@ minute and every decision after it; the apps only draw (SHY-0693).
 - [ ] Each fresh drop after a reconnect starts a fresh minute.
 - [ ] Two devices: the user counts as dropped only when no device holds the
       connection (today's `isUserPresent` re-check).
-- [ ] Pressing Leave or Close is still instant (no minute).
+- [ ] Swiping the app away (backgrounded or killed from the app switcher)
+      is a drop, never a quit: the minute applies.
+- [ ] An active quit during the minute or the grace ends it as a quit (the
+      deadline does nothing afterwards).
+- [ ] Joining another room during the minute or the grace is SHY-0696's
+      switch: the old room's record and deadline are cleared by it.
 - [ ] A member who drops while not on a seat changes nothing (as today).
 - [ ] A room closed by any other path during the minute: the deadline does
       nothing.
