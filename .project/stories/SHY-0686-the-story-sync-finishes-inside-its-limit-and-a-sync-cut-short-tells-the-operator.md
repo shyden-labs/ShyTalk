@@ -168,3 +168,9 @@ None: operator tooling.
   token check, the daily full pass) and #2536 (the time report). The
   measured cost is map_lookup's per-story jq over the whole items map, not
   story parsing, and it is filed as SHY-0689.
+- **2026-10-22**: correction found after Done (side agent; Shyden: _"it
+  should queue instead"_). The two-push AC holds, but with THREE pushes
+  GitHub's default `queue: single` cancels the waiting run, so the middle
+  push's edits wait for the daily full pass. Its proof never tried three,
+  and a run cancelled while pending fires no alert. Filed as SHY-0691
+  (P0): `queue: max`, and each push syncs from the last completed sync.

@@ -534,6 +534,7 @@ fun PrivateMessageBubble(
                 ReactionBadges(
                     reactions = message.reactions,
                     currentUserId = currentUserId,
+                    messageId = message.messageId,
                     onToggleReaction = onToggleReaction,
                 )
             }
@@ -569,6 +570,13 @@ fun PrivateMessageBubble(
                             showContextMenu = false
                             showReactionPicker = !showReactionPicker
                         },
+                        // SHY-0645: a DropdownMenu is its own Compose window,
+                        // so the tag needs exposeTestTagsToPlatformDumps (as
+                        // the report item below says).
+                        modifier =
+                            Modifier
+                                .exposeTestTagsToPlatformDumps()
+                                .testTag(REACT_MENU_ITEM_TAG),
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(Res.string.reply)) },

@@ -22,7 +22,13 @@ const path = require('node:path');
 
 const REPO_ROOT = path.join(__dirname, '..', '..', '..');
 const RUNNER = path.join(REPO_ROOT, 'express-api', 'scripts', 'device-journey-runner.js');
-const { resolveTargetApi, TARGETS, devFirebaseKey, DEV_GOOGLE_SERVICES } = require(RUNNER);
+const {
+  resolveTargetApi,
+  TARGETS,
+  devFirebaseKey,
+  devFirebaseProjectId,
+  DEV_GOOGLE_SERVICES,
+} = require(RUNNER);
 
 /**
  * A stand-in key, so the dev tests do not depend on a gitignored file.
@@ -34,9 +40,13 @@ const { resolveTargetApi, TARGETS, devFirebaseKey, DEV_GOOGLE_SERVICES } = requi
  * story is about, committed by its own test.
  */
 const FAKE_KEY = 'AIzaTestKeyNotARealCredential';
+// SHY-0645: the project id has the same two sources as the key, so the
+// stand-in carries one for the same reason.
+const FAKE_PROJECT = 'shytalk-test-project-not-real';
 const devEnv = (extra = {}) => ({
   PERSONAS_PASSWORD: 'x',
   DEV_FIREBASE_API_KEY: FAKE_KEY,
+  DEV_FIREBASE_PROJECT_ID: FAKE_PROJECT,
   ...extra,
 });
 
@@ -211,5 +221,47 @@ describe('the dev key has two sources, and neither is a silent default', () => {
       expect(() => devFirebaseKey({})).toThrow(/DEV_FIREBASE_API_KEY/);
       expect(() => devFirebaseKey({})).toThrow(/google-services\.json/);
     }
+  });
+});
+
+describe('the Firestore REST address follows the target (SHY-0645)', () => {
+  test('local writes to the emulator project the stack starts', () => {
+    expect(resolveTargetApi('local', {}).firestoreDocumentsUrl).toBe(
+      'http://localhost:8080/v1/projects/demo-shytalk/databases/(default)/documents',
+    );
+  });
+  test('dev writes to the project named by DEV_FIREBASE_PROJECT_ID', () => {
+    const env = {
+      PERSONAS_PASSWORD: 'pw',
+      DEV_FIREBASE_API_KEY: 'k',
+      DEV_FIREBASE_PROJECT_ID: 'proj-x',
+    };
+    expect(resolveTargetApi('dev', env).firestoreDocumentsUrl).toBe(
+      'https://firestore.googleapis.com/v1/projects/proj-x/databases/(default)/documents',
+    );
+  });
+  test('the environment value is trimmed', () => {
+    expect(devFirebaseProjectId({ DEV_FIREBASE_PROJECT_ID: ' proj-y ' }, () => null)).toBe(
+      'proj-y',
+    );
+  });
+  test('a blank environment value falls back to the APK config', () => {
+    const services = { project_info: { project_id: 'proj-file' } };
+    expect(devFirebaseProjectId({ DEV_FIREBASE_PROJECT_ID: '  ' }, () => services)).toBe(
+      'proj-file',
+    );
+  });
+  test('with neither source it refuses, naming both', () => {
+    expect(() => devFirebaseProjectId({}, () => null)).toThrow(
+      /No dev Firebase project id\. Set DEV_FIREBASE_PROJECT_ID, or provide .*google-services\.json/,
+    );
+  });
+  test('a config without project_info.project_id is refused by name', () => {
+    expect(() => devFirebaseProjectId({}, () => ({ client: [] }))).toThrow(
+      'Could not read the dev Firebase project id from',
+    );
+  });
+  test('the description names the Firestore host', () => {
+    expect(resolveTargetApi('local', {}).describe).toContain('fs=localhost:8080');
   });
 });

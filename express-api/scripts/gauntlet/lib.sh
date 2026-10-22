@@ -6,7 +6,8 @@
 #   GAUNTLET_TMP   run artifacts root (default /tmp/shytalk-gauntlet)
 
 # Scripts live at express-api/scripts/gauntlet/ → repo root is three dirs up.
-REPO="${SHYTALK_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
+# `CDPATH=`: sourced by a relative path, cd would otherwise search CDPATH first.
+REPO="${SHYTALK_REPO:-$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 GAUNTLET_TMP="${GAUNTLET_TMP:-/tmp/shytalk-gauntlet}"
 
 # TCP ports the local stack owns (same list as local/start.sh step 0).
@@ -58,7 +59,20 @@ kill_port() {
   ok "freed :$port (${label})"
 }
 
-require_repo() { [ -d "$REPO/.git" ] || die "repo not found at $REPO (set SHYTALK_REPO)"; }
+# A repository's top level, asked of git: a worktree's .git is a file, so a
+# `[ -d .git ]` test refused every worktree. A folder inside a repository is not
+# its top level and is still refused (physical paths compared: /var vs /private/var).
+# `CDPATH= cd --`: git ignores CDPATH and options, so cd must too, or a relative
+# name reaches another folder (and cd prints it into the result).
+require_repo() {
+  local top here
+  top="$(git -C "$REPO" rev-parse --show-toplevel 2>/dev/null)" || top=""
+  here="$(CDPATH='' cd -- "$REPO" 2>/dev/null && pwd -P)" || here=""
+  [ -n "$top" ] && [ "$top" = "$here" ] || die "repo not found at $REPO (set SHYTALK_REPO)"
+  # Absolute from here on: every command later runs `cd "$REPO"`, which a relative
+  # name would expose to CDPATH again.
+  REPO="$top"
+}
 
 # docker_ready — true when the Docker daemon answers.
 docker_ready() { docker info >/dev/null 2>&1; }

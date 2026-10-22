@@ -68,6 +68,13 @@ const {
   ANDROID_SOURCE_UNAVAILABLE,
 } = require('./drivers/android-source-session');
 const { createRecorder } = require('./drivers/journey-screen-recorder');
+const {
+  firestoreAsPerson,
+  reactAs,
+  createGroupAs,
+  canonicalReactions,
+  waitForStored,
+} = require('./lib/firestore-as-person');
 
 // --------------------------------------------------------------------------
 // Repo / target configuration
@@ -189,6 +196,34 @@ function devFirebaseKey(env = process.env) {
   return key;
 }
 
+/** The dev APK's google-services.json, parsed, or null when this machine has none. */
+function readDevGoogleServices() {
+  if (!fs.existsSync(DEV_GOOGLE_SERVICES)) return null;
+  return JSON.parse(fs.readFileSync(DEV_GOOGLE_SERVICES, 'utf8'));
+}
+
+/**
+ * The dev Firebase project id (SHY-0645: the reaction journey writes
+ * Firestore over REST as each persona). Same two sources as the key, in the
+ * same order, and no default: `DEV_FIREBASE_PROJECT_ID`, then the file the
+ * dev APK is built from.
+ */
+function devFirebaseProjectId(env = process.env, readServices = readDevGoogleServices) {
+  const fromEnv = env.DEV_FIREBASE_PROJECT_ID;
+  if (fromEnv && fromEnv.trim()) return fromEnv.trim();
+  const services = readServices();
+  if (!services) {
+    throw new Error(
+      `No dev Firebase project id. Set DEV_FIREBASE_PROJECT_ID, or provide ${DEV_GOOGLE_SERVICES} ` +
+        '(gitignored; written from a secret, and present wherever the dev APK can be built).',
+    );
+  }
+  const id = services?.project_info?.project_id;
+  if (!id)
+    throw new Error(`Could not read the dev Firebase project id from ${DEV_GOOGLE_SERVICES}`);
+  return id;
+}
+
 /** Where the operator's dev persona password is kept, per provision-test-personas.js. */
 const DEV_CREDENTIALS_FILE = '~/.shytalk/dev-personas-credentials';
 
@@ -219,6 +254,11 @@ const TARGETS = {
     // what makes these tokens worth asserting with.
     authUrl:
       'http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo',
+    // SHY-0645: the people not on the phone write Firestore over REST as
+    // themselves. 8080 is the emulator the stack starts, `demo-shytalk` its
+    // project; the runner runs on the Mac, so no tunnel is involved.
+    firestoreDocumentsUrl:
+      'http://localhost:8080/v1/projects/demo-shytalk/databases/(default)/documents',
     // Seeded by scripts/seed-personas-local.js, which fixes it.
     password: { kind: 'fixed', value: 'localdev123' },
   },
@@ -236,6 +276,10 @@ const TARGETS = {
     // getter has no way to be told which environment is meant.
     authUrlFor(env) {
       return `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${devFirebaseKey(env)}`;
+    },
+    // SHY-0645: a function for the same reason as authUrlFor.
+    firestoreDocumentsUrlFor(env) {
+      return `https://firestore.googleapis.com/v1/projects/${devFirebaseProjectId(env)}/databases/(default)/documents`;
     },
     // Generated per-environment by provision-test-personas.js. There is no
     // default, and that is the point: a dev run without it must refuse rather
@@ -810,8 +854,14 @@ class Reporter {
 
   // Wrap a unit of work: time it, capture a screenshot + screen summary,
   // record pass/fail. On failure it throws so the journey aborts cleanly.
-  async step(device, name, fn, { preamble = false } = {}) {
-    const rec = { name, status: 'running', startedAt: Date.now(), preamble };
+  //
+  // `check: true` marks an independent check (SHY-0645): its failure is
+  // recorded and the journey carries on, so an earlier red can never hide a
+  // later check; `assertNoFailedChecks` then fails the journey naming every
+  // failed one. A red-first run that stopped at its first failure proved one
+  // of J28R's three recipient writes and none of the rest (2026-10-22).
+  async step(device, name, fn, { preamble = false, check = false } = {}) {
+    const rec = { name, status: 'running', startedAt: Date.now(), preamble, check };
     // Snapshot the counter so this step is credited only with what IT did.
     const uiOpsBefore = uiOps.count;
     const overlaysBefore = overlays.cleared.length;
@@ -866,10 +916,10 @@ class Reporter {
       if (rec.screen)
         console.log(`     on-screen testTags: ${rec.screen.testTags.join(', ') || '(none)'}`);
     } else {
-      console.log(`✗ ${rec.detail}`);
+      console.log(`✗ ${check ? '(check; the journey carries on) ' : ''}${rec.detail}`);
       if (rec.screen)
         console.log(`     on-screen testTags: ${rec.screen.testTags.join(', ') || '(none)'}`);
-      throw caught;
+      if (!check) throw caught;
     }
   }
 
@@ -991,6 +1041,51 @@ const overlays = { cleared: [] };
 
 /** The kinds a journey may declare. Closed set: an unknown kind is a bug. */
 const JOURNEY_KINDS = Object.freeze(['ui', 'api-contract']);
+
+/**
+ * Every failed independent check (SHY-0645) with its reason, in run order, or
+ * null when none failed. A failed plain step is not a check.
+ */
+function failedChecksSummary(journeyId, steps) {
+  const failed = (steps ?? []).filter((st) => st.check && st.status === 'fail');
+  if (failed.length === 0) return null;
+  const noun = failed.length === 1 ? 'check' : 'checks';
+  return (
+    `${journeyId}: ${failed.length} ${noun} failed: ` +
+    failed.map((st) => `${st.name} (${st.detail})`).join('; ')
+  );
+}
+
+/** Fail a journey whose independent checks did not all pass, naming each. */
+function assertNoFailedChecks(journeyId, steps) {
+  const summary = failedChecksSummary(journeyId, steps);
+  if (summary) throw new Error(summary);
+}
+
+/**
+ * Run one journey and record its verdict. Exported so the verdict's wiring is
+ * tested by behaviour, not by a source match a definition would also satisfy.
+ */
+async function runOneJourney(j, device, reporter, ctx) {
+  reporter.startJourney(j.id, j.title);
+  let checksJudged = false;
+  try {
+    await j.run(device, reporter, ctx);
+    // Every independent check is judged before anything else (SHY-0645).
+    checksJudged = true;
+    assertNoFailedChecks(j.id, reporter.current?.steps ?? []);
+    // Checked AFTER the journey's own assertions and before it is called a
+    // pass: every step can be true and the run still prove nothing about
+    // the product if the phone was never touched (SHY-0457).
+    assertJourneyTouchedTheUi({ ...j, steps: reporter.current?.steps ?? [] });
+    reporter.endJourney('pass');
+  } catch (e) {
+    // A plain step that stops the journey after failed checks must not hide
+    // them: the reason names both (SHY-0645).
+    const checks = checksJudged ? null : failedChecksSummary(j.id, reporter.current?.steps ?? []);
+    reporter.endJourney('fail', checks ? `${e.message}; and ${checks}` : e.message);
+  }
+}
 
 /**
  * Did this journey actually use the product?
@@ -1569,6 +1664,30 @@ async function waitForId(device, id, timeoutMs = 8000) {
   }
   throw new Error(
     `timed out (${timeoutMs}ms) waiting for #${id}; screen showed: ${last.join(', ') || '(none)'}`,
+  );
+}
+
+/**
+ * Wait until #id has LEFT the screen, judged only on a dump that still shows
+ * #stays (SHY-0645). Without the anchor, an empty tree or the wrong screen
+ * would read as "gone" and pass: that is how an absence check goes vacuous.
+ */
+async function waitForIdGone(device, id, { stays, timeoutMs = 8000 } = {}) {
+  if (!stays)
+    throw new Error('waitForIdGone needs a `stays` id: absence is only judged beside a presence');
+  const deadline = Date.now() + timeoutMs;
+  let seen = { stays: false, id: false };
+  while (Date.now() < deadline) {
+    const tick = Date.now();
+    const nodes = await dump(device);
+    seen = { stays: !!byId(nodes, stays), id: !!byId(nodes, id) };
+    if (seen.stays && !seen.id) return nodes;
+    await pollGap(tick, device);
+  }
+  const yn = (b) => (b ? 'yes' : 'no');
+  throw new Error(
+    `timed out (${timeoutMs}ms) waiting for #${id} to leave while #${stays} stays; ` +
+      `last screen had #${stays}: ${yn(seen.stays)}, #${id}: ${yn(seen.id)}`,
   );
 }
 
@@ -2526,14 +2645,18 @@ function resolveTargetApi(target, env = process.env) {
 
   const { apiBaseUrl } = cfg;
   const authUrl = cfg.authUrlFor ? cfg.authUrlFor(env) : cfg.authUrl;
+  const firestoreDocumentsUrl = cfg.firestoreDocumentsUrlFor
+    ? cfg.firestoreDocumentsUrlFor(env)
+    : cfg.firestoreDocumentsUrl;
   return {
     apiBaseUrl,
     authUrl,
+    firestoreDocumentsUrl,
     password,
     // Printed in the run header so the target is legible without reading the
     // source. The password is deliberately absent: a header reaches CI logs,
     // screenshots and evidence pages.
-    describe: `api=${apiBaseUrl} auth=${new URL(authUrl).host}`,
+    describe: `api=${apiBaseUrl} auth=${new URL(authUrl).host} fs=${new URL(firestoreDocumentsUrl).host}`,
   };
 }
 
@@ -4859,6 +4982,392 @@ function selectJourneys(all, selectedIds) {
   return [...core, ...rest];
 }
 
+// SHY-0645: each phone is linked to one account (signing anyone else in is
+// refused: "This device is already linked to another account", measured
+// 2026-10-20), so Alice holds the Android phone and Theo the iPhone. The other
+// of the two is the sender: they post, write one-to-one and read the store over
+// the network as themselves, so the reader is never the phone's writer. Selma
+// reacts only over the network. One definition runs on both phones.
+const ALICE = { name: 'Alice', email: 'adult-power@shytalk.dev', uid: '50000010' };
+const THEO = { name: 'Theo', email: 'host@shytalk.dev', uid: '50000060' };
+const SELMA = { name: 'Selma', email: 'mc-singer@shytalk.dev', uid: '50000080' };
+function reactionCast(platform) {
+  if (platform === 'android') return { phone: ALICE, other: THEO, third: SELMA };
+  if (platform === 'ios') return { phone: THEO, other: ALICE, third: SELMA };
+  throw new Error(`J28R has no linked phone for platform "${platform}"`);
+}
+const HEART = 0; // places in quickReactions (ReactionTagsTest pins the order)
+const LAUGH = 1;
+const THUMBS = 2;
+const QUICK = ['❤️', '😂', '👍'];
+const STORE_WAIT_MS = 15000;
+
+// The j28 reaction scenarios share one world: the cast, their tokens, the
+// store reader and the phone's taps. Each scenario is its own journey
+// (SHY-0645): one test per case, so a red in one can never hide another. The
+// first red-first run walked all three as one journey, stopped at its first
+// failure, and proved one of the three recipient writes (2026-10-22).
+function reactionWorld(device, reporter, ctx) {
+  const { phone, other, third } = reactionCast(device.kind);
+  const { firestoreDocumentsUrl } = requireActiveApi();
+  const stamp = Date.now();
+  const tokens = {};
+  const fsOf = {};
+
+  // The sender reads the store with their own token, never the phone's.
+  const stored = (convId, msgId) => async () => {
+    const r = await apiCall('GET', `/api/conversations/${convId}/messages?limit=50`, {
+      token: tokens[other.name],
+    });
+    if (r.status !== 200) {
+      throw new Error(
+        `GET messages of ${convId} as ${other.name} expected 200; got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`,
+      );
+    }
+    const m = Array.isArray(r.body) ? r.body.find((x) => x.id === msgId) : undefined;
+    if (!m) throw new Error(`message ${msgId} is not among the last 50 of ${convId}`);
+    return m.reactions || {};
+  };
+  const expectStored = (convId, msgId, want, what) =>
+    waitForStored(
+      stored(convId, msgId),
+      (got) => canonicalReactions(got) === canonicalReactions(want),
+      { timeoutMs: STORE_WAIT_MS, what, describe: canonicalReactions },
+    );
+  // One emoji's own entry, whatever else the message carries: an independent
+  // check must not fail because a different person's write was refused.
+  const expectEmoji = (convId, msgId, emoji, uids, what) =>
+    waitForStored(
+      stored(convId, msgId),
+      (got) =>
+        canonicalReactions({ [emoji]: got[emoji] || [] }) === canonicalReactions({ [emoji]: uids }),
+      { timeoutMs: STORE_WAIT_MS, what, describe: canonicalReactions },
+    );
+  const phoneReacts = async (msgId, place) => {
+    await tapId(device, `privateChat_msgTarget_${msgId}`);
+    await waitForId(device, 'privateChat_reactMenuItem', 10000);
+    await tapId(device, 'privateChat_reactMenuItem');
+    await waitForId(device, `privateChat_reactionPick_${place}`, 10000);
+    await tapId(device, `privateChat_reactionPick_${place}`);
+  };
+  const badge = (msgId, place) => `privateChat_reactionBadge_${msgId}_${place}`;
+
+  const signInEveryone = () =>
+    reporter.step(
+      device,
+      'Setup: Alice, Theo and Selma each sign in to the network as themselves',
+      async () => {
+        for (const p of [ALICE, THEO, SELMA]) {
+          tokens[p.name] = await getIdToken(p.email);
+          fsOf[p.name] = firestoreAsPerson({
+            documentsUrl: firestoreDocumentsUrl,
+            token: tokens[p.name],
+            who: p.name,
+          });
+        }
+        return `three ID tokens; Firestore at ${new URL(firestoreDocumentsUrl).host}`;
+      },
+    );
+
+  const makeGroup = async (tag) => {
+    const out = { name: `JR-${tag}-${stamp}`, text: `JR-${tag}-GROUP-${stamp}` };
+    await reporter.step(
+      device,
+      `Setup: ${other.name} makes a new group "${out.name}" with ${phone.name} and ${third.name}, and posts in it`,
+      async () => {
+        const group = await createGroupAs(fsOf[other.name], {
+          creatorId: other.uid,
+          cohort: 'adult',
+          memberIds: [phone.uid, third.uid],
+          groupName: out.name,
+          now: stamp,
+        });
+        out.id = group.id;
+        const r = await apiCall('POST', `/api/conversations/${group.id}/messages`, {
+          token: tokens[other.name],
+          body: { text: out.text, type: 'TEXT' },
+        });
+        if (r.status !== 200)
+          throw new Error(
+            `${other.name}'s group message expected 200; got ${r.status}: ${JSON.stringify(r.body)}`,
+          );
+        out.msgId = r.body.id;
+        return `conversations/${group.id} with ${group.participantIds.join(', ')}; message ${out.msgId}`;
+      },
+    );
+    return out;
+  };
+
+  const writeOneToOne = async (tag) => {
+    const out = { text: `JR-${tag}-DM-${stamp}` };
+    await reporter.step(
+      device,
+      `Setup: ${other.name} writes to ${phone.name} one-to-one`,
+      async () => {
+        const c = await apiCall('POST', '/api/conversations', {
+          token: tokens[other.name],
+          body: { otherUserId: phone.uid },
+        });
+        if (c.status !== 200)
+          throw new Error(
+            `one-to-one chat expected 200; got ${c.status}: ${JSON.stringify(c.body)}`,
+          );
+        out.id = c.body.id;
+        const r = await apiCall('POST', `/api/conversations/${out.id}/messages`, {
+          token: tokens[other.name],
+          body: { text: out.text, type: 'TEXT' },
+        });
+        if (r.status !== 200)
+          throw new Error(
+            `${other.name}'s one-to-one message expected 200; got ${r.status}: ${JSON.stringify(r.body)}`,
+          );
+        out.msgId = r.body.id;
+        return `conversations/${out.id}, new message ${out.msgId}`;
+      },
+    );
+    return out;
+  };
+
+  // Puts reactions on a message BEFORE the phone acts, so the write under test
+  // starts from the state its scenario names. On the local stack the
+  // emulator's admin handle writes them (it bypasses the rules: setup only, so
+  // a red-first run against old rules still reaches the phone's write); on dev
+  // each person writes their own, as the app would.
+  const placeReactions = (convId, msgId, reactions) =>
+    reporter.step(
+      device,
+      `Setup: ${Object.entries(reactions)
+        .map(([emoji, uids]) => `${emoji} by ${uids.join(', ')}`)
+        .join(' and ')} on the message before the phone acts`,
+      async () => {
+        if (ctx.state.db) {
+          await ctx.state.db.doc(`conversations/${convId}/messages/${msgId}`).update({ reactions });
+        } else {
+          for (const [emoji, uids] of Object.entries(reactions)) {
+            for (const uid of uids) {
+              const who = [ALICE, THEO, SELMA].find((p) => p.uid === uid);
+              await reactAs(fsOf[who.name], {
+                conversationId: convId,
+                messageId: msgId,
+                emoji,
+                uid,
+              });
+            }
+          }
+        }
+        const got = await expectStored(convId, msgId, reactions, 'the set-up reactions');
+        return `stored ${canonicalReactions(got)} via ${ctx.state.db ? 'the emulator admin (setup only)' : 'each person'}`;
+      },
+    );
+
+  const openChatByText = async (needle, label) => {
+    await tapId(device, 'main_messagesTab');
+    const pickRow = (nodes) =>
+      nodes.find((n) => n.center && `${n.text || ''} ${n.desc || ''}`.includes(needle));
+    const rows = await waitForText(device, needle, 15000);
+    const row = pickRow(rows);
+    if (!row)
+      throw new Error(
+        `${label} is not in ${phone.name}'s messages; on screen: ${summarizeScreen(rows).texts.slice(0, 12).join(' | ')}`,
+      );
+    await tapResolved(device, row, { label, relocate: pickRow });
+    await waitForId(device, 'privateChat_messageInput', 12000);
+  };
+
+  const openGroup = (g) =>
+    reporter.step(device, `UI: ${phone.name} opens the new group`, async () => {
+      await openChatByText(g.name, `the group "${g.name}"`);
+      await waitForId(device, `privateChat_msgTarget_${g.msgId}`, 12000);
+      return `${other.name}'s group message is on screen`;
+    });
+
+  return {
+    phone,
+    other,
+    third,
+    fsOf,
+    expectStored,
+    expectEmoji,
+    phoneReacts,
+    badge,
+    signInEveryone,
+    makeGroup,
+    writeOneToOne,
+    placeReactions,
+    openChatByText,
+    openGroup,
+    phoneSignsIn: () => signInAs(device, reporter, ctx, phone.email),
+  };
+}
+
+const J28R_GROUP = {
+  id: 'J28R-GROUP',
+  kind: 'ui',
+  title: 'j28 — reactions: two people react to a group message',
+  async run(device, reporter, ctx) {
+    const w = reactionWorld(device, reporter, ctx);
+    const { phone, other, third } = w;
+    await w.signInEveryone();
+    const g = await w.makeGroup('J28R-GROUP');
+    await w.phoneSignsIn();
+    await w.openGroup(g);
+
+    // Each write is its own check, judged on its own emoji, so a refusal of
+    // one never hides the other. The store is read FIRST after a phone tap: a
+    // write the rules refuse shows nothing on screen (SHY-0644).
+    await reporter.step(
+      device,
+      `UI: ${phone.name} taps ❤️ on ${other.name}'s message (on the phone)`,
+      async () => {
+        await w.phoneReacts(g.msgId, HEART);
+        const got = await w.expectEmoji(
+          g.id,
+          g.msgId,
+          '❤️',
+          [phone.uid],
+          `${phone.name}'s ❤️ on the phone (a refused phone write shows no error: SHY-0644)`,
+        );
+        return `stored ${canonicalReactions(got)}`;
+      },
+      { check: true },
+    );
+    await reporter.step(
+      device,
+      `API: ${third.name} reacts 👍 to ${other.name}'s message (over the network)`,
+      async () => {
+        await reactAs(w.fsOf[third.name], {
+          conversationId: g.id,
+          messageId: g.msgId,
+          emoji: QUICK[THUMBS],
+          uid: third.uid,
+        });
+        const got = await w.expectEmoji(
+          g.id,
+          g.msgId,
+          '👍',
+          [third.uid],
+          `${third.name}'s 👍 over the network`,
+        );
+        return `stored ${canonicalReactions(got)}`;
+      },
+      { check: true },
+    );
+    // Each check judged one emoji; this judges the whole map, so a write that
+    // also changed someone else's reaction cannot pass.
+    await reporter.step(
+      device,
+      `Store: ${other.name} reads exactly ${phone.name}'s ❤️ and ${third.name}'s 👍`,
+      async () => {
+        const got = await w.expectStored(
+          g.id,
+          g.msgId,
+          { '❤️': [phone.uid], '👍': [third.uid] },
+          `exactly ${phone.name}'s ❤️ and ${third.name}'s 👍`,
+        );
+        return canonicalReactions(got);
+      },
+    );
+    await reporter.step(device, `UI: ${phone.name} sees ❤️ and 👍 under the message`, async () => {
+      await waitForId(device, w.badge(g.msgId, HEART), 15000);
+      await waitForId(device, w.badge(g.msgId, THUMBS), 15000);
+      return 'both badges are on screen';
+    });
+  },
+};
+
+const J28R_UNDO = {
+  id: 'J28R-UNDO',
+  kind: 'ui',
+  title: 'j28 — reactions: taking a reaction back',
+  async run(device, reporter, ctx) {
+    const w = reactionWorld(device, reporter, ctx);
+    const { phone, other, third } = w;
+    await w.signInEveryone();
+    const g = await w.makeGroup('J28R-UNDO');
+    await w.placeReactions(g.id, g.msgId, { '❤️': [phone.uid], '👍': [third.uid] });
+    await w.phoneSignsIn();
+    await w.openGroup(g);
+    await reporter.step(
+      device,
+      `UI: ${phone.name} sees their ❤️ and ${third.name}'s 👍`,
+      async () => {
+        await waitForId(device, w.badge(g.msgId, HEART), 15000);
+        await waitForId(device, w.badge(g.msgId, THUMBS), 15000);
+        return 'both badges are on screen';
+      },
+    );
+
+    // The write under test: a tap on the phone, on both platforms.
+    await reporter.step(device, `UI: ${phone.name} taps their ❤️ to take it back`, async () => {
+      await tapId(device, w.badge(g.msgId, HEART));
+      return `${phone.name} tapped their ❤️ badge`;
+    });
+    await reporter.step(device, `Store: ${other.name} reads only ${third.name}'s 👍`, async () => {
+      const got = await w.expectStored(
+        g.id,
+        g.msgId,
+        { '👍': [third.uid] },
+        `${phone.name}'s ❤️ taken back on the phone, ${third.name}'s 👍 kept (a refused phone write shows no error: SHY-0644)`,
+      );
+      return canonicalReactions(got);
+    });
+    await reporter.step(device, `UI: ${phone.name} sees 👍 and no ❤️`, async () => {
+      await waitForIdGone(device, w.badge(g.msgId, HEART), {
+        stays: w.badge(g.msgId, THUMBS),
+        timeoutMs: 15000,
+      });
+      return '❤️ gone, 👍 still there';
+    });
+  },
+};
+
+const J28R_DM = {
+  id: 'J28R-DM',
+  kind: 'ui',
+  title: "j28 — reactions: the recipient's reaction reaches the sender",
+  async run(device, reporter, ctx) {
+    const w = reactionWorld(device, reporter, ctx);
+    const { phone, other } = w;
+    await w.signInEveryone();
+    const dm = await w.writeOneToOne('J28R-DM');
+    await w.phoneSignsIn();
+    await reporter.step(
+      device,
+      `UI: ${phone.name} opens ${other.name}'s one-to-one chat`,
+      async () => {
+        await w.openChatByText(dm.text, `${other.name}'s one-to-one chat`);
+        await waitForId(device, `privateChat_msgTarget_${dm.msgId}`, 12000);
+        return `${other.name}'s new message is on screen`;
+      },
+    );
+    await reporter.step(
+      device,
+      `UI: ${phone.name} reacts 😂 to ${other.name}'s message`,
+      async () => {
+        await w.phoneReacts(dm.msgId, LAUGH);
+        return 'tapped 😂';
+      },
+    );
+    await reporter.step(device, `Store: ${other.name} reads ${phone.name}'s 😂`, async () => {
+      const got = await w.expectStored(
+        dm.id,
+        dm.msgId,
+        { '😂': [phone.uid] },
+        `${phone.name}'s 😂 on ${other.name}'s message (a refused phone write shows no error: SHY-0644)`,
+      );
+      return canonicalReactions(got);
+    });
+    await reporter.step(
+      device,
+      `UI: ${phone.name} sees 😂 under ${other.name}'s message`,
+      async () => {
+        await waitForId(device, w.badge(dm.msgId, LAUGH), 15000);
+        return '😂 badge on screen';
+      },
+    );
+  },
+};
+
 function buildJourneys(ctx) {
   const smoke = {
     id: 'J-SMOKE',
@@ -4955,6 +5464,9 @@ function buildJourneys(ctx) {
     J04,
     J11,
     J07,
+    J28R_GROUP,
+    J28R_UNDO,
+    J28R_DM,
     J09,
     J12,
     J05,
@@ -5177,17 +5689,7 @@ async function main() {
         continue;
       }
 
-      reporter.startJourney(j.id, j.title);
-      try {
-        await j.run(device, reporter, ctx);
-        // Checked AFTER the journey's own assertions and before it is called a
-        // pass: every step can be true and the run still prove nothing about
-        // the product if the phone was never touched (SHY-0457).
-        assertJourneyTouchedTheUi({ ...j, steps: reporter.current?.steps ?? [] });
-        reporter.endJourney('pass');
-      } catch (e) {
-        reporter.endJourney('fail', e.message);
-      }
+      await runOneJourney(j, device, reporter, ctx);
     }
   } finally {
     // `finally`, so a walk that throws still yields its video -- a FAILED run
@@ -5273,6 +5775,10 @@ module.exports = {
   JOURNEY_KINDS,
   journeyTouchedTheUi,
   assertJourneyTouchedTheUi,
+  // SHY-0645: independent checks, and the reporter that records them.
+  assertNoFailedChecks,
+  Reporter,
+  runOneJourney,
   dismissKeyboard,
   uiOps,
   overlays,
@@ -5304,6 +5810,7 @@ module.exports = {
   SUPPORT_PERSONA_BY_PLATFORM,
   parseNodes,
   byId,
+  waitForIdGone,
   byText,
   byTextContains,
   summarizeScreen,
@@ -5331,7 +5838,9 @@ module.exports = {
   getIdToken,
   resolveTargetApi,
   devFirebaseKey,
+  devFirebaseProjectId,
   DEV_GOOGLE_SERVICES,
   setActiveApi,
   TARGETS,
+  reactionCast,
 };

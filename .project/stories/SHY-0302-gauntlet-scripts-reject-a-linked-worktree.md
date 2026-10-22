@@ -35,10 +35,10 @@ names the correct path and then denies it exists.
 Measured 2026-08-16 while running the Express suite from a worktree during
 SHY-0298:
 
-| checkout                 | `.git`                | `tests/scripts/50-matrix-cmd-stop.test.js` |
-| ------------------------ | --------------------- | ------------------------------------------ |
-| `Developer/Repos/ShyTalk` | directory, 608 bytes  | **9 passed**                               |
-| a linked worktree        | file, 69 bytes        | **4 failed**, 5 passed                     |
+| checkout                  | `.git`               | `tests/scripts/50-matrix-cmd-stop.test.js` |
+| ------------------------- | -------------------- | ------------------------------------------ |
+| `Developer/Repos/ShyTalk` | directory, 608 bytes | **9 passed**                               |
+| a linked worktree         | file, 69 bytes       | **4 failed**, 5 passed                     |
 
 Same code, same tests; the only variable is the git layout.
 
@@ -56,47 +56,50 @@ git commands fail confusingly later. Only its test is wrong.
 
 ### Happy path
 
-- [ ] `require_repo` succeeds in an ordinary checkout, exactly as today.
-- [ ] `require_repo` succeeds in a linked worktree.
-- [ ] `tests/scripts/50-matrix-cmd-stop.test.js` passes from both.
-- [ ] `tests/scripts/runner-process-identity.test.js` passes from both
+- [x] `require_repo` succeeds in an ordinary checkout, exactly as today.
+- [x] `require_repo` succeeds in a linked worktree.
+- [x] `tests/scripts/50-matrix-cmd-stop.test.js` passes from both.
+- [x] `tests/scripts/runner-process-identity.test.js` passes from both
       (from SHY-0557).
-- [ ] The process-reaping suites SHY-0326 listed give the same verdict in
+- [x] The process-reaping suites SHY-0326 listed give the same verdict in
       the main checkout and a linked worktree, and their mutation table
       kills in both (from SHY-0326).
 
 ### Error paths
 
-- [ ] A path that is genuinely not a repository still fails, with the same
+- [x] A path that is genuinely not a repository still fails, with the same
       message and the same non-zero exit — the guard must not be weakened into
       always passing, which is the obvious wrong fix.
-- [ ] A path that does not exist at all fails the same way.
-- [ ] A **bare** repository is rejected: the gauntlet needs a working tree, so
+- [x] A path that does not exist at all fails the same way.
+- [x] A **bare** repository is rejected: the gauntlet needs a working tree, so
       accepting one would move the failure to a later, more confusing point.
 
 ### Edge cases
 
-- [ ] A worktree whose `.git` file points at a `gitdir` that no longer exists
+- [x] A worktree whose `.git` file points at a `gitdir` that no longer exists
       (the main checkout was deleted) is rejected, not silently accepted.
-- [ ] A subdirectory of the repo is accepted, since `$REPO` is not guaranteed
-      to be the top level.
-- [ ] `$SHYTALK_REPO` still overrides, and the override is validated the same
+- [x] A subdirectory of the repo is **refused**, naming the path (amended
+      2026-10-22 from "accepted"): every consumer uses `$REPO/express-api`
+      or `$REPO/scripts`, so a subfolder would pass the check and fail later
+      at an obscure `cd`. `require_repo` compares git's top level with the
+      physical path.
+- [x] `$SHYTALK_REPO` still overrides, and the override is validated the same
       way.
 
 ### Performance
 
-- [ ] The check runs once per command invocation and costs a single `git`
+- [x] The check runs once per command invocation and costs a single `git`
       call — negligible against a gauntlet measured in minutes.
 
 ### Security
 
-- [ ] `$REPO` is passed to `git -C` as a single argument, never interpolated
+- [x] `$REPO` is passed to `git -C` as a single argument, never interpolated
       into a shell string, so a path containing spaces or metacharacters cannot
       alter the command.
 
 ### UX
 
-- [ ] The failure message still names the path and the `SHYTALK_REPO` override,
+- [x] The failure message still names the path and the `SHYTALK_REPO` override,
       because that part was already good.
 
 ### i18n
@@ -143,7 +146,8 @@ directory:
 - `accepts a linked worktree` — `git worktree add` a real worktree, run,
   expect exit 0. RED today.
 - `accepts an ordinary checkout` — the regression guard.
-- `accepts a subdirectory of the repo`.
+- `refuses a subdirectory of the repo` (amended 2026-10-22, see the Edge
+  cases AC).
 - `rejects a plain directory` — expect exit non-zero and the existing message.
 - `rejects a non-existent path`.
 - `rejects a bare repository`.
@@ -186,14 +190,16 @@ FROM a worktree, which is the failure that surfaced this;
 
 ## Definition of Done
 
-- [ ] RED tests written and observed failing before the fix.
-- [ ] `require_repo` accepts a worktree and still rejects a non-repository.
-- [ ] The `return 0` mutant proven to redden the rejection cases.
-- [ ] `50-matrix-cmd-stop.test.js` passes from a worktree AND from the main
+- [x] RED tests written and observed failing before the fix.
+- [x] `require_repo` accepts a worktree and still rejects a non-repository.
+- [x] The `return 0` mutant proven to redden the rejection cases.
+- [x] `50-matrix-cmd-stop.test.js` passes from a worktree AND from the main
       checkout.
-- [ ] Whole-repo sweep for the same `[ -d .git ]` shape, with the result
+- [x] Whole-repo sweep for the same `[ -d .git ]` shape, with the result
       recorded either way.
-- [ ] `code-reviewer` 100% clean; `Reviewed-up-to:` recorded.
+- [x] `code-reviewer` 100% clean; `Reviewed-up-to:` recorded.
+      Reviewed-up-to: bb9172bca34 (inline, 2026-10-22: one defect found and
+      fixed, see the running log).
 - [ ] Status → In Review → judgment-merge → deploy develop to dev.
 
 ## Notes (running log)
@@ -210,3 +216,49 @@ FROM a worktree, which is the failure that surfaced this;
   (the same cause behind the process-reaping suites) are closed as
   duplicates of this story; it takes SHY-0557's P0 and both stories'
   remaining criteria. Estimate 2 → 3 for the added suites.
+- **2026-10-22 — fixed on SHY-0645's branch** (PR #2454), where merging
+  develop ran the SHY-0304 tests from a worktree and six failed on the old
+  check. `require_repo` now asks git for the top level and compares it with
+  the physical path (`pwd -P`). The tests live in
+  `runner-process-identity.test.js`, block `require_repo asks git…` (eight
+  cases), not in a new file.
+  - **require_repo mutants**, all killed: always accepts (5 refusal tests
+    red, the story's `return 0`), top-level equality dropped, non-empty
+    check dropped, the old `.git` directory check (7 red: the worktree case
+    plus the six SHY-0304 tests), logical path (`pwd -L`), message without
+    the path, message without the `SHYTALK_REPO` hint, `$REPO` unquoted for
+    git, and the path evaluated by a shell with the exit still 0 (only the
+    `pwned` absence check catches that one).
+  - **SHY-0326's requirement**, run on 4b81a531dc4 in a clone (`.git` a
+    directory) and this worktree (`.git` a file): both reaping suites 33/33
+    in each, alone and at the same time, and every row below killed its
+    named test in BOTH checkouts:
+
+    | Mutation                         | Killed by                                                                                                |
+    | -------------------------------- | -------------------------------------------------------------------------------------------------------- |
+    | predicate's `node` half dropped  | `does not target a reader holding the runner script itself` (new)                                        |
+    | bare-name match, like `pgrep -f` | `qa-cleanup-orphans.sh › does not target a process that only NAMES the runner`                           |
+    | ancestor exclusion dropped       | `does not target its own ancestors`                                                                      |
+    | tree never walked                | `the recorded pid's WHOLE process tree is killed`                                                        |
+    | tree gate never opens            | the same                                                                                                 |
+    | run-id scoping removed           | `a runner belonging to ANOTHER run does not fail this run's stop` (now checks the other runner is alive) |
+
+    SHY-0326's own table named the wrong guard for three rows. Its first
+    run found two real holes: the `node` mutant survived, since every decoy
+    named `manual-qa-runner.test.js` and never the script itself; and the
+    scope mutant passed its named test while stop killed the other run's
+    runner. Both are now tested.
+
+  - Sweep: no other `[ -d … .git ]` shape in the repo.
+  - **Inline review (2026-10-22)** found one defect, now fixed (bb9172bca34).
+    `cd "$REPO"` consults an exported CDPATH and reads a leading dash as an
+    option; `git -C` does neither. So a relative name could reach two
+    different folders, and `cd` printed its pick into the result. lib.sh's
+    default REPO had the same flaw when it was sourced by a relative path.
+    Measured: REPO came out as the decoy's path twice, on two lines. Both
+    cds are now `CDPATH='' cd --`, and REPO is pinned to git's absolute
+    top level once accepted. Four tests were red first. 13 mutants, all
+    killed, cover the four new ones: the CDPATH dropped (in each of the two
+    places), the `--` dropped, and the pin removed. The same idiom at 24
+    other sites is SHY-0690.
+  - Left: In Review.

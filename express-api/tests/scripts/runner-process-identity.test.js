@@ -210,13 +210,19 @@ describe('SHY-0304 — a runner is identified by what it is, not what it mention
       // NOT killed by this run's scoped kill, must not be reported as this
       // run's leftover. Today the machine-wide pgrep reports it and exits 1.
       const otherRun = `matrix-other-${process.pid}`;
-      spawnVisible(`node ${RUNNER} --matrix --report-dir=/tmp/${otherRun}/report`, otherRun);
+      const other = spawnVisible(
+        `node ${RUNNER} --matrix --report-dir=/tmp/${otherRun}/report`,
+        otherRun,
+      );
 
       makeRun('mine-a', deadPid());
       const r = runStop('mine-a');
 
       expectStatus(r, 0);
       expect(r.stdout).toMatch(/0 runners remain/);
+      // The harm, not only the verdict: with the scope dropped, stop KILLS the
+      // other run's runner and then truthfully finds none left (SHY-0302).
+      expect(commandOf(other.pid)).toContain(otherRun);
     });
 
     test('a runner from another run is still surfaced, attributed, not silently dropped', () => {
@@ -458,6 +464,19 @@ describe('SHY-0304 — a runner is identified by what it is, not what it mention
       expect(targets).not.toContain(String(child.pid));
     });
 
+    test('does not target a reader holding the runner script itself', () => {
+      // Every other decoy names `manual-qa-runner.test.js`. This one names the
+      // runner's own path, as `tail -f` or an editor on it would, so only the
+      // predicate's `node` half spares it (found 2026-10-22, SHY-0302).
+      const decoy = `shy0302-reader-${process.pid}`;
+      const child = spawnVisible(`tail -f ${RUNNER} ${decoy}`, decoy);
+
+      const { r, targets } = runCleanup();
+
+      expectStatus(r, 0);
+      expect(targets).not.toContain(String(child.pid));
+    });
+
     test('does not target its own ancestors', () => {
       // The wrapper's argv carries a genuine `node …/manual-qa-runner.js`
       // token, so identity matching alone would select it — only ancestor
@@ -548,5 +567,139 @@ describe('SHY-0304 — a runner is identified by what it is, not what it mention
         .filter(({ cmd }) => cmd !== '' && !/[\s/]manual-qa-runner\.js(\s|$)/.test(cmd));
       expect(impostors).toEqual([]);
     });
+  });
+});
+
+describe('require_repo asks git, so a worktree is a repository (found 2026-10-22, SHY-0645)', () => {
+  // `[ -d "$REPO/.git" ]` refused every git worktree, whose .git is a FILE, so the
+  // gauntlet (and these SHY-0304 tests) failed in any worktree, never in CI's clone.
+  const LIB = path.join(REPO_ROOT, 'express-api/scripts/gauntlet/lib.sh');
+  const git = (cwd, ...args) => {
+    const r = spawnSync('/usr/bin/git', args, { cwd, encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
+  };
+  // cwd is the scratch root, so a path that leaked into a shell string would run
+  // its `;touch pwned` there, where the metacharacter test looks for it.
+  const requireRepo = (repo, extraEnv = {}) =>
+    spawnSync('/bin/bash', ['-c', 'source "$1"; require_repo && echo repo-ok', 'bash', LIB], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, SHYTALK_REPO: repo, ...extraEnv },
+    });
+  let root;
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'require-repo-'));
+    const clone = path.join(root, 'clone');
+    fs.mkdirSync(clone);
+    git(clone, 'init', '-q', '-b', 'main');
+    git(
+      clone,
+      '-c',
+      'user.email=t@shytalk.dev',
+      '-c',
+      'user.name=T',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      'base',
+    );
+    git(clone, 'worktree', 'add', '-q', path.join(root, 'wt'));
+    fs.mkdirSync(path.join(root, 'plain'));
+  });
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('a normal clone is a repository', () => {
+    const r = requireRepo(path.join(root, 'clone'));
+    expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
+  });
+  test('a git worktree (.git is a file) is a repository', () => {
+    expect(fs.statSync(path.join(root, 'wt', '.git')).isFile()).toBe(true);
+    const r = requireRepo(path.join(root, 'wt'));
+    expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
+  });
+  test('a folder inside a repository is not its top level, so it is refused', () => {
+    const sub = path.join(root, 'clone', 'sub');
+    fs.mkdirSync(sub, { recursive: true });
+    const r = requireRepo(sub);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`repo not found at ${sub}`);
+  });
+  test('a path that does not exist is refused, naming it', () => {
+    const gone = path.join(root, 'no-such-dir');
+    const r = requireRepo(gone);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`repo not found at ${gone}`);
+  });
+  test('a bare repository is refused: the gauntlet needs a working tree', () => {
+    const bare = path.join(root, 'bare.git');
+    git(root, 'init', '-q', '--bare', bare);
+    const r = requireRepo(bare);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`repo not found at ${bare}`);
+  });
+  test('a worktree whose main checkout is gone is refused', () => {
+    const lost = path.join(root, 'lost');
+    fs.mkdirSync(lost);
+    fs.writeFileSync(
+      path.join(lost, '.git'),
+      `gitdir: ${path.join(root, 'deleted', '.git', 'worktrees', 'x')}\n`,
+    );
+    const r = requireRepo(lost);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`repo not found at ${lost}`);
+  });
+  test('a plain folder is still refused, naming it', () => {
+    const r = requireRepo(path.join(root, 'plain'));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`repo not found at ${path.join(root, 'plain')}`);
+    expect(r.stderr).toContain('(set SHYTALK_REPO)');
+  });
+  test('a path with a space and shell metacharacters reaches git as one argument', () => {
+    const odd = path.join(root, 'odd dir;touch pwned');
+    fs.mkdirSync(odd);
+    git(odd, 'init', '-q', '-b', 'main');
+    const r = requireRepo(odd);
+    expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
+    expect(fs.existsSync(path.join(root, 'pwned'))).toBe(false);
+  });
+  // `cd` consults an exported CDPATH and git does not, so a relative name could
+  // reach two different folders, and `cd` prints the one it picked into $(...).
+  test('a relative path means the folder git sees, whatever CDPATH says', () => {
+    fs.mkdirSync(path.join(root, 'decoys', 'clone'), { recursive: true });
+    const r = requireRepo('clone', { CDPATH: path.join(root, 'decoys') });
+    expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
+  });
+  test('an accepted relative path is pinned to its absolute top level', () => {
+    // Every gauntlet command later runs `cd "$REPO"`; absolute, CDPATH cannot move it.
+    const r = spawnSync(
+      '/bin/bash',
+      ['-c', 'source "$1"; require_repo && printf "%s" "$REPO"', 'bash', LIB],
+      { cwd: root, encoding: 'utf8', env: { ...process.env, SHYTALK_REPO: 'clone' } },
+    );
+    expect([r.status, r.stdout]).toEqual([0, fs.realpathSync(path.join(root, 'clone'))]);
+  });
+  test('a path starting with a dash is a folder, not an option to cd', () => {
+    const dash = path.join(root, '-dash');
+    fs.mkdirSync(dash);
+    git(dash, 'init', '-q', '-b', 'main');
+    const r = requireRepo('-dash');
+    expect([r.status, r.stdout.trim()]).toEqual([0, 'repo-ok']);
+  });
+  test('the default REPO, sourced by a relative path, ignores CDPATH', () => {
+    // No SHYTALK_REPO: lib.sh finds the repo from its own path, which is relative
+    // here, so a CDPATH holding the same folders would otherwise be chosen.
+    const decoyRoot = path.join(root, 'cdpath-decoy');
+    fs.mkdirSync(path.join(decoyRoot, 'express-api', 'scripts', 'gauntlet'), { recursive: true });
+    const env = { ...process.env, CDPATH: decoyRoot };
+    delete env.SHYTALK_REPO;
+    const r = spawnSync(
+      '/bin/bash',
+      ['-c', 'source express-api/scripts/gauntlet/lib.sh; printf "%s" "$REPO"'],
+      { cwd: REPO_ROOT, encoding: 'utf8', env },
+    );
+    expect([r.status, r.stdout]).toEqual([0, REPO_ROOT]);
   });
 });
