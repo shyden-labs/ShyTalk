@@ -122,7 +122,7 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // 2038 -> 2041: .github/actions/apk-holds-no-persona-password/action.yml,
 // scripts/ci/apk-persona-check.js and two tests added, one test removed
 // (SHY-0662).
-const FILES_READ_FLOOR = 2041;
+const FILES_READ_FLOOR = 2044;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

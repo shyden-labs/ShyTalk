@@ -51,7 +51,7 @@ const DEAD_NAMES = [/minio\/minio\b/gi, /minio\/mc\b/gi, /\/minio\/health\b/gi];
 // .github/actions/apk-holds-no-persona-password/action.yml and
 // scripts/ci/apk-persona-check.js (SHY-0662).
 // SHY-0556 moves this figure to the floors record.
-const FILES_READ_FLOOR = 484;
+const FILES_READ_FLOOR = 485;
 
 function findDeadNames(text) {
   return DEAD_NAMES.flatMap((re) => text.match(re) ?? []);
