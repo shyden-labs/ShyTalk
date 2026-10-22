@@ -2397,12 +2397,45 @@ async function ensureAtSignIn(device, pkg) {
   if (anyMainTab(nodes)) await signOutFlow(device);
 }
 
+/**
+ * Wait for #id, clearing any overlay that comes up meanwhile (SHY-0702).
+ * `waitForId` reads raw dumps, so a sheet presented after Home rendered was
+ * stared at until the timeout, or tapped through by the next step.
+ */
+async function waitForIdClearingOverlays(device, id, timeoutMs = 8000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = [];
+  const cleared = [];
+  while (Date.now() < deadline) {
+    const tick = Date.now();
+    const nodes = await dump(device);
+    const what = await clearOverlays(device, nodes, tick);
+    if (what) {
+      cleared.push(what);
+      continue;
+    }
+    if (byId(nodes, id)) return nodes;
+    last = summarizeScreen(nodes).testTags;
+    await pollGap(tick, device);
+  }
+  throw new Error(
+    `timed out (${timeoutMs}ms) waiting for #${id}; screen showed: ${last.join(', ') || '(none)'}` +
+      (cleared.length ? `; dismissed first: ${cleared.join(', ')}` : ''),
+  );
+}
+
 // Profile tab -> settings -> sign out -> confirm -> back at SignIn.
+//
+// Each target is waited for clearing overlays (SHY-0702): the daily-reward
+// sheet is presented a moment AFTER Home renders (SHY-0527), so it can slide up
+// between any two taps here. Tapping straight through sent the next tap to the
+// sheet: measured on both phones after J08, 2026-10-23.
 async function signOutFlow(device) {
+  await waitForIdClearingOverlays(device, 'main_profileTab', 15000);
   await tapId(device, 'main_profileTab');
-  await waitForId(device, 'main_settingsButton', 6000);
+  await waitForIdClearingOverlays(device, 'main_settingsButton', 6000);
   await tapId(device, 'main_settingsButton');
-  await waitForId(device, 'settings_signOutButton', 6000);
+  await waitForIdClearingOverlays(device, 'settings_signOutButton', 6000);
   await tapId(device, 'settings_signOutButton');
   await waitForText(device, 'Are you sure you want to sign out', 6000);
   await tapLowestText(device, 'Sign Out');
@@ -5788,6 +5821,9 @@ module.exports = {
   // shared overlay pass, and the handler that closes the sheet by tag.
   confirmAccountOnDevice,
   clearOverlays,
+  // SHY-0702: the sign-out flow and its overlay-clearing wait.
+  signOutFlow,
+  waitForIdClearingOverlays,
   handleRewardCalendar,
   REWARD_SHEET_BUTTON_IDS,
   watchForText,
