@@ -12,7 +12,7 @@ paths:
   # SHY-0691: GitHub added `concurrency.queue` (changelog 2026-05-07);
   # actionlint 1.7.x rejects it until rhysd/actionlint#654 is released. This
   # ignores that one message in this one file, pinned by
-  # express-api/tests/scripts/sync-stories-queue.test.js. SHY-0695 drops it
+  # express-api/tests/scripts/sync-stories-queue.test.js. SHY-0694 drops it
   # once a release accepts the key.
   .github/workflows/sync-stories-to-issues.yml:
     ignore:
