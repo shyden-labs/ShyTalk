@@ -1,6 +1,6 @@
 ---
 id: SHY-0702
-status: Draft
+status: Done
 owner: claude
 created: 2026-10-23
 priority: P0
@@ -56,34 +56,52 @@ the first attempt failed after J08 in 2 of 2 runs.
 
 ### Happy path
 
-- [ ] The cause is measured on the phone (a dump and screenshot just
-      before and after the gear tap, with the time since the profile tab
-      was tapped) and named in this story.
-- [ ] The sign-out completes after J08 in 10 of 10 runs on the Android
+- [x] The cause is measured on the phone and named in this story (the
+      first plan, a dump around the gear tap, fitted the first guess; the
+      cause was found from other recorded screens).
+      Proof: the iPhone --debug run's screens (J08 ends on New Message; the
+      failing step shows dailyReward_dialog) and the diagnostic trials'
+      named paths on 9f9d01944ef ("tap target #main_profileTab not found"
+      after the wait had seen it); both written up in Why and Notes.
+- [x] The sign-out completes after J08 in 10 of 10 runs on the Android
       phone and on the iPhone: a reward sheet arriving mid-flow is dismissed
       and a tap it swallowed is made again.
+      Proof: Android 10 of 10 real runs (2 more starts void before any
+      journey: the recorder, SHY-0445), iPhone 10 of 10; J28R-GROUP green
+      in all 20 (#2549 comment 6350793934).
 
 ### Error paths
 
-- [ ] When the next screen does not come, the step fails at its deadline
+- [x] When the next screen does not come, the step fails at its deadline
       naming the target, the taps, the screen, what was dismissed and the
       last tap error. A tap is made again only while the target is still
       on screen and never within 3 s of the last, so a slow screen is not
       tapped twice; never a silent retry.
+      Proof: device-journey-signout-overlays.unit.test.js (never arriving,
+      the 3 s rule, a tap that keeps throwing, an empty screen); mutants
+      9/9 killed (#2549).
 
 ### Edge cases
 
-- [ ] A persona whose profile is still loading (gift wall, wallet) is
+- [x] A persona whose profile is still loading (gift wall, wallet) is
       covered.
-- [ ] A journey that ended inside a chat or room (no tab bar on screen)
+      Proof: the 20 trials sign Vexa out and Alice or Theo in over loading
+      profiles; the sheet-arrives-mid-flow unit tests.
+- [x] A journey that ended inside a chat or room (no tab bar on screen)
       is covered: the flow reaches a tab bar before tapping a tab (today by
       restarting the app; without a restart is SHY-0703).
+      Proof: all 20 trials took "no SignIn or Home on screen (...
+      newMessage_searchField ...); restarted the app; signed out from Home";
+      unit test "left on a screen with no tab bar".
 
 ### Performance
 
-- [ ] "Reach SignIn" after J08 is measured before and after on each
+- [x] "Reach SignIn" after J08 is measured before and after on each
       phone. Removing the restart that J08's ending screen forces moved to
       SHY-0703 (2026-10-23).
+      Proof: before, the iPhone failed 2 of 2 and Android's first attempt
+      failed 2 of 2 (one journey red); after, Android 59.4-64.8 s and the
+      iPhone 35.3-38.7 s, all completed (#2549 comment 6350793934).
 
 ### Security
 
@@ -100,11 +118,13 @@ the first attempt failed after J08 in 2 of 2 runs.
 
 ### Observability
 
-- [x] Not applicable: the runner's report already names the step.
+- [x] The Reach SignIn step now names the path it took, including any
+      failure a restart rescued (9f9d01944ef); unit-tested.
 
 ### Runtime proof
 
-- [ ] The 10-run measurement on each phone, recorded.
+- [x] The 10-run measurement on each phone, recorded.
+      Proof: #2549 comment 6350793934.
 
 ## Announce
 
@@ -140,8 +160,10 @@ None: test harness only.
 
 ## Definition of Done
 
-- [ ] Every AC ticked with its proof; CI green by step name; merged to
+- [x] Every AC ticked with its proof; CI green by step name; merged to
       `develop`.
+      Proof: #2549 merged (3aa92471dd2); PR Checks run 39845960577 green by
+      step name on head 1dd91dce14c.
 
 ## Notes
 
