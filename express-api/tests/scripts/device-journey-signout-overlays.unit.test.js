@@ -13,11 +13,7 @@
  * on Jest's fake clock: a unit test never waits out real time.
  */
 
-const {
-  waitForIdClearingOverlays,
-  signOutFlow,
-  overlays,
-} = require('../../scripts/device-journey-runner');
+const { tapUntilArrived, signOutFlow, overlays } = require('../../scripts/device-journey-runner');
 
 const nodeXml = (attrs) =>
   `<node ${Object.entries(attrs)
@@ -96,31 +92,175 @@ beforeEach(() => {
 });
 afterEach(() => jest.useRealTimers());
 
-describe('waitForIdClearingOverlays dismisses what covers the target, then finds it', () => {
-  test('a sheet over the screen is dismissed by tag, then the target is found', async () => {
-    const device = deviceServing([SHEET, PROFILE]);
-    const nodes = await onFakeClock(waitForIdClearingOverlays(device, 'main_settingsButton', 6000));
-    expect({
-      found: nodes.some((n) => n.id === 'main_settingsButton'),
-      taps: device.taps,
-      cleared: overlays.cleared,
-    }).toEqual({
-      found: true,
-      taps: [DISMISS],
+/**
+ * The iPhone race, measured 2026-10-23: Home is drawn and the reward sheet is
+ * mid-presentation, so the first tap lands as the sheet arrives and does
+ * nothing. Dismissing the sheet leaves Home, and only a second tap moves on.
+ */
+function sheetSwallowsFirstTap() {
+  let state = 'home-sheet-coming';
+  const frameOf = {
+    'home-sheet-coming': HOME,
+    sheet: SHEET,
+    home: HOME,
+    profile: PROFILE,
+    settings: SETTINGS,
+    confirm: CONFIRM,
+    signIn: SIGN_IN,
+  };
+  const at = (p, q) => p.x === q.x && p.y === q.y;
+  const taps = [];
+  return {
+    kind: 'android',
+    taps,
+    async dumpXml() {
+      return frameOf[state];
+    },
+    async tap(x, y) {
+      const p = { x, y };
+      taps.push(p);
+      if (state === 'home-sheet-coming') state = 'sheet';
+      else if (state === 'sheet' && at(p, DISMISS)) state = 'home';
+      else if (state === 'home' && at(p, PROFILE_TAB)) state = 'profile';
+      else if (state === 'profile' && at(p, GEAR)) state = 'settings';
+      else if (state === 'settings' && at(p, SIGN_OUT)) state = 'confirm';
+      else if (state === 'confirm' && at(p, CONFIRM_BUTTON)) state = 'signIn';
+    },
+  };
+}
+
+const arrivedAt = (id) => (nodes) => nodes.some((n) => n.id === id);
+
+describe('tapUntilArrived drives a tap until the next screen is there', () => {
+  test('a sheet over the screen is dismissed by tag before the target is tapped', async () => {
+    const device = deviceServing([SHEET, HOME, PROFILE]);
+    await onFakeClock(
+      tapUntilArrived(
+        device,
+        'main_profileTab',
+        arrivedAt('main_settingsButton'),
+        'the profile',
+        6000,
+      ),
+    );
+    expect({ taps: device.taps, cleared: overlays.cleared }).toEqual({
+      taps: [DISMISS, PROFILE_TAB],
       cleared: ['the daily-reward sheet via dailyReward_dismissButton'],
     });
   });
-  test('a clean screen is read without a single tap', async () => {
+  test('already arrived: not a single tap', async () => {
     const device = deviceServing([PROFILE]);
-    await onFakeClock(waitForIdClearingOverlays(device, 'main_settingsButton', 6000));
+    await onFakeClock(
+      tapUntilArrived(
+        device,
+        'main_profileTab',
+        arrivedAt('main_settingsButton'),
+        'the profile',
+        6000,
+      ),
+    );
     expect(device.taps).toEqual([]);
   });
-  test('a target that never comes fails naming it, the screen and what was dismissed', async () => {
-    const device = deviceServing([SHEET, OTHER]);
+  test('a tap swallowed by an arriving sheet is made again once the sheet is gone', async () => {
+    const device = sheetSwallowsFirstTap();
+    await onFakeClock(
+      tapUntilArrived(
+        device,
+        'main_profileTab',
+        arrivedAt('main_settingsButton'),
+        'the profile',
+        6000,
+      ),
+    );
+    expect(device.taps).toEqual([PROFILE_TAB, DISMISS, PROFILE_TAB]);
+  });
+  test('a target that is still on screen is not tapped again within 3 s (a slow screen is not double-tapped)', async () => {
+    const slow = deviceServing([HOME]); // the tap changes nothing: a screen still loading
     await expect(
-      onFakeClock(waitForIdClearingOverlays(device, 'main_settingsButton', 3000)),
+      onFakeClock(
+        tapUntilArrived(
+          slow,
+          'main_profileTab',
+          arrivedAt('main_settingsButton'),
+          'the profile',
+          5000,
+        ),
+      ),
+    ).rejects.toThrow('the profile not reached within 5000ms after 2 taps on #main_profileTab');
+  });
+  test('an empty screen at the deadline says so', async () => {
+    const device = deviceServing([screen()]);
+    await expect(
+      onFakeClock(
+        tapUntilArrived(
+          device,
+          'main_profileTab',
+          arrivedAt('main_settingsButton'),
+          'the profile',
+          2000,
+        ),
+      ),
     ).rejects.toThrow(
-      'timed out (3000ms) waiting for #main_settingsButton; screen showed: privateChat_messageInput; ' +
+      'the profile not reached within 2000ms after 0 taps on #main_profileTab; screen showed: (none)',
+    );
+  });
+  test('a tap that throws (the element went away) is followed by a fresh read, not a failure', async () => {
+    const device = deviceServing([HOME, PROFILE]);
+    const realTap = device.tap;
+    let first = true;
+    device.tap = async (x, y) => {
+      if (first) {
+        first = false;
+        throw new Error('element gone');
+      }
+      return realTap(x, y);
+    };
+    await onFakeClock(
+      tapUntilArrived(
+        device,
+        'main_profileTab',
+        arrivedAt('main_settingsButton'),
+        'the profile',
+        6000,
+      ),
+    );
+    expect(device.taps).toEqual([PROFILE_TAB]);
+  });
+  test('a tap that keeps throwing fails at the deadline, naming the last tap error', async () => {
+    const device = deviceServing([HOME]);
+    device.tap = async () => {
+      throw new Error('element gone');
+    };
+    await expect(
+      onFakeClock(
+        tapUntilArrived(
+          device,
+          'main_profileTab',
+          arrivedAt('main_settingsButton'),
+          'the profile',
+          4000,
+        ),
+      ),
+    ).rejects.toThrow(
+      'the profile not reached within 4000ms after 2 taps on #main_profileTab; ' +
+        'screen showed: main_roomsTab, main_messagesTab, main_profileTab; last tap failed: element gone',
+    );
+  });
+  test('never arriving fails naming the target, the taps, the screen and what was dismissed', async () => {
+    const device = deviceServing([SHEET, HOME, OTHER]);
+    await expect(
+      onFakeClock(
+        tapUntilArrived(
+          device,
+          'main_profileTab',
+          arrivedAt('main_settingsButton'),
+          'the profile',
+          3000,
+        ),
+      ),
+    ).rejects.toThrow(
+      'the profile not reached within 3000ms after 1 tap on #main_profileTab; ' +
+        'screen showed: privateChat_messageInput; ' +
         'dismissed first: the daily-reward sheet via dailyReward_dismissButton',
     );
   });
@@ -141,6 +281,18 @@ describe('signOutFlow never taps through a sheet that comes up mid-flow (SHY-070
     const device = deviceServing([HOME, PROFILE, SHEET, SETTINGS, CONFIRM, SIGN_IN]);
     await onFakeClock(signOutFlow(device));
     expect(device.taps).toEqual([PROFILE_TAB, GEAR, DISMISS, SIGN_OUT, CONFIRM_BUTTON]);
+  });
+  test('a profile-tab tap swallowed by the arriving sheet: dismissed, tapped again, signed out', async () => {
+    const device = sheetSwallowsFirstTap();
+    await onFakeClock(signOutFlow(device));
+    expect(device.taps).toEqual([
+      PROFILE_TAB,
+      DISMISS,
+      PROFILE_TAB,
+      GEAR,
+      SIGN_OUT,
+      CONFIRM_BUTTON,
+    ]);
   });
   test('with no sheet the flow is the four taps it always was', async () => {
     const device = deviceServing([HOME, PROFILE, SETTINGS, CONFIRM, SIGN_IN]);
@@ -186,9 +338,30 @@ describe('ensureAtSignIn says which way it reached SignIn (SHY-0702)', () => {
   test('a sign-out that fails names its reason, then the restart path', async () => {
     const device = restartable([HOME, OTHER], [SIGN_IN]);
     expect(await onFakeClock(ensureAtSignIn(device, 'pkg'))).toBe(
-      'sign-out from Home failed (timed out (6000ms) waiting for #main_settingsButton; ' +
-        'screen showed: privateChat_messageInput); restarted the app; already at SignIn',
+      'sign-out from Home failed (the profile not reached within 20000ms after 1 tap on ' +
+        '#main_profileTab; screen showed: privateChat_messageInput); restarted the app; already at SignIn',
     );
     expect(device.taps).toEqual([PROFILE_TAB, 'forceStop', 'launch']);
+  });
+  test('left on a screen with no tab bar (J08 ends on New Message): restart, then sign out, and say so', async () => {
+    const device = restartable([OTHER], [HOME, PROFILE, SETTINGS, CONFIRM, SIGN_IN]);
+    expect(await onFakeClock(ensureAtSignIn(device, 'pkg'))).toBe(
+      'no SignIn or Home on screen (SignIn or Home not reached within 20000ms; ' +
+        'screen showed: privateChat_messageInput); restarted the app; signed out from Home',
+    );
+    expect(device.taps).toEqual([
+      'forceStop',
+      'launch',
+      PROFILE_TAB,
+      GEAR,
+      SIGN_OUT,
+      CONFIRM_BUTTON,
+    ]);
+  });
+  test('a sign-out that fails again after the restart keeps the first reason in its error', async () => {
+    const device = restartable([HOME, OTHER], [HOME, OTHER]);
+    await expect(onFakeClock(ensureAtSignIn(device, 'pkg'))).rejects.toThrow(
+      /^sign-out from Home failed \(the profile not reached .*\); restarted the app; then the sign-out failed: the profile not reached/,
+    );
   });
 });

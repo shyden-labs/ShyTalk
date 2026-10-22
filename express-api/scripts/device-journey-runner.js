@@ -2402,19 +2402,38 @@ async function ensureAtSignIn(device, pkg) {
   nodes = await settle(device, 45000);
   if (atSignIn(nodes)) return `${before}; restarted the app; already at SignIn`;
   // settle() returns only SignIn or Home, so this is Home.
-  await signOutFlow(device);
+  try {
+    await signOutFlow(device);
+  } catch (e) {
+    throw new Error(`${before}; restarted the app; then the sign-out failed: ${e.message}`, {
+      cause: e,
+    });
+  }
   return `${before}; restarted the app; signed out from Home`;
 }
 
+/** A target still on screen after a tap is not tapped again sooner than this. */
+const RETAP_AFTER_MS = 3000;
+
 /**
- * Wait for #id, clearing any overlay that comes up meanwhile (SHY-0702).
- * `waitForId` reads raw dumps, so a sheet presented after Home rendered was
- * stared at until the timeout, or tapped through by the next step.
+ * Tap #id until `arrived(nodes)` holds, clearing overlays on every read
+ * (SHY-0702), in the drive-forward idiom of `advanceUntil`.
+ *
+ * The daily-reward sheet is presented a moment AFTER Home renders (SHY-0527),
+ * so it can arrive between any two reads or under a tap. A tap that lands as it
+ * arrives does nothing (Android sends it to the sheet; on the iPhone the
+ * covered element goes inaccessible mid-click): the sheet is dismissed and,
+ * the screen not having moved, the target is tapped again. Never sooner than
+ * RETAP_AFTER_MS after the last tap, so a screen that is merely slow to come
+ * is not tapped twice. Fails at the deadline naming everything it saw.
  */
-async function waitForIdClearingOverlays(device, id, timeoutMs = 8000) {
+async function tapUntilArrived(device, id, arrived, label, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
-  let last = [];
   const cleared = [];
+  let last = [];
+  let taps = 0;
+  let lastTapAt = -Infinity;
+  let tapError = null;
   while (Date.now() < deadline) {
     const tick = Date.now();
     const nodes = await dump(device);
@@ -2423,30 +2442,58 @@ async function waitForIdClearingOverlays(device, id, timeoutMs = 8000) {
       cleared.push(what);
       continue;
     }
-    if (byId(nodes, id)) return nodes;
+    if (arrived(nodes)) return nodes;
     last = summarizeScreen(nodes).testTags;
+    const target = byId(nodes, id);
+    if (target && Date.now() - lastTapAt >= RETAP_AFTER_MS) {
+      lastTapAt = Date.now();
+      taps += 1;
+      try {
+        await tapResolved(device, target, { label: `#${id}`, nodes });
+        tapError = null;
+      } catch (e) {
+        // The element went away under the tap; the next read says what is there.
+        tapError = e.message;
+      }
+    }
     await pollGap(tick, device);
   }
   throw new Error(
-    `timed out (${timeoutMs}ms) waiting for #${id}; screen showed: ${last.join(', ') || '(none)'}` +
-      (cleared.length ? `; dismissed first: ${cleared.join(', ')}` : ''),
+    `${label} not reached within ${timeoutMs}ms after ${taps} tap${taps === 1 ? '' : 's'} on #${id}; ` +
+      `screen showed: ${last.join(', ') || '(none)'}` +
+      (cleared.length ? `; dismissed first: ${cleared.join(', ')}` : '') +
+      (tapError ? `; last tap failed: ${tapError}` : ''),
   );
 }
 
-// Profile tab -> settings -> sign out -> confirm -> back at SignIn.
-//
-// Each target is waited for clearing overlays (SHY-0702): the daily-reward
-// sheet is presented a moment AFTER Home renders (SHY-0527), so it can slide up
-// between any two taps here. Tapping straight through sent the next tap to the
-// sheet: measured on both phones after J08, 2026-10-23.
+const signOutConfirmShown = (nodes) => !!byTextContains(nodes, 'Are you sure you want to sign out');
+
+// Profile tab -> settings -> sign out -> confirm -> back at SignIn. Each tap
+// is driven until the next screen is there (SHY-0702): tapping straight
+// through sent taps to a reward sheet that slid up mid-flow, measured on both
+// phones after J08, 2026-10-23.
 async function signOutFlow(device) {
-  await waitForIdClearingOverlays(device, 'main_profileTab', 15000);
-  await tapId(device, 'main_profileTab');
-  await waitForIdClearingOverlays(device, 'main_settingsButton', 6000);
-  await tapId(device, 'main_settingsButton');
-  await waitForIdClearingOverlays(device, 'settings_signOutButton', 6000);
-  await tapId(device, 'settings_signOutButton');
-  await waitForText(device, 'Are you sure you want to sign out', 6000);
+  await tapUntilArrived(
+    device,
+    'main_profileTab',
+    (n) => !!byId(n, 'main_settingsButton'),
+    'the profile',
+    20000,
+  );
+  await tapUntilArrived(
+    device,
+    'main_settingsButton',
+    (n) => !!byId(n, 'settings_signOutButton'),
+    'the settings',
+    10000,
+  );
+  await tapUntilArrived(
+    device,
+    'settings_signOutButton',
+    signOutConfirmShown,
+    'the sign-out confirmation',
+    10000,
+  );
   await tapLowestText(device, 'Sign Out');
   // 12s -> 45s. Signing out is a network round trip and a navigation, and on
   // the iPhone it routinely takes longer than twelve seconds. The symptom was
@@ -5832,7 +5879,7 @@ module.exports = {
   clearOverlays,
   // SHY-0702: the sign-out flow and its overlay-clearing wait.
   signOutFlow,
-  waitForIdClearingOverlays,
+  tapUntilArrived,
   ensureAtSignIn,
   handleRewardCalendar,
   REWARD_SHEET_BUTTON_IDS,
