@@ -316,6 +316,19 @@ describe('POST /api/rooms/:roomId/disconnect-user', () => {
     expect(await currentRoomIdOf(HOST)).toBe(ROOM);
   });
 
+  test('200 removes an absent non-owner who has moved on, and keeps their new room (SHY-0708)', async () => {
+    await seed({
+      seats: { 3: { userId: String(ATTENDEE), state: 'OCCUPIED', isMuted: false } },
+    });
+    await markAbsent(ATTENDEE);
+    await db.doc(`users/${ATTENDEE}`).set({ uniqueId: ATTENDEE, currentRoomId: 'shy0708-other' });
+
+    expect((await disconnect(ATTENDEE)).status).toBe(200);
+
+    expect((await room()).participantIds).not.toContain(String(ATTENDEE));
+    expect(await currentRoomIdOf(ATTENDEE)).toBe('shy0708-other');
+  });
+
   test('409 when the room is CLOSED — short-circuited before anything happens', async () => {
     const before = await seed({
       state: 'CLOSED',

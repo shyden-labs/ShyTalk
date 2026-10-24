@@ -92,30 +92,20 @@ describe('the participant release is BEST-EFFORT', () => {
 
     jest.spyOn(log, 'error').mockImplementation(() => {});
 
-    // Fail ONLY the participant-clear batch.
-    //
-    // Replacing `db.batch` wholesale breaks the transaction, because the
-    // Firestore SDK builds a `WriteBatch` through it — the first attempt died
-    // with `this._writeBatch._reset is not a function` and the route answered
-    // 500 for the wrong reason entirely.
-    //
-    // So a REAL batch is returned, and its commit is refused only once it has
-    // been given a `users/` write. The transaction's own batch never touches
-    // that collection, so it commits normally.
-    const realBatch = db.batch.bind(db);
-    jest.spyOn(db, 'batch').mockImplementation(() => {
-      const batch = realBatch();
-      const set = batch.set.bind(batch);
-      const commit = batch.commit.bind(batch);
-      let clearedAParticipant = false;
-      batch.set = (ref, data, options) => {
-        if (String(ref?.path || '').startsWith('users/')) clearedAParticipant = true;
-        return set(ref, data, options);
-      };
-      batch.commit = () =>
-        clearedAParticipant ? Promise.reject(new Error('batch down')) : commit();
-      return batch;
-    });
+    // Fail ONLY the participant clears (SHY-0708: one transaction per
+    // member, reading their user doc). The room's own transaction never
+    // reads a users/ doc, so it commits normally.
+    const realRun = db.runTransaction.bind(db);
+    jest.spyOn(db, 'runTransaction').mockImplementation((body, options) =>
+      realRun((t) => {
+        const get = t.get.bind(t);
+        t.get = (ref) =>
+          String(ref?.path || '').startsWith('users/')
+            ? Promise.reject(new Error('user doc down'))
+            : get(ref);
+        return body(t);
+      }, options),
+    );
 
     const res = await request(createApp()).post(`/api/rooms/${ROOM}/close`).send({});
 

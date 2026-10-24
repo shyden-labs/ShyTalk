@@ -127,7 +127,9 @@ const PRUNE_PATHS = new Set([path.join('.husky', '_')]);
 // tests/scripts/device-journey-wait-for-id-gone.test.js and
 // shared/.../feature/messaging/ReactionTagsTest.kt (SHY-0645).
 // 2048 -> 2049: tests/scripts/device-journey-signout-overlays.unit.test.js (SHY-0702).
-const FILES_READ_FLOOR = 2049;
+// 2049 -> 2051 (SHY-0708): express-api/src/utils/clear-current-room.js and
+// tests/utils/clear-current-room.unit.test.js.
+const FILES_READ_FLOOR = 2051;
 
 function findRetiredName(text) {
   return text.match(RETIRED) ?? [];

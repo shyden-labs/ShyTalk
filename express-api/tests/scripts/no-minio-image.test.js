@@ -52,7 +52,8 @@ const DEAD_NAMES = [/minio\/minio\b/gi, /minio\/mc\b/gi, /\/minio\/health\b/gi];
 // scripts/ci/apk-persona-check.js (SHY-0662). 484 -> 485 on develop (SHY-0691,
 // #2538). 485 -> 486: express-api/scripts/lib/firestore-as-person.js (SHY-0645).
 // SHY-0556 moves this figure to the floors record.
-const FILES_READ_FLOOR = 486;
+// 486 -> 487: express-api/src/utils/clear-current-room.js (SHY-0708).
+const FILES_READ_FLOOR = 487;
 
 function findDeadNames(text) {
   return DEAD_NAMES.flatMap((re) => text.match(re) ?? []);

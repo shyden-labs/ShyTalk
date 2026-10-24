@@ -226,6 +226,43 @@ service cloud.firestore {
 
     // ── Rooms ────────────────────────────────────────────────────
     match /rooms/{roomId} {
+      // SHY-0708 — a new room starts live with only its owner: exactly the
+      // fields both apps write (RoomRepositoryImpl.kt and
+      // IosRoomRepositoryImpl.kt createRoom), ACTIVE, the owner its only
+      // member and seated on seat 0 of 8, and no host, ban, kick, invite,
+      // join time or away field. Before, a client could create a room that
+      // listed other members, or one already away, and the server's close
+      // then cleared those members' currentRoomId.
+      function isNewRoom(d) {
+        let owner = d.ownerId;
+        let empty = {'userId': null, 'state': 'EMPTY', 'isMuted': false};
+        return d.keys().hasAll(['ownerId', 'state', 'participantIds', 'seats'])
+          && d.keys().hasOnly(['id', 'name', 'ownerId', 'ownerFirebaseUid',
+            'state', 'createdAt', 'participantIds', 'hostIds', 'bannedUserIds',
+            'kickInfo', 'pendingInvites', 'seats', 'voiceRoomName',
+            'requireApproval', 'firstJoinTimestamps', 'allTimeHostIds',
+            'allTimeSeatUserIds', 'cohort'])
+          && d.state == 'ACTIVE'
+          && d.participantIds == [owner]
+          && d.seats == {
+            '0': {'userId': owner, 'state': 'OCCUPIED', 'isMuted': false},
+            '1': empty, '2': empty, '3': empty, '4': empty,
+            '5': empty, '6': empty, '7': empty
+          }
+          && d.get('hostIds', []) == []
+          && d.get('bannedUserIds', []) == []
+          && d.get('allTimeHostIds', []) == []
+          && d.get('allTimeSeatUserIds', [owner]) == [owner]
+          && d.get('kickInfo', {}) == {}
+          && d.get('pendingInvites', {}) == {}
+          && d.get('firstJoinTimestamps', {}) == {}
+          && d.get('id', roomId) == roomId
+          && d.get('voiceRoomName', roomId) == roomId
+          && d.get('name', '') is string
+          && d.get('createdAt', 0) is number
+          && d.get('requireApproval', false) is bool;
+      }
+
       // Same-cohort read gate. Admin bypass for moderation. Room
       // create writes `cohort` from the owner's resolved cohort at
       // creation time; rooms never change cohort after create, so
@@ -269,7 +306,8 @@ service cloud.firestore {
             || request.resource.data.get('cohort', '') == 'minor')
         && string(callerUniqueId()) == request.resource.data.ownerId
         && request.resource.data.get('ownerFirebaseUid', '')
-            == request.auth.uid;
+            == request.auth.uid
+        && isNewRoom(request.resource.data);
 
       // POST-LOCKDOWN (PR #858 server-authz cutover, this PR): client-side
       // room-doc UPDATEs are denied. ALL room-doc mutations now route through

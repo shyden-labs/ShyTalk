@@ -146,15 +146,19 @@ describe('the write path fails', () => {
   test('the eviction stands when the currentRoomId clear fails (best-effort)', async () => {
     await seed();
     const errors = jest.spyOn(log, 'error').mockImplementation(() => {});
-    // Fail only the foreign user-document write, leaving the transaction alone.
-    const realDoc = db.doc.bind(db);
-    jest.spyOn(db, 'doc').mockImplementation((p) => {
-      const ref = realDoc(p);
-      if (String(p) === `users/${ATTENDEE}`) {
-        ref.set = () => Promise.reject(new Error('user doc write failed'));
-      }
-      return ref;
-    });
+    // Fail only the user's clear (SHY-0708: a transaction reading their user
+    // doc), leaving the room's own transaction alone.
+    const realRun = db.runTransaction.bind(db);
+    jest.spyOn(db, 'runTransaction').mockImplementation((body, options) =>
+      realRun((t) => {
+        const get = t.get.bind(t);
+        t.get = (ref) =>
+          String(ref?.path || '') === `users/${ATTENDEE}`
+            ? Promise.reject(new Error('user doc read failed'))
+            : get(ref);
+        return body(t);
+      }, options),
+    );
 
     const res = await request(createApp(HOST))
       .post(`/api/rooms/${ROOM}/disconnect-user`)

@@ -154,13 +154,22 @@ const OPS = [
     label: 'rooms create',
     seed: () => Promise.resolve(),
     op: (db, a) =>
+      // The shape both apps create (SHY-0708: the create rule admits no other).
       db.doc(`rooms/r-create-${a.uniqueId}`).set({
         cohort: a.cohort,
         ownerId: sid(a),
         ownerFirebaseUid: a.uid,
         name: 'Room',
-        state: 'OPEN',
+        state: 'ACTIVE',
         participantIds: [sid(a)],
+        seats: Object.fromEntries(
+          Array.from({ length: 8 }, (_, i) => [
+            String(i),
+            i === 0
+              ? { userId: sid(a), state: 'OCCUPIED', isMuted: false }
+              : { userId: null, state: 'EMPTY', isMuted: false },
+          ]),
+        ),
       }),
   },
   {

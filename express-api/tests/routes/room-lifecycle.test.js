@@ -213,6 +213,28 @@ describe('POST /api/rooms/:roomId/close', () => {
     expect((await eventRef().once('value')).val()).toBeTruthy();
   });
 
+  test('200 a listed member sitting in another room keeps it (SHY-0708)', async () => {
+    await seed();
+    // The room's list names ATTENDEE, but ATTENDEE has since moved on.
+    await db.doc(`users/${ATTENDEE}`).set({ uniqueId: ATTENDEE, currentRoomId: 'shy0708-other' });
+
+    expect((await close()).status).toBe(200);
+
+    expect(await currentRoomIdOf(OWNER)).toBeNull();
+    expect(await currentRoomIdOf(HOST)).toBeNull();
+    expect(await currentRoomIdOf(ATTENDEE)).toBe('shy0708-other');
+  });
+
+  test('200 a listed id with no user document creates none (SHY-0708)', async () => {
+    await seed();
+    await db.doc(`users/${HOST}`).delete();
+
+    expect((await close()).status).toBe(200);
+
+    expect((await db.doc(`users/${HOST}`).get()).exists).toBe(false);
+    expect(await currentRoomIdOf(OWNER)).toBeNull();
+  });
+
   test('200 idempotent when already CLOSED — no write, and nobody is re-cleared', async () => {
     await seed({ state: 'CLOSED' });
     // Somebody still carries a stale pointer; an idempotent close must not

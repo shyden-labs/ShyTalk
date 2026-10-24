@@ -40,6 +40,7 @@ const {
   OWNER_SEAT_INDEX,
 } = require('../utils/room-auth');
 const { shouldReapStaleRoom, reapStaleRoomTx } = require('../utils/stale-room-reap');
+const { clearCurrentRoomFor } = require('../utils/clear-current-room');
 const { checkFeatureAccess } = require('../safety/enforce');
 const log = require('../utils/log');
 
@@ -128,7 +129,8 @@ async function inRoomTransaction(req, roomId, mutate) {
  * idempotent set-once / already-in-target-state branches), and converts an
  * unexpected throw into a logged 500. Reserved for endpoints whose shape is
  * "validate → load+gate→update → respond"; specialised flows (`owner-away`
- * pre-reads RTDB presence; `close` does a post-txn batch user-doc clear;
+ * pre-reads RTDB presence; `close` clears its members' currentRoomId after
+ * the txn (`clearCurrentRoomFor`);
  * `disconnect-user` does both) hand-roll their try/catch.
  */
 async function executeRoomMutation(req, res, errorContext, mutate) {
@@ -497,20 +499,8 @@ router.post('/rooms/:roomId/close', async (req, res) => {
     if (result.status === 200 && result.closed) {
       // Best-effort: a failure here must NOT undo the already-committed close;
       // clients also self-clear their own currentRoomId on observing the close.
-      try {
-        if (participantsToClear.length) {
-          const batch = db.batch();
-          for (const pid of participantsToClear) {
-            batch.set(db.doc(`users/${pid}`), { currentRoomId: null }, { merge: true });
-          }
-          await batch.commit();
-        }
-      } catch (err) {
-        log.error('room-mutations', 'closeRoom currentRoomId clear failed', {
-          roomId,
-          error: err.message,
-        });
-      }
+      // Only members still in this room are cleared (SHY-0708).
+      await clearCurrentRoomFor(db, roomId, participantsToClear, log);
       await broadcastRoomUpdated(roomId);
     }
     return res.status(result.status).json(result.body);
@@ -650,15 +640,8 @@ router.post('/rooms/:roomId/disconnect-user', async (req, res) => {
       return { status: 200, body: { success: true } };
     });
     if (result.status === 200) {
-      try {
-        await db.doc(`users/${targetId}`).set({ currentRoomId: null }, { merge: true });
-      } catch (err) {
-        log.error('room-mutations', 'disconnect-user currentRoomId clear failed', {
-          roomId,
-          targetId,
-          error: err.message,
-        });
-      }
+      // Only while their currentRoomId still names this room (SHY-0708).
+      await clearCurrentRoomFor(db, roomId, [targetId], log);
       await broadcastRoomUpdated(roomId);
     }
     return res.status(result.status).json(result.body);

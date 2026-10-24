@@ -50,7 +50,8 @@ const SUSPENDED_KEYS = new Set(['isSuspended', 'is_suspended']);
 // 149 -> 152: src/utils/message-history.js, conversation-write-gate.js and
 // src/routes/conversation-message-edits.js (SHY-0614). 152 -> 153:
 // src/utils/delete-tree.js (SHY-0631).
-const FILES_READ_FLOOR = 153;
+// 153 -> 154: src/utils/clear-current-room.js (SHY-0708).
+const FILES_READ_FLOOR = 154;
 
 // ─── A small walker: @babel/parser is declared, @babel/traverse is not ───
 

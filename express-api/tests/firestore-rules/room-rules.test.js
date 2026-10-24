@@ -94,22 +94,48 @@ function dbAnon() {
   return handles.get('__anon__');
 }
 
+const EMPTY_SEAT = { userId: null, state: 'EMPTY', isMuted: false };
+
+/** The 8 seats a new room starts with: its owner on seat 0, the rest empty. */
+function newRoomSeats(owner) {
+  const seats = {};
+  for (let i = 0; i < 8; i += 1) seats[String(i)] = { ...EMPTY_SEAT };
+  seats['0'] = { userId: String(owner.uniqueId), state: 'OCCUPIED', isMuted: false };
+  return seats;
+}
+
 /**
- * A valid room document as the migrated client stamps it: `cohort` copied from
- * the owner's resolved cohort, `ownerId` = the owner's stringified uniqueId,
- * `ownerFirebaseUid` = the owner's Firebase uid. Override fields per test to
- * isolate a single failing clause.
+ * A valid room document exactly as both apps create it
+ * (`RoomRepositoryImpl.kt` createRoom, `IosRoomRepositoryImpl.kt` createRoom),
+ * less `id` and `voiceRoomName`, which name the doc's own id (see
+ * appRoomDoc). Override fields per test to isolate a single failing clause.
  */
 function roomDoc(owner, overrides = {}) {
+  const ownerId = String(owner.uniqueId);
   return {
-    cohort: owner.cohort,
-    ownerId: String(owner.uniqueId),
-    ownerFirebaseUid: owner.uid,
     name: 'Test Room',
-    state: 'OPEN',
-    participantIds: [String(owner.uniqueId)],
+    ownerId,
+    ownerFirebaseUid: owner.uid,
+    state: 'ACTIVE',
+    createdAt: 1_700_000_000_000,
+    participantIds: [ownerId],
+    hostIds: [],
+    bannedUserIds: [],
+    kickInfo: {},
+    pendingInvites: {},
+    seats: newRoomSeats(owner),
+    requireApproval: false,
+    firstJoinTimestamps: {},
+    allTimeHostIds: [],
+    allTimeSeatUserIds: [ownerId],
+    cohort: owner.cohort,
     ...overrides,
   };
+}
+
+/** Every field both apps write, `id` and `voiceRoomName` included. */
+function appRoomDoc(owner, roomId, overrides = {}) {
+  return roomDoc(owner, { id: roomId, voiceRoomName: roomId, ...overrides });
 }
 
 /** Seed any document bypassing rules (precondition for read/update/delete). */
@@ -288,6 +314,118 @@ describe('rooms/{roomId} create — real rules engine', () => {
 
   test('DENY: unauthenticated create', async () => {
     await assertFails(dbAnon().doc('rooms/r-deny-6').set(roomDoc(ADULT)));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// create — a new room starts live with only its owner (SHY-0708)
+// ═══════════════════════════════════════════════════════════════════════════
+// Before SHY-0708 the create rule checked only cohort and owner, so a client
+// could create a room listing other members, or already away or closed, and
+// the server's close then cleared those members' currentRoomId.
+
+describe('rooms/{roomId} create — the new room shape (SHY-0708)', () => {
+  const create = (data, id = 'r-shape') => dbFor(ADULT).doc(`rooms/${id}`).set(data);
+
+  test('the exact payload both apps write is allowed', async () => {
+    await assertSucceeds(create(appRoomDoc(ADULT, 'r-shape')));
+  });
+
+  test.each([
+    ['OWNER_AWAY', { state: 'OWNER_AWAY' }],
+    ['CLOSED', { state: 'CLOSED' }],
+    ['OPEN (no such state)', { state: 'OPEN' }],
+  ])('DENY: a room created %s', async (_label, overrides) => {
+    await assertFails(create(roomDoc(ADULT, overrides)));
+  });
+
+  test.each([
+    ['state', 'state'],
+    ['participantIds', 'participantIds'],
+    ['seats', 'seats'],
+  ])('DENY: a create with no %s', async (_label, field) => {
+    const data = roomDoc(ADULT);
+    delete data[field];
+    await assertFails(create(data));
+  });
+
+  test.each([
+    ['ownerLeftAt', { ownerLeftAt: 1 }],
+    ['ownerAwayCause', { ownerAwayCause: 'QUIT' }],
+    ['closedAt', { closedAt: 1 }],
+    ['awayUserIds', { awayUserIds: { [String(ADULT_2.uniqueId)]: 1 } }],
+    ['indexVersion', { indexVersion: 1 }],
+    ['a field the apps never write', { anything: true }],
+  ])('DENY: a create carrying %s', async (_label, overrides) => {
+    await assertFails(create(roomDoc(ADULT, overrides)));
+  });
+
+  test.each([
+    [
+      'another member listed',
+      { participantIds: [String(ADULT.uniqueId), String(ADULT_2.uniqueId)] },
+    ],
+    ['only another member listed', { participantIds: [String(ADULT_2.uniqueId)] }],
+    ['nobody listed', { participantIds: [] }],
+    [
+      'the owner listed twice',
+      { participantIds: [String(ADULT.uniqueId), String(ADULT.uniqueId)] },
+    ],
+  ])('DENY: participantIds with %s', async (_label, overrides) => {
+    await assertFails(create(roomDoc(ADULT, overrides)));
+  });
+
+  test('DENY: another member seated', async () => {
+    const seats = newRoomSeats(ADULT);
+    seats['1'] = { userId: String(ADULT_2.uniqueId), state: 'OCCUPIED', isMuted: false };
+    await assertFails(create(roomDoc(ADULT, { seats })));
+  });
+
+  test('DENY: the owner not on seat 0', async () => {
+    const seats = newRoomSeats(ADULT);
+    seats['0'] = { ...EMPTY_SEAT };
+    await assertFails(create(roomDoc(ADULT, { seats })));
+  });
+
+  test('DENY: a ninth seat', async () => {
+    const seats = { ...newRoomSeats(ADULT), 8: { ...EMPTY_SEAT } };
+    await assertFails(create(roomDoc(ADULT, { seats })));
+  });
+
+  test('DENY: an empty seat that is locked', async () => {
+    const seats = newRoomSeats(ADULT);
+    seats['3'] = { userId: null, state: 'LOCKED', isMuted: false };
+    await assertFails(create(roomDoc(ADULT, { seats })));
+  });
+
+  test.each([
+    ['a host', { hostIds: [String(ADULT_2.uniqueId)] }],
+    ['a ban', { bannedUserIds: [String(ADULT_2.uniqueId)] }],
+    ['a past host', { allTimeHostIds: [String(ADULT_2.uniqueId)] }],
+    [
+      'a past seat user',
+      { allTimeSeatUserIds: [String(ADULT.uniqueId), String(ADULT_2.uniqueId)] },
+    ],
+    ['a kick', { kickInfo: { [String(ADULT_2.uniqueId)]: { at: 1 } } }],
+    ['an invite', { pendingInvites: { [String(ADULT_2.uniqueId)]: { at: 1 } } }],
+    ['a join time', { firstJoinTimestamps: { [String(ADULT_2.uniqueId)]: 1 } }],
+  ])('DENY: a create with %s already set', async (_label, overrides) => {
+    await assertFails(create(roomDoc(ADULT, overrides)));
+  });
+
+  test.each([
+    ['id names another room', { id: 'r-other' }],
+    ['voiceRoomName names another room', { voiceRoomName: 'r-other' }],
+  ])('DENY: a create whose %s', async (_label, overrides) => {
+    await assertFails(create(appRoomDoc(ADULT, 'r-shape', overrides)));
+  });
+
+  test.each([
+    ['a name that is not a string', { name: 7 }],
+    ['a createdAt that is not a number', { createdAt: 'now' }],
+    ['a requireApproval that is not a boolean', { requireApproval: 'no' }],
+  ])('DENY: %s', async (_label, overrides) => {
+    await assertFails(create(roomDoc(ADULT, overrides)));
   });
 });
 
