@@ -45,6 +45,9 @@ const BRANCHES: Branch[] = ['develop', 'main'];
 /** The commit status `.github/workflows/check-release-cut.yml` posts on each pull request into main's head. */
 export const RELEASE_CUT = 'release-cut';
 
+/** GitHub Actions' app id: every required check, release-cut included, is posted by a workflow, so no other app may satisfy it. */
+export const GITHUB_ACTIONS_APP_ID = 15368;
+
 /** The ruleset a branch must carry. */
 export function desiredRuleset(branch: Branch, checks: string[]): RulesetBody {
   if (checks.length === 0) {
@@ -76,7 +79,7 @@ export function desiredRuleset(branch: Branch, checks: string[]): RulesetBody {
         type: 'required_status_checks',
         parameters: {
           strict_required_status_checks_policy: branch === 'develop',
-          required_status_checks: contexts.map((context) => ({ context })),
+          required_status_checks: contexts.map((context) => ({ context, integration_id: GITHUB_ACTIONS_APP_ID })),
         },
       },
       { type: 'required_signatures' },
@@ -120,7 +123,7 @@ export function planRulesets(existing: ExistingRuleset[], checks: string[]): Rul
 
 interface ChecksParameters {
   strict_required_status_checks_policy?: boolean;
-  required_status_checks?: { context: string }[];
+  required_status_checks?: { context: string; integration_id?: number }[];
 }
 
 /** Every way a branch's rules (as `rules/branches/<branch>` reports them) fall short; empty when none. */
@@ -136,6 +139,11 @@ export function auditBranchRules(branch: Branch, rules: Rule[]): string[] {
   }
   const checks = rules.filter((r) => r.type === 'required_status_checks').map((r) => (r.parameters ?? {}) as ChecksParameters);
   const requiresReleaseCut = checks.some((c) => c.required_status_checks?.some((s) => s.context === RELEASE_CUT) === true);
+  for (const status of checks.flatMap((c) => c.required_status_checks ?? [])) {
+    if (status.integration_id !== GITHUB_ACTIONS_APP_ID) {
+      problems.push(`${branch}: required check "${status.context}" is not pinned to GitHub Actions (app ${GITHUB_ACTIONS_APP_ID})`);
+    }
+  }
   if (checks.length === 0) {
     problems.push(`${branch}: no rule requires status checks`);
   } else if (branch === 'develop') {
