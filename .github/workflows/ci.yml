@@ -83,3 +83,12 @@ jobs:
       - run: node scripts/npm-ci.ts
       - if: steps.classify.outputs.scope != 'docs-only'
         run: npm run test:coverage
+
+  # The SonarCloud quality gate, blocking (shyden-labs/repo-template#27, shyden-labs/repo-template#60): the reusable workflow
+  # scans, then fails unless this scan's gate is OK (docs/sonarcloud.md).
+  sonarcloud:
+    uses: ./.github/workflows/sonarcloud.yml
+    with:
+      organization: shyden-labs
+      project-key: shyden-labs_ShyTalk
+    secrets: inherit

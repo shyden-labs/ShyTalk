@@ -580,8 +580,10 @@ describe('check-release-cut.yml', () => {
   });
 
   it('pins the same actions at the same SHAs as ci.yml', () => {
-    const pins = (file: string) => usesLines(readFileSync(`.github/workflows/${file}`, 'utf8'));
-    // ci.yml runs several jobs, each pinning the same actions: compare the distinct pins.
+    const pins = (file: string) =>
+      usesLines(readFileSync(`.github/workflows/${file}`, 'utf8')).filter((line) => !line.startsWith('uses: ./'));
+    // ci.yml runs several jobs, each pinning the same actions: compare the distinct
+    // pins. A local reusable workflow (./.github/...) is in this repo, so has no pin.
     expect(pins('check-release-cut.yml')).toEqual([...new Set(pins('ci.yml'))]);
   });
 });
