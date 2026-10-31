@@ -32,7 +32,7 @@ function ruleTypes(body: { rules: { type: string }[] }): string[] {
 
 function checksRule(body: { rules: { type: string; parameters?: unknown }[] }) {
   return body.rules.find((r) => r.type === 'required_status_checks')?.parameters as
-    { strict_required_status_checks_policy: boolean; required_status_checks: { context: string }[] } | undefined;
+    { strict_required_status_checks_policy: boolean; required_status_checks: { context: string; integration_id?: number }[] } | undefined;
 }
 
 describe('desiredRuleset', () => {
@@ -53,7 +53,10 @@ describe('desiredRuleset', () => {
   });
 
   it('requires exactly the named checks on develop, in order', () => {
-    expect(checksRule(desiredRuleset('develop', CHECKS))?.required_status_checks).toEqual([{ context: 'unit' }, { context: 'PR Gate' }]);
+    expect(checksRule(desiredRuleset('develop', CHECKS))?.required_status_checks).toEqual([
+      { context: 'unit', integration_id: 15368 },
+      { context: 'PR Gate', integration_id: 15368 },
+    ]);
   });
 
   // Each release merge lands on main and never on squash-only develop, so a
@@ -64,9 +67,9 @@ describe('desiredRuleset', () => {
 
   it('requires the named checks on main, in order, then release-cut', () => {
     expect(checksRule(desiredRuleset('main', CHECKS))?.required_status_checks).toEqual([
-      { context: 'unit' },
-      { context: 'PR Gate' },
-      { context: 'release-cut' },
+      { context: 'unit', integration_id: 15368 },
+      { context: 'PR Gate', integration_id: 15368 },
+      { context: 'release-cut', integration_id: 15368 },
     ]);
   });
 
@@ -188,7 +191,10 @@ describe('auditBranchRules', () => {
 
   const mainChecks = (strict: boolean, contexts: string[]): Rule => ({
     type: 'required_status_checks',
-    parameters: { strict_required_status_checks_policy: strict, required_status_checks: contexts.map((context) => ({ context })) },
+    parameters: {
+      strict_required_status_checks_policy: strict,
+      required_status_checks: contexts.map((context) => ({ context, integration_id: 15368 })),
+    },
   });
 
   it('passes a main that requires release-cut and is not strict', () => {
@@ -322,7 +328,10 @@ describe('main', () => {
     strict[1],
     {
       type: 'required_status_checks',
-      parameters: { strict_required_status_checks_policy: false, required_status_checks: [{ context: 'release-cut' }] },
+      parameters: {
+        strict_required_status_checks_policy: false,
+        required_status_checks: [{ context: 'release-cut', integration_id: 15368 }],
+      },
     },
   ];
   const deletes = { delete_branch_on_merge: true };
@@ -482,5 +491,19 @@ describe('main', () => {
     expect(() => main([REPO, ...CHECKS])).toThrow(
       'read back, the repository still falls short:\n  merged head branches are not deleted (delete_branch_on_merge is false)',
     );
+  });
+});
+
+describe('auditBranchRules: the app pin', () => {
+  it('names a required check that any app could report', () => {
+    const rules: Rule[] = [
+      { type: 'deletion' },
+      { type: 'pull_request' },
+      {
+        type: 'required_status_checks',
+        parameters: { strict_required_status_checks_policy: true, required_status_checks: [{ context: 'unit' }] },
+      },
+    ];
+    expect(auditBranchRules('develop', rules)).toEqual(['develop: required check "unit" is not pinned to GitHub Actions (app 15368)']);
   });
 });
