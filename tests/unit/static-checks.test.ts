@@ -21,7 +21,11 @@ const steps = (job: string) =>
     .map((step) => ({
       name: /^ {6}(?:- | {2})name: (.*)/m.exec(step)?.[1] ?? '',
       run: /^ {6}(?:- | {2})run: (.*)/m.exec(step)?.[1] ?? '',
+      if: /^ {6}(?:- | {2})if: (.*)/m.exec(step)?.[1] ?? '',
     }));
+
+/** The docs-only fast path's guard: a step carrying it is skipped for a docs-only change. */
+const CODE = 'steps.classify.outputs.scope != docs-only';
 
 describe('package.json', () => {
   it.each([
@@ -36,19 +40,39 @@ describe('package.json', () => {
 });
 
 describe('ci.yml', () => {
-  it('runs the audit, typecheck, lint and format check as named steps of build-and-test, after the install and before the unit suite', () => {
+  // The docs-only fast path (scripts/change-scope.ts): the install, audit and format check always run, since
+  // Prettier checks non-Markdown files under docs/; typecheck, lint and the unit suite are skipped for docs.
+  it('runs the classifier, install, audit, typecheck, lint and format check as steps of build-and-test, before the unit suite', () => {
     expect(steps(yamlBlock(ci, 'build-and-test', '  '))).toEqual([
-      { name: 'The default branch is develop', run: '|' },
-      { name: '', run: '' },
-      { name: '', run: '|' },
-      { name: '', run: '' },
-      { name: '', run: 'node scripts/npm-ci.ts' },
-      { name: 'Audit', run: 'npm audit --audit-level=low' },
-      { name: 'Typecheck', run: 'npm run typecheck' },
-      { name: 'Lint', run: 'npm run lint' },
-      { name: 'Format', run: 'npm run format:check' },
-      { name: '', run: 'npm run test:unit' },
+      { name: 'The default branch is develop', run: '|', if: '' },
+      { name: '', run: '', if: '' },
+      { name: '', run: '|', if: '' },
+      { name: '', run: '', if: '' },
+      { name: '', run: 'node scripts/change-scope.ts', if: '' },
+      { name: '', run: 'node scripts/npm-ci.ts', if: '' },
+      { name: 'Audit', run: 'npm audit --audit-level=low', if: '' },
+      { name: 'Typecheck', run: 'npm run typecheck', if: CODE },
+      { name: 'Lint', run: 'npm run lint', if: CODE },
+      { name: 'Format', run: 'npm run format:check', if: '' },
+      { name: '', run: 'npm run test:unit', if: CODE },
     ]);
+  });
+
+  // A job skipped through needs: reports "skipped", which a required check takes as a pass, so coverage classifies
+  // for itself and still reports.
+  it('runs the classifier and install in coverage, and skips only the coverage run for docs', () => {
+    expect(steps(yamlBlock(ci, 'coverage', '  '))).toEqual([
+      { name: '', run: '', if: '' },
+      { name: '', run: '|', if: '' },
+      { name: '', run: '', if: '' },
+      { name: '', run: 'node scripts/change-scope.ts', if: '' },
+      { name: '', run: 'node scripts/npm-ci.ts', if: '' },
+      { name: '', run: 'npm run test:coverage', if: CODE },
+    ]);
+  });
+
+  it('fetches the parent commit in both jobs, so the classifier can diff it', () => {
+    expect(ci.match(/^ {10}fetch-depth: 2$/gm)).toHaveLength(2);
   });
 });
 
