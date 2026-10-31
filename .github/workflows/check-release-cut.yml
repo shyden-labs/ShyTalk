@@ -1,0 +1,50 @@
+# Every third-party `uses:` is pinned at the SHA ci.yml pins (supply-chain test).
+#
+# A pull request into main merges only a frozen release/* cut (issue shyden-labs/repo-template#86,
+# docs/release-cut.md). main is not strict, because each release merge lands
+# on main and never on squash-only develop; this job proves instead what
+# strict proved: that what lands is exactly what CI tested on develop.
+#
+# pull_request_target runs the default branch's own copy of this workflow and
+# checks out the default branch, never the pull request: the job fetches the
+# pull request's merge ref as git data and runs none of its code. It posts
+# its verdict as the release-cut commit status on the head, which main
+# requires (Shyden's rulings of 2026-10-23 on shyden-labs/repo-template#86).
+name: release-cut
+on:
+  pull_request_target:
+    branches: [main]
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  judge-release-cut:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      # The default branch, with every branch's history: the check asks git about origin/develop and origin/main.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143).
+      - id: node
+        run: |
+          version=$(sed -nE 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' .github/node/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+      # The head ref is text the pull request's author chose: it reaches the shell through env, never through an expression.
+      - name: Judge the release cut and post its status
+        env:
+          # A fork's full name, refused before anything is posted (issue shyden-labs/repo-template#103); empty once the fork is deleted.
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release-cut.ts "$HEAD_REPOSITORY" "$HEAD_REF" "$HEAD_SHA" "$PR_NUMBER"

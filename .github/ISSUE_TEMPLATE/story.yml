@@ -1,0 +1,58 @@
+name: Story
+description: One story, fully defined before any work starts.
+labels: []
+body:
+  - type: markdown
+    id: filing-steps
+    attributes:
+      value: |
+        Every project files a ticket the same way (`docs/project-board.md`, "Filing a ticket"):
+        1. **Search the open board first.** On a duplicate, add what is new to the original instead.
+        2. **Add the issue to the board**, checking the board’s title before you write.
+        3. Set the board’s **Estimate** field: 1, 2, 3, 5, 8 or 13 story points. It is scored from the acceptance criteria against similar closed stories, never from felt hours. Anything larger is an epic: split it into stories. Progress by effort reads the board field and nothing else.
+        4. Set its **Priority** too: P0 (now) to P5 (someday), as docs/project-board.md defines them. A blocker takes at least the level of what waits on it.
+        5. Add a **Blocked by** link for each issue it waits on: a “Depends on” section is context, not the record.
+        6. Set its epic as its **parent**.
+        7. Write `Refs #N` in commits and pull requests, never a closing keyword; close it by hand once every criterion is verified.
+
+        `node scripts/file-story.ts` does steps 1 to 6.
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      description: As a <who>, I can <what>, so that <why>.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: The spec sections, decisions and research it rests on, and what it waits on.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: Numbered, each one testable. A story is not ready until these are complete.
+      value: |
+        1.
+    validations:
+      required: true
+  - type: textarea
+    id: announce
+    attributes:
+      label: Announce
+      description: What this lets us tell people once it closes (on the site, the roadmap or the release notes), or "nothing" and why.
+    validations:
+      required: true
+  - type: textarea
+    id: definition-of-done
+    attributes:
+      label: Definition of done
+      value: |
+        - Every new test written first and seen red for the stated reason.
+        - Lint, typecheck, formatting and the zero-warnings gate pass; no retries; one test per case.
+        - CI green on the PR head SHA, read step by step by name; merged into `develop` and deployed to dev, verified.
+    validations:
+      required: true

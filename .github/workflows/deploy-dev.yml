@@ -1,0 +1,78 @@
+# Every merge into `develop` deploys to dev (shyden-labs/repo-template#12; operator 2026-10-14), so dev
+# always shows develop's head and nobody has to remember a deploy. A project
+# replaces the last step with its own deploy, acting only on the areas the
+# merge changed (`changed-files.txt`); until it does, the run fails and names
+# that step. Every pull request runs the same job as a rehearsal (shyden-labs/repo-template#35 AC3), so
+# its lines run on the pull request's own commit: it uses `dev-rehearsal`, an
+# environment that holds no credential, with DEPLOY_REHEARSAL=true, so it
+# deploys nothing. A pull request runs its own copy of this file, so what
+# keeps the dev credential out of one is `dev` letting only `develop` deploy
+# (shyden-labs/repo-template#117), not this file. A repository that hosts nothing deletes this file and
+# `tests/unit/deploy-dev.test.ts`, and says why in its README.
+#
+# Third-party actions are pinned to full SHAs with a `# vX.Y.Z` comment, as in
+# ci.yml.
+name: deploy-dev
+on:
+  push:
+    branches: [develop]
+  pull_request:
+  workflow_dispatch:
+
+# A deploy stopped halfway leaves dev in an undefined state, so a newer merge
+# waits for the running deploy instead of cancelling it. A newer pending run
+# cancels the older pending one, and a cancelled step reads as unrun (shyden-labs/repo-template#35), so
+# each pull request rehearses in its own group, never in develop's.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('deploy-dev-rehearsal-{0}', github.event.pull_request.number) || 'deploy-dev' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-dev:
+    # The template itself hosts nothing, so its own develop skips the deploy
+    # rather than failing on every merge (shyden-labs/repo-template#43, Shyden 2026-10-27). Its pull
+    # requests still rehearse, so the rehearsal is proved here before any
+    # project copies it (shyden-labs/repo-template#121, Shyden 2026-10-28). A repository made from the
+    # template has another name, so it runs this job, and the job fails until
+    # the last step is filled in.
+    if: ${{ github.repository != 'shyden-labs/repo-template' || github.event_name == 'pull_request' }}
+    runs-on: ubuntu-26.04
+    # The dev credential lives in `dev`, which must let only `develop` deploy
+    # (shyden-labs/repo-template#117), never as a repository secret. A pull request rehearses in
+    # `dev-rehearsal`, which GitHub creates on first use and which holds nothing.
+    environment: ${{ github.event_name == 'pull_request' && 'dev-rehearsal' || 'dev' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # What this deploy covers: the files the push changed, or every file on
+      # a hand-started run or a branch's first push (no earlier commit to diff).
+      # A pull request has no `before`, so its rehearsal diffs against its base.
+      - name: List the files this merge changed
+        env:
+          BEFORE: ${{ github.event.before || github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BEFORE" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            git diff --name-only "$BEFORE" "$GITHUB_SHA" > changed-files.txt
+          else
+            git ls-files > changed-files.txt
+          fi
+          {
+            echo '### Files this deploy covers'
+            echo '```'
+            cat changed-files.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Deploy the changed areas to dev
+        env:
+          DEPLOY_REHEARSAL: ${{ github.event_name == 'pull_request' }}
+        run: |
+          if [ "$GITHUB_REPOSITORY" = shyden-labs/repo-template ] && [ "$DEPLOY_REHEARSAL" = true ]; then
+            echo "The template hosts nothing, so its rehearsal deploys nothing."
+            exit 0
+          fi
+          echo "::error title=deploy-dev is not filled in::Replace this step with the project's own dev deploy, acting only on the areas in changed-files.txt, and deploying nothing when DEPLOY_REHEARSAL is true (README, Using it, step 7)."
+          exit 1

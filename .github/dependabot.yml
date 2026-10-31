@@ -1,0 +1,71 @@
+# Dependency updates for every ecosystem this repo carries, plus the Actions
+# themselves. Version updates are NOT inheritable org-wide -- only SECURITY
+# updates are -- so this file is mandatory in every repo and must be created
+# deliberately each time. Never assume an org setting covers it.
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    # Never `main`. A PR opened against a protected default branch either
+    # cannot merge or bypasses the dev gate entirely.
+    target-branch: 'develop'
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 10
+    groups:
+      # Vitest and @vitest/coverage-v8 must stay at one exact version
+      # (tests/unit/coverage-tool.test.ts), so they move in one pull request.
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+      # Dependabot scores groups rather than reading them in order, so the
+      # catch-all names what the vitest group holds, or a patch bump of one
+      # of them could land here alone.
+      patch-updates:
+        update-types:
+          - 'patch'
+        exclude-patterns:
+          - 'vitest'
+          - '@vitest/*'
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    target-branch: 'develop'
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 10
+    groups:
+      # CONFIGURED, not described. Dependabot treats actions/cache,
+      # actions/cache/restore and actions/cache/save as three dependencies, so
+      # ungrouped they arrive as three PRs, each moving one SHA while its
+      # siblings lag behind. ShyTalk shipped that bug as SHY-0226.
+      #
+      # Declaring it is not enough. Dependabot offers a package to every group
+      # that can hold it, and a group with no patterns outscores any wildcard,
+      # so order decides nothing (Shyden 2026-10-20). patch-updates excludes
+      # this group's pattern, so only this group can take a cache sub-path.
+      # tests/unit/supply-chain.test.ts checks every pattern group this way.
+      #
+      # It is declared here even though a new repo uses no sub-path actions
+      # yet, because the failure is silent on the day someone adds one.
+      actions-subpaths:
+        patterns:
+          - 'actions/cache*'
+      patch-updates:
+        update-types:
+          - 'patch'
+        exclude-patterns:
+          - 'actions/cache*'
+
+  # The exact Node CI runs (shyden-labs/repo-template#143): Dependabot opens one pull request per Node
+  # release, which alone goes red if the release warns. Majors are chosen.
+  - package-ecosystem: 'docker'
+    directory: '/.github/node'
+    target-branch: 'develop'
+    schedule:
+      interval: 'weekly'
+    ignore:
+      - dependency-name: 'node'
+        update-types:
+          - 'version-update:semver-major'

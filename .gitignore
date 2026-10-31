@@ -1,0 +1,8 @@
+node_modules/
+.vite/
+coverage/
+.superpowers/
+HANDOVER.md
+.claude/settings.local.json
+*.jks
+local.properties
