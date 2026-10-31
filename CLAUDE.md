@@ -28,4 +28,9 @@
 
 ## Board
 
-To be filled in once the board exists.
+- Board: "ShyTalk Stories", organisation project 5, node id `PVT_kwDOEOcG584BpkXr` (https://github.com/orgs/shyden-labs/projects/5). Assert the title before any write.
+- The old app's board is project 1, "ShyTalk Stories (legacy)": nothing new goes there.
+- Epic titles start with `Epic:`; the progress script leaves epics out of both counts.
+- Next ticket: `node scripts/board-next.ts PVT_kwDOEOcG584BpkXr "ShyTalk Stories"`.
+- Progress: `node scripts/board-progress.ts PVT_kwDOEOcG584BpkXr "ShyTalk Stories"`.
+- File a story: `node scripts/file-story.ts PVT_kwDOEOcG584BpkXr "ShyTalk Stories" <story.json>`.
