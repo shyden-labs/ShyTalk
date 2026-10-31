@@ -26,6 +26,8 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
       # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143).
       - id: node
         run: |
@@ -36,18 +38,25 @@ jobs:
         with:
           node-version: ${{ steps.node.outputs.version }}
           cache: 'npm'
+      # The docs-only fast path (scripts/change-scope.ts): every job runs and
+      # reports; a docs change skips everything but the install, audit and format check.
+      - id: classify
+        run: node scripts/change-scope.ts
       - run: node scripts/npm-ci.ts
       # Any known vulnerability, of any severity and dev dependencies included, fails the build (shyden-labs/repo-template#156).
       - name: Audit
         run: npm audit --audit-level=low
       # The static checks (issue shyden-labs/repo-template#61); .githooks/pre-push runs the same three before every push.
       - name: Typecheck
+        if: steps.classify.outputs.scope != 'docs-only'
         run: npm run typecheck
       - name: Lint
+        if: steps.classify.outputs.scope != 'docs-only'
         run: npm run lint
       - name: Format
         run: npm run format:check
-      - run: npm run test:unit
+      - if: steps.classify.outputs.scope != 'docs-only'
+        run: npm run test:unit
 
   # Coverage runs apart from the 1 s unit step: one overall threshold over the
   # TypeScript under scripts/ (vitest.unit.config.ts, shyden-labs/repo-template#149).
@@ -55,6 +64,8 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
       # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143).
       - id: node
         run: |
@@ -65,5 +76,10 @@ jobs:
         with:
           node-version: ${{ steps.node.outputs.version }}
           cache: 'npm'
+      # The docs-only fast path (scripts/change-scope.ts): every job runs and
+      # reports; a docs change skips everything but the install, audit and format check.
+      - id: classify
+        run: node scripts/change-scope.ts
       - run: node scripts/npm-ci.ts
-      - run: npm run test:coverage
+      - if: steps.classify.outputs.scope != 'docs-only'
+        run: npm run test:coverage
