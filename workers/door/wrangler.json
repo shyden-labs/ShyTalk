@@ -7,12 +7,12 @@
     "test": {
       "name": "shytalk-door-test",
       "routes": [{ "pattern": "test.shytalk.app", "custom_domain": true }],
-      "vars": { "ORIGIN": "https://shytalk-test.origin-set-in-task-e4.invalid" }
+      "vars": { "ORIGIN": "https://shytalk-test.shytalk-non-prod.workers.dev" }
     },
     "dev": {
       "name": "shytalk-door-dev",
       "routes": [{ "pattern": "dev.shytalk.app", "custom_domain": true }],
-      "vars": { "ORIGIN": "https://shytalk-dev.origin-set-in-task-e4.invalid" }
+      "vars": { "ORIGIN": "https://shytalk-dev.shytalk-non-prod.workers.dev" }
     }
   }
 }

@@ -34,6 +34,12 @@ describe('door config', () => {
     expect(Object.keys(environment(name)['vars'] as Config)).toEqual(['ORIGIN']);
   });
 
+  // The Non-Prod account's workers.dev subdomain, read from Cloudflare on
+  // 2026-11-01 (ShyTalk#30); each door forwards to its own environment's Worker.
+  it.each(['test', 'dev'])('the %s door forwards to its own Worker on the Non-Prod workers.dev address', (name) => {
+    expect((environment(name)['vars'] as Config)['ORIGIN']).toBe(`https://shytalk-${name}.shytalk-non-prod.workers.dev`);
+  });
+
   it.each(['test', 'dev'])('the %s door answers on %s.shytalk.app as a custom domain', (name) => {
     expect(environment(name)['name']).toBe(`shytalk-door-${name}`);
     expect(environment(name)['routes']).toEqual([{ pattern: `${name}.shytalk.app`, custom_domain: true }]);
