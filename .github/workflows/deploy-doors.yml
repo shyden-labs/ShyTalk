@@ -1,0 +1,65 @@
+# The front doors for TEST and DEV (design 4.17; plan 2
+# Task E6 Step 2, shyden-labs/ShyTalk#31). They live in the production
+# "shytalk" account, so they deploy only from here: from `main`, in the
+# `production` environment, which waits for Shyden's approval and holds the
+# production token (decisions 207, 214). Each door gets its own environment's
+# door secret, which the matching Non-Prod origin also holds (decision 216).
+# deploy-dev never deploys a door (decision 217).
+#
+# Third-party actions are pinned to full SHAs with a `# vX.Y.Z` comment, as in
+# ci.yml.
+name: deploy-doors
+on:
+  push:
+    branches: [main]
+    paths: ['workers/door/**', '.github/workflows/deploy-doors.yml']
+  workflow_dispatch:
+
+# A door deploy stopped halfway leaves one door older than the other, so a
+# newer run waits for the running one.
+concurrency:
+  group: deploy-doors
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-doors:
+    # `production` allows only `main` too; this line makes a hand-started run
+    # on another branch skip before asking for approval.
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-26.04
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143), as in ci.yml.
+      - id: node
+        run: |
+          version=$(sed -nE 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' .github/node/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: 'npm'
+      - run: node scripts/npm-ci.ts
+      - name: Deploy both doors with their secrets
+        working-directory: workers/door
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DOOR_SECRET_TEST: ${{ secrets.DOOR_SECRET_TEST }}
+          DOOR_SECRET_DEV: ${{ secrets.DOOR_SECRET_DEV }}
+        run: |
+          if [ -z "$DOOR_SECRET_TEST" ]; then
+            echo "::error title=DOOR_SECRET_TEST missing::Set DOOR_SECRET_TEST in the production environment (decision 216)."
+            exit 1
+          fi
+          if [ -z "$DOOR_SECRET_DEV" ]; then
+            echo "::error title=DOOR_SECRET_DEV missing::Set DOOR_SECRET_DEV in the production environment (decision 216)."
+            exit 1
+          fi
+          npx wrangler deploy --env test || { echo "::error title=deploy-doors failed::the test door did not deploy"; exit 1; }
+          printf '%s' "$DOOR_SECRET_TEST" | npx wrangler secret put DOOR_SECRET --env test || { echo "::error title=deploy-doors failed::the test door secret was not set"; exit 1; }
+          npx wrangler deploy --env dev || { echo "::error title=deploy-doors failed::the dev door did not deploy"; exit 1; }
+          printf '%s' "$DOOR_SECRET_DEV" | npx wrangler secret put DOOR_SECRET --env dev || { echo "::error title=deploy-doors failed::the dev door secret was not set"; exit 1; }
