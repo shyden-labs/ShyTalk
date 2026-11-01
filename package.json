@@ -23,10 +23,13 @@
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "wrangler": "4.156.0"
   },
   "allowScripts": {
-    "fsevents": false
+    "fsevents": false,
+    "esbuild": false,
+    "workerd": false
   },
   "overrides": {
     "minimatch": "11.0.3"

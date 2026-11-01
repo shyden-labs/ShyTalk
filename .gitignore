@@ -6,3 +6,4 @@ HANDOVER.md
 .claude/settings.local.json
 *.jks
 local.properties
+.wrangler/
