@@ -1,0 +1,30 @@
+---
+import { localePath, t, type Locale } from '../i18n/t.ts';
+import { SHOW_ROADMAP, SHOW_SIGN_IN } from '../site.ts';
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const items = [
+  { href: localePath(locale, '/'), label: t(locale, 'menu.home') },
+  { href: localePath(locale, '/closed-testing'), label: t(locale, 'menu.closedTesting') },
+  ...(SHOW_ROADMAP ? [{ href: localePath(locale, '/roadmap'), label: t(locale, 'menu.roadmap') }] : []),
+  ...(SHOW_SIGN_IN ? [{ href: localePath(locale, '/sign-in'), label: t(locale, 'menu.signIn') }] : []),
+];
+---
+
+<header class="site-header">
+  <a class="brand" href={localePath(locale, '/')}>{t(locale, 'site.name')}</a>
+  <nav aria-label={t(locale, 'menu.label')}>
+    <ul>
+      {
+        items.map((item) => (
+          <li>
+            <a href={item.href}>{item.label}</a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</header>

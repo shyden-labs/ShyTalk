@@ -7,3 +7,5 @@ HANDOVER.md
 *.jks
 local.properties
 .wrangler/
+apps/web/dist/
+apps/web/.astro/

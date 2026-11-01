@@ -26,7 +26,9 @@ describe('eslint.config.js', () => {
 
   it('reads types through the project service, rooted at the repository', () => {
     expect(config.map((c) => c.languageOptions?.parserOptions).filter((p) => p !== undefined)).toEqual([
-      { projectService: true, tsconfigRootDir: ROOT },
+      // The Astro config sits outside tsconfig (its import pulls in browser-typed declarations),
+      // so the project service lints it under a default project rather than skipping it.
+      { projectService: { allowDefaultProject: ['apps/web/astro.config.mjs'] }, tsconfigRootDir: ROOT },
     ]);
   });
 
@@ -73,6 +75,8 @@ describe('eslint.config.js', () => {
       'coverage/',
       'node_modules/',
       '.superpowers/',
+      'apps/web/dist/',
+      'apps/web/.astro/',
     ]);
   });
 });

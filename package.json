@@ -19,6 +19,7 @@
     "@eslint/js": "10.0.1",
     "@types/node": "26.6.5",
     "@vitest/coverage-v8": "5.0.5",
+    "astro": "7.3.5",
     "eslint": "10.13.0",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
