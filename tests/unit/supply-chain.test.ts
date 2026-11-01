@@ -121,7 +121,7 @@ const splitPins = (uses: Use[]) => {
 describe('the CI supply chain is pinned', () => {
   it('pins each action at one SHA in every workflow, judged over every pinned use', () => {
     const uses = externalUses();
-    expect({ pinned: uses.length, split: splitPins(uses) }).toEqual({ pinned: 10, split: [] });
+    expect({ pinned: uses.length, split: splitPins(uses) }).toEqual({ pinned: 11, split: [] });
   });
 
   it('names an action whose bump reached one workflow and missed another', () => {
@@ -373,7 +373,7 @@ describe('the template runs one Node and one runner, pinned exactly', () => {
 
   it("every setup-node step takes the read step's version and follows it, judged over every step read", () => {
     const steps = workflowFiles().flatMap((f) => setupNodeSteps(f, workflow(f)));
-    expect({ read: steps.length, wrong: steps.filter(({ wrong }) => wrong.length > 0) }).toEqual({ read: 4, wrong: [] });
+    expect({ read: steps.length, wrong: steps.filter(({ wrong }) => wrong.length > 0) }).toEqual({ read: 5, wrong: [] });
   });
 
   const steps = (...lines: string[]) => ['    steps:', ...lines, ''].join('\n');
@@ -524,8 +524,10 @@ describe('the template runs one Node and one runner, pinned exactly', () => {
   // npm 11 skips every dependency install script that allowScripts does not name, and warns about it. The only
   // install script fsevents has is the `node-gyp rebuild` npm adds for a package published with a binding.gyp,
   // but its tarball ships no binding.gyp, only a prebuilt universal fsevents.node that loads without it (shyden-labs/repo-template#70).
-  it('allowScripts denies fsevents and approves nothing', () => {
-    expect(manifest().allowScripts).toEqual({ fsevents: false });
+  // esbuild's and workerd's (wrangler's) postinstalls only check the platform binary npm already installed;
+  // `wrangler deploy --dry-run` bundles without them (plan 2 Task E2, measured pass 4; shyden-labs/ShyTalk#31).
+  it('allowScripts denies fsevents, esbuild and workerd and approves nothing', () => {
+    expect(manifest().allowScripts).toEqual({ fsevents: false, esbuild: false, workerd: false });
   });
 
   // An allow-scripts line in .npmrc approves packages past allowScripts, so the file is pinned whole.
@@ -541,7 +543,10 @@ describe('the template runs one Node and one runner, pinned exactly', () => {
     const withScripts = Object.entries(packages)
       .filter(([, entry]) => entry.hasInstallScript === true)
       .map(([path]) => path.slice(path.lastIndexOf('node_modules/') + 'node_modules/'.length));
-    expect([withScripts.sort(), Object.keys({ ...manifest().allowScripts }).sort()]).toEqual([['fsevents'], ['fsevents']]);
+    expect([withScripts.sort(), Object.keys({ ...manifest().allowScripts }).sort()]).toEqual([
+      ['esbuild', 'fsevents', 'workerd'],
+      ['esbuild', 'fsevents', 'workerd'],
+    ]);
   });
 });
 

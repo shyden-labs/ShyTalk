@@ -15,7 +15,8 @@ export interface Exception {
   reason: string;
 }
 
-const PERMISSIVE = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'BlueOak-1.0.0']);
+// 0BSD (tslib) and CC0-1.0 (@speed-highlight/core, via wrangler's miniflare) are public-domain-equivalent: no conditions at all.
+const PERMISSIVE = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'BlueOak-1.0.0', '0BSD', 'CC0-1.0']);
 
 const WEAK_COPYLEFT = new Set(['MPL-2.0', 'LGPL-2.1-only', 'LGPL-2.1-or-later', 'LGPL-3.0-only', 'LGPL-3.0-or-later']);
 
@@ -28,6 +29,11 @@ export const EXCEPTIONS: Exception[] = [
   {
     name: /^lightningcss(-.+)?$/,
     reason: 'MPL-2.0; CSS tooling inside vitest (via vite) and its per-platform builds; only tests run it',
+  },
+  {
+    name: /^@img\/sharp-.+$/,
+    reason:
+      "LGPL-3.0 (libvips); sharp's per-platform builds inside wrangler's local runtime (miniflare); only wrangler on CI or the Mac runs it, and no Worker imports it",
   },
 ];
 

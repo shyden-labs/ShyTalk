@@ -69,23 +69,42 @@ describe('deploy-dev', () => {
     expect(keys).toEqual(['if', 'runs-on', 'environment', 'steps']);
   });
 
-  // Only the template's rehearsal passes the placeholder: the template has
-  // nothing to deploy (shyden-labs/repo-template#121). Anywhere else, or on a real deploy, it fails
-  // until the project fills it in.
-  it('still fails in a repository made from the template until it fills in its deploy', () => {
+  // The project's own deploy (shyden-labs/ShyTalk#44; decisions 216, 217): the
+  // dev origin Worker, only when its files changed; a rehearsal only bundles it,
+  // with no credential; never a door, which deploys only through production.
+  const deployStep = (): string[] => {
     const jobs = topLevel(workflow(), 'jobs').split('\n');
-    const step = jobs.indexOf('      - name: Deploy the changed areas to dev');
-    expect(jobs.slice(step, step + 10)).toEqual([
-      '      - name: Deploy the changed areas to dev',
-      '        env:',
-      '          DEPLOY_REHEARSAL: ${{ github.event_name == pull_request }}',
-      '        run: |',
-      '          if [ $GITHUB_REPOSITORY = shyden-labs/repo-template ] && [ $DEPLOY_REHEARSAL = true ]; then',
-      '            echo The template hosts nothing, so its rehearsal deploys nothing.',
-      '            exit 0',
-      '          fi',
-      '          echo ::error title=deploy-dev is not filled in::Replace this step with the projects own dev deploy, acting only on the areas in changed-files.txt, and deploying nothing when DEPLOY_REHEARSAL is true (README, Using it, step 7).',
-      '          exit 1',
-    ]);
+    const start = jobs.indexOf('      - name: Deploy the changed areas to dev');
+    expect(start).toBeGreaterThan(-1);
+    return jobs.slice(start);
+  };
+
+  it('no longer holds the template placeholder', () => {
+    expect(workflow()).not.toContain('deploy-dev is not filled in');
+  });
+
+  it('deploys only when the echo Worker or the environment package changed', () => {
+    expect(deployStep()).toContain('          if ! grep -qE ^(workers/echo/|packages/environment/) changed-files.txt; then');
+  });
+
+  it('only bundles on a rehearsal, and deploys the dev environment otherwise', () => {
+    const step = deployStep().join('\n');
+    const rehearsal = step.indexOf('if [ $DEPLOY_REHEARSAL = true ]; then');
+    const dryRun = step.indexOf('npx wrangler deploy --dry-run --env dev');
+    const deploy = step.indexOf('npx wrangler deploy --env dev ||');
+    expect(rehearsal).toBeGreaterThan(-1);
+    expect(dryRun).toBeGreaterThan(rehearsal);
+    expect(deploy).toBeGreaterThan(dryRun);
+  });
+
+  it('sets the door secret from the dev environment, failing when it is missing', () => {
+    const step = deployStep().join('\n');
+    expect(step).toContain('DOOR_SECRET: ${{ secrets.DOOR_SECRET }}');
+    expect(step).toContain('if [ -z $DOOR_SECRET ]; then');
+    expect(step).toContain('npx wrangler secret put DOOR_SECRET --env dev');
+  });
+
+  it('never deploys a door', () => {
+    expect(workflow()).not.toContain('workers/door');
   });
 });
