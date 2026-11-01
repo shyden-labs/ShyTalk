@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import web, { CONTENT_SECURITY_POLICY, handle, type WebEnv } from '../../workers/web/src/index.ts';
+import web from '../../workers/web/src/index.ts';
+import { CONTENT_SECURITY_POLICY, handle, type WebEnv } from '../../workers/web/src/web.ts';
 import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
 
 /**

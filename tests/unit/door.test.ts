@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import door, { DOOR_SECRET_HEADER, forward, type DoorEnv } from '../../workers/door/src/index.ts';
+import door from '../../workers/door/src/index.ts';
+import { DOOR_SECRET_HEADER, forward, type DoorEnv } from '../../workers/door/src/door.ts';
 
 /**
  * The front door (design 4.17, ShyTalk#28): a Worker in PROD's zone that passes
