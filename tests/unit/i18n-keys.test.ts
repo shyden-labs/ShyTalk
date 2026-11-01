@@ -53,6 +53,14 @@ describe('t', () => {
     expect(() => t('th', 'missing')).toThrow('no line "missing" in th');
     expect(() => t('en', 'menu')).toThrow('no line "menu" in en');
   });
+
+  it('throws when the key reaches past a line, rather than reading into the text', () => {
+    expect(() => t('id', 'menu.home.length')).toThrow('no line "menu.home.length" in id');
+  });
+
+  it('throws when the key reaches past a missing section', () => {
+    expect(() => t('vi', 'nowhere.home')).toThrow('no line "nowhere.home" in vi');
+  });
 });
 
 describe('localePath', () => {

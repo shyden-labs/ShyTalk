@@ -15,7 +15,7 @@ export default {
     hookTimeout: 1_000,
     coverage: {
       provider: 'v8',
-      include: ['scripts/**/*.ts', 'workers/*/src/**/*.ts', 'packages/**/*.ts'],
+      include: ['scripts/**/*.ts', 'workers/*/src/**/*.ts', 'packages/**/*.ts', 'apps/web/src/**/*.ts'],
       reporter: ['text-summary', 'lcov'],
       thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },
     },

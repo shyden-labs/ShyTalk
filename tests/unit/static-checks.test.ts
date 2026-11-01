@@ -29,7 +29,9 @@ const CODE = 'steps.classify.outputs.scope != docs-only';
 
 describe('package.json', () => {
   it.each([
-    ['typecheck', 'tsc --noEmit -p .'],
+    ['typecheck', 'tsc --noEmit -p . && tsc --noEmit -p tests/smoke'],
+    ['build:web', 'astro build --root apps/web'],
+    ['test:smoke', 'playwright test -c tests/smoke'],
     ['lint', 'eslint --max-warnings 0 .'],
     ['format:check', 'prettier --check .'],
     ['format', 'prettier --write .'],
@@ -71,8 +73,21 @@ describe('ci.yml', () => {
     ]);
   });
 
-  it('fetches the parent commit in both jobs, so the classifier can diff it', () => {
-    expect(ci.match(/^ {10}fetch-depth: 2$/gm)).toHaveLength(2);
+  it('builds the site, installs Chromium and runs the smoke in web-smoke, skipping all three for docs', () => {
+    expect(steps(yamlBlock(ci, 'web-smoke', '  '))).toEqual([
+      { name: '', run: '', if: '' },
+      { name: '', run: '|', if: '' },
+      { name: '', run: '', if: '' },
+      { name: '', run: 'node scripts/change-scope.ts', if: '' },
+      { name: '', run: 'node scripts/npm-ci.ts', if: '' },
+      { name: 'Build the site', run: 'npm run build:web', if: CODE },
+      { name: 'Install Chromium', run: 'npx playwright install --with-deps chromium', if: CODE },
+      { name: 'Smoke', run: '|', if: CODE },
+    ]);
+  });
+
+  it('fetches the parent commit in all three jobs, so the classifier can diff it', () => {
+    expect(ci.match(/^ {10}fetch-depth: 2$/gm)).toHaveLength(3);
   });
 });
 

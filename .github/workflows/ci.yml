@@ -84,6 +84,46 @@ jobs:
       - if: steps.classify.outputs.scope != 'docs-only'
         run: npm run test:coverage
 
+  # The site smoke (shyden-labs/ShyTalk#51 AC4): the built pages served by the
+  # real web Worker under `wrangler dev` as DEV, behind the door with a fresh
+  # secret per run; each language's home 200 and 404 404, in its language,
+  # with no CSP refusal (playwright.config.ts, tests/smoke/).
+  web-smoke:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143).
+      - id: node
+        run: |
+          version=$(sed -nE 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' .github/node/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: 'npm'
+      # The docs-only fast path (scripts/change-scope.ts): every job runs and
+      # reports; a docs change skips everything but the install.
+      - id: classify
+        run: node scripts/change-scope.ts
+      - run: node scripts/npm-ci.ts
+      - name: Build the site
+        if: steps.classify.outputs.scope != 'docs-only'
+        run: npm run build:web
+      - name: Install Chromium
+        if: steps.classify.outputs.scope != 'docs-only'
+        run: npx playwright install --with-deps chromium
+      - name: Smoke
+        if: steps.classify.outputs.scope != 'docs-only'
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          SMOKE_DOOR_SECRET=$(openssl rand -hex 32)
+          export SMOKE_DOOR_SECRET
+          npm run test:smoke
+
   # The SonarCloud quality gate, blocking (shyden-labs/repo-template#27, shyden-labs/repo-template#60): the reusable workflow
   # scans, then fails unless this scan's gate is OK (docs/sonarcloud.md).
   sonarcloud:
