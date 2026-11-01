@@ -18,7 +18,7 @@ const read = (f: string) => readFileSync(`${WORKFLOWS}/${f}`, 'utf8');
 
 describe('every workflow', () => {
   it('is judged', () => {
-    expect(files).toEqual(['check-release-cut.yml', 'ci.yml', 'deploy-dev.yml', 'sonarcloud.yml']);
+    expect(files).toEqual(['check-release-cut.yml', 'ci.yml', 'deploy-dev.yml', 'deploy-doors.yml', 'sonarcloud.yml']);
   });
 
   it.each(files)('%s swallows no failure and gates no step on the token', (file) => {

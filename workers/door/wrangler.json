@@ -1,6 +1,7 @@
 {
   "name": "shytalk-door",
   "main": "src/index.ts",
+  "account_id": "debdf0b47ce2f7e5554e99c1f5d3a1e0",
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
   "env": {

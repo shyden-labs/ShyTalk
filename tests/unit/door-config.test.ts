@@ -14,7 +14,13 @@ const environment = (name: string): Config => (config()['env'] as Record<string,
 
 describe('door config', () => {
   it('holds only the allowed top-level keys', () => {
-    expect(Object.keys(config()).sort()).toEqual(['compatibility_date', 'env', 'main', 'name', 'workers_dev']);
+    expect(Object.keys(config()).sort()).toEqual(['account_id', 'compatibility_date', 'env', 'main', 'name', 'workers_dev']);
+  });
+
+  // The doors live in the production "shytalk" account, which holds the
+  // shytalk.app zone (decisions 193, 207); the id was read from Cloudflare (ShyTalk#26).
+  it('deploys to the production shytalk account, never Non-Prod', () => {
+    expect(config()['account_id']).toBe('debdf0b47ce2f7e5554e99c1f5d3a1e0');
   });
 
   it('runs src/index.ts, never on a workers.dev address of its own', () => {
