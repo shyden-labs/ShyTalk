@@ -1,0 +1,53 @@
+# The daily door count (decision 197; plan 2 Task E6 Step 5,
+# shyden-labs/ShyTalk#31). Only people use the doors; this reads each door's
+# requests over the past day (scripts/door-count.ts) and opens an issue for
+# ShydenMcM when TEST passes 20,000, DEV 10,000, or the read fails.
+#
+# Why `prod-cron` (the global prod-cron rule): it runs unattended every day,
+# so it cannot wait for an approval click. `prod-cron` allows `main` alone,
+# has no reviewer, and holds only a read-only Account Analytics token for the
+# production shytalk account. door-count-trigger.yml dispatches it on `main`.
+#
+# Third-party actions are pinned to full SHAs with a `# vX.Y.Z` comment, as in
+# ci.yml.
+name: door-count
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  door-count:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-26.04
+    environment: prod-cron
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143), as in ci.yml.
+      - id: node
+        run: |
+          version=$(sed -nE 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' .github/node/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+      # The script imports only node, so no install is needed.
+      - name: Count each door's requests over the past day
+        env:
+          CLOUDFLARE_ANALYTICS_TOKEN: ${{ secrets.CLOUDFLARE_ANALYTICS_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: debdf0b47ce2f7e5554e99c1f5d3a1e0
+        run: node scripts/door-count.ts
+      # Any failure above (an over-limit door, a failed read, a broken step)
+      # opens an issue, so the count never stops silently.
+      - name: Open an issue for ShydenMcM
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" --assignee ShydenMcM \
+            --title "Door count: over a limit or unreadable ($(date -u +%F))" \
+            --body "The daily door count failed (decision 197). Its summary names each door's count or why it could not be read: $RUN_URL"
