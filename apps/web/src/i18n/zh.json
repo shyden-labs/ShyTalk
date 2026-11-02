@@ -1,28 +1,39 @@
 {
   "site": {
     "name": "ShyTalk",
-    "tagline": "Learn languages and cultures by talking."
+    "tagline": "在交谈中学习语言和文化。"
   },
   "menu": {
-    "label": "Main menu",
-    "home": "Home",
-    "closedTesting": "Closed testing",
-    "roadmap": "Roadmap",
-    "signIn": "Sign in"
+    "label": "主菜单",
+    "home": "首页",
+    "closedTesting": "封闭测试",
+    "roadmap": "路线图",
+    "signIn": "登录"
   },
   "footer": {
-    "terms": "Terms",
-    "privacy": "Privacy",
-    "guidelines": "Community guidelines",
-    "contact": "Contact"
+    "terms": "条款",
+    "privacy": "隐私",
+    "guidelines": "社区准则",
+    "contact": "联系方式"
   },
   "home": {
     "title": "ShyTalk",
-    "placeholder": "This page is being built."
+    "heading": "在交谈中学习语言和文化",
+    "intro": "ShyTalk 是一个友好的地方，让你开口练习语言，并探索语言背后的文化。",
+    "paceTitle": "按自己的节奏练习。",
+    "paceBody": "进入语音房间，先听一听，等你准备好了再入座发言。害羞的人在这里同样受欢迎。",
+    "peopleTitle": "向以这种语言生活的人学习。",
+    "peopleBody": "听听一种语言在现实中是怎么说的，了解随之而来的习俗、节日和日常生活。",
+    "safeTitle": "友善、安全的空间。",
+    "safeBody": "清晰的社区规则让 ShyTalk 保持互相支持的氛围，并由管理员负责执行。未满 18 岁的用户和成年人使用各自独立的空间。",
+    "wayTitle": "ShyTalk 即将到来。",
+    "wayBody": "ShyTalk 应用正在开发中。申请封闭测试，抢先体验。",
+    "apply": "申请封闭测试",
+    "roadmap": "查看路线图"
   },
   "notFound": {
-    "title": "Page not found",
-    "body": "There is no page at this address.",
-    "home": "Go to the home page"
+    "title": "找不到页面",
+    "body": "此地址没有页面。",
+    "home": "返回首页"
   }
 }

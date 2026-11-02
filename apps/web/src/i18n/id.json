@@ -1,28 +1,39 @@
 {
   "site": {
     "name": "ShyTalk",
-    "tagline": "Learn languages and cultures by talking."
+    "tagline": "Belajar bahasa dan budaya dengan bercakap-cakap."
   },
   "menu": {
-    "label": "Main menu",
-    "home": "Home",
-    "closedTesting": "Closed testing",
-    "roadmap": "Roadmap",
-    "signIn": "Sign in"
+    "label": "Navigasi utama",
+    "home": "Beranda",
+    "closedTesting": "Uji coba tertutup",
+    "roadmap": "Peta jalan",
+    "signIn": "Masuk"
   },
   "footer": {
-    "terms": "Terms",
-    "privacy": "Privacy",
-    "guidelines": "Community guidelines",
-    "contact": "Contact"
+    "terms": "Syarat dan Ketentuan",
+    "privacy": "Privasi",
+    "guidelines": "Pedoman komunitas",
+    "contact": "Kontak"
   },
   "home": {
     "title": "ShyTalk",
-    "placeholder": "This page is being built."
+    "heading": "Belajar bahasa dan budaya dengan bercakap-cakap",
+    "intro": "ShyTalk adalah tempat yang ramah untuk berlatih berbicara dalam suatu bahasa dan mengenal budaya di baliknya.",
+    "paceTitle": "Berlatih sesuai kecepatanmu.",
+    "paceBody": "Masuk ke ruang obrolan suara, dengarkan dulu, lalu ambil kursi untuk berbicara saat kamu sudah siap. Pemalu pun disambut di sini.",
+    "peopleTitle": "Belajar dari orang-orang yang menjalaninya.",
+    "peopleBody": "Dengarkan bagaimana suatu bahasa benar-benar diucapkan, dan pelajari adat, perayaan, dan kehidupan sehari-hari yang menyertainya.",
+    "safeTitle": "Ruang yang ramah dan aman.",
+    "safeBody": "Aturan komunitas yang jelas menjaga ShyTalk tetap suportif, dan para moderator menegakkannya. Pengguna di bawah 18 tahun dan orang dewasa menggunakan area terpisah.",
+    "wayTitle": "ShyTalk segera hadir.",
+    "wayBody": "Aplikasi ShyTalk sedang dibangun saat ini. Ajukan diri untuk uji coba tertutup agar bisa mencobanya lebih awal.",
+    "apply": "Ajukan diri untuk uji coba tertutup",
+    "roadmap": "Lihat peta jalan"
   },
   "notFound": {
-    "title": "Page not found",
-    "body": "There is no page at this address.",
-    "home": "Go to the home page"
+    "title": "Halaman tidak ditemukan",
+    "body": "Tidak ada halaman di alamat ini.",
+    "home": "Ke beranda"
   }
 }

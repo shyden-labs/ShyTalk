@@ -32,6 +32,10 @@ export const EXCEPTIONS: Exception[] = [
     reason: 'MPL-2.0; CSS tooling inside vitest (via vite) and its per-platform builds; only tests run it',
   },
   {
+    name: /^(@axe-core\/playwright|axe-core)$/,
+    reason: 'MPL-2.0; the accessibility check in the CI Playwright smoke (shyden-labs/ShyTalk#53); only tests run it',
+  },
+  {
     name: /^@img\/sharp-.+$/,
     reason:
       "LGPL-3.0 (libvips); sharp's per-platform builds inside wrangler's local runtime (miniflare); only wrangler on CI or the Mac runs it, and no Worker imports it",
