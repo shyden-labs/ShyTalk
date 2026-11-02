@@ -107,6 +107,9 @@ describe('no workflow approves an install script past allowScripts', () => {
       'workflows/check-release-cut.yml',
       'workflows/ci.yml',
       'workflows/deploy-dev.yml',
+      'workflows/deploy-doors.yml',
+      'workflows/door-count-trigger.yml',
+      'workflows/door-count.yml',
       'workflows/sonarcloud.yml',
     ]);
   });

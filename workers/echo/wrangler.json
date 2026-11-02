@@ -1,0 +1,15 @@
+{
+  "name": "shytalk-echo",
+  "main": "src/index.ts",
+  "account_id": "6a27c9ff4b4eefef2c46535449ea4f49",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["EchoRoom"] }],
+  "env": {
+    "dev": {
+      "name": "shytalk-dev",
+      "workers_dev": true,
+      "durable_objects": { "bindings": [{ "name": "ECHO", "class_name": "EchoRoom" }] }
+    }
+  }
+}

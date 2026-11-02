@@ -1,8 +1,7 @@
 # Every merge into `develop` deploys to dev (shyden-labs/repo-template#12; operator 2026-10-14), so dev
-# always shows develop's head and nobody has to remember a deploy. A project
-# replaces the last step with its own deploy, acting only on the areas the
-# merge changed (`changed-files.txt`); until it does, the run fails and names
-# that step. Every pull request runs the same job as a rehearsal (shyden-labs/repo-template#35 AC3), so
+# always shows develop's head and nobody has to remember a deploy. The last
+# step is ShyTalk's own deploy, acting only on the areas the merge changed
+# (`changed-files.txt`). Every pull request runs the same job as a rehearsal (shyden-labs/repo-template#35 AC3), so
 # its lines run on the pull request's own commit: it uses `dev-rehearsal`, an
 # environment that holds no credential, with DEPLOY_REHEARSAL=true, so it
 # deploys nothing. A pull request runs its own copy of this file, so what
@@ -66,13 +65,41 @@ jobs:
             cat changed-files.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143), as in ci.yml.
+      - id: node
+        run: |
+          version=$(sed -nE 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' .github/node/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: 'npm'
+      - run: node scripts/npm-ci.ts
+      # ShyTalk's dev deploy (shyden-labs/ShyTalk#44; decisions 216, 217): the
+      # dev origin Worker on the Non-Prod account, only when its files changed.
+      # Today that is the throwaway echo Worker of the door spike
+      # (shyden-labs/ShyTalk#31). A rehearsal only bundles it, with no
+      # credential. Doors never deploy from here: they live in the production
+      # account and deploy only through `production`, with Shyden's approval.
       - name: Deploy the changed areas to dev
         env:
           DEPLOY_REHEARSAL: ${{ github.event_name == 'pull_request' }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
         run: |
-          if [ "$GITHUB_REPOSITORY" = shyden-labs/repo-template ] && [ "$DEPLOY_REHEARSAL" = true ]; then
-            echo "The template hosts nothing, so its rehearsal deploys nothing."
+          if ! grep -qE '^(workers/echo/|packages/environment/)' changed-files.txt; then
+            echo "Nothing deployable changed, so dev deploys nothing."
             exit 0
           fi
-          echo "::error title=deploy-dev is not filled in::Replace this step with the project's own dev deploy, acting only on the areas in changed-files.txt, and deploying nothing when DEPLOY_REHEARSAL is true (README, Using it, step 7)."
-          exit 1
+          cd workers/echo
+          if [ "$DEPLOY_REHEARSAL" = true ]; then
+            npx wrangler deploy --dry-run --env dev --outdir "$RUNNER_TEMP/echo" || { echo "::error title=deploy-dev failed::workers/echo did not bundle"; exit 1; }
+            exit 0
+          fi
+          npx wrangler deploy --env dev || { echo "::error title=deploy-dev failed::workers/echo did not deploy"; exit 1; }
+          if [ -z "$DOOR_SECRET" ]; then
+            echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the dev environment (decision 216); until then the dev origin refuses every request."
+            exit 1
+          fi
+          printf '%s' "$DOOR_SECRET" | npx wrangler secret put DOOR_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev door secret was not set"; exit 1; }

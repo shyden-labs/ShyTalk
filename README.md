@@ -11,7 +11,7 @@ settings already in place, and nothing it doesn't need on day one (shyden-labs/r
 
 | File | What it does |
 | --- | --- |
-| `.github/workflows/ci.yml` | On every pull request and every push to `develop`: install, `npm audit` (any known vulnerability fails), typecheck, lint, format check and unit tests (`build-and-test`), then coverage as one overall threshold over the TypeScript under `scripts/` (`coverage`). Its first step fails unless the default branch is `develop`. |
+| `.github/workflows/ci.yml` | On every pull request and every push to `develop`: install, `npm audit` (any known vulnerability fails), typecheck, lint, format check and unit tests (`build-and-test`), then coverage as one overall threshold over the TypeScript under `scripts/` (`coverage`). Its first step fails unless the default branch is `develop`. A pull request changing only Markdown or non-code files under `docs/` takes the docs-only fast path (`scripts/change-scope.ts`): both jobs still run and report, but skip typecheck, lint, unit tests and coverage. |
 | `.github/dependabot.yml` | Version updates for npm, GitHub Actions and the Node pin, each targeting `develop`. |
 | `.github/node/Dockerfile` | CI's one exact Node version (`FROM node:<major>.<minor>.<patch>`), bumped by Dependabot as a pull request of its own (shyden-labs/repo-template#143). |
 | `scripts/npm-ci.ts` | Every workflow installs through it: `npm ci` that fails on any warning npm prints, naming each line (shyden-labs/repo-template#140). |

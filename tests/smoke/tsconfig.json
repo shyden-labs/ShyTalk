@@ -1,0 +1,7 @@
+{
+  "//": "The browser smoke: the root options plus the DOM, which Playwright's types need (shyden-labs/ShyTalk#51).",
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "lib": ["es2024", "dom"] },
+  "include": ["**/*.ts"],
+  "exclude": []
+}

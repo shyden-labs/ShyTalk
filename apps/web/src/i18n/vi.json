@@ -1,0 +1,39 @@
+{
+  "site": {
+    "name": "ShyTalk",
+    "tagline": "Học ngôn ngữ và văn hóa qua trò chuyện."
+  },
+  "menu": {
+    "label": "Menu chính",
+    "home": "Trang chủ",
+    "closedTesting": "Thử nghiệm kín",
+    "roadmap": "Lộ trình phát triển",
+    "signIn": "Đăng nhập"
+  },
+  "footer": {
+    "terms": "Điều khoản sử dụng",
+    "privacy": "Quyền riêng tư",
+    "guidelines": "Nguyên tắc cộng đồng",
+    "contact": "Liên hệ"
+  },
+  "home": {
+    "title": "ShyTalk",
+    "heading": "Học ngôn ngữ và văn hóa qua trò chuyện",
+    "intro": "ShyTalk là một nơi thân thiện để luyện nói một ngôn ngữ thành tiếng và khám phá những nền văn hóa đằng sau nó.",
+    "paceTitle": "Luyện tập theo nhịp độ của bạn.",
+    "paceBody": "Vào một phòng trò chuyện thoại, lắng nghe, rồi nhận một chỗ ngồi để nói khi bạn cảm thấy sẵn sàng. Người nhút nhát cũng được chào đón ở đây.",
+    "peopleTitle": "Học từ chính những người đang sống cùng ngôn ngữ ấy.",
+    "peopleBody": "Nghe một ngôn ngữ thực sự được nói như thế nào, và tìm hiểu phong tục, lễ hội và đời sống hằng ngày đi kèm với nó.",
+    "safeTitle": "Một không gian tử tế và an toàn.",
+    "safeBody": "Các quy tắc cộng đồng rõ ràng giúp ShyTalk luôn là nơi hỗ trợ lẫn nhau, và đội ngũ kiểm duyệt viên thực thi các quy tắc đó. Người dưới 18 tuổi và người lớn sử dụng các không gian riêng biệt.",
+    "wayTitle": "ShyTalk sắp ra mắt.",
+    "wayBody": "Ứng dụng ShyTalk đang được xây dựng. Hãy đăng ký thử nghiệm kín để dùng thử sớm.",
+    "apply": "Đăng ký tham gia thử nghiệm kín",
+    "roadmap": "Xem lộ trình phát triển"
+  },
+  "notFound": {
+    "title": "Không tìm thấy trang",
+    "body": "Không có trang nào ở địa chỉ này.",
+    "home": "Về trang chủ"
+  }
+}

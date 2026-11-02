@@ -1,0 +1,70 @@
+/* The ShyTalk site's styles (plan 3 Task 1): plain CSS, no framework. */
+:root {
+  --ink: #1d2433;
+  --paper: #ffffff;
+  --accent: #2f6fdb;
+  --muted: #5b6475;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e8ecf4;
+    --paper: #121621;
+    --accent: #8fb4ff;
+    --muted: #a9b2c3;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+a {
+  color: var(--accent);
+}
+
+.site-header,
+.site-footer,
+main {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.site-header ul,
+.site-footer ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.25rem;
+  text-decoration: none;
+}
+
+.site-footer {
+  color: var(--muted);
+  border-top: 1px solid currentcolor;
+}

@@ -1,0 +1,23 @@
+# Starts the daily door count (decision 197; shyden-labs/ShyTalk#31).
+# Schedules run on the default branch, `develop`, but the count's credential
+# lives in `prod-cron`, which allows `main` alone (the global prod-cron rule).
+# So this only dispatches door-count.yml on `main`, and holds no credential
+# but its own token, allowed only to start workflows.
+name: door-count-trigger
+on:
+  schedule:
+    - cron: '17 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Start the door count on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run door-count.yml --ref main

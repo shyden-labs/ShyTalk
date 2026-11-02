@@ -1,0 +1,19 @@
+{
+  "name": "shytalk-door",
+  "main": "src/index.ts",
+  "account_id": "debdf0b47ce2f7e5554e99c1f5d3a1e0",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "env": {
+    "test": {
+      "name": "shytalk-door-test",
+      "routes": [{ "pattern": "test.shytalk.app", "custom_domain": true }],
+      "vars": { "ORIGIN": "https://shytalk-test.shytalk-non-prod.workers.dev" }
+    },
+    "dev": {
+      "name": "shytalk-door-dev",
+      "routes": [{ "pattern": "dev.shytalk.app", "custom_domain": true }],
+      "vars": { "ORIGIN": "https://shytalk-dev.shytalk-non-prod.workers.dev" }
+    }
+  }
+}

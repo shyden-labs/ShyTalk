@@ -6,3 +6,6 @@ HANDOVER.md
 .claude/settings.local.json
 *.jks
 local.properties
+.wrangler/
+apps/web/dist/
+apps/web/.astro/

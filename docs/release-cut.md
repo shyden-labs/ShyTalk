@@ -45,6 +45,18 @@ how many commits it judged. git failing to answer fails the check rather
 than reading as a pass: no merge ref (GitHub builds none for a pull request
 that conflicts with `main`), or a missing branch.
 
+## How `main` is first created
+
+A new repository has only `develop`. `main` is created once, at the
+repository's root commit (Shyden, 2026-11-02, shyden-labs/ShyTalk#70): the
+root holds no production workflow, so creating `main` there deploys nothing,
+and `origin/develop..origin/main` is empty, so the first cut passes (d). The
+first `release/*` cut then brings everything into `main` by merge commit, as
+every later one does. `scripts/branch-rules-setup.ts` gives `main`'s required
+checks `do_not_enforce_on_create`: `release-cut` runs only on a pull request
+into `main`, so checks enforced on creation would keep `main` from ever
+existing (GitHub answered 422). Every merge into `main` still needs every check.
+
 ## Which pull requests it judges (issue shyden-labs/repo-template#103)
 
 It judges only pull requests whose head branch is in this repository. A

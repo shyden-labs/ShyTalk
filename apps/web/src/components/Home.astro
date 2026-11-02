@@ -1,0 +1,30 @@
+---
+import Base from '../layouts/Base.astro';
+import { localePath, t, type Locale } from '../i18n/t.ts';
+import { SHOW_ROADMAP } from '../site.ts';
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+
+/** The approved home page (decision 212): each section a bold title and its line. */
+const sections = ['pace', 'people', 'safe', 'way'] as const;
+---
+
+<Base locale={locale} title={t(locale, 'home.title')}>
+  <h1>{t(locale, 'home.heading')}</h1>
+  <p>{t(locale, 'home.intro')}</p>
+  {
+    sections.map((section) => (
+      <section>
+        <h2>{t(locale, `home.${section}Title`)}</h2>
+        <p>{t(locale, `home.${section}Body`)}</p>
+      </section>
+    ))
+  }
+  <p>
+    <a href={localePath(locale, '/closed-testing')}>{t(locale, 'home.apply')}</a>
+    {SHOW_ROADMAP && <a href={localePath(locale, '/roadmap')}>{t(locale, 'home.roadmap')}</a>}
+  </p>
+</Base>

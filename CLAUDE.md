@@ -23,7 +23,14 @@
 
 - One branch per ticket, named `<type>/<issue>-<slug>` (for example `feat/12-sign-in`), from a fresh `origin/develop`, squash-merged once CI is green.
 - Commit and pull request texts cite issues as `Refs #N`.
+- This Mac runs unit tests, typecheck, lint and format only; every other suite runs in CI through a pull request.
+- A pull request changing only Markdown, or non-code files under `docs/`, takes CI's docs-only fast path: keep docs changes in their own one-commit pull request.
 
 ## Board
 
-To be filled in once the board exists.
+- Board: "ShyTalk Stories", organisation project 5, node id `PVT_kwDOEOcG584BpkXr` (https://github.com/orgs/shyden-labs/projects/5). Assert the title before any write.
+- The old app's board is project 1, "ShyTalk Stories (legacy)": nothing new goes there.
+- Epic titles start with `Epic:`; the progress script leaves epics out of both counts.
+- Next ticket: `node scripts/board-next.ts PVT_kwDOEOcG584BpkXr "ShyTalk Stories"`.
+- Progress: `node scripts/board-progress.ts PVT_kwDOEOcG584BpkXr "ShyTalk Stories"`.
+- File a story: `node scripts/file-story.ts PVT_kwDOEOcG584BpkXr "ShyTalk Stories" <story.json>`.

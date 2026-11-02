@@ -1,0 +1,39 @@
+{
+  "site": {
+    "name": "ShyTalk",
+    "tagline": "Learn languages and cultures by talking."
+  },
+  "menu": {
+    "label": "Main menu",
+    "home": "Home",
+    "closedTesting": "Closed testing",
+    "roadmap": "Roadmap",
+    "signIn": "Sign in"
+  },
+  "footer": {
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "guidelines": "Community guidelines",
+    "contact": "Contact"
+  },
+  "home": {
+    "title": "ShyTalk",
+    "heading": "Learn languages and cultures by talking",
+    "intro": "ShyTalk is a friendly place to practise a language out loud and discover the cultures behind it.",
+    "paceTitle": "Practise at your own pace.",
+    "paceBody": "Join a voice room, listen in, and take a seat to speak when you feel ready. Shy is welcome here.",
+    "peopleTitle": "Learn from the people who live it.",
+    "peopleBody": "Hear how a language is really spoken, and learn the customs, festivals and everyday life that come with it.",
+    "safeTitle": "A kind, safe space.",
+    "safeBody": "Clear community rules keep ShyTalk supportive, and moderators enforce them. Under-18s and adults use separate spaces.",
+    "wayTitle": "ShyTalk is on its way.",
+    "wayBody": "The ShyTalk app is being built now. Apply for closed testing to try it early.",
+    "apply": "Apply for closed testing",
+    "roadmap": "See the roadmap"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "There is no page at this address.",
+    "home": "Go to the home page"
+  }
+}

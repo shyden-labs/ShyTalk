@@ -1,0 +1,32 @@
+{
+  "name": "shytalk-web",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "../../apps/web/dist",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "404-page"
+  },
+  "env": {
+    "prod": {
+      "name": "shytalk-web",
+      "account_id": "debdf0b47ce2f7e5554e99c1f5d3a1e0",
+      "workers_dev": false,
+      "routes": [{ "pattern": "shytalk.app", "custom_domain": true }],
+      "vars": { "ENVIRONMENT_NAME": "prod" }
+    },
+    "test": {
+      "name": "shytalk-test",
+      "account_id": "6a27c9ff4b4eefef2c46535449ea4f49",
+      "workers_dev": true,
+      "vars": { "ENVIRONMENT_NAME": "test" }
+    },
+    "dev": {
+      "name": "shytalk-dev",
+      "account_id": "6a27c9ff4b4eefef2c46535449ea4f49",
+      "workers_dev": true,
+      "vars": { "ENVIRONMENT_NAME": "dev" }
+    }
+  }
+}
