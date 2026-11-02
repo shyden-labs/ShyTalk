@@ -123,7 +123,7 @@
 **Interfaces:** Table `audit(id INTEGER PRIMARY KEY, at INTEGER NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL, subject TEXT, detail TEXT, environment TEXT NOT NULL)` with triggers `BEFORE UPDATE`/`BEFORE DELETE … RAISE(ABORT,'audit is append-only')`. Produces `audit(env, {actor, action, subject?, detail?}): D1PreparedStatement` so callers batch it with their own write (`env.DB.batch([write, audit(...)])`): both land or neither.
 
 - [ ] **Step 1 (red):** unit: the statement binds the environment from `env.ENVIRONMENT_NAME`; `detail` never contains a key named `code`, `token`, `secret` or `password` (refused with a thrown error). Integration (CI): an UPDATE and a DELETE on `audit` both fail; a batch whose first write fails leaves no audit row.
-- [ ] **Step 2:** Implement; Task 5's routes switch to batching their writes with an audit row (actor `public`). PR, merge.
+- [ ] **Step 2:** Implement. PR, merge. Task 5 (#55) batches its own writes with an audit row (actor `public`): decision 221 moved that check there, and this task waits only on plan 4 Task 2's databases (#75).
 
 ### Task 9: Email-code sign-in (estimate 5)
 
