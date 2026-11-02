@@ -15,8 +15,9 @@ export interface Exception {
   reason: string;
 }
 
+// Python-2.0 (argparse, via Astro's js-yaml) is the PSF licence: permissive, BSD-style.
 // 0BSD (tslib) and CC0-1.0 (@speed-highlight/core, via wrangler's miniflare) are public-domain-equivalent: no conditions at all.
-const PERMISSIVE = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'BlueOak-1.0.0', '0BSD', 'CC0-1.0']);
+const PERMISSIVE = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'BlueOak-1.0.0', '0BSD', 'CC0-1.0', 'Python-2.0']);
 
 const WEAK_COPYLEFT = new Set(['MPL-2.0', 'LGPL-2.1-only', 'LGPL-2.1-or-later', 'LGPL-3.0-only', 'LGPL-3.0-or-later']);
 

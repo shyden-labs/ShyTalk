@@ -1,0 +1,18 @@
+---
+import { localePath, t, type Locale } from '../i18n/t.ts';
+import { SUPPORT_EMAIL } from '../site.ts';
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+---
+
+<footer class="site-footer">
+  <ul>
+    <li><a href={localePath(locale, '/terms')}>{t(locale, 'footer.terms')}</a></li>
+    <li><a href={localePath(locale, '/privacy')}>{t(locale, 'footer.privacy')}</a></li>
+    <li><a href={localePath(locale, '/guidelines')}>{t(locale, 'footer.guidelines')}</a></li>
+    <li>{t(locale, 'footer.contact')}: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
+  </ul>
+</footer>

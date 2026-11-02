@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import echo, {
+import echo from '../../workers/echo/src/index.ts';
+import {
   ALARM_EVERY_MS,
   EchoRoom,
   handle,
@@ -7,7 +8,7 @@ import echo, {
   type RoomState,
   type SocketLike,
   type WorkersRuntime,
-} from '../../workers/echo/src/index.ts';
+} from '../../workers/echo/src/echo.ts';
 import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
 
 /**

@@ -1,0 +1,28 @@
+{
+  "site": {
+    "name": "ShyTalk",
+    "tagline": "Learn languages and cultures by talking."
+  },
+  "menu": {
+    "label": "Main menu",
+    "home": "Home",
+    "closedTesting": "Closed testing",
+    "roadmap": "Roadmap",
+    "signIn": "Sign in"
+  },
+  "footer": {
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "guidelines": "Community guidelines",
+    "contact": "Contact"
+  },
+  "home": {
+    "title": "ShyTalk",
+    "placeholder": "This page is being built."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "There is no page at this address.",
+    "home": "Go to the home page"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "//": "Checks every .ts and .js file; Node runs them by stripping types, so nothing is emitted and only erasable syntax is allowed (issue shyden-labs/repo-template#61).",
+  "//": "Checks every .ts and .js file but the Astro config, whose import pulls in Astro's browser-typed declarations (it is checked by the build) and the browser smoke (tests/smoke/tsconfig.json adds the DOM); Node runs them by stripping types, so nothing is emitted and only erasable syntax is allowed (issue shyden-labs/repo-template#61).",
   "compilerOptions": {
     "target": "es2024",
     "module": "nodenext",
@@ -26,5 +26,5 @@
     "skipLibCheck": false
   },
   "include": ["**/*.ts", "**/*.js"],
-  "exclude": ["node_modules", "coverage"]
+  "exclude": ["node_modules", "coverage", "apps/web/dist", "apps/web/.astro", "apps/web/astro.config.mjs", "tests/smoke"]
 }
