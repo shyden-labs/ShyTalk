@@ -79,6 +79,10 @@ export function desiredRuleset(branch: Branch, checks: string[]): RulesetBody {
         type: 'required_status_checks',
         parameters: {
           strict_required_status_checks_policy: branch === 'develop',
+          // A new main needs its first release cut's pull request, the only place release-cut
+          // runs, so enforcing checks on creation would keep main from ever existing
+          // (shyden-labs/ShyTalk#70). Every merge into main still needs every check.
+          do_not_enforce_on_create: branch === 'main',
           required_status_checks: contexts.map((context) => ({ context, integration_id: GITHUB_ACTIONS_APP_ID })),
         },
       },
@@ -123,6 +127,7 @@ export function planRulesets(existing: ExistingRuleset[], checks: string[]): Rul
 
 interface ChecksParameters {
   strict_required_status_checks_policy?: boolean;
+  do_not_enforce_on_create?: boolean;
   required_status_checks?: { context: string; integration_id?: number }[];
 }
 
@@ -159,6 +164,11 @@ export function auditBranchRules(branch: Branch, rules: Rule[]): string[] {
     }
     if (!requiresReleaseCut) {
       problems.push(`${branch}: no rule requires ${RELEASE_CUT}`);
+    }
+    if (checks.some((c) => c.do_not_enforce_on_create !== true)) {
+      problems.push(
+        `${branch}: its required checks are enforced when it is created, so it can never be created (${RELEASE_CUT} needs a pull request into main)`,
+      );
     }
   }
   return problems;
