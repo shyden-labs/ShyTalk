@@ -5,7 +5,8 @@
  */
 import { handle, type EchoEnv } from './echo.ts';
 
-export { EchoRoom } from './echo.ts';
+// EchoRoom is no longer exported: its class is deleted (wrangler.json migration v2,
+// plan 2 Task E6 Step 6, shyden-labs/ShyTalk#31) just before the Worker goes.
 
 export default {
   fetch: (request: Request, env: EchoEnv): Promise<Response> => handle(request, env),

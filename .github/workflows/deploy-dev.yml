@@ -79,14 +79,15 @@ jobs:
       # ShyTalk's dev deploy (shyden-labs/ShyTalk#44; decisions 216, 217): the
       # dev origin Worker on the Non-Prod account, only when its files changed.
       # Today that is the throwaway echo Worker of the door spike
-      # (shyden-labs/ShyTalk#31). A rehearsal only bundles it, with no
+      # (shyden-labs/ShyTalk#31), on its way out (plan 2 Task E6 Step 6): this
+      # deploy runs its deleted_classes migration, removing every echo Durable
+      # Object, then deletes the Worker. A rehearsal only bundles it, with no
       # credential. Doors never deploy from here: they live in the production
       # account and deploy only through `production`, with Shyden's approval.
       - name: Deploy the changed areas to dev
         env:
           DEPLOY_REHEARSAL: ${{ github.event_name == 'pull_request' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
         run: |
           if ! grep -qE '^(workers/echo/|packages/environment/)' changed-files.txt; then
             echo "Nothing deployable changed, so dev deploys nothing."
@@ -98,8 +99,4 @@ jobs:
             exit 0
           fi
           npx wrangler deploy --env dev || { echo "::error title=deploy-dev failed::workers/echo did not deploy"; exit 1; }
-          if [ -z "$DOOR_SECRET" ]; then
-            echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the dev environment (decision 216); until then the dev origin refuses every request."
-            exit 1
-          fi
-          printf '%s' "$DOOR_SECRET" | npx wrangler secret put DOOR_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev door secret was not set"; exit 1; }
+          npx wrangler delete --env dev --force || { echo "::error title=deploy-dev failed::the echo Worker was not deleted"; exit 1; }
