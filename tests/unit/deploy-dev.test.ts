@@ -99,13 +99,22 @@ describe('deploy-dev', () => {
 
   // Plan 2 Task E6 Step 6 (shyden-labs/ShyTalk#31): the echo deploy deletes
   // its Durable Object class (wrangler.json's deleted_classes migration), then
-  // the Worker itself goes, so no secret is set on it any more.
-  it('deletes the echo Worker right after the deploy that deletes its Durable Object class', () => {
+  // the Worker itself goes through the API, since `wrangler delete` also lists
+  // KV namespaces, which the Workers-only dev token cannot read (run
+  // 41753702982). A read-back must then find no script, so no secret is set.
+  it('deletes the echo Worker through the API right after the deploy, and reads back that it is gone', () => {
     const step = deployStep().join('\n');
+    const script = 'https://api.cloudflare.com/client/v4/accounts/6a27c9ff4b4eefef2c46535449ea4f49/workers/scripts/shytalk-dev';
     const deploy = step.indexOf('npx wrangler deploy --env dev ||');
-    const remove = step.indexOf('npx wrangler delete --env dev --force ||');
+    const named = step.indexOf(`script=${script}`);
+    const remove = step.indexOf('curl --fail-with-body -sS -X DELETE $script');
+    const readBack = step.indexOf('-w %{http_code} $script');
     expect(deploy).toBeGreaterThan(-1);
-    expect(remove).toBeGreaterThan(deploy);
+    expect(named).toBeGreaterThan(deploy);
+    expect(remove).toBeGreaterThan(named);
+    expect(readBack).toBeGreaterThan(remove);
+    expect(step).toContain('if [ "$status" != 404 ]; then'.replaceAll('"', ''));
+    expect(step).not.toContain('wrangler delete');
     expect(step).not.toContain('secret put');
   });
 
