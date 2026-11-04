@@ -9,6 +9,8 @@
  * no Worker serves from another environment's database.
  */
 import { createMarkerGuard, requireDoorSecret, type D1Like } from '../../../packages/environment/index.ts';
+import { handleAppApi, isAppApi } from './app/router.ts';
+import { json } from './http.ts';
 
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
@@ -41,9 +43,6 @@ function markerGuard(environment: string, db: D1Like): ReturnType<typeof createM
   return guard;
 }
 
-const json = (status: number, body: unknown): Response =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-
 /** The API: nothing yet (plan 3 Task 5 adds the closed-testing form). */
 export function handleApi(): Promise<Response> {
   return Promise.resolve(json(404, { error: 'not_found' }));
@@ -60,7 +59,9 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   if (!env.DB) return new Response('Service Unavailable', { status: 503 });
   const wrongStore = await markerGuard(env.ENVIRONMENT_NAME, env.DB).assertEnvironmentMarkers();
   if (wrongStore) return wrongStore;
-  if (new URL(request.url).pathname.startsWith('/api/')) return handleApi();
+  const { pathname } = new URL(request.url);
+  if (isAppApi(pathname)) return handleAppApi(request, env);
+  if (pathname.startsWith('/api/')) return handleApi();
   return env.ASSETS.fetch(request);
 }
 
