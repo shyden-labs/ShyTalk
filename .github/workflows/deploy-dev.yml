@@ -81,7 +81,7 @@ jobs:
       # Today that is the throwaway echo Worker of the door spike
       # (shyden-labs/ShyTalk#31), on its way out (plan 2 Task E6 Step 6): this
       # deploy runs its deleted_classes migration, removing every echo Durable
-      # Object, then deletes the Worker. A rehearsal only bundles it, with no
+      # Object, then deletes the Worker through the API. A rehearsal only bundles it, with no
       # credential. Doors never deploy from here: they live in the production
       # account and deploy only through `production`, with Shyden's approval.
       - name: Deploy the changed areas to dev
@@ -99,4 +99,13 @@ jobs:
             exit 0
           fi
           npx wrangler deploy --env dev || { echo "::error title=deploy-dev failed::workers/echo did not deploy"; exit 1; }
-          npx wrangler delete --env dev --force || { echo "::error title=deploy-dev failed::the echo Worker was not deleted"; exit 1; }
+          # Wrangler's delete command also lists KV namespaces, which this Workers-only
+          # token cannot read (run 41753702982), so the script goes through the API.
+          script="https://api.cloudflare.com/client/v4/accounts/6a27c9ff4b4eefef2c46535449ea4f49/workers/scripts/shytalk-dev"
+          curl --fail-with-body -sS -X DELETE "$script" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" || { echo "::error title=deploy-dev failed::the echo Worker was not deleted"; exit 1; }
+          status=$(curl -sS -o /dev/null -w '%{http_code}' "$script" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
+          if [ "$status" != 404 ]; then
+            echo "::error title=deploy-dev failed::the echo Worker still answers ($status) after its deletion"
+            exit 1
+          fi
+          echo "Read back: shytalk-dev is gone (404)."
