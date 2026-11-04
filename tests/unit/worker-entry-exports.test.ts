@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import * as door from '../../workers/door/src/index.ts';
-import * as echo from '../../workers/echo/src/index.ts';
 import * as web from '../../workers/web/src/index.ts';
 
 /**
@@ -10,7 +9,7 @@ import * as web from '../../workers/web/src/index.ts';
  * So a main module exports its default handler and Durable Object classes only;
  * constants and helpers live in a module beside it.
  */
-const entries = { door, echo, web };
+const entries = { door, web };
 
 describe('each Worker main module', () => {
   it.each(Object.entries(entries))('%s exports a default handler and classes only', (_name, mod) => {
