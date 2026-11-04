@@ -86,8 +86,21 @@ describe('ci.yml', () => {
     ]);
   });
 
-  it('fetches the parent commit in all three jobs, so the classifier can diff it', () => {
-    expect(ci.match(/^ {10}fetch-depth: 2$/gm)).toHaveLength(3);
+  // shyden-labs/ShyTalk#59: the first integration suite, on Cloudflare's local
+  // engines (vitest.integration.config.ts); a required check (decision 230).
+  it('runs the integration suite in its own job, skipping it for docs', () => {
+    expect(steps(yamlBlock(ci, 'integration', '  '))).toEqual([
+      { name: '', run: '', if: '' },
+      { name: '', run: '|', if: '' },
+      { name: '', run: '', if: '' },
+      { name: '', run: 'node scripts/change-scope.ts', if: '' },
+      { name: '', run: 'node scripts/npm-ci.ts', if: '' },
+      { name: 'Integration', run: 'npm run test:integration', if: CODE },
+    ]);
+  });
+
+  it('fetches the parent commit in all four jobs, so the classifier can diff it', () => {
+    expect(ci.match(/^ {10}fetch-depth: 2$/gm)).toHaveLength(4);
   });
 });
 
