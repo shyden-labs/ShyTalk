@@ -12,6 +12,7 @@
  *              dead one stays counted, capped at CUT_CAP_MS.
  */
 import { execFileSync } from 'node:child_process';
+import { lookup } from 'node:dns/promises';
 
 const URL_BASE = 'wss://dev.shytalk.app/ws';
 const HOLD_MS = Number(process.env.HOLD_MS ?? 30 * 60_000);
@@ -36,13 +37,16 @@ const iptables = (op: '-I' | '-D', port: string): void => {
   run('sudo', ['iptables', op, 'OUTPUT', '-p', 'tcp', '--sport', port, '-j', 'DROP']);
 };
 
-/** The runner's established :443 connections, by local port. */
+/** The runner's established connections to dev.shytalk.app (by its resolved addresses), by local port. */
+const doorAddresses = new Set((await lookup('dev.shytalk.app', { all: true })).map((a) => a.address));
 const localPorts = (): Set<string> =>
   new Set(
     run('ss', ['-tnH', 'state', 'established', '( dport = :443 )'])
       .split('\n')
       .filter(Boolean)
-      .map((line) => line.trim().split(/\s+/)[2]?.split(':').at(-1) ?? ''),
+      .map((line) => line.trim().split(/\s+/))
+      .filter((cols) => doorAddresses.has((cols[3] ?? '').replace(/^\[|\]?:\d+$/g, '').replace(/^::ffff:/, '')))
+      .map((cols) => cols[2]?.split(':').at(-1) ?? ''),
   );
 
 interface Session {

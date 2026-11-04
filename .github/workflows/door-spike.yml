@@ -24,4 +24,8 @@ jobs:
         with:
           node-version: ${{ steps.node.outputs.version }}
       - name: Hold 30 minutes, resume, then cut a socket at the firewall and time the server noticing
+        # Run 41746950144 already held 30 minutes cleanly; this run only needs the cut phase.
+        env:
+          HOLD_MS: '65000'
+          RESUME_MS: '35000'
         run: node scripts/door-spike.ts
