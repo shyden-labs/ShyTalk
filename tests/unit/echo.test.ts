@@ -178,6 +178,19 @@ describe('the echo room (Durable Object)', () => {
     expect(socket.sent.map((m) => JSON.parse(m) as unknown)).toEqual([{ echo: 'hello', at: 5_000 }]);
   });
 
+  // The real-drop spike (shyden-labs/ShyTalk#31, Shyden 2026-11-04) asks how
+  // many sockets the room still holds, to time how long a silently dropped
+  // connection stays counted.
+  it('answers "sockets" with how many sockets the room holds, instead of echoing', async () => {
+    vi.useFakeTimers({ now: 7_000 });
+    const state = fakeState();
+    const room = new EchoRoom(state, {}, fakeRuntime());
+    const socket = new FakeSocket();
+    state.sockets.push(socket, new FakeSocket(), new FakeSocket());
+    await room.webSocketMessage(socket, 'sockets');
+    expect(socket.sent.map((m) => JSON.parse(m) as unknown)).toEqual([{ sockets: 3, at: 7_000 }]);
+  });
+
   it('echoes a binary message by its size', async () => {
     const room = new EchoRoom(fakeState(), {}, fakeRuntime());
     const socket = new FakeSocket();
