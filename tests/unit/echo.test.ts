@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import echo from '../../workers/echo/src/index.ts';
 import {
   ALARM_EVERY_MS,
@@ -254,4 +255,30 @@ describe('the echo room (Durable Object)', () => {
     expect(state.sockets).toEqual([server]);
     expect(made).toContainEqual([null, { status: 101, webSocket: client }]);
   });
+});
+
+// Step 6 (shyden-labs/ShyTalk#31): the last echo deploy drops the binding and
+// deletes the EchoRoom class, so every echo Durable Object and its storage go
+// before the Worker is deleted (Cloudflare's order: binding off, then a
+// deleted_classes migration).
+describe('the echo config before deletion', () => {
+  const config = JSON.parse(readFileSync('workers/echo/wrangler.json', 'utf8')) as {
+    migrations: { tag: string; new_sqlite_classes?: string[]; deleted_classes?: string[] }[];
+    env: { dev: Record<string, unknown> };
+  };
+
+  it('binds no Durable Object in dev', () => {
+    expect(config.env.dev).not.toHaveProperty('durable_objects');
+  });
+
+  it('ends its migrations by deleting EchoRoom', () => {
+    expect(config.migrations).toEqual([
+      { tag: 'v1', new_sqlite_classes: ['EchoRoom'] },
+      { tag: 'v2', deleted_classes: ['EchoRoom'] },
+    ]);
+  });
+});
+
+it('the echo entry no longer exports the deleted EchoRoom class', async () => {
+  expect(await import('../../workers/echo/src/index.ts')).not.toHaveProperty('EchoRoom');
 });

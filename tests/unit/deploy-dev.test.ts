@@ -97,11 +97,16 @@ describe('deploy-dev', () => {
     expect(deploy).toBeGreaterThan(dryRun);
   });
 
-  it('sets the door secret from the dev environment, failing when it is missing', () => {
+  // Plan 2 Task E6 Step 6 (shyden-labs/ShyTalk#31): the echo deploy deletes
+  // its Durable Object class (wrangler.json's deleted_classes migration), then
+  // the Worker itself goes, so no secret is set on it any more.
+  it('deletes the echo Worker right after the deploy that deletes its Durable Object class', () => {
     const step = deployStep().join('\n');
-    expect(step).toContain('DOOR_SECRET: ${{ secrets.DOOR_SECRET }}');
-    expect(step).toContain('if [ -z $DOOR_SECRET ]; then');
-    expect(step).toContain('npx wrangler secret put DOOR_SECRET --env dev');
+    const deploy = step.indexOf('npx wrangler deploy --env dev ||');
+    const remove = step.indexOf('npx wrangler delete --env dev --force ||');
+    expect(deploy).toBeGreaterThan(-1);
+    expect(remove).toBeGreaterThan(deploy);
+    expect(step).not.toContain('secret put');
   });
 
   it('never deploys a door', () => {
