@@ -1,5 +1,5 @@
 {
-  "prod": { "d1": [], "kv": [], "r2": [] },
-  "test": { "d1": [], "kv": [], "r2": [] },
-  "dev": { "d1": [], "kv": [], "r2": [] }
+  "prod": { "d1": ["shytalk-prod"], "kv": [], "r2": [] },
+  "test": { "d1": ["shytalk-test"], "kv": [], "r2": [] },
+  "dev": { "d1": ["shytalk-dev"], "kv": [], "r2": [] }
 }

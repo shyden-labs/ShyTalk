@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import web from '../../workers/web/src/index.ts';
 import { CONTENT_SECURITY_POLICY, handle, type WebEnv } from '../../workers/web/src/web.ts';
-import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
+import { DOOR_SECRET_HEADER, type D1Like } from '../../packages/environment/index.ts';
 
 /**
  * The site's Worker (plan 3 Task 1, shyden-labs/ShyTalk#51): `/api/*` goes to
@@ -11,14 +11,40 @@ import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
 
 const SECRET = 'the-door-secret';
 
-/** An env whose ASSETS answers with `status` and records each path asked for. */
-function env(environment: WebEnv['ENVIRONMENT_NAME'], status = 200): { env: WebEnv; asked: string[] } {
+/**
+ * A `DB` whose environment marker reads `marker` (null: no row), counting each
+ * read, so a test can see the marker is read once per guard.
+ */
+function database(marker: string | null): { db: D1Like; reads: () => number } {
+  let reads = 0;
+  return {
+    reads: () => reads,
+    db: {
+      prepare: () => ({
+        first: <T>() => {
+          reads += 1;
+          return Promise.resolve((marker === null ? null : { name: marker }) as T | null);
+        },
+      }),
+    },
+  };
+}
+
+/** An env whose ASSETS answers with `status` and records each path asked for; its `DB` marks `marker`. */
+function env(
+  environment: WebEnv['ENVIRONMENT_NAME'],
+  status = 200,
+  marker: string | null = environment,
+): { env: WebEnv; asked: string[]; reads: () => number } {
   const asked: string[] = [];
+  const { db, reads } = database(marker);
   return {
     asked,
+    reads,
     env: {
       ENVIRONMENT_NAME: environment,
       DOOR_SECRET: SECRET,
+      DB: db,
       ASSETS: {
         fetch: (request: Request) => {
           asked.push(new URL(request.url).pathname);
@@ -94,6 +120,63 @@ describe('the door', () => {
     const unnamed = { ...e, ENVIRONMENT_NAME: undefined } as unknown as WebEnv;
     expect((await handle(request('/'), unnamed)).status).toBe(503);
     expect(asked).toEqual([]);
+  });
+});
+
+// Plan 4 Task 2 (shyden-labs/ShyTalk#75): after the door, every request checks
+// that `DB` names this environment, PROD included, so no Worker serves from
+// another environment's database.
+describe('the environment marker', () => {
+  it.each([
+    ['dev', 'prod'],
+    ['test', 'dev'],
+    ['prod', 'dev'],
+  ] as const)('%s whose DB marks %s answers 503 and serves nothing', async (environment, marker) => {
+    const { env: e, asked } = env(environment, 200, marker);
+    const response = await handle(request('/'), e);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('content-security-policy')).toBe(CONTENT_SECURITY_POLICY);
+    expect(asked).toEqual([]);
+  });
+
+  it('answers 503 when DB has no marker row', async () => {
+    const { env: e, asked } = env('dev', 200, null);
+    expect((await handle(request('/'), e)).status).toBe(503);
+    expect(asked).toEqual([]);
+  });
+
+  it('answers 503 when the DB binding is missing, failing closed', async () => {
+    const { env: e, asked } = env('dev');
+    const unbound = { ...e, DB: undefined } as unknown as WebEnv;
+    expect((await handle(request('/'), unbound)).status).toBe(503);
+    expect(asked).toEqual([]);
+  });
+
+  it('answers 503 to the API too, when the marker is wrong', async () => {
+    const { env: e } = env('dev', 200, 'prod');
+    expect((await handle(request('/api/x'), e)).status).toBe(503);
+  });
+
+  it('serves when the marker matches, reading it once for the guard', async () => {
+    const { env: e, asked, reads } = env('dev');
+    expect((await handle(request('/'), e)).status).toBe(200);
+    expect((await handle(request('/id/'), e)).status).toBe(200);
+    expect(asked).toEqual(['/', '/id/']);
+    expect(reads()).toBe(1);
+  });
+
+  it('keeps one guard per DB, so a pass for one database never stands for another', async () => {
+    const good = env('dev');
+    expect((await handle(request('/'), good.env)).status).toBe(200);
+    const bad = env('dev', 200, 'prod');
+    expect((await handle(request('/'), bad.env)).status).toBe(503);
+    expect(bad.reads()).toBe(1);
+  });
+
+  it('checks the door before the marker: a request without the secret reads nothing', async () => {
+    const { env: e, reads } = env('dev');
+    expect((await handle(request('/', null), e)).status).toBe(403);
+    expect(reads()).toBe(0);
   });
 });
 

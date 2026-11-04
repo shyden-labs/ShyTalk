@@ -13,20 +13,52 @@
       "name": "shytalk-web",
       "account_id": "debdf0b47ce2f7e5554e99c1f5d3a1e0",
       "workers_dev": false,
-      "routes": [{ "pattern": "shytalk.app", "custom_domain": true }],
-      "vars": { "ENVIRONMENT_NAME": "prod" }
+      "routes": [
+        {
+          "pattern": "shytalk.app",
+          "custom_domain": true
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT_NAME": "prod"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "shytalk-prod",
+          "migrations_dir": "../../migrations"
+        }
+      ]
     },
     "test": {
       "name": "shytalk-test",
       "account_id": "6a27c9ff4b4eefef2c46535449ea4f49",
       "workers_dev": true,
-      "vars": { "ENVIRONMENT_NAME": "test" }
+      "vars": {
+        "ENVIRONMENT_NAME": "test"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "shytalk-test",
+          "migrations_dir": "../../migrations"
+        }
+      ]
     },
     "dev": {
       "name": "shytalk-dev",
       "account_id": "6a27c9ff4b4eefef2c46535449ea4f49",
       "workers_dev": true,
-      "vars": { "ENVIRONMENT_NAME": "dev" }
+      "vars": {
+        "ENVIRONMENT_NAME": "dev"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "shytalk-dev",
+          "migrations_dir": "../../migrations"
+        }
+      ]
     }
   }
 }

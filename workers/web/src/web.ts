@@ -4,12 +4,11 @@
  * their doors, so there every request needs the door secret
  * (packages/environment). `/api/*` goes to the API; everything else to the
  * built pages (Workers static assets, Astro's output). Every answer carries
- * the security headers.
- *
- * It checks no environment marker yet: it has no store to mark until plan 3
- * Task 5 brings D1 (decision 215's reasoning).
+ * the security headers. After the door, every request checks that `DB` names
+ * this environment (plan 4 Task 2, shyden-labs/ShyTalk#75), PROD included, so
+ * no Worker serves from another environment's database.
  */
-import { requireDoorSecret } from '../../../packages/environment/index.ts';
+import { createMarkerGuard, requireDoorSecret, type D1Like } from '../../../packages/environment/index.ts';
 
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
@@ -19,10 +18,28 @@ export interface WebEnv {
   ENVIRONMENT_NAME: 'prod' | 'test' | 'dev';
   /** The environment's door secret (a Wrangler secret, TEST and DEV only). */
   DOOR_SECRET?: string;
+  /** The environment's own D1 database, `shytalk-<env>`, marked with its name; absent only in a Worker deployed without it, which serves nothing. */
+  DB?: D1Like;
   ASSETS: { fetch(request: Request): Promise<Response> };
 }
 
 const ENVIRONMENTS = new Set(['prod', 'test', 'dev']);
+
+/**
+ * One marker guard per `DB` binding, made on its first request and kept for
+ * the isolate's life. Keyed by the binding, so a pass for one database (one
+ * unit test's env) never stands for another.
+ */
+const guards = new WeakMap<D1Like, ReturnType<typeof createMarkerGuard>>();
+
+function markerGuard(environment: string, db: D1Like): ReturnType<typeof createMarkerGuard> {
+  let guard = guards.get(db);
+  if (guard === undefined) {
+    guard = createMarkerGuard(environment, { databases: { DB: db }, buckets: {} });
+    guards.set(db, guard);
+  }
+  return guard;
+}
 
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -39,6 +56,10 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
     const refused = await requireDoorSecret(request, env.DOOR_SECRET);
     if (refused) return refused;
   }
+  // A Worker deployed without its database cannot prove whose data it serves.
+  if (!env.DB) return new Response('Service Unavailable', { status: 503 });
+  const wrongStore = await markerGuard(env.ENVIRONMENT_NAME, env.DB).assertEnvironmentMarkers();
+  if (wrongStore) return wrongStore;
   if (new URL(request.url).pathname.startsWith('/api/')) return handleApi();
   return env.ASSETS.fetch(request);
 }
