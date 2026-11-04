@@ -83,9 +83,9 @@ describe('deploy-dev', () => {
     expect(workflow()).not.toContain('deploy-dev is not filled in');
   });
 
-  it('deploys only when the website, its Worker or the environment package changed, or the lockfile or this workflow', () => {
+  it('deploys only when the website, its Worker, the migrations or the environment package changed, or the lockfile or this workflow', () => {
     expect(deployStep()).toContain(
-      '          if ! grep -qE ^(apps/web/|workers/web/|packages/environment/|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
+      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
     );
   });
 
@@ -120,6 +120,41 @@ describe('deploy-dev', () => {
     expect(missing).toBeGreaterThan(deploy);
     expect(put).toBeGreaterThan(missing);
     expect(step).toContain('DOOR_SECRET: ${{ secrets.DOOR_SECRET }}');
+  });
+
+  // Plan 4 Task 2 (shyden-labs/ShyTalk#75): before the Worker deploys, its
+  // database exists, is migrated and is marked `dev`, or the site answers 503.
+  // A rehearsal exits before any of it, holding no credential.
+  it('readies the dev database, in order, after the rehearsal exits and before the Worker deploys', () => {
+    const step = deployStep().join('\n');
+    const order = [
+      'if [ $DEPLOY_REHEARSAL = true ]; then',
+      'info=$(npx wrangler d1 info shytalk-dev --env dev 2>&1) || {',
+      '*Couldnt find a D1 DB named shytalk-dev*) npx wrangler d1 create shytalk-dev --location apac ||',
+      'npx wrangler d1 migrations apply DB --remote --env dev ||',
+      'npx wrangler d1 execute DB --remote --env dev --command CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT dev WHERE NOT EXISTS (SELECT 1 FROM environment_marker); ||',
+      'marker=$(npx wrangler d1 execute DB --remote --env dev --json --command SELECT name FROM environment_marker) ||',
+      'npx wrangler deploy --env dev ||',
+    ].map((line) => step.indexOf(line));
+    expect(order.every((at) => at > -1)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it('stops naming the error when d1 info fails for any reason but a missing database, with no retry', () => {
+    const step = deployStep().join('\n');
+    const other = step.indexOf('*) echo ::error title=deploy-dev failed::d1 info shytalk-dev failed; exit 1 ;;');
+    expect(other).toBeGreaterThan(step.indexOf('*Couldnt find a D1 DB named shytalk-dev*)'));
+    expect(step.match(/wrangler d1 info/g)).toHaveLength(1);
+    expect(step.match(/wrangler d1 create/g)).toHaveLength(1);
+  });
+
+  it('stops unless the marker reads back as exactly one row, dev', () => {
+    const step = deployStep().join('\n');
+    const read = step.indexOf('marker=$(npx wrangler d1 execute DB --remote --env dev --json');
+    const check = step.indexOf('if [ $(printf %s $marker | jq -c [.[0].results[].name]) != [dev] ]; then');
+    expect(read).toBeGreaterThan(-1);
+    expect(check).toBeGreaterThan(read);
+    expect(step.indexOf('npx wrangler deploy --env dev ||')).toBeGreaterThan(check);
   });
 
   it('no longer deploys or deletes the echo Worker, which is gone (#31 AC5)', () => {

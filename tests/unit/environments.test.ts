@@ -12,9 +12,9 @@ import { doorHosts, environmentProblems, filesUnder, hostMentions, type Environm
  */
 
 const LISTED: EnvironmentsFile = {
-  prod: { d1: ['prod-db'], kv: ['prod-kv'], r2: ['prod-media'] },
-  test: { d1: ['test-db'], kv: [], r2: [] },
-  dev: { d1: ['dev-db', 'dev-db-preview'], kv: ['dev-kv'], r2: ['dev-media'] },
+  prod: { d1: ['prod-db', 'shytalk-prod'], kv: ['prod-kv'], r2: ['prod-media'] },
+  test: { d1: ['test-db', 'shytalk-test'], kv: [], r2: [] },
+  dev: { d1: ['dev-db', 'dev-db-preview', 'shytalk-dev'], kv: ['dev-kv'], r2: ['dev-media'] },
 };
 
 const found = (config: unknown, path = 'workers/api/wrangler.json'): FoundConfig[] => [{ path, config }];
@@ -24,27 +24,47 @@ describe('environment ids: fixtures', () => {
     const config = {
       env: {
         dev: {
-          d1_databases: [{ binding: 'DB', database_id: 'dev-db', preview_database_id: 'dev-db-preview' }],
+          d1_databases: [{ binding: 'DB', database_name: 'shytalk-dev', database_id: 'dev-db', preview_database_id: 'dev-db-preview' }],
           kv_namespaces: [{ binding: 'KV', id: 'dev-kv' }],
           r2_buckets: [{ binding: 'MEDIA', bucket_name: 'dev-media' }],
         },
-        prod: { d1_databases: [{ binding: 'DB', database_id: 'prod-db' }] },
+        prod: { d1_databases: [{ binding: 'DB', database_name: 'shytalk-prod', database_id: 'prod-db' }] },
       },
     };
     expect(environmentProblems(found(config), LISTED)).toEqual([]);
   });
 
   it("refuses DEV bound to PROD's D1", () => {
-    const config = { env: { dev: { d1_databases: [{ binding: 'DB', database_id: 'prod-db' }] } } };
+    const config = { env: { dev: { d1_databases: [{ binding: 'DB', database_name: 'shytalk-dev', database_id: 'prod-db' }] } } };
     expect(environmentProblems(found(config), LISTED)).toEqual([
       'workers/api/wrangler.json env.dev d1 DB database_id prod-db is listed under prod, not dev',
     ]);
   });
 
+  // Plan 4 Task 2 (shyden-labs/ShyTalk#75): D1 is bound by name, with no id.
+  it("refuses DEV bound to PROD's D1 by name, naming both environments", () => {
+    const config = { env: { dev: { d1_databases: [{ binding: 'DB', database_name: 'shytalk-prod' }] } } };
+    expect(environmentProblems(found(config), LISTED)).toEqual([
+      'workers/api/wrangler.json env.dev d1 DB database_name shytalk-prod is listed under prod, not dev',
+    ]);
+  });
+
+  it('passes DEV bound to its own D1 by name', () => {
+    const config = { env: { dev: { d1_databases: [{ binding: 'DB', database_name: 'shytalk-dev' }] } } };
+    expect(environmentProblems(found(config), LISTED)).toEqual([]);
+  });
+
+  // Wrangler provisions a D1 binding that names no database by itself, under a
+  // name no check sees, so a binding must name one.
+  it('refuses a D1 binding that names no database', () => {
+    const config = { env: { dev: { d1_databases: [{ binding: 'DB' }] } } };
+    expect(environmentProblems(found(config), LISTED)).toEqual(['workers/api/wrangler.json env.dev d1 DB names no database_name']);
+  });
+
   it.each([
     [
       'a D1 preview id',
-      { d1_databases: [{ binding: 'DB', database_id: 'test-db', preview_database_id: 'dev-db' }] },
+      { d1_databases: [{ binding: 'DB', database_name: 'shytalk-test', database_id: 'test-db', preview_database_id: 'dev-db' }] },
       'd1 DB preview_database_id dev-db is listed under dev, not test',
     ],
     ['a KV id', { kv_namespaces: [{ binding: 'KV', id: 'prod-kv' }] }, 'kv KV id prod-kv is listed under prod, not test'],
@@ -92,7 +112,7 @@ describe('environment ids: fixtures', () => {
   });
 
   it('refuses an id that is not a string, naming an unnamed binding as such', () => {
-    const config = { env: { dev: { d1_databases: [{ database_id: { nested: 'prod-db' } }] } } };
+    const config = { env: { dev: { d1_databases: [{ database_name: 'shytalk-dev', database_id: { nested: 'prod-db' } }] } } };
     expect(environmentProblems(found(config), LISTED)).toEqual([
       'workers/api/wrangler.json env.dev d1 (unnamed) database_id is not a string',
     ]);
@@ -187,6 +207,16 @@ describe('the real tree', () => {
       config: path.endsWith('.json') ? (JSON.parse(readFileSync(path, 'utf8')) as unknown) : null,
     }));
     expect(environmentProblems(configs, listed)).toEqual([]);
+  });
+
+  it.each(['prod', 'test', 'dev'])('binds the site Worker in %s to its own database, shytalk-<env>, and lists it', (environment) => {
+    const config = JSON.parse(readFileSync('workers/web/wrangler.json', 'utf8')) as {
+      env: Record<string, { d1_databases?: { binding: string; database_name?: string; database_id?: string }[] }>;
+    };
+    expect(config.env[environment]?.d1_databases).toEqual([
+      { binding: 'DB', database_name: `shytalk-${environment}`, migrations_dir: '../../migrations' },
+    ]);
+    expect(listed[environment]?.d1).toEqual([`shytalk-${environment}`]);
   });
 
   it('names no door host under tests/, scripts/ or .github/', () => {

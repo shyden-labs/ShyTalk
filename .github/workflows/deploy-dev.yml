@@ -79,8 +79,8 @@ jobs:
       # ShyTalk's dev deploy (shyden-labs/ShyTalk#44; decisions 216, 217): the
       # dev origin Worker `shytalk-dev` on the Non-Prod account, the website's
       # front door (workers/web, plan 3 Task 1, shyden-labs/ShyTalk#51), only
-      # when the site, its Worker, the environment package, the lockfile or this file
-      # changed. It replaces the door spike's echo Worker, deleted in
+      # when the site, its Worker, the migrations, the environment package, the
+      # lockfile or this file changed. It replaces the door spike's echo Worker, deleted in
       # shyden-labs/ShyTalk#31. The origin refuses every request without the
       # door secret, so the deploy sets it from the dev environment (decision
       # 216). A rehearsal only bundles it, with no credential. Doors never
@@ -92,7 +92,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
         run: |
-          if ! grep -qE '^(apps/web/|workers/web/|packages/environment/|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
+          if ! grep -qE '^(apps/web/|workers/web/|migrations/|packages/environment/|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
             echo "Nothing deployable changed, so dev deploys nothing."
             exit 0
           fi
@@ -102,6 +102,27 @@ jobs:
             npx wrangler deploy --dry-run --env dev --outdir "$RUNNER_TEMP/web" || { echo "::error title=deploy-dev failed::workers/web did not bundle"; exit 1; }
             exit 0
           fi
+          # Plan 4 Task 2 (shyden-labs/ShyTalk#75, decisions 219, 220): the
+          # database exists, is migrated and is marked `dev` before the Worker
+          # deploys, or the site answers 503 to everyone. Only Wrangler
+          # 4.156.0's not-found message creates it; any other error stops the
+          # job, with no retry.
+          info=$(npx wrangler d1 info shytalk-dev --env dev 2>&1) || {
+            printf '%s\n' "$info"
+            case "$info" in
+              *"Couldn't find a D1 DB named 'shytalk-dev'"*) npx wrangler d1 create shytalk-dev --location apac || { echo "::error title=deploy-dev failed::shytalk-dev was not created"; exit 1; } ;;
+              *) echo "::error title=deploy-dev failed::d1 info shytalk-dev failed"; exit 1 ;;
+            esac
+          }
+          npx wrangler d1 migrations apply DB --remote --env dev || { echo "::error title=deploy-dev failed::the shytalk-dev migrations did not apply"; exit 1; }
+          npx wrangler d1 execute DB --remote --env dev --command "CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT 'dev' WHERE NOT EXISTS (SELECT 1 FROM environment_marker);" || { echo "::error title=deploy-dev failed::the shytalk-dev marker was not written"; exit 1; }
+          marker=$(npx wrangler d1 execute DB --remote --env dev --json --command "SELECT name FROM environment_marker") || { echo "::error title=deploy-dev failed::the shytalk-dev marker could not be read back"; exit 1; }
+          if [ "$(printf '%s' "$marker" | jq -c '[.[0].results[].name]')" != '["dev"]' ]; then
+            printf '%s\n' "$marker"
+            echo "::error title=deploy-dev failed::shytalk-dev must hold exactly one marker row, dev"
+            exit 1
+          fi
+          echo "Read back: shytalk-dev is marked dev."
           npx wrangler deploy --env dev || { echo "::error title=deploy-dev failed::workers/web did not deploy"; exit 1; }
           if [ -z "$DOOR_SECRET" ]; then
             echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the dev environment (decision 216); until then the dev origin refuses every request."

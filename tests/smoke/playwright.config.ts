@@ -17,6 +17,16 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const secret = process.env.SMOKE_DOOR_SECRET ?? '';
 if (secret === '') throw new Error('SMOKE_DOOR_SECRET is unset: the smoke needs a door secret to send and to configure');
 
+/**
+ * The site answers 503 until its `DB` marks this environment (plan 4 Task 2,
+ * shyden-labs/ShyTalk#75), so the smoke readies its local database as
+ * deploy-dev readies dev's: migrations, then the marker. One local state
+ * folder for all three commands; the marker write is idempotent.
+ */
+const LOCAL_D1 = `--config workers/web/wrangler.json --env dev --local --persist-to .wrangler/smoke-state`;
+const MARKER_SQL =
+  "CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT 'dev' WHERE NOT EXISTS (SELECT 1 FROM environment_marker);";
+
 export default defineConfig({
   testDir: '.',
   forbidOnly: true,
@@ -28,7 +38,11 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: `npx wrangler dev --config workers/web/wrangler.json --env dev --ip 127.0.0.1 --port ${String(PORT)} --var DOOR_SECRET:${secret}`,
+    command: [
+      `npx wrangler d1 migrations apply DB ${LOCAL_D1}`,
+      `npx wrangler d1 execute DB ${LOCAL_D1} --command "${MARKER_SQL}"`,
+      `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --var DOOR_SECRET:${secret}`,
+    ].join(' && '),
     // Playwright counts a 403 as up: the door answers before the secret is sent.
     url: `http://127.0.0.1:${String(PORT)}/`,
     cwd: ROOT,
