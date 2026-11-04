@@ -79,7 +79,7 @@ export async function handle(request: Request, env: EchoEnv): Promise<Response> 
   return plain(200, 'shytalk echo: ok\n');
 }
 
-/** One spike session: echoes messages and, every 30 s while a socket is open, sends a numbered alarm. */
+/** One spike session: echoes messages (but answers `sockets` with the open count) and, every 30 s while a socket is open, sends a numbered alarm. */
 export class EchoRoom {
   private readonly state: RoomState;
   private readonly runtime: WorkersRuntime;
@@ -98,6 +98,11 @@ export class EchoRoom {
   }
 
   async webSocketMessage(socket: SocketLike, message: string | ArrayBuffer): Promise<void> {
+    // The real-drop spike asks how many sockets the room still holds.
+    if (message === 'sockets') {
+      socket.send(JSON.stringify({ sockets: this.state.getWebSockets().length, at: Date.now() }));
+      return Promise.resolve();
+    }
     const echo = typeof message === 'string' ? message : `<${String(message.byteLength)} bytes>`;
     socket.send(JSON.stringify({ echo, at: Date.now() }));
     return Promise.resolve();
