@@ -51,6 +51,6 @@ describe('deploy-doors', () => {
 
   it('deploys from the door folder and nothing else', () => {
     expect(jobs()).toContain('        working-directory: workers/door');
-    expect(workflow()).not.toContain('workers/echo');
+    expect(workflow()).not.toContain('workers/web');
   });
 });

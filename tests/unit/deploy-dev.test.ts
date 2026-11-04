@@ -83,39 +83,48 @@ describe('deploy-dev', () => {
     expect(workflow()).not.toContain('deploy-dev is not filled in');
   });
 
-  it('deploys only when the echo Worker or the environment package changed', () => {
-    expect(deployStep()).toContain('          if ! grep -qE ^(workers/echo/|packages/environment/) changed-files.txt; then');
+  it('deploys only when the website, its Worker or the environment package changed, or the lockfile or this workflow', () => {
+    expect(deployStep()).toContain(
+      '          if ! grep -qE ^(apps/web/|workers/web/|packages/environment/|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
+    );
+  });
+
+  it('builds the website before the Worker bundles it', () => {
+    const step = deployStep().join('\n');
+    const build = step.indexOf('npm run build:web ||');
+    const enter = step.indexOf('cd workers/web');
+    expect(build).toBeGreaterThan(-1);
+    expect(enter).toBeGreaterThan(build);
   });
 
   it('only bundles on a rehearsal, and deploys the dev environment otherwise', () => {
     const step = deployStep().join('\n');
     const rehearsal = step.indexOf('if [ $DEPLOY_REHEARSAL = true ]; then');
-    const dryRun = step.indexOf('npx wrangler deploy --dry-run --env dev');
+    const dryRun = step.indexOf('npx wrangler deploy --dry-run --env dev --outdir $RUNNER_TEMP/web');
     const deploy = step.indexOf('npx wrangler deploy --env dev ||');
     expect(rehearsal).toBeGreaterThan(-1);
     expect(dryRun).toBeGreaterThan(rehearsal);
     expect(deploy).toBeGreaterThan(dryRun);
   });
 
-  // Plan 2 Task E6 Step 6 (shyden-labs/ShyTalk#31): the echo deploy deletes
-  // its Durable Object class (wrangler.json's deleted_classes migration), then
-  // the Worker itself goes through the API, since `wrangler delete` also lists
-  // KV namespaces, which the Workers-only dev token cannot read (run
-  // 41753702982). A read-back must then find no script, so no secret is set.
-  it('deletes the echo Worker through the API right after the deploy, and reads back that it is gone', () => {
+  // #31 AC6 and #51 AC2: the dev origin refuses every request without the door
+  // secret, so the deploy sets it from the dev environment (decision 216), and
+  // fails naming the missing secret rather than leaving an origin that
+  // refuses everything.
+  it('sets the door secret after the deploy, and fails naming it when the environment lacks it', () => {
     const step = deployStep().join('\n');
-    const script = 'https://api.cloudflare.com/client/v4/accounts/6a27c9ff4b4eefef2c46535449ea4f49/workers/scripts/shytalk-dev';
     const deploy = step.indexOf('npx wrangler deploy --env dev ||');
-    const named = step.indexOf(`script=${script}`);
-    const remove = step.indexOf('curl --fail-with-body -sS -X DELETE $script');
-    const readBack = step.indexOf('-w %{http_code} $script');
+    const missing = step.indexOf('if [ -z $DOOR_SECRET ]; then');
+    const put = step.indexOf("printf '%s' $DOOR_SECRET | npx wrangler secret put DOOR_SECRET --env dev ||".replaceAll("'", ''));
     expect(deploy).toBeGreaterThan(-1);
-    expect(named).toBeGreaterThan(deploy);
-    expect(remove).toBeGreaterThan(named);
-    expect(readBack).toBeGreaterThan(remove);
-    expect(step).toContain('if [ "$status" != 404 ]; then'.replaceAll('"', ''));
-    expect(step).not.toContain('wrangler delete');
-    expect(step).not.toContain('secret put');
+    expect(missing).toBeGreaterThan(deploy);
+    expect(put).toBeGreaterThan(missing);
+    expect(step).toContain('DOOR_SECRET: ${{ secrets.DOOR_SECRET }}');
+  });
+
+  it('no longer deploys or deletes the echo Worker, which is gone (#31 AC5)', () => {
+    expect(workflow()).not.toContain('workers/echo');
+    expect(workflow()).not.toContain('-X DELETE');
   });
 
   it('never deploys a door', () => {

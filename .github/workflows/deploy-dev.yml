@@ -77,35 +77,34 @@ jobs:
           cache: 'npm'
       - run: node scripts/npm-ci.ts
       # ShyTalk's dev deploy (shyden-labs/ShyTalk#44; decisions 216, 217): the
-      # dev origin Worker on the Non-Prod account, only when its files changed.
-      # Today that is the throwaway echo Worker of the door spike
-      # (shyden-labs/ShyTalk#31), on its way out (plan 2 Task E6 Step 6): this
-      # deploy runs its deleted_classes migration, removing every echo Durable
-      # Object, then deletes the Worker through the API. A rehearsal only bundles it, with no
-      # credential. Doors never deploy from here: they live in the production
-      # account and deploy only through `production`, with Shyden's approval.
+      # dev origin Worker `shytalk-dev` on the Non-Prod account, the website's
+      # front door (workers/web, plan 3 Task 1, shyden-labs/ShyTalk#51), only
+      # when the site, its Worker, the environment package, the lockfile or this file
+      # changed. It replaces the door spike's echo Worker, deleted in
+      # shyden-labs/ShyTalk#31. The origin refuses every request without the
+      # door secret, so the deploy sets it from the dev environment (decision
+      # 216). A rehearsal only bundles it, with no credential. Doors never
+      # deploy from here: they live in the production account and deploy only
+      # through `production`, with Shyden's approval.
       - name: Deploy the changed areas to dev
         env:
           DEPLOY_REHEARSAL: ${{ github.event_name == 'pull_request' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
         run: |
-          if ! grep -qE '^(workers/echo/|packages/environment/)' changed-files.txt; then
+          if ! grep -qE '^(apps/web/|workers/web/|packages/environment/|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
             echo "Nothing deployable changed, so dev deploys nothing."
             exit 0
           fi
-          cd workers/echo
+          npm run build:web || { echo "::error title=deploy-dev failed::the website did not build"; exit 1; }
+          cd workers/web
           if [ "$DEPLOY_REHEARSAL" = true ]; then
-            npx wrangler deploy --dry-run --env dev --outdir "$RUNNER_TEMP/echo" || { echo "::error title=deploy-dev failed::workers/echo did not bundle"; exit 1; }
+            npx wrangler deploy --dry-run --env dev --outdir "$RUNNER_TEMP/web" || { echo "::error title=deploy-dev failed::workers/web did not bundle"; exit 1; }
             exit 0
           fi
-          npx wrangler deploy --env dev || { echo "::error title=deploy-dev failed::workers/echo did not deploy"; exit 1; }
-          # Wrangler's delete command also lists KV namespaces, which this Workers-only
-          # token cannot read (run 41753702982), so the script goes through the API.
-          script="https://api.cloudflare.com/client/v4/accounts/6a27c9ff4b4eefef2c46535449ea4f49/workers/scripts/shytalk-dev"
-          curl --fail-with-body -sS -X DELETE "$script" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" || { echo "::error title=deploy-dev failed::the echo Worker was not deleted"; exit 1; }
-          status=$(curl -sS -o /dev/null -w '%{http_code}' "$script" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
-          if [ "$status" != 404 ]; then
-            echo "::error title=deploy-dev failed::the echo Worker still answers ($status) after its deletion"
+          npx wrangler deploy --env dev || { echo "::error title=deploy-dev failed::workers/web did not deploy"; exit 1; }
+          if [ -z "$DOOR_SECRET" ]; then
+            echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the dev environment (decision 216); until then the dev origin refuses every request."
             exit 1
           fi
-          echo "Read back: shytalk-dev is gone (404)."
+          printf '%s' "$DOOR_SECRET" | npx wrangler secret put DOOR_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev door secret was not set"; exit 1; }
