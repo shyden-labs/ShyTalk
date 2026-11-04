@@ -1,0 +1,27 @@
+# THROWAWAY (plan 2 Task E6 Step 3, shyden-labs/ShyTalk#31; Shyden 2026-11-04):
+# the door spike from a GitHub runner, to tell the door path from the laptop's
+# network. Runs on this pull request only; the pull request is closed unmerged.
+# Uses no secret: the door adds the dev door secret itself.
+name: door-spike
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  door-spike:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: node
+        run: |
+          version=$(sed -nE 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' .github/node/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+      - name: Hold 30 minutes, resume, then cut a socket at the firewall and time the server noticing
+        run: node scripts/door-spike.ts
