@@ -30,11 +30,13 @@ const sleep = (ms: number): Promise<void> =>
   });
 const run = (file: string, args: string[]): string => execFileSync(file, args, { encoding: 'utf8' });
 
-/** Drops (`-I`) or restores (`-D`) every packet of one local TCP port, both ways. */
+/** Drops (`-I`) or restores (`-D`) every packet of one local TCP port, both ways, IPv4 and IPv6. */
 const iptables = (op: '-I' | '-D', port: string): void => {
   if (!/^\d+$/.test(port)) throw new Error(`not a port: ${port}`);
-  run('sudo', ['iptables', op, 'INPUT', '-p', 'tcp', '--dport', port, '-j', 'DROP']);
-  run('sudo', ['iptables', op, 'OUTPUT', '-p', 'tcp', '--sport', port, '-j', 'DROP']);
+  for (const tool of ['iptables', 'ip6tables']) {
+    run('sudo', [tool, op, 'INPUT', '-p', 'tcp', '--dport', port, '-j', 'DROP']);
+    run('sudo', [tool, op, 'OUTPUT', '-p', 'tcp', '--sport', port, '-j', 'DROP']);
+  }
 };
 
 /** The runner's established connections to dev.shytalk.app (by its resolved addresses), by local port. */
@@ -159,12 +161,13 @@ const resume = await holdThenClose('resume', RESUME_MS);
 const before = localPorts();
 const dead = await open('cut');
 const ports = [...localPorts()].filter((p) => !before.has(p));
-const port = ports[0];
-if (ports.length !== 1 || port === undefined) throw new Error(`cut: expected one new connection, found ${JSON.stringify(ports)}`);
+// The client may open more than one connection to the door (IPv4 and IPv6 at
+// once); every new one is this socket's, so every one is cut.
+if (ports.length === 0) throw new Error('cut: found no new connection to dev.shytalk.app');
 await sleep(35_000); // one alarm on the soon-dead socket first
-iptables('-I', port);
+for (const port of ports) iptables('-I', port);
 const cutAt = Date.now();
-log('cut', { port, how: 'iptables DROP both ways, no close, no reset' });
+log('cut', { ports, how: 'iptables DROP both ways, no close, no reset' });
 const probe = await open('probe');
 let goneAfterMs: number | null = null;
 while (Date.now() - cutAt < CUT_CAP_MS) {
@@ -177,7 +180,7 @@ while (Date.now() - cutAt < CUT_CAP_MS) {
 }
 const clientSawCloseAfterMs = dead.closedAt === null ? null : dead.closedAt - cutAt;
 log('server-noticed', { goneAfterMs, capMs: CUT_CAP_MS, clientSawCloseAfterMs });
-iptables('-D', port);
+for (const port of ports) iptables('-D', port);
 probe.ws.close(4000, 'spike done');
 await probe.closed;
 
