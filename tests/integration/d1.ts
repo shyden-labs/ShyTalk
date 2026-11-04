@@ -23,6 +23,7 @@ export interface LocalDevEnv {
  * in miniflare's, which need @cloudflare/workers-types and more that this
  * repository does not install, and lib checks are on. Loaded through a
  * variable so the compiler does not resolve those declarations.
+ * `@vite-ignore` tells Vite the variable import is meant, so it does not warn.
  */
 type GetPlatformProxy = (options: {
   configPath: string;
@@ -38,7 +39,7 @@ const WRANGLER = 'wrangler';
  * database the global setup migrated. Never remote.
  */
 export async function localDev(): Promise<{ env: LocalDevEnv; dispose: () => Promise<void> }> {
-  const { getPlatformProxy } = (await import(WRANGLER)) as { getPlatformProxy: GetPlatformProxy };
+  const { getPlatformProxy } = (await import(/* @vite-ignore */ WRANGLER)) as { getPlatformProxy: GetPlatformProxy };
   const proxy = await getPlatformProxy({
     configPath: 'workers/web/wrangler.json',
     environment: 'dev',
