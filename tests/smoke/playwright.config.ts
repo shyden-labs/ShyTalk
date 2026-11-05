@@ -36,8 +36,9 @@ export default defineConfig({
   testDir: '.',
   forbidOnly: true,
   retries: 0,
-  // The JSON report is read by scripts/smoke-totals.ts, from the repository root.
-  reporter: [['list'], ['json', { outputFile: SMOKE_REPORT }]],
+  // scripts/smoke-totals.ts reads the JSON report from the repository root;
+  // Playwright resolves a relative outputFile from this config's folder, so it is made absolute.
+  reporter: [['list'], ['json', { outputFile: `${ROOT}${SMOKE_REPORT}` }]],
   use: {
     baseURL: `http://127.0.0.1:${String(PORT)}`,
     extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret },
