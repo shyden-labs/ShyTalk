@@ -38,7 +38,7 @@ describe('web config', () => {
     expect(block['account_id']).toBe(account);
     expect(block['workers_dev']).toBe(true);
     expect(block['routes']).toBeUndefined();
-    expect(block['vars']).toEqual({ ENVIRONMENT_NAME: name });
+    expect((block['vars'] as Config)['ENVIRONMENT_NAME']).toBe(name);
   });
 
   it('prod answers shytalk.app from the production account, with no workers.dev address', () => {
@@ -47,10 +47,42 @@ describe('web config', () => {
     expect(block['account_id']).toBe(PROD);
     expect(block['workers_dev']).toBe(false);
     expect(block['routes']).toEqual([{ pattern: 'shytalk.app', custom_domain: true }]);
-    expect(block['vars']).toEqual({ ENVIRONMENT_NAME: 'prod' });
+    expect((block['vars'] as Config)['ENVIRONMENT_NAME']).toBe('prod');
   });
 
   it('has no top-level account, so no deploy can fall back to one', () => {
     expect(config()['account_id']).toBeUndefined();
+  });
+});
+
+// App sign-in's settings (plan 4 Task 3, shyden-labs/ShyTalk#76). Client IDs
+// are public, so they are vars; GOOGLE_CLIENT_IDS stays empty (sign-in answers
+// 503) until the Google clients exist.
+describe('app sign-in config', () => {
+  // TEST's and DEV's origins are their doors, read from the door's own config:
+  // no test names a door host (environments.test.ts).
+  const door = JSON.parse(readFileSync('workers/door/wrangler.json', 'utf8')) as { env: Record<string, { routes: { pattern: string }[] }> };
+  const doorOrigin = (name: string): string => `https://${door.env[name]?.routes[0]?.pattern ?? 'no-door-route'}`;
+  const ORIGINS = { prod: 'https://shytalk.app', test: doorOrigin('test'), dev: doorOrigin('dev') };
+
+  it.each(Object.entries(ORIGINS))('%s holds its origin, the client IDs and the bundle ID as vars', (name, origin) => {
+    expect(environment(name)['vars']).toEqual({
+      ENVIRONMENT_NAME: name,
+      SITE_ORIGIN: origin,
+      GOOGLE_CLIENT_IDS: '',
+      APPLE_AUDIENCES: 'com.shyden.shytalk',
+    });
+  });
+
+  it.each(Object.keys(ORIGINS))('%s limits sign-in to 10 a minute', (name) => {
+    const [limit, ...others] = environment(name)['ratelimits'] as Config[];
+    expect(others).toEqual([]);
+    expect(limit).toMatchObject({ name: 'SIGN_IN_LIMIT', simple: { limit: 10, period: 60 } });
+  });
+
+  it('gives each environment its own counter: dev and test share an account, so they must not share a namespace', () => {
+    const ids = Object.keys(ORIGINS).map((name) => ((environment(name)['ratelimits'] as Config[])[0] as Config)['namespace_id']);
+    expect(new Set(ids).size).toBe(3);
+    for (const id of ids) expect(id).toMatch(/^[1-9][0-9]*$/);
   });
 });

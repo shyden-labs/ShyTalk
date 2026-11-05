@@ -20,13 +20,26 @@
         }
       ],
       "vars": {
-        "ENVIRONMENT_NAME": "prod"
+        "ENVIRONMENT_NAME": "prod",
+        "SITE_ORIGIN": "https://shytalk.app",
+        "GOOGLE_CLIENT_IDS": "",
+        "APPLE_AUDIENCES": "com.shyden.shytalk"
       },
       "d1_databases": [
         {
           "binding": "DB",
           "database_name": "shytalk-prod",
           "migrations_dir": "../../migrations"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "SIGN_IN_LIMIT",
+          "namespace_id": "1001",
+          "simple": {
+            "limit": 10,
+            "period": 60
+          }
         }
       ]
     },
@@ -35,13 +48,26 @@
       "account_id": "6a27c9ff4b4eefef2c46535449ea4f49",
       "workers_dev": true,
       "vars": {
-        "ENVIRONMENT_NAME": "test"
+        "ENVIRONMENT_NAME": "test",
+        "SITE_ORIGIN": "https://test.shytalk.app",
+        "GOOGLE_CLIENT_IDS": "",
+        "APPLE_AUDIENCES": "com.shyden.shytalk"
       },
       "d1_databases": [
         {
           "binding": "DB",
           "database_name": "shytalk-test",
           "migrations_dir": "../../migrations"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "SIGN_IN_LIMIT",
+          "namespace_id": "1002",
+          "simple": {
+            "limit": 10,
+            "period": 60
+          }
         }
       ]
     },
@@ -50,13 +76,26 @@
       "account_id": "6a27c9ff4b4eefef2c46535449ea4f49",
       "workers_dev": true,
       "vars": {
-        "ENVIRONMENT_NAME": "dev"
+        "ENVIRONMENT_NAME": "dev",
+        "SITE_ORIGIN": "https://dev.shytalk.app",
+        "GOOGLE_CLIENT_IDS": "",
+        "APPLE_AUDIENCES": "com.shyden.shytalk"
       },
       "d1_databases": [
         {
           "binding": "DB",
           "database_name": "shytalk-dev",
           "migrations_dir": "../../migrations"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "SIGN_IN_LIMIT",
+          "namespace_id": "1003",
+          "simple": {
+            "limit": 10,
+            "period": 60
+          }
         }
       ]
     }
