@@ -87,7 +87,8 @@ jobs:
   # The site smoke (shyden-labs/ShyTalk#51 AC4): the built pages served by the
   # real web Worker under `wrangler dev` as DEV, behind the door with a fresh
   # secret per run; each language's home 200 and 404 404, in its language,
-  # with no CSP refusal (playwright.config.ts, tests/smoke/).
+  # with no CSP refusal (playwright.config.ts, tests/smoke/), on Chromium,
+  # Firefox and WebKit (shyden-labs/ShyTalk#109).
   web-smoke:
     runs-on: ubuntu-26.04
     steps:
@@ -112,9 +113,9 @@ jobs:
       - name: Build the site
         if: steps.classify.outputs.scope != 'docs-only'
         run: npm run build:web
-      - name: Install Chromium
+      - name: Install the browsers
         if: steps.classify.outputs.scope != 'docs-only'
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox webkit
       - name: Smoke
         if: steps.classify.outputs.scope != 'docs-only'
         env:
@@ -123,6 +124,12 @@ jobs:
           SMOKE_DOOR_SECRET=$(openssl rand -hex 32)
           export SMOKE_DOOR_SECRET
           npm run test:smoke
+      # One suite, run unchanged on every target (shyden-labs/ShyTalk#109):
+      # prints each target's total; fails if any differ or a test was skipped.
+      # Runs after a red smoke too, so the totals always print.
+      - name: Compare the totals
+        if: ${{ !cancelled() && steps.classify.outputs.scope != 'docs-only' }}
+        run: node scripts/smoke-totals.ts
 
   # The integration suite (shyden-labs/ShyTalk#59, decision 230: a required
   # check): tests under tests/integration against Cloudflare's own local
