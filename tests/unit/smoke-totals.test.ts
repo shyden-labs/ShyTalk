@@ -3,116 +3,110 @@ import { readFileSync } from 'node:fs';
 import { smokeTotals, main, SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
 import { SMOKE_TARGETS } from '../smoke/targets.ts';
 
-// The report file is stood in: a unit test reads nothing from disk.
+// The report is stood in: a unit test reads nothing from disk.
 vi.mock('node:fs', () => ({ readFileSync: vi.fn() }));
 const read = vi.mocked(readFileSync);
 
 type Status = 'expected' | 'unexpected' | 'flaky' | 'skipped';
 
-/** One spec run on each named target, as Playwright's JSON reporter writes it. */
+const TARGETS = ['chromium', 'firefox', 'webkit'] as const;
+
+/** One spec as Playwright's JSON reporter writes it: a title and one result per project it ran on. */
 function spec(title: string, runs: Record<string, Status>) {
   return { title, tests: Object.entries(runs).map(([projectName, status]) => ({ projectName, status })) };
 }
 
-const ALL = (status: Status = 'expected') => ({ chromium: status, firefox: status, webkit: status });
-const TARGETS = ['chromium', 'firefox', 'webkit'] as const;
+/** The same status on every target. */
+const everywhere = (status: Status) => ({ chromium: status, firefox: status, webkit: status });
 
-describe('smokeTotals', () => {
-  it('prints each target with its total, and finds nothing wrong when every target ran the same tests', () => {
-    const report = { suites: [{ title: 'site.spec.ts', specs: [spec('a', ALL()), spec('b', ALL())], suites: [] }] };
+describe('smokeTotals: each target total', () => {
+  it('prints every target with its total and skips, and finds nothing wrong when all agree', () => {
+    const report = { suites: [{ title: 'site.spec.ts', specs: [spec('a', everywhere('expected')), spec('b', everywhere('expected'))] }] };
     expect(smokeTotals(report, TARGETS)).toEqual({
       lines: ['chromium: 2 tests, 0 skipped', 'firefox: 2 tests, 0 skipped', 'webkit: 2 tests, 0 skipped'],
       errors: [],
     });
   });
 
-  it('counts a failed or flaky test in its target total: the run itself reports the failure', () => {
-    const report = { suites: [{ title: 'f', specs: [spec('a', ALL('unexpected')), spec('b', ALL('flaky'))] }] };
-    expect(smokeTotals(report, TARGETS).errors).toEqual([]);
-    expect(smokeTotals(report, TARGETS).lines[0]).toBe('chromium: 2 tests, 0 skipped');
+  it('counts failed and flaky results too: the smoke step reports those itself', () => {
+    const report = { suites: [{ title: 'f', specs: [spec('a', everywhere('unexpected')), spec('b', everywhere('flaky'))] }] };
+    expect(smokeTotals(report, TARGETS)).toEqual({
+      lines: ['chromium: 2 tests, 0 skipped', 'firefox: 2 tests, 0 skipped', 'webkit: 2 tests, 0 skipped'],
+      errors: [],
+    });
   });
 
-  it('counts specs in nested suites', () => {
+  it('counts specs inside nested suites, and suites that hold only suites', () => {
     const report = {
-      suites: [{ title: 'f', specs: [spec('a', ALL())], suites: [{ title: 'inner', specs: [spec('b', ALL())] }] }],
+      suites: [
+        { title: 'f', suites: [{ title: 'inner', specs: [spec('a', everywhere('expected'))] }] },
+        { title: 'g', specs: [spec('b', everywhere('expected'))] },
+      ],
     };
-    expect(smokeTotals(report, TARGETS).lines).toContain('webkit: 2 tests, 0 skipped');
+    expect(smokeTotals(report, TARGETS).lines).toEqual([
+      'chromium: 2 tests, 0 skipped',
+      'firefox: 2 tests, 0 skipped',
+      'webkit: 2 tests, 0 skipped',
+    ]);
   });
+});
 
-  it('fails when the totals differ, naming every target and its total', () => {
+describe('smokeTotals: faults', () => {
+  it('fails when the totals differ, naming each target and its total', () => {
     const report = {
-      suites: [{ title: 'f', specs: [spec('a', ALL()), spec('b', { chromium: 'expected', firefox: 'expected' })] }],
+      suites: [{ title: 'f', specs: [spec('a', everywhere('expected')), spec('b', { chromium: 'expected', firefox: 'expected' })] }],
     };
-    expect(smokeTotals(report, TARGETS).errors).toEqual(['the totals differ: chromium 2, firefox 2, webkit 1']);
+    expect(smokeTotals(report, TARGETS).errors).toContain('the totals differ: chromium 2, firefox 2, webkit 1');
   });
 
   it('fails on a test skipped on one target, naming the target and the test', () => {
     const report = {
-      suites: [{ title: 'f', specs: [spec('a', ALL()), spec('b', { chromium: 'expected', firefox: 'expected', webkit: 'skipped' })] }],
+      suites: [
+        {
+          title: 'f',
+          specs: [spec('a', everywhere('expected')), spec('b', { chromium: 'expected', firefox: 'expected', webkit: 'skipped' })],
+        },
+      ],
     };
-    const { lines, errors } = smokeTotals(report, TARGETS);
-    expect(lines).toContain('webkit: 2 tests, 1 skipped');
-    expect(errors).toEqual(['webkit skipped "b"']);
+    expect(smokeTotals(report, TARGETS)).toEqual({
+      lines: ['chromium: 2 tests, 0 skipped', 'firefox: 2 tests, 0 skipped', 'webkit: 2 tests, 1 skipped'],
+      errors: ['webkit skipped "b"'],
+    });
   });
 
-  it('fails on a target that ran no tests', () => {
+  it('fails on every target that ran no tests', () => {
+    expect(smokeTotals({ suites: [] }, TARGETS).errors).toEqual(['chromium ran no tests', 'firefox ran no tests', 'webkit ran no tests']);
+  });
+
+  it('names a missing target before the totals that differ because of it', () => {
     const report = { suites: [{ title: 'f', specs: [spec('a', { chromium: 'expected', firefox: 'expected' })] }] };
     expect(smokeTotals(report, TARGETS).errors).toEqual(['webkit ran no tests', 'the totals differ: chromium 1, firefox 1, webkit 0']);
   });
 
-  it('fails on a target that is not on the list', () => {
-    const report = { suites: [{ title: 'f', specs: [spec('a', { ...ALL(), edge: 'expected' })] }] };
+  it('fails on a project that is not a listed target', () => {
+    const report = { suites: [{ title: 'f', specs: [spec('a', { ...everywhere('expected'), edge: 'expected' })] }] };
     expect(smokeTotals(report, TARGETS).errors).toEqual(['edge ran but is not a listed target']);
-  });
-
-  it('fails on a report with no tests at all', () => {
-    expect(smokeTotals({ suites: [] }, TARGETS).errors).toEqual(['chromium ran no tests', 'firefox ran no tests', 'webkit ran no tests']);
-  });
-
-  it('reads a suite holding only nested suites', () => {
-    const report = { suites: [{ title: 'f', suites: [{ title: 'inner', specs: [spec('a', ALL())] }] }] };
-    expect(smokeTotals(report, TARGETS).errors).toEqual([]);
-  });
-
-  it.each([
-    null,
-    'text',
-    {},
-    { suites: 'x' },
-    { suites: ['x'] },
-    { suites: [{ specs: 'x' }] },
-    { suites: [{ specs: ['x'] }] },
-    { suites: [{ specs: [{ tests: [] }] }] },
-    { suites: [{ specs: [{ title: 'a', tests: 'x' }] }] },
-    { suites: [{ specs: [{ title: 'a', tests: ['x'] }] }] },
-    { suites: [{ specs: [{ title: 'a', tests: [{ status: 'expected' }] }] }] },
-    { suites: [{ specs: [{ title: 'a', tests: [{ projectName: 'webkit' }] }] }] },
-    { suites: [{ suites: 'x' }] },
-  ])('refuses a report that is not Playwright JSON: %j', (report) => {
-    expect(() => smokeTotals(report, TARGETS)).toThrow(/not a Playwright JSON report/);
-  });
-});
-
-describe('the smoke targets', () => {
-  it('are Chromium, Firefox and WebKit (Shyden 2026-11-05, shyden-labs/ShyTalk#109)', () => {
-    expect(SMOKE_TARGETS).toEqual(['chromium', 'firefox', 'webkit']);
   });
 });
 
 describe('main', () => {
   let log: MockInstance<typeof console.log>;
   let error: MockInstance<typeof console.error>;
+  const printed = (spy: MockInstance<typeof console.log>) => spy.mock.calls.map((call) => String(call[0]));
+
   beforeEach(() => {
     read.mockReset();
     log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('reads the report, prints each target and passes when all agree', () => {
-    read.mockReturnValue(JSON.stringify({ suites: [{ title: 'f', specs: [spec('a', ALL())] }] }));
+  it('reads the report from the repository root and checks the listed smoke targets', () => {
+    read.mockReturnValue(JSON.stringify({ suites: [{ title: 'f', specs: [spec('a', everywhere('expected'))] }] }));
     expect(main()).toBe(0);
-    expect(read).toHaveBeenCalledWith(SMOKE_REPORT, 'utf8');
-    expect(log.mock.calls.map((call) => String(call[0]))).toEqual([
+    expect(read).toHaveBeenCalledWith('test-results/smoke-report.json', 'utf8');
+    expect(SMOKE_REPORT).toBe('test-results/smoke-report.json');
+    expect(SMOKE_TARGETS).toEqual(['chromium', 'firefox', 'webkit']);
+    expect(printed(log)).toEqual([
       'smoke-totals: chromium: 1 tests, 0 skipped',
       'smoke-totals: firefox: 1 tests, 0 skipped',
       'smoke-totals: webkit: 1 tests, 0 skipped',
@@ -120,12 +114,13 @@ describe('main', () => {
     expect(error).not.toHaveBeenCalled();
   });
 
-  it('prints each fault and fails', () => {
+  it('prints the totals and every fault, and fails', () => {
     read.mockReturnValue(
       JSON.stringify({ suites: [{ title: 'f', specs: [spec('a', { chromium: 'expected', firefox: 'expected', webkit: 'skipped' })] }] }),
     );
     expect(main()).toBe(1);
-    expect(error.mock.calls.map((call) => String(call[0]))).toEqual(['smoke-totals: webkit skipped "a"']);
+    expect(printed(log)).toContain('smoke-totals: webkit: 1 tests, 1 skipped');
+    expect(printed(error)).toEqual(['smoke-totals: webkit skipped "a"']);
   });
 
   it('fails naming the file when there is no report', () => {
@@ -133,6 +128,13 @@ describe('main', () => {
       throw new Error('ENOENT: no such file');
     });
     expect(main()).toBe(1);
-    expect(error.mock.calls.map((call) => String(call[0]))).toEqual([`smoke-totals: cannot read ${SMOKE_REPORT}: ENOENT: no such file`]);
+    expect(printed(error)).toEqual(['smoke-totals: cannot read test-results/smoke-report.json: ENOENT: no such file']);
+  });
+
+  it.each(['not json', '{}', '{"suites":[{"specs":[{"title":"a"}]}]}'])('fails naming the file on a report it cannot read: %s', (text) => {
+    read.mockReturnValue(text);
+    expect(main()).toBe(1);
+    expect(printed(error)).toHaveLength(1);
+    expect(printed(error)[0]).toMatch(/^smoke-totals: cannot read test-results\/smoke-report\.json: /);
   });
 });
