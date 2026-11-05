@@ -36,7 +36,7 @@
 - **Mutation testing while a test is written, never after** (Shyden, 2026-11-02, global): each new test is seen to fail once against a deliberate break of the code it covers, recorded in the PR body; no repeat mutation runs, CI jobs or schedules.
 - **Laptop runs** unit, typecheck, lint, format only. A unit test reaches no D1, DO, network or process.
 - **Workflow:** one story per task, one branch per story from fresh `origin/develop`, squash-merge on green `headRefOid`, `Refs #N` only.
-- **Not a dating app:** no field, switch or copy key in the document schema names pairing, matching or partners in the romantic sense (CLAUDE.md guardrail); Task 5's schema test lists the refused words.
+- **Not a dating app:** no field, switch or copy key in the document schema names pairing, matching or partners in the romantic sense (CLAUDE.md guardrail). No refused-word list (Shyden 2026-11-05: any word is fine in the right context; ShyTalk must not be used primarily as a dating app, which a word list cannot judge).
 
 ## Review Focus
 
@@ -103,12 +103,12 @@
 
 ### Task 5: The UI document's schema (estimate 3)
 
-**Files:** `packages/ui-document/{index.ts,schema.ts}`; `manifests/ui.json` (version 1: menus, colours, sizes, switches, copy); `tests/unit/ui-document.test.ts`.
+**Files:** `packages/ui-document/index.ts`; `manifests/ui.json` (version 1: menus, colours, sizes, switches, copy); `tests/unit/ui-document.test.ts`.
 
 **Interfaces:**
-- Produces: `type UiDocument = { schemaVersion: 1; navigation: NavItem[]; tokens: Record<string, string | number>; switches: Record<string, boolean>; copy: Record<Locale, Record<string, string>>; screens?: never }` (`screens` reserved for Part 2, live-app D6); `validateUiDocument(input: unknown, refused: RefusedWords): { ok: true; doc: UiDocument } | { ok: false; errors: string[] }`; `RefusedWords = Record<Locale, readonly string[]>`.
+- Produces: `type UiDocument = { schemaVersion: 1; navigation: NavItem[]; tokens: Record<string, string | number>; switches: Record<string, boolean>; copy: Record<Locale, Record<string, string>>; screens?: never }` (`screens` reserved for Part 2, live-app D6); `validateUiDocument(input: unknown): { ok: true; doc: UiDocument } | { ok: false; errors: string[] }`; `MENU_ROUTES` (the routes a menu may name) and `SEALED_ROUTES` (named in the refusal, kept off `MENU_ROUTES` by a test).
 
-- [ ] **Step 1 (red):** a document missing a copy key in any of the five locales fails naming key and locale; an unknown top-level key fails; `screens` present fails until Part 2; a `navigation` item naming a sealed route (ban and suspension, App-Lock, cohort segregation, unsafe device, account deletion) fails; a refused word fails in every language alike (Shyden 2026-11-03, "keep things consistent amongst languages"): each line is checked against its own language's list (Thai and Chinese by substring, the others by whole word), keys against English; one test per language; the English list is put to Shyden and every translated list read back by Google before commit ("date" and "match" left out as ordinary words: pass 5); `manifests/ui.json` passes.
+- [ ] **Step 1 (red):** a document missing a copy key in any of the five locales fails naming key and locale; an unknown top-level key fails; `screens` present fails until Part 2; a `navigation` item naming any route not in `MENU_ROUTES` fails under any name or spelling, and a sealed route (ban and suspension, App-Lock, cohort segregation, unsafe device, account deletion) is named in the refusal; every translated line is read back by Google before commit; `manifests/ui.json` passes. (The refused-word check of earlier drafts was dropped by Shyden's ruling of 2026-11-05; shipped in PR #102.)
 - [ ] **Step 2:** implement with Valibot; unit green; PR; merge.
 
 ### Task 6: Serving and publishing the document (estimate 5)
@@ -192,3 +192,5 @@
 **Pass 7 (2026-11-03):** checked the filed stories against the folded plan: three were stale (#76 still said audit "in the same batch", #78 had the English-only refused-word rule, #80 lacked the bucket edge and `undoes`); fixed, and the provisional banners removed from #76-#82.
 
 **Pass 8 (2026-11-03):** read back every story #76-#82 (no banner, no "same batch") and the plan's Tasks 3 and 7 lines; nothing new. Every task has now been run (Tasks 1-2 in `wt-plan4`, Tasks 3-8 in `wt-plan4b`; Task 9 is close-out with no code).
+
+**After Task 5 (2026-11-05):** Shyden ruled that any word is fine in the right context, so the refused-word list (pass 5 above) was dropped, and menus were limited to an allow-list, `MENU_ROUTES`. Global Constraints and Task 5 now say so; the pass notes above stay as history.
