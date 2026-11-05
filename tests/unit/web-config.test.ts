@@ -65,11 +65,17 @@ describe('app sign-in config', () => {
   const doorOrigin = (name: string): string => `https://${door.env[name]?.routes[0]?.pattern ?? 'no-door-route'}`;
   const ORIGINS = { prod: 'https://shytalk.app', test: doorOrigin('test'), dev: doorOrigin('dev') };
 
+  // The audiences Google signs app tokens for, from project `shytalk-app`
+  // (made 2026-11-05): Android tokens name the web client, iOS tokens the iOS
+  // client. The three Android clients only bind the package to its keys.
+  const GOOGLE_WEB = '415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com';
+  const GOOGLE_IOS = '415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com';
+
   it.each(Object.entries(ORIGINS))('%s holds its origin, the client IDs and the bundle ID as vars', (name, origin) => {
     expect(environment(name)['vars']).toEqual({
       ENVIRONMENT_NAME: name,
       SITE_ORIGIN: origin,
-      GOOGLE_CLIENT_IDS: '',
+      GOOGLE_CLIENT_IDS: `${GOOGLE_WEB},${GOOGLE_IOS}`,
       APPLE_AUDIENCES: 'com.shyden.shytalk',
     });
   });

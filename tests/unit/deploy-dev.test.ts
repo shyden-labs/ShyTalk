@@ -122,6 +122,20 @@ describe('deploy-dev', () => {
     expect(step).toContain('DOOR_SECRET: ${{ secrets.DOOR_SECRET }}');
   });
 
+  // #76: dev app sign-in answers 503 until the Worker holds Better Auth's
+  // secret, so the deploy puts it from the dev environment, after the Worker
+  // exists, and stops naming the secret when the environment has none.
+  it('puts the Better Auth secret after the deploy, and stops naming it when the environment lacks it', () => {
+    const step = deployStep().join('\n');
+    const deploy = step.indexOf('npx wrangler deploy --env dev ||');
+    const missing = step.indexOf('if [ -z $BETTER_AUTH_SECRET ]; then');
+    const put = step.indexOf('printf %s $BETTER_AUTH_SECRET | npx wrangler secret put BETTER_AUTH_SECRET --env dev ||');
+    expect(deploy).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(deploy);
+    expect(put).toBeGreaterThan(missing);
+    expect(step).toContain('BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}');
+  });
+
   // Plan 4 Task 2 (shyden-labs/ShyTalk#75): before the Worker deploys, its
   // database exists, is migrated and is marked `dev`, or the site answers 503.
   // A rehearsal exits before any of it, holding no credential.

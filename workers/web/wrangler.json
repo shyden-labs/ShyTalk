@@ -22,7 +22,7 @@
       "vars": {
         "ENVIRONMENT_NAME": "prod",
         "SITE_ORIGIN": "https://shytalk.app",
-        "GOOGLE_CLIENT_IDS": "",
+        "GOOGLE_CLIENT_IDS": "415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com,415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com",
         "APPLE_AUDIENCES": "com.shyden.shytalk"
       },
       "d1_databases": [
@@ -50,7 +50,7 @@
       "vars": {
         "ENVIRONMENT_NAME": "test",
         "SITE_ORIGIN": "https://test.shytalk.app",
-        "GOOGLE_CLIENT_IDS": "",
+        "GOOGLE_CLIENT_IDS": "415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com,415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com",
         "APPLE_AUDIENCES": "com.shyden.shytalk"
       },
       "d1_databases": [
@@ -78,7 +78,7 @@
       "vars": {
         "ENVIRONMENT_NAME": "dev",
         "SITE_ORIGIN": "https://dev.shytalk.app",
-        "GOOGLE_CLIENT_IDS": "",
+        "GOOGLE_CLIENT_IDS": "415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com,415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com",
         "APPLE_AUDIENCES": "com.shyden.shytalk"
       },
       "d1_databases": [
