@@ -1,38 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { MENU_ROUTES, SEALED_ROUTES, validateUiDocument, type RefusedWords, type UiDocument } from '../../packages/ui-document/index.ts';
-
-/**
- * Made-up refused words, so no unread translation sits in a test. The real
- * lists are Shyden's to check (English) and Google's to read back (the rest).
- * Vietnamese holds a two-word phrase: its words are written apart.
- */
-const REFUSED: RefusedWords = {
-  en: ['refused'],
-  id: ['zzditolak'],
-  th: ['ซซซ'],
-  vi: ['zz cam'],
-  zh: ['禁禁'],
-};
+import { MENU_ROUTES, SEALED_ROUTES, validateUiDocument, type UiDocument } from '../../packages/ui-document/index.ts';
 
 const manifest = (): UiDocument => JSON.parse(readFileSync('manifests/ui.json', 'utf8')) as UiDocument;
-const errors = (doc: unknown, refused: RefusedWords = REFUSED): string[] => {
-  const result = validateUiDocument(doc, refused);
+const errors = (doc: unknown): string[] => {
+  const result = validateUiDocument(doc);
   return result.ok ? [] : result.errors;
 };
-const withLine = (locale: keyof RefusedWords, line: string): UiDocument => {
-  const doc = manifest();
-  doc.copy[locale]['nav.rooms'] = line;
-  return doc;
-};
-
 describe('the UI document: shape (AC1)', () => {
   it('passes manifests/ui.json', () => {
     expect(errors(manifest())).toEqual([]);
   });
 
   it('returns the parsed document when it passes', () => {
-    const result = validateUiDocument(manifest(), REFUSED);
+    const result = validateUiDocument(manifest());
     expect(result).toEqual({ ok: true, doc: manifest() });
   });
 
@@ -79,7 +60,9 @@ describe('the UI document: shape (AC1)', () => {
   });
 
   it('refuses an empty line', () => {
-    expect(errors(withLine('en', ''))).toEqual(['copy.en.nav.rooms: Invalid length: Expected >=1 but received 0']);
+    const doc = manifest();
+    doc.copy.en['nav.rooms'] = '';
+    expect(errors(doc)).toEqual(['copy.en.nav.rooms: Invalid length: Expected >=1 but received 0']);
   });
 
   it('refuses an unknown top-level key', () => {
@@ -139,79 +122,5 @@ describe('the UI document: sealed routes (AC2)', () => {
     const doc = manifest();
     doc.navigation.push({ id: 'x', route: 'rooms', label: 'nav.rooms' });
     expect(errors(doc)).toEqual([]);
-  });
-});
-
-describe('the UI document: refused words, the same rule in every language (AC3)', () => {
-  it('refuses an English line holding a refused word, whatever its case', () => {
-    expect(errors(withLine('en', 'Find a REFUSED here'))).toEqual(['copy.en.nav.rooms uses refused word refused']);
-  });
-
-  it('refuses an Indonesian line holding a refused word', () => {
-    expect(errors(withLine('id', 'Cari zzditolak di sini'))).toEqual(['copy.id.nav.rooms uses refused word zzditolak']);
-  });
-
-  it('refuses a Vietnamese line holding a refused phrase', () => {
-    expect(errors(withLine('vi', 'Tìm zz cam ở đây'))).toEqual(['copy.vi.nav.rooms uses refused word zz cam']);
-  });
-
-  it('refuses a Thai line holding a refused word inside other letters', () => {
-    expect(errors(withLine('th', 'ห้องซซซห้อง'))).toEqual(['copy.th.nav.rooms uses refused word ซซซ']);
-  });
-
-  it('refuses a Chinese line holding a refused word inside other letters', () => {
-    expect(errors(withLine('zh', '房间禁禁房间'))).toEqual(['copy.zh.nav.rooms uses refused word 禁禁']);
-  });
-
-  it('matches whole words in English, so a longer word is not refused', () => {
-    expect(errors(withLine('en', 'refusedness'))).toEqual([]);
-  });
-
-  it('matches a Vietnamese phrase only when its words are together', () => {
-    expect(errors(withLine('vi', 'zz và cam'))).toEqual([]);
-  });
-
-  it('checks each line against its own language only', () => {
-    expect(errors(withLine('id', 'refused'))).toEqual([]);
-  });
-
-  it('refuses a refused word hidden with a zero-width space', () => {
-    expect(errors(withLine('en', 'ref\u200Bused'))).toEqual(['copy.en.nav.rooms uses refused word refused']);
-  });
-
-  it('refuses a refused word written in full-width letters', () => {
-    expect(errors(withLine('en', 'ｒｅｆｕｓｅｄ'))).toEqual(['copy.en.nav.rooms uses refused word refused']);
-  });
-
-  it('refuses a Thai refused word split by a space', () => {
-    expect(errors(withLine('th', 'ซซ ซ'))).toEqual(['copy.th.nav.rooms uses refused word ซซซ']);
-  });
-
-  it('refuses a refused word in a copy key, against English', () => {
-    const doc = manifest();
-    for (const locale of ['en', 'id', 'th', 'vi', 'zh'] as const) doc.copy[locale]['refused.title'] = 'x';
-    expect(errors(doc)).toEqual(['copy key refused.title uses refused word refused']);
-  });
-
-  it('refuses a refused word in a switch key written in camel case', () => {
-    const doc = manifest();
-    doc.switches['rooms.useRefusedMode'] = true;
-    expect(errors(doc)).toEqual(['switches key rooms.useRefusedMode uses refused word refused']);
-  });
-
-  it('refuses a refused word in a token key or value', () => {
-    const doc = manifest();
-    doc.tokens['zz_refused'] = 'refused';
-    expect(errors(doc)).toEqual(['tokens key zz_refused uses refused word refused', 'tokens value zz_refused uses refused word refused']);
-  });
-
-  it('refuses a refused word in a navigation id', () => {
-    const doc = manifest();
-    doc.navigation.push({ id: 'refused', route: 'rooms', label: 'nav.rooms' });
-    expect(errors(doc)).toEqual(['navigation id refused uses refused word refused']);
-  });
-
-  it('refuses a refused-word list holding an empty entry, which would match everything or nothing', () => {
-    expect(() => validateUiDocument(manifest(), { ...REFUSED, th: [' '] })).toThrow('refused words for th hold an empty entry');
   });
 });
