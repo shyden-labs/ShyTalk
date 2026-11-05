@@ -8,13 +8,25 @@ import * as v from 'valibot';
 export const LOCALES = ['en', 'id', 'th', 'vi', 'zh'] as const;
 export type Locale = (typeof LOCALES)[number];
 
-/** Routes the server alone controls; no document may put them in a menu, at any depth of a path. */
+/**
+ * The routes a menu may link to. Anything else is refused, whatever its name,
+ * so a server-controlled screen cannot reach a menu under a name nobody
+ * listed. A new menu route is added here, in reviewed code, never by editing
+ * the document. Grows with the app's screens (plan 6).
+ */
+export const MENU_ROUTES: readonly string[] = ['rooms'];
+
+/**
+ * Screens the server alone opens (ban and suspension, App-Lock, cohort
+ * segregation, unsafe device, account deletion): never a menu route, held
+ * apart by a test, and named in the refusal when a document tries one.
+ */
 export const SEALED_ROUTES: readonly string[] = ['ban', 'suspension', 'app-lock', 'cohort', 'unsafe-device', 'delete-account'];
 
 /**
  * Not a dating app (CLAUDE.md guardrail): no key or line, in any language, may
  * name romantic pairing. Each language has its own list and each line is
- * checked against its own language's list; keys, ids, routes and tokens
+ * checked against its own language's list; keys, ids and tokens
  * against English. An entry may be several words (Vietnamese writes each
  * syllable apart), matched only when its words stand together.
  */
@@ -23,8 +35,6 @@ export type RefusedWords = Record<Locale, readonly string[]>;
 /** Thai and Chinese put no spaces between words, so their entries match anywhere in a line. */
 const SUBSTRING_LOCALES: ReadonlySet<Locale> = new Set(['th', 'zh']);
 
-/** Lower-case words joined by `-`, segments joined by `/`: one spelling per route, so a sealed one cannot hide. */
-const ROUTE = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
 const NOT_WORD = /[^\p{L}\p{M}\p{N}]+/gu;
 
 /** NFKC folds full-width and other look-alike forms; format characters (zero-width spaces and joiners) are dropped. */
@@ -72,10 +82,7 @@ const Text = v.pipe(v.string(), v.minLength(1));
 const Lines = v.record(Text, Text);
 const NavItem = v.strictObject({
   id: Text,
-  route: v.pipe(
-    v.string(),
-    v.regex(ROUTE, (issue) => `Invalid format: Expected lower-case words joined by - and / but received ${issue.received}`),
-  ),
+  route: Text,
   /** A copy key, so every menu label is translated. */
   label: Text,
 });
@@ -107,11 +114,10 @@ export function validateUiDocument(input: unknown, refused: RefusedWords): { ok:
   for (const item of doc.navigation) {
     if (ids.has(item.id)) errors.push(`navigation ${item.id} is listed twice`);
     ids.add(item.id);
-    if (item.route.split('/').some((segment) => SEALED_ROUTES.includes(segment)))
-      errors.push(`navigation ${item.id} names sealed route ${item.route}`);
+    if (SEALED_ROUTES.includes(item.route)) errors.push(`navigation ${item.id} names sealed route ${item.route}`);
+    else if (!MENU_ROUTES.includes(item.route)) errors.push(`navigation ${item.id} names route ${item.route}, which is not a menu route`);
     if (!english.includes(item.label)) errors.push(`navigation ${item.id} label ${item.label} is not a copy key`);
     for (const word of keyHits(item.id, lists)) errors.push(`navigation id ${item.id} uses refused word ${word}`);
-    for (const word of keyHits(item.route, lists)) errors.push(`navigation route ${item.route} uses refused word ${word}`);
   }
   for (const [key, value] of Object.entries(doc.tokens)) {
     for (const word of keyHits(key, lists)) errors.push(`tokens key ${key} uses refused word ${word}`);

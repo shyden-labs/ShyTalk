@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { validateUiDocument, type RefusedWords, type UiDocument } from '../../packages/ui-document/index.ts';
+import { MENU_ROUTES, SEALED_ROUTES, validateUiDocument, type RefusedWords, type UiDocument } from '../../packages/ui-document/index.ts';
 
 /**
  * Made-up refused words, so no unread translation sits in a test. The real
@@ -100,13 +100,13 @@ describe('the UI document: shape (AC1)', () => {
 
   it('refuses a navigation label that is not a copy key', () => {
     const doc = manifest();
-    doc.navigation.push({ id: 'x', route: 'profile', label: 'Profile' });
+    doc.navigation.push({ id: 'x', route: 'rooms', label: 'Profile' });
     expect(errors(doc)).toEqual(['navigation x label Profile is not a copy key']);
   });
 
   it('refuses two navigation items with one id', () => {
     const doc = manifest();
-    doc.navigation.push({ id: 'rooms', route: 'profile', label: 'nav.rooms' });
+    doc.navigation.push({ id: 'rooms', route: 'rooms', label: 'nav.rooms' });
     expect(errors(doc)).toEqual(['navigation rooms is listed twice']);
   });
 });
@@ -121,26 +121,23 @@ describe('the UI document: sealed routes (AC2)', () => {
     },
   );
 
-  it('refuses a sealed route deeper in a path', () => {
-    const doc = manifest();
-    doc.navigation.push({ id: 'x', route: 'settings/app-lock', label: 'nav.rooms' });
-    expect(errors(doc)).toEqual(['navigation x names sealed route settings/app-lock']);
-  });
-
-  it.each(['App-Lock', '/ban', 'ban/', 'ban//x', ' ban', 'unsafe_device', 'ban?x=1'])(
-    'refuses the route spelling %j, so a sealed route cannot be written another way',
+  // A menu links only to routes the server knows as menu routes: a sealed screen under any other name is refused too.
+  it.each(['account-deletion', 'age-group', 'settings/app-lock', 'App-Lock', '/ban', 'ban/', ' ban', 'unsafe_device', 'ban?x=1', 'rooms/'])(
+    'refuses the route %j, which is not a menu route',
     (route) => {
       const doc = manifest();
       doc.navigation.push({ id: 'x', route, label: 'nav.rooms' });
-      expect(errors(doc)).toEqual([
-        'navigation.1.route: Invalid format: Expected lower-case words joined by - and / but received ' + JSON.stringify(route),
-      ]);
+      expect(errors(doc)).toEqual([`navigation x names route ${route}, which is not a menu route`]);
     },
   );
 
-  it('lets an ordinary route through', () => {
+  it('keeps every sealed route off the menu routes', () => {
+    expect(MENU_ROUTES.filter((route) => SEALED_ROUTES.includes(route))).toEqual([]);
+  });
+
+  it('lets a menu route through', () => {
     const doc = manifest();
-    doc.navigation.push({ id: 'x', route: 'settings/language', label: 'nav.rooms' });
+    doc.navigation.push({ id: 'x', route: 'rooms', label: 'nav.rooms' });
     expect(errors(doc)).toEqual([]);
   });
 });
@@ -208,10 +205,10 @@ describe('the UI document: refused words, the same rule in every language (AC3)'
     expect(errors(doc)).toEqual(['tokens key zz_refused uses refused word refused', 'tokens value zz_refused uses refused word refused']);
   });
 
-  it('refuses a refused word in a navigation id or route', () => {
+  it('refuses a refused word in a navigation id', () => {
     const doc = manifest();
-    doc.navigation.push({ id: 'refused', route: 'refused', label: 'nav.rooms' });
-    expect(errors(doc)).toEqual(['navigation id refused uses refused word refused', 'navigation route refused uses refused word refused']);
+    doc.navigation.push({ id: 'refused', route: 'rooms', label: 'nav.rooms' });
+    expect(errors(doc)).toEqual(['navigation id refused uses refused word refused']);
   });
 
   it('refuses a refused-word list holding an empty entry, which would match everything or nothing', () => {
