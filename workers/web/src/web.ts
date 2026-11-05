@@ -11,6 +11,7 @@
 import { createMarkerGuard, requireDoorSecret, type D1Like } from '../../../packages/environment/index.ts';
 import { handleAppApi, isAppApi } from './app/router.ts';
 import { json } from './http.ts';
+import type { RateLimit } from './app/sign-in.ts';
 
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
@@ -23,6 +24,13 @@ export interface WebEnv {
   /** The environment's own D1 database, `shytalk-<env>`, marked with its name; absent only in a Worker deployed without it, which serves nothing. */
   DB?: D1Like;
   ASSETS: { fetch(request: Request): Promise<Response> };
+  /** App sign-in's settings (plan 4 Task 3, shyden-labs/ShyTalk#76): see `AuthEnv`; absent, sign-in answers 503. */
+  SITE_ORIGIN?: string;
+  BETTER_AUTH_SECRET?: string;
+  GOOGLE_CLIENT_IDS?: string;
+  APPLE_AUDIENCES?: string;
+  /** Sign-in attempts per IP (wrangler.json `ratelimits`). */
+  SIGN_IN_LIMIT?: RateLimit;
 }
 
 const ENVIRONMENTS = new Set(['prod', 'test', 'dev']);

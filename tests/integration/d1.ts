@@ -1,16 +1,24 @@
 import { join } from 'node:path';
 import { inject } from 'vitest';
 
+/** One statement's result, as D1 answers it. */
+export interface D1Result<T> {
+  results: T[];
+  meta: { changes: number; last_row_id: number };
+}
+
 /** The part of D1 the integration tests use. */
 export interface D1 {
   prepare(sql: string): D1Statement;
-  batch(statements: D1Statement[]): Promise<unknown[]>;
+  batch<T = unknown>(statements: D1Statement[]): Promise<D1Result<T>[]>;
+  exec(sql: string): Promise<unknown>;
 }
 
 export interface D1Statement {
   bind(...values: unknown[]): D1Statement;
   run(): Promise<unknown>;
   first<T>(): Promise<T | null>;
+  all<T = Record<string, unknown>>(): Promise<D1Result<T>>;
 }
 
 export interface LocalDevEnv {

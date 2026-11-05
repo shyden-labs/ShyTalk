@@ -72,6 +72,72 @@ describe('/api/app/*', () => {
   });
 });
 
+// Sign-in (plan 4 Task 3, shyden-labs/ShyTalk#76) is reached through the
+// router only when the Worker has everything it needs; otherwise it fails
+// closed. The flows themselves are tested in app-sign-in.test.ts.
+describe('/api/app/sign-in and sign-out', () => {
+  /** A full Worker env: a D1-shaped DB, Better Auth's settings and the rate limit. */
+  const ready = (): WebEnv => ({
+    ...env('dev'),
+    DB: {
+      prepare: () => ({ first: <T>() => Promise.resolve({ name: 'dev' } as T), bind: () => ({}) }),
+      batch: () => Promise.resolve([]),
+      exec: () => Promise.resolve({}),
+    } as D1Like,
+    SITE_ORIGIN: 'https://site.example.test',
+    BETTER_AUTH_SECRET: 'a-test-secret-that-is-long-enough-for-better-auth',
+    GOOGLE_CLIENT_IDS: 'web.apps.googleusercontent.com',
+    APPLE_AUDIENCES: 'com.shyden.shytalk',
+    SIGN_IN_LIMIT: { limit: () => Promise.resolve({ success: true }) },
+  });
+  const postTo = (path: string, body: string): Request =>
+    new Request(`https://site.example.test${path}`, { method: 'POST', body, headers: { [DOOR_SECRET_HEADER]: SECRET } });
+
+  it.each(['/api/app/sign-in/google', '/api/app/sign-in/apple'])(
+    '%s reaches the sign-in handler (a bad body answers 400)',
+    async (path) => {
+      const response = await handle(postTo(path, '{'), ready());
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'bad_request' });
+      expect(response.headers.get('content-security-policy')).toBe(CONTENT_SECURITY_POLICY);
+    },
+  );
+
+  it('/api/app/sign-out reaches the sign-out handler (GET answers 405)', async () => {
+    const response = await handle(get('/api/app/sign-out'), ready());
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe('POST');
+  });
+
+  it.each([
+    ['SITE_ORIGIN', { SITE_ORIGIN: undefined }],
+    ['BETTER_AUTH_SECRET', { BETTER_AUTH_SECRET: undefined }],
+    ['GOOGLE_CLIENT_IDS', { GOOGLE_CLIENT_IDS: undefined }],
+    ['APPLE_AUDIENCES', { APPLE_AUDIENCES: undefined }],
+    ['SIGN_IN_LIMIT', { SIGN_IN_LIMIT: undefined }],
+    [
+      'a DB without batch',
+      { DB: { prepare: () => ({ first: <T>() => Promise.resolve({ name: 'dev' } as T) }), exec: () => Promise.resolve({}) } as D1Like },
+    ],
+    [
+      'a DB without exec',
+      { DB: { prepare: () => ({ first: <T>() => Promise.resolve({ name: 'dev' } as T) }), batch: () => Promise.resolve([]) } as D1Like },
+    ],
+  ])('without %s, sign-in and sign-out answer 503 sign_in_unavailable', async (_name, missing) => {
+    const partial = { ...ready(), ...missing } as WebEnv;
+    for (const path of ['/api/app/sign-in/google', '/api/app/sign-in/apple', '/api/app/sign-out']) {
+      const response = await handle(postTo(path, '{}'), partial);
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'sign_in_unavailable' });
+    }
+  });
+
+  it.each(['/api/app/sign-in', '/api/app/sign-in/github', '/api/app/sign-in/google/extra'])('%s is not a route: 404', async (path) => {
+    const response = await handle(postTo(path, '{}'), ready());
+    expect(response.status).toBe(404);
+  });
+});
+
 // Later app routes depend on exactly which paths are the app's: `/api/app`
 // and below, never a sibling such as `/api/apps`.
 describe('isAppApi', () => {
