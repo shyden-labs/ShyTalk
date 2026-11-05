@@ -23,6 +23,7 @@ describe('every workflow', () => {
       'ci.yml',
       'deploy-dev.yml',
       'deploy-doors.yml',
+      'deploy-release.yml',
       'door-count-trigger.yml',
       'door-count.yml',
       'sonarcloud.yml',
