@@ -73,7 +73,8 @@ describe('ci.yml', () => {
     ]);
   });
 
-  it('builds the site, installs Chromium and runs the smoke in web-smoke, skipping all three for docs', () => {
+  // shyden-labs/ShyTalk#109: every target the site supports runs the same suite, and their totals are compared.
+  it('builds the site, installs every browser, runs the smoke and compares the totals in web-smoke, skipping them for docs', () => {
     expect(steps(yamlBlock(ci, 'web-smoke', '  '))).toEqual([
       { name: '', run: '', if: '' },
       { name: '', run: '|', if: '' },
@@ -81,8 +82,9 @@ describe('ci.yml', () => {
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
       { name: 'Build the site', run: 'npm run build:web', if: CODE },
-      { name: 'Install Chromium', run: 'npx playwright install --with-deps chromium', if: CODE },
+      { name: 'Install the browsers', run: 'npx playwright install --with-deps chromium firefox webkit', if: CODE },
       { name: 'Smoke', run: '|', if: CODE },
+      { name: 'Compare the totals', run: 'node scripts/smoke-totals.ts', if: `\${{ !cancelled() && ${CODE} }}` },
     ]);
   });
 

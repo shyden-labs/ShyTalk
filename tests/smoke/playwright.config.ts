@@ -8,8 +8,13 @@
 import { defineConfig, devices } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
+import { SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
+import { SMOKE_TARGETS } from './targets.ts';
 
 const PORT = 8787;
+
+/** Each target's desktop browser (shyden-labs/ShyTalk#109); the suite runs unchanged on all of them. */
+const DEVICE = { chromium: 'Desktop Chrome', firefox: 'Desktop Firefox', webkit: 'Desktop Safari' } as const;
 /** wrangler runs from the repository root, where its config paths start. */
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -31,12 +36,14 @@ export default defineConfig({
   testDir: '.',
   forbidOnly: true,
   retries: 0,
-  reporter: [['list']],
+  // scripts/smoke-totals.ts reads the JSON report from the repository root;
+  // Playwright resolves a relative outputFile from this config's folder, so it is made absolute.
+  reporter: [['list'], ['json', { outputFile: `${ROOT}${SMOKE_REPORT}` }]],
   use: {
     baseURL: `http://127.0.0.1:${String(PORT)}`,
     extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret },
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: SMOKE_TARGETS.map((name) => ({ name, use: { ...devices[DEVICE[name]] } })),
   webServer: {
     command: [
       `npx wrangler d1 migrations apply DB ${LOCAL_D1}`,
