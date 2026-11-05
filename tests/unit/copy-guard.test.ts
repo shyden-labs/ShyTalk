@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs';
 import { t } from '../../apps/web/src/i18n/t.ts';
 
 /**
- * The site's words (plan 3 Task 3, shyden-labs/ShyTalk#53). ShyTalk is not a
- * dating app (CLAUDE.md guardrail), and to the public the app is still being
- * built, never rebuilt (decision 212). The English and Google's English
+ * The site's words (plan 3 Task 3, shyden-labs/ShyTalk#53). To the public the
+ * app is still being built, never rebuilt (decision 212). There is no dating
+ * word list: any word is fine in the right context (Shyden 2026-11-05,
+ * shyden-labs/ShyTalk#104). The English and Google's English
  * read-back of every other language are checked, so a translation that drifts
  * is caught in the words a reviewer can read.
  */
@@ -17,7 +18,7 @@ import { t } from '../../apps/web/src/i18n/t.ts';
  */
 const FIRST_PERSON = /\b(we|we're|we've|we'll|us|our|ours|I|I'm|I've|me|my|the team|solo|just me|one-person|small team)\b/i;
 
-const REFUSED = /\b(partners?|match(es|ing)?|dat(e|es|ing)|couples?|soulmates?|meet someone|rebuild|rebuilt|relaunch(ed)?)\b/i;
+const REFUSED = /\b(rebuild|rebuilt|relaunch(ed)?)\b/i;
 
 const englishLines = (): string[] => {
   const lines: string[] = [];
@@ -66,11 +67,11 @@ describe('the copy guard', () => {
     for (const line of read) expect(line, line).not.toMatch(REFUSED);
   });
 
-  it.each(['a dating app', 'find a partner', 'the app is rebuilt', 'We relaunched'])('refuses "%s"', (line) => {
+  it.each(['the app is rebuilt', 'We relaunched', 'a rebuild is coming'])('refuses "%s"', (line) => {
     expect(line).toMatch(REFUSED);
   });
 
-  it.each(['update your app', 'candidates welcome', 'mismatched socks'])('lets "%s" through', (line) => {
+  it.each(['update your app', 'find a language partner', 'the date of the festival', 'a matching pair'])('lets "%s" through', (line) => {
     expect(line).not.toMatch(REFUSED);
   });
 });
