@@ -54,8 +54,7 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     await expect(page.getByRole('link', { name: t(locale, 'home.roadmap') })).toHaveCount(0);
   });
 
-  test(`${lang}: the home page passes axe`, async ({ page, browserName }) => {
-    test.skip(browserName === 'webkit' && lang === 'en', 'deliberate skip, #109 AC 5: the totals check must fail');
+  test(`${lang}: the home page passes axe`, async ({ page }) => {
     await page.goto(`${prefix}/`, { waitUntil: 'load' });
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
