@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { createAuth, getAuth, type AuthDatabase, type AuthEnv, type ShyTalkAuth } from '../../workers/web/src/auth/better-auth.ts';
-import { handleSignIn, handleSignOut, type SignInEnv } from '../../workers/web/src/app/sign-in.ts';
+import { END_SESSION_SQL, handleSignIn, handleSignOut, type SignInEnv } from '../../workers/web/src/app/sign-in.ts';
 import { appSession, signedOut } from '../../workers/web/src/app/session.ts';
 import { verifyIdToken } from '../../workers/web/src/auth/id-token.ts';
 import { APPLE_ID, APPLE_ISSUER, GOOGLE_IDS, GOOGLE_ISSUER, issuer, sha256Hex, type Claims, type Issuer } from '../support/id-tokens.ts';
@@ -36,6 +36,8 @@ interface World {
   audits: Bound[];
   limited: string[];
   setAuditFails(fails: boolean): void;
+  /** Fails, whole, every batch holding an audit row for one of `actions`. */
+  setAuditFailsOn(actions: string[]): void;
   setLimited(limited: boolean): void;
 }
 
@@ -43,6 +45,7 @@ function world(): World {
   const audits: Bound[] = [];
   const limited: string[] = [];
   let auditFails = false;
+  let failingActions: string[] = [];
   let overLimit = false;
   const store: Record<string, Record<string, unknown>[]> = { user: [], session: [], account: [], verification: [] };
   const env: SignInEnv = {
@@ -53,9 +56,17 @@ function world(): World {
     APPLE_AUDIENCES: APPLE_ID,
     DB: {
       prepare: (sql: string) => ({ bind: (...values: unknown[]): Bound => ({ sql, values }) }),
+      // Like D1, a batch lands whole or not at all: audit rows are kept, and a
+      // session DELETE is applied to the memory store, only when nothing fails.
       batch: (statements: Bound[]) => {
         if (auditFails) return Promise.reject(new Error('D1 is down'));
-        audits.push(...statements);
+        if (statements.some((statement) => failingActions.includes(String(statement.values[2]))))
+          return Promise.reject(new Error('D1 is down'));
+        for (const statement of statements) {
+          if (statement.sql === END_SESSION_SQL)
+            store['session'] = (store['session'] ?? []).filter((row) => row['id'] !== statement.values[0]);
+          else audits.push(statement);
+        }
         return Promise.resolve([]);
       },
     },
@@ -74,6 +85,9 @@ function world(): World {
     store,
     audits,
     limited,
+    setAuditFailsOn: (actions) => {
+      failingActions = actions;
+    },
     setAuditFails: (fails) => {
       auditFails = fails;
     },
@@ -380,17 +394,37 @@ describe('the app session and sign-out', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
 
-  it('sign-out deletes the session, writes one audit row, and the old token then gets 401', async () => {
+  /** The sign-out rows: everything after the sign-in's `session.start`. */
+  const signOutRows = (): Bound[] => w.audits.filter((row) => String(row.values[2]).startsWith('session.end'));
+  const detail = (row: Bound): Record<string, unknown> => JSON.parse(String(row.values[4])) as Record<string, unknown>;
+
+  it('sign-out logs an attempt, deletes the session, logs its success on the same chain, and the old token then gets 401', async () => {
     const { token, userId } = await signedIn();
     const response = await handleSignOut(bearer('sign-out', token), w.env, w.auth);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
     expect(w.store['session']).toHaveLength(0);
-    expect(w.audits).toHaveLength(2);
-    expect(nth(w.audits, 1).values.slice(1, 4)).toEqual([`user:${userId}`, 'session.end', `user:${userId}`]);
+    const [attempt, outcome, ...more] = signOutRows();
+    expect(more).toEqual([]);
+    if (attempt === undefined || outcome === undefined) throw new Error('expected two sign-out rows');
+    expect(attempt.values.slice(1, 4)).toEqual([`user:${userId}`, 'session.end.attempt', `user:${userId}`]);
+    expect(outcome.values.slice(1, 4)).toEqual([`user:${userId}`, 'session.end.success', `user:${userId}`]);
+    const chain = detail(attempt)['chain'];
+    expect(chain).toMatch(/^[0-9a-f-]{36}$/);
+    expect(detail(outcome)).toEqual({ chain });
+    expect(JSON.stringify(signOutRows())).not.toContain(token);
     const again = await handleSignOut(bearer('sign-out', token), w.env, w.auth);
     expect(again.status).toBe(401);
     expect(await again.json()).toEqual({ error: 'signed_out' });
+  });
+
+  it('each sign-out has its own chain', async () => {
+    for (let i = 0; i < 2; i += 1) {
+      const { token } = await signedIn();
+      await handleSignOut(bearer('sign-out', token), w.env, w.auth);
+    }
+    const chains = new Set(signOutRows().map((row) => detail(row)['chain']));
+    expect(chains.size).toBe(2);
   });
 
   it('sign-out without a session answers 401 and writes nothing', async () => {
@@ -399,13 +433,47 @@ describe('the app session and sign-out', () => {
     expect(w.audits).toHaveLength(0);
   });
 
-  it('a failing audit write on sign-out answers 500 and keeps the session, so sign-out can be tried again', async () => {
+  it('when the attempt cannot be logged, sign-out answers 500 and keeps the session, so it can be tried again', async () => {
     const { token } = await signedIn();
     w.setAuditFails(true);
     const response = await handleSignOut(bearer('sign-out', token), w.env, w.auth);
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'sign_out_failed' });
     expect(w.store['session']).toHaveLength(1);
+    expect(signOutRows()).toEqual([]);
+  });
+
+  it('the session ends in the same all-or-nothing batch as its success row', async () => {
+    const { token } = await signedIn();
+    w.setAuditFailsOn(['session.end.success']);
+    const response = await handleSignOut(bearer('sign-out', token), w.env, w.auth);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'sign_out_failed' });
+    expect(w.store['session']).toHaveLength(1);
+    const [attempt, outcome, ...more] = signOutRows();
+    expect(more).toEqual([]);
+    if (attempt === undefined || outcome === undefined) throw new Error('expected two sign-out rows');
+    expect(outcome.values[2]).toBe('session.end.failure');
+    expect(detail(outcome)).toEqual({ chain: detail(attempt)['chain'], error: 'Error: D1 is down' });
+    expect((await handleSignOut(bearer('sign-out', token), w.env, w.auth)).status).toBe(500);
+  });
+
+  it('when the failure cannot be logged either, the session is kept and sign-out answers 500', async () => {
+    const { token } = await signedIn();
+    w.setAuditFailsOn(['session.end.success', 'session.end.failure']);
+    const response = await handleSignOut(bearer('sign-out', token), w.env, w.auth);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'sign_out_failed' });
+    expect(w.store['session']).toHaveLength(1);
+    expect(signOutRows().map((row) => row.values[2])).toEqual(['session.end.attempt']);
+  });
+
+  it('the end step deletes exactly the signed-in session, by its id', async () => {
+    const first = await signedIn();
+    const second = await signedIn();
+    await handleSignOut(bearer('sign-out', first.token), w.env, w.auth);
+    expect(rows(w, 'session').map((row) => row['token'])).toEqual([second.token]);
+    expect(END_SESSION_SQL).toBe('DELETE FROM session WHERE id = ?');
   });
 
   it('sign-out answers 405 to anything but POST', async () => {

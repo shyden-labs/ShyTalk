@@ -7,8 +7,12 @@
  * Better Auth runs D1 without transactions, so the audit row cannot share a
  * batch with the session (decision 222): sign-in writes it after the session
  * and, if that write fails, deletes the session and answers an error, so no
- * session exists without its row. Sign-out writes its row first and deletes
- * the session only once the row is written.
+ * session exists without its row. Sign-out is a chain of rows sharing one
+ * `chain` id (Shyden, 2026-11-05): `session.end.attempt` before the session
+ * is touched, then `session.end.success`, or `session.end.failure` with the
+ * error. No attempt row, no sign-out. The session's DELETE and the success
+ * row share one D1 batch, so a chain with no outcome always means the person
+ * is still signed in.
  */
 import { APIError } from 'better-auth/api';
 import { audit, type AuditDatabase } from '../audit.ts';
@@ -85,17 +89,33 @@ export async function handleSignIn(request: Request, env: SignInEnv, auth: ShyTa
   return json(200, { token: signedIn.token, userId: signedIn.user.id });
 }
 
+/**
+ * Ends one session by its id. Written by ShyTalk rather than through Better
+ * Auth's sign-out, so it can share a D1 batch with the success row: the
+ * session ends and its row lands together, or neither (Shyden, 2026-11-05).
+ * No session cache is configured, so the row is the whole session.
+ */
+export const END_SESSION_SQL = 'DELETE FROM session WHERE id = ?';
+
 export async function handleSignOut(request: Request, env: SignInEnv, auth: ShyTalkAuth): Promise<Response> {
   if (request.method !== 'POST') return methodNotAllowed();
   const session = await appSession(request, auth);
   if (session === null) return signedOut();
-  const { userId } = session;
-  const actor = `user:${userId}`;
+  const actor = `user:${session.userId}`;
+  const chain = crypto.randomUUID();
+  const row = (action: string, detail: Record<string, unknown> = {}): unknown =>
+    audit(env, { actor, action: `session.end.${action}`, subject: actor, detail: { chain, ...detail } });
+
   try {
-    await env.DB.batch([audit(env, { actor, action: 'session.end', subject: actor })]);
+    await env.DB.batch([row('attempt')]);
   } catch {
     return json(500, { error: 'sign_out_failed' });
   }
-  await auth.api.signOut({ headers: request.headers });
+  try {
+    await env.DB.batch([env.DB.prepare(END_SESSION_SQL).bind(session.sessionId), row('success')]);
+  } catch (error) {
+    await env.DB.batch([row('failure', { error: String(error) })]).catch(() => undefined);
+    return json(500, { error: 'sign_out_failed' });
+  }
   return json(200, { ok: true });
 }

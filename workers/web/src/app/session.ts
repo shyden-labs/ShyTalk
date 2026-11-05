@@ -7,6 +7,8 @@ import { json } from '../http.ts';
 import type { ShyTalkAuth } from '../auth/better-auth.ts';
 
 export interface AppSession {
+  /** Better Auth's id for the session row (never its token). */
+  sessionId: string;
   userId: string;
   email: string;
   /** When the session began, in milliseconds since the epoch. */
@@ -17,7 +19,12 @@ export interface AppSession {
 export async function appSession(request: Request, auth: ShyTalkAuth): Promise<AppSession | null> {
   const found = await auth.api.getSession({ headers: request.headers });
   if (found === null) return null;
-  return { userId: found.user.id, email: found.user.email, createdAt: new Date(found.session.createdAt).getTime() };
+  return {
+    sessionId: found.session.id,
+    userId: found.user.id,
+    email: found.user.email,
+    createdAt: new Date(found.session.createdAt).getTime(),
+  };
 }
 
 /** The answer to a request that needs a session and has none. */

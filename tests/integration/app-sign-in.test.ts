@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAuth, type ShyTalkAuth } from '../../workers/web/src/auth/better-auth.ts';
-import { handleSignIn, handleSignOut, type SignInEnv } from '../../workers/web/src/app/sign-in.ts';
+import { END_SESSION_SQL, handleSignIn, handleSignOut, type SignInEnv } from '../../workers/web/src/app/sign-in.ts';
 import { APPLE_ID, GOOGLE_IDS, issuer, type Issuer } from '../support/id-tokens.ts';
 import { localDev, type LocalDevEnv } from './d1.ts';
 
@@ -142,7 +142,7 @@ describe('app sign-in on D1', () => {
     expect(await count('session WHERE userId IN (SELECT id FROM user WHERE email = ?)', email)).toBe(0);
   });
 
-  it('sign-out deletes the session row and writes its audit row; the old token then gets 401', async () => {
+  it('sign-out deletes the session row and writes its attempt and success on one chain; the old token then gets 401', async () => {
     const signedIn = await handleSignIn(
       post('sign-in/google', { idToken: await provider.idToken({ email: 'leaver@example.test', sub: 'g-l' }) }),
       env,
@@ -152,7 +152,48 @@ describe('app sign-in on D1', () => {
     const { token, userId } = (await signedIn.json()) as { token: string; userId: string };
     expect((await handleSignOut(post('sign-out', {}, token), env, auth)).status).toBe(200);
     expect(await count('session WHERE token = ?', token)).toBe(0);
-    expect(await count("audit WHERE action = 'session.end' AND actor = ?", `user:${userId}`)).toBe(1);
+    expect(await count("audit WHERE action = 'session.end.attempt' AND actor = ?", `user:${userId}`)).toBe(1);
+    const chains = await local.DB.prepare(
+      "SELECT action, json_extract(detail, '$.chain') AS chain FROM audit WHERE actor = ? AND action LIKE 'session.end.%' ORDER BY id",
+    )
+      .bind(`user:${userId}`)
+      .all<{ action: string; chain: string }>();
+    expect(chains.results.map((row) => row.action)).toEqual(['session.end.attempt', 'session.end.success']);
+    expect(new Set(chains.results.map((row) => row.chain)).size).toBe(1);
     expect((await handleSignOut(post('sign-out', {}, token), env, auth)).status).toBe(401);
+  });
+
+  it('a sign-out whose end batch fails on D1 keeps the session row and logs the failure on the chain', async () => {
+    const signedIn = await handleSignIn(
+      post('sign-in/google', { idToken: await provider.idToken({ email: 'stayer@example.test', sub: 'g-s' }) }),
+      env,
+      auth,
+      'google',
+    );
+    const { token, userId } = (await signedIn.json()) as { token: string; userId: string };
+    // The end batch gets one more statement that D1 refuses (audit.actor is NOT NULL),
+    // so D1 itself must roll back the session DELETE beside it.
+    const refusing: SignInEnv = {
+      ...env,
+      DB: {
+        prepare: (sql) => local.DB.prepare(sql),
+        batch: (statements) => {
+          const ends = statements.length === 2;
+          const all = statements as Parameters<typeof local.DB.batch>[0];
+          return local.DB.batch(ends ? [...all, local.DB.prepare('INSERT INTO audit (at) VALUES (1)')] : all);
+        },
+      },
+    };
+    const response = await handleSignOut(post('sign-out', {}, token), refusing, auth);
+    expect(response.status).toBe(500);
+    expect(await count('session WHERE token = ?', token)).toBe(1);
+    const chain = await local.DB.prepare(
+      "SELECT action, json_extract(detail, '$.chain') AS chain FROM audit WHERE actor = ? AND action LIKE 'session.end.%' ORDER BY id",
+    )
+      .bind(`user:${userId}`)
+      .all<{ action: string; chain: string }>();
+    expect(chain.results.map((row) => row.action)).toEqual(['session.end.attempt', 'session.end.failure']);
+    expect(new Set(chain.results.map((row) => row.chain)).size).toBe(1);
+    expect(END_SESSION_SQL).toContain('DELETE FROM session');
   });
 });
