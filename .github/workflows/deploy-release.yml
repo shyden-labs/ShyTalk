@@ -1,0 +1,93 @@
+# TEST and PROD deploy the website from a release cut (shyden-labs/ShyTalk#116).
+# A push to `release/*` deploys TEST through `test`, which allows only
+# `release/*` and holds the Non-Prod test token. A push to `main` (the cut
+# merged by Shyden) deploys PROD through `production`, which allows only `main`
+# and waits for his approval. Neither environment's credential reaches the
+# other, and dev can never deploy either (decision 214, one token per account).
+# A pull request changing this file rehearses it in `release-rehearsal`, which
+# holds nothing, so its lines run before a release depends on them.
+#
+# Third-party actions are pinned to full SHAs with a `# vX.Y.Z` comment, as in
+# ci.yml.
+name: deploy-release
+on:
+  push:
+    branches: ['release/**', main]
+  pull_request:
+    paths: ['.github/workflows/deploy-release.yml']
+  workflow_dispatch:
+
+# A deploy stopped halfway leaves an environment undefined, so a newer run
+# waits for the running one. Each ref queues alone, so TEST never waits on
+# PROD's approval, and each pull request rehearses in its own group.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('deploy-release-rehearsal-{0}', github.event.pull_request.number) || format('deploy-release-{0}', github.ref) }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-release:
+    # A hand-started run on any other branch skips before asking for approval.
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/') }}
+    runs-on: ubuntu-26.04
+    environment: ${{ github.event_name == 'pull_request' && 'release-rehearsal' || github.ref == 'refs/heads/main' && 'production' || 'test' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143), as in ci.yml.
+      - id: node
+        run: |
+          version=$(sed -nE 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' .github/node/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: 'npm'
+      - run: node scripts/npm-ci.ts
+      # The same steps as deploy-dev, for the Worker environment TARGET (test
+      # or prod): the database exists, is migrated and is marked TARGET before
+      # the Worker deploys, or the site answers 503 to everyone (#75, decisions
+      # 219, 220). A rehearsal only bundles both environments, with no
+      # credential.
+      - name: Deploy the website
+        env:
+          DEPLOY_REHEARSAL: ${{ github.event_name == 'pull_request' }}
+          TARGET: ${{ github.ref == 'refs/heads/main' && 'prod' || 'test' }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
+        run: |
+          npm run build:web || { echo "::error title=deploy-release failed::the website did not build"; exit 1; }
+          cd workers/web
+          if [ "$DEPLOY_REHEARSAL" = true ]; then
+            npx wrangler deploy --dry-run --env test --outdir "$RUNNER_TEMP/test" || { echo "::error title=deploy-release failed::workers/web did not bundle for test"; exit 1; }
+            npx wrangler deploy --dry-run --env prod --outdir "$RUNNER_TEMP/prod" || { echo "::error title=deploy-release failed::workers/web did not bundle for prod"; exit 1; }
+            exit 0
+          fi
+          info=$(npx wrangler d1 info "shytalk-$TARGET" --env "$TARGET" 2>&1) || {
+            printf '%s\n' "$info"
+            case "$info" in
+              *"Couldn't find a D1 DB named 'shytalk-$TARGET'"*) npx wrangler d1 create "shytalk-$TARGET" --location apac || { echo "::error title=deploy-release failed::shytalk-$TARGET was not created"; exit 1; } ;;
+              *) echo "::error title=deploy-release failed::d1 info shytalk-$TARGET failed"; exit 1 ;;
+            esac
+          }
+          npx wrangler d1 migrations apply DB --remote --env "$TARGET" || { echo "::error title=deploy-release failed::the shytalk-$TARGET migrations did not apply"; exit 1; }
+          npx wrangler d1 execute DB --remote --env "$TARGET" --command "CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT '$TARGET' WHERE NOT EXISTS (SELECT 1 FROM environment_marker);" || { echo "::error title=deploy-release failed::the shytalk-$TARGET marker was not written"; exit 1; }
+          marker=$(npx wrangler d1 execute DB --remote --env "$TARGET" --json --command "SELECT name FROM environment_marker") || { echo "::error title=deploy-release failed::the shytalk-$TARGET marker could not be read back"; exit 1; }
+          if [ "$(printf '%s' "$marker" | jq --arg t "$TARGET" '[.[0].results[].name] == [$t]')" != true ]; then
+            printf '%s\n' "$marker"
+            echo "::error title=deploy-release failed::shytalk-$TARGET must hold exactly one marker row, $TARGET"
+            exit 1
+          fi
+          echo "Read back: shytalk-$TARGET is marked $TARGET."
+          npx wrangler deploy --env "$TARGET" || { echo "::error title=deploy-release failed::workers/web did not deploy to $TARGET"; exit 1; }
+          # The TEST origin refuses every request without its door secret
+          # (decision 216); PROD has no door.
+          if [ "$TARGET" = test ]; then
+            if [ -z "$DOOR_SECRET" ]; then
+              echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the test environment (decision 216); until then the TEST origin refuses every request."
+              exit 1
+            fi
+            printf '%s' "$DOOR_SECRET" | npx wrangler secret put DOOR_SECRET --env test || { echo "::error title=deploy-release failed::the test door secret was not set"; exit 1; }
+          fi

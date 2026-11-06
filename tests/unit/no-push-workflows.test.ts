@@ -39,7 +39,7 @@ describe('no workflow writes to the repository', () => {
   it('judges every workflow but the deploy and release ones', () => {
     expect({ judged, allowed: workflows.filter((f) => MAY_WRITE.test(f)) }).toEqual({
       judged: ['check-release-cut.yml', 'ci.yml', 'door-count-trigger.yml', 'door-count.yml', 'sonarcloud.yml'],
-      allowed: ['deploy-dev.yml', 'deploy-doors.yml'],
+      allowed: ['deploy-dev.yml', 'deploy-doors.yml', 'deploy-release.yml'],
     });
   });
 
