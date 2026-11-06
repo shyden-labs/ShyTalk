@@ -127,6 +127,26 @@ describe('deploy-release', () => {
     expect(step).not.toContain('secret put DOOR_SECRET --env $TARGET');
   });
 
+  // App sign-in answers 503 until the Worker holds Better Auth's secret
+  // (shyden-labs/ShyTalk#110); TEST and PROD each need their own.
+  it('puts the Better Auth secret on TEST and PROD, after the deploy, failing by name when the environment lacks it', () => {
+    const step = deployStep();
+    const deploy = step.indexOf('npx wrangler deploy --env $TARGET ||');
+    const missing = step.indexOf('if [ -z $BETTER_AUTH_SECRET ]; then');
+    const named = step.indexOf(
+      'echo ::error title=BETTER_AUTH_SECRET missing::Set BETTER_AUTH_SECRET in this runs GitHub environment (shyden-labs/ShyTalk#110); until then $TARGET app sign-in answers 503.',
+    );
+    const put = step.indexOf('printf %s $BETTER_AUTH_SECRET | npx wrangler secret put BETTER_AUTH_SECRET --env $TARGET ||');
+    expect(deploy).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(deploy);
+    expect(named).toBeGreaterThan(missing);
+    expect(put).toBeGreaterThan(named);
+    expect(step).toContain('BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}');
+    // Outside the TEST-only door block, so PROD gets it too.
+    const onlyTest = step.indexOf('if [ $TARGET = test ]; then');
+    expect(onlyTest === -1 || put < onlyTest).toBe(true);
+  });
+
   it('never deploys a door', () => {
     expect(workflow()).not.toContain('workers/door');
   });
