@@ -35,6 +35,8 @@ return el ? (el.textContent ?? '').replace(/\\s+/g, ' ').trim() : null;`;
 const AXE = `const done = arguments[arguments.length - 1];
 axe.run(document).then((r) => done(r.violations.map((v) => ({ id: v.id, nodes: v.nodes.length }))));`;
 
+/** How long axe may take on a page before WebDriver gives up on it. */
+const AXE_TIMEOUT_MS = 60_000;
 const AXE_FILE = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 
 export function safariPage(
@@ -92,6 +94,8 @@ export function safariPage(
     },
     async axeViolations() {
       await run(read(AXE_FILE));
+      // Appium's default script timeout cut axe off at 17-29 ms on the iPhone Air (measured 2026-11-07).
+      await call('POST', `${at}/timeouts`, { script: AXE_TIMEOUT_MS });
       const violations = (await call('POST', `${at}/execute/async`, { script: AXE, args: [] })) as { id: string; nodes: number }[];
       return violations.map(({ id, nodes }) => `${id}: ${String(nodes)}`);
     },

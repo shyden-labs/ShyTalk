@@ -138,4 +138,12 @@ describe('safariPage: reading the page', () => {
     expect(executes.map(([, path]) => path)).toEqual(['/session/s1/execute/sync', '/session/s1/execute/async']);
     expect((executes[0]?.[2] as { script: string }).script).toBe('window.axe = {};');
   });
+
+  it('gives axe a minute before running it: Appium’s own script timeout cut it off at 17-29 ms on the iPhone Air (2026-11-07)', async () => {
+    const fake = appium({}, [null, []]);
+    await safariPage(fake.call, 's1', BASE, () => '').axeViolations();
+    const steps = fake.calls.map(([, path]) => path);
+    expect(fake.calls).toContainEqual(['POST', '/session/s1/timeouts', { script: 60_000 }]);
+    expect(steps.indexOf('/session/s1/timeouts')).toBeLessThan(steps.indexOf('/session/s1/execute/async'));
+  });
 });
