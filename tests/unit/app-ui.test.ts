@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { handleUi, publishUi, type UiStore, type UiRow, type NewUiRow } from '../../workers/web/src/app/ui.ts';
+import { d1UiStore, handleUi, publishUi, type UiStore, type UiRow, type NewUiRow, type UiStatement } from '../../workers/web/src/app/ui.ts';
+import { AUDIT_SQL } from '../../workers/web/src/audit.ts';
 import type { AuditEntry } from '../../workers/web/src/audit.ts';
 
 /**
@@ -131,5 +132,84 @@ describe('GET /api/app/ui', () => {
     const response = await handleUi(new Request('https://site.example.test/api/app/ui', { method: 'POST' }), memoryStore());
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');
+  });
+});
+
+describe('d1UiStore', () => {
+  interface Prepared extends UiStatement {
+    sql: string;
+    values: unknown[];
+  }
+
+  /** A D1 stand-in that records each statement and each batch, answering `answer` to every batch. */
+  function recordingDb(answer: { results: unknown[] }[], rows: unknown[] = []) {
+    const batches: Prepared[][] = [];
+    const statement = (sql: string, values: unknown[] = []): Prepared => ({
+      sql,
+      values,
+      bind: (...bound: unknown[]) => statement(sql, bound),
+      all: () => Promise.resolve({ results: rows }),
+    });
+    const DB = {
+      prepare: (sql: string) => statement(sql),
+      batch: (statements: UiStatement[]) => {
+        batches.push(statements as Prepared[]);
+        return Promise.resolve(answer);
+      },
+    };
+    return { DB, batches };
+  }
+
+  const row: NewUiRow = { body: '{}', audience: 'everyone', share: null, publishedAt: 5, publishedBy: 'ci:deploy-dev' };
+  const entry: AuditEntry = { actor: 'ci:deploy-dev', action: 'ui.publish', subject: 'ui_document' };
+
+  it('writes the version and its audit row in one batch, answering the version the INSERT returned', async () => {
+    const { DB, batches } = recordingDb([{ results: [{ version: 4 }] }, { results: [] }]);
+    const version = await d1UiStore({ ENVIRONMENT_NAME: 'dev', DB }).insert(row, entry);
+    expect(version).toBe(4);
+    expect(batches).toHaveLength(1);
+    const [insert, audited] = batches[0] ?? [];
+    expect(insert?.sql).toContain('SELECT COALESCE(MAX(version), 0) + 1');
+    expect(insert?.sql).toContain('RETURNING version');
+    expect(insert?.values).toEqual(['{}', 'everyone', null, 5, 'ci:deploy-dev']);
+    expect(audited?.sql).toBe(AUDIT_SQL);
+    expect(audited?.values.slice(1, 4)).toEqual(['ci:deploy-dev', 'ui.publish', 'ui_document']);
+  });
+
+  it('fails naming the missing version when the INSERT returns none', async () => {
+    const { DB } = recordingDb([{ results: [] }, { results: [] }]);
+    await expect(d1UiStore({ ENVIRONMENT_NAME: 'dev', DB }).insert(row, entry)).rejects.toThrow(
+      'the ui_documents insert answered no version',
+    );
+  });
+
+  it('reads the newest version for one audience', async () => {
+    const stored = { version: 3, body: '{}', audience: 'named', share: null, undoes: null, publishedAt: 5, publishedBy: 'staff:1' };
+    const { DB } = recordingDb([], [stored]);
+    const prepared: Prepared[] = [];
+    const watched = {
+      ...DB,
+      prepare: (sql: string) => {
+        const s = DB.prepare(sql);
+        prepared.push(s);
+        return {
+          ...s,
+          bind: (...v: unknown[]) => {
+            const b = s.bind(...v) as Prepared;
+            prepared.push(b);
+            return b;
+          },
+        };
+      },
+    };
+    expect(await d1UiStore({ ENVIRONMENT_NAME: 'dev', DB: watched }).newest('named')).toEqual(stored);
+    const bound = prepared.at(-1);
+    expect(bound?.sql).toContain('WHERE audience = ? ORDER BY version DESC LIMIT 1');
+    expect(bound?.values).toEqual(['named']);
+  });
+
+  it('answers null when an audience has no version', async () => {
+    const { DB } = recordingDb([], []);
+    expect(await d1UiStore({ ENVIRONMENT_NAME: 'dev', DB }).newest('everyone')).toBeNull();
   });
 });
