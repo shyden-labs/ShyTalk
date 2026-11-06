@@ -7,7 +7,7 @@
  * reading during a publish gets one whole version, never a mix.
  */
 import { validateUiDocument } from '../../../../packages/ui-document/index.ts';
-import type { AuditEntry, AuditEnv } from '../audit.ts';
+import { audit, type AuditEntry, type AuditEnv } from '../audit.ts';
 import { json } from '../http.ts';
 
 /** Who a version is for: named people, a share of people (Task 7), or everyone. */
@@ -71,11 +71,29 @@ export interface UiDatabase {
   batch(statements: UiStatement[]): Promise<{ results: unknown[] }[]>;
 }
 
+// The next version is taken inside the INSERT itself, so two publishes can
+// never share a number.
+const INSERT_SQL =
+  'INSERT INTO ui_documents (version, body, audience, share, undoes, published_at, published_by) ' +
+  'SELECT COALESCE(MAX(version), 0) + 1, ?, ?, ?, NULL, ?, ? FROM ui_documents RETURNING version';
+const NEWEST_SQL =
+  'SELECT version, body, audience, share, undoes, published_at AS publishedAt, published_by AS publishedBy ' +
+  'FROM ui_documents WHERE audience = ? ORDER BY version DESC LIMIT 1';
+
 /** The store on the environment's D1 (table `ui_documents`, migrations/0004_ui_documents.sql). */
 export function d1UiStore(env: AuditEnv<UiStatement> & { DB: UiDatabase }): UiStore {
   return {
-    insert: () => Promise.reject(new Error(`${env.ENVIRONMENT_NAME}: not written yet`)),
-    newest: () => Promise.reject(new Error(`${env.ENVIRONMENT_NAME}: not written yet`)),
+    async insert(row, entry) {
+      const insert = env.DB.prepare(INSERT_SQL).bind(row.body, row.audience, row.share, row.publishedAt, row.publishedBy);
+      const [inserted] = await env.DB.batch([insert, audit(env, entry)]);
+      const version = (inserted?.results[0] as { version?: unknown } | undefined)?.version;
+      if (typeof version !== 'number') throw new Error('the ui_documents insert answered no version');
+      return version;
+    },
+    async newest(audience) {
+      const { results } = await env.DB.prepare(NEWEST_SQL).bind(audience).all();
+      return (results[0] as UiRow | undefined) ?? null;
+    },
   };
 }
 

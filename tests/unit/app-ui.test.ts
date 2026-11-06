@@ -32,7 +32,7 @@ function memoryStore(): UiStore & { rows: UiRow[]; audits: AuditEntry[] } {
   };
 }
 
-const get = (headers: Record<string, string> = {}): Request => new Request('https://dev.shytalk.app/api/app/ui', { headers });
+const get = (headers: Record<string, string> = {}): Request => new Request('https://site.example.test/api/app/ui', { headers });
 
 describe('publishUi', () => {
   it('refuses an invalid document, naming why, and stores nothing', async () => {
@@ -128,7 +128,7 @@ describe('GET /api/app/ui', () => {
   });
 
   it('answers 405 to anything but GET', async () => {
-    const response = await handleUi(new Request('https://dev.shytalk.app/api/app/ui', { method: 'POST' }), memoryStore());
+    const response = await handleUi(new Request('https://site.example.test/api/app/ui', { method: 'POST' }), memoryStore());
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET');
   });

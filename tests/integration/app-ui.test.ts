@@ -25,7 +25,7 @@ afterAll(async () => {
 
 const valid = (): unknown => JSON.parse(readFileSync('manifests/ui.json', 'utf8'));
 const count = async (sql: string): Promise<number> => (await env.DB.prepare(sql).first<{ n: number }>())?.n ?? -1;
-const get = (headers: Record<string, string> = {}): Request => new Request('https://dev.shytalk.app/api/app/ui', { headers });
+const get = (headers: Record<string, string> = {}): Request => new Request('https://site.example.test/api/app/ui', { headers });
 
 describe('the UI document on D1', () => {
   it('gives each valid publish the next version, with one audit row each', async () => {
