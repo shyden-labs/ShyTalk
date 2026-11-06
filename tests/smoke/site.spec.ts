@@ -5,7 +5,8 @@
  * no roadmap button while the roadmap is hidden, and passes axe
  * (shyden-labs/ShyTalk#53 AC4). One test per page and language.
  */
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixture.ts';
 import AxeBuilder from '@axe-core/playwright';
 import { t } from '../../apps/web/src/i18n/t.ts';
 
