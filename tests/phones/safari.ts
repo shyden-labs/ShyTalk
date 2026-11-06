@@ -39,11 +39,23 @@ axe.run(document).then((r) => done(r.violations.map((v) => ({ id: v.id, nodes: v
 const AXE_TIMEOUT_MS = 60_000;
 const AXE_FILE = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 
+/**
+ * A token per visit, unique across runs: Safari kept pages cached across
+ * sessions and answered 304 on revalidating them (measured 2026-11-07), which
+ * hides the page's own status. A query no earlier visit used fetches it fresh.
+ */
+function visitTokens(): () => string {
+  const run = Date.now().toString(36);
+  let visit = 0;
+  return () => `${run}${(visit++).toString(36)}`;
+}
+
 export function safariPage(
   call: WebDriverCall,
   session: string,
   base: string,
   read: (file: string) => string = (file) => readFileSync(file, 'utf8'),
+  token: () => string = visitTokens(),
 ): SafariPage {
   const at = `/session/${session}`;
   const log = async (type: 'safariNetwork' | 'safariConsole') =>
@@ -56,7 +68,7 @@ export function safariPage(
       await log('safariNetwork');
       await log('safariConsole');
       refusals = [];
-      const url = `${base}${path}`;
+      const url = `${base}${path}?phone-smoke=${token()}`;
       await call('POST', `${at}/url`, { url });
       const documents = (await log('safariNetwork'))
         .filter((entry) => entry.method === 'Network.responseReceived')

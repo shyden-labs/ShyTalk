@@ -40,13 +40,24 @@ describe('safariPage: goto', () => {
     const fake = appium({
       safariNetwork: [[network('old', 200)], [network(`${BASE}/id/`, 404), network(`${BASE}/s.css`, 200, 'StyleSheet')]],
     });
-    const page = safariPage(fake.call, 's1', BASE);
+    const page = safariPage(fake.call, 's1', BASE, undefined, () => 'v1');
     await expect(page.goto('/id/')).resolves.toBe(404);
     expect(fake.calls.slice(0, 3)).toEqual([
       ['POST', '/session/s1/se/log', { type: 'safariNetwork' }],
       ['POST', '/session/s1/se/log', { type: 'safariConsole' }],
-      ['POST', '/session/s1/url', { url: `${BASE}/id/` }],
+      ['POST', '/session/s1/url', { url: `${BASE}/id/?phone-smoke=v1` }],
     ]);
+  });
+
+  it('asks for each page fresh, with a token no earlier visit used: Safari answered 304 from its cache across sessions (2026-11-07)', async () => {
+    const fake = appium({ safariNetwork: [[], [network(`${BASE}/`, 200)], [], [network(`${BASE}/`, 200)]] });
+    const page = safariPage(fake.call, 's1', BASE);
+    await page.goto('/');
+    await page.goto('/');
+    const urls = fake.calls.filter(([, path]) => path.endsWith('/url')).map(([, , body]) => (body as { url: string }).url);
+    expect(urls).toHaveLength(2);
+    for (const url of urls) expect(url).toMatch(new RegExp(`^${BASE}/\\?phone-smoke=[0-9a-z]+$`));
+    expect(new Set(urls).size).toBe(2);
   });
 
   it('answers the last document when the page loads more than one, and ignores other kinds', async () => {
@@ -66,7 +77,7 @@ describe('safariPage: goto', () => {
 
   it('fails naming the address when Safari logged no document', async () => {
     const fake = appium({ safariNetwork: [[], [network(`${BASE}/s.css`, 200, 'StyleSheet')]] });
-    await expect(safariPage(fake.call, 's1', BASE).goto('/th/')).rejects.toThrow(`Safari logged no document for ${BASE}/th/`);
+    await expect(safariPage(fake.call, 's1', BASE).goto('/th/')).rejects.toThrow(`Safari logged no document for ${BASE}/th/?phone-smoke=`);
   });
 });
 
