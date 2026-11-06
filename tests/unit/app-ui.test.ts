@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { d1UiStore, handleUi, publishUi, type UiStore, type UiRow, type NewUiRow, type UiStatement } from '../../workers/web/src/app/ui.ts';
+import { validateUiDocument } from '../../packages/ui-document/index.ts';
+import {
+  d1UiStore,
+  handleUi,
+  publishUi,
+  publishValid,
+  type UiStore,
+  type UiRow,
+  type NewUiRow,
+  type UiStatement,
+} from '../../workers/web/src/app/ui.ts';
 import { AUDIT_SQL } from '../../workers/web/src/audit.ts';
 import type { AuditEntry } from '../../workers/web/src/audit.ts';
 
@@ -67,6 +77,19 @@ describe('publishUi', () => {
     await publishUi(store, valid(), 'everyone', 'ci:deploy-dev');
     expect(store.audits).toEqual([
       { actor: 'ci:deploy-dev', action: 'ui.publish', subject: 'ui_document', detail: { audience: 'everyone', share: null } },
+    ]);
+  });
+});
+
+describe('publishValid', () => {
+  it('stores an already validated document as the next version, audited, for whom it names', async () => {
+    const store = memoryStore();
+    const checked = validateUiDocument(valid());
+    if (!checked.ok) throw new Error(checked.errors.join('; '));
+    expect(await publishValid(store, checked.doc, 'share', 'staff:1', 10)).toBe(1);
+    expect(store.rows[0]).toMatchObject({ body: JSON.stringify(checked.doc), audience: 'share', share: 10, publishedBy: 'staff:1' });
+    expect(store.audits).toEqual([
+      { actor: 'staff:1', action: 'ui.publish', subject: 'ui_document', detail: { audience: 'share', share: 10 } },
     ]);
   });
 });

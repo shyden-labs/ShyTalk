@@ -6,7 +6,7 @@
  * number as the ETag, so an app holding that version gets 304 and an app
  * reading during a publish gets one whole version, never a mix.
  */
-import { validateUiDocument } from '../../../../packages/ui-document/index.ts';
+import { validateUiDocument, type UiDocument } from '../../../../packages/ui-document/index.ts';
 import { audit, type AuditEntry, type AuditEnv } from '../audit.ts';
 import { json } from '../http.ts';
 
@@ -52,11 +52,21 @@ export async function publishUi(
 ): Promise<PublishResult> {
   const checked = validateUiDocument(input);
   if (!checked.ok) return checked;
-  const version = await store.insert(
-    { body: JSON.stringify(checked.doc), audience, share, publishedAt: Date.now(), publishedBy: by },
+  return { ok: true, version: await publishValid(store, checked.doc, audience, by, share) };
+}
+
+/** Stores a document `validateUiDocument` already passed as the next version for `audience`, with its audit row. */
+export function publishValid(
+  store: UiStore,
+  doc: UiDocument,
+  audience: Audience,
+  by: string,
+  share: number | null = null,
+): Promise<number> {
+  return store.insert(
+    { body: JSON.stringify(doc), audience, share, publishedAt: Date.now(), publishedBy: by },
     { actor: by, action: 'ui.publish', subject: 'ui_document', detail: { audience, share } },
   );
-  return { ok: true, version };
 }
 
 /** The part of a D1 statement the store uses. */

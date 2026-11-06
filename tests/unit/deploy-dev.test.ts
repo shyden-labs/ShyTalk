@@ -83,9 +83,9 @@ describe('deploy-dev', () => {
     expect(workflow()).not.toContain('deploy-dev is not filled in');
   });
 
-  it('deploys only when the website, its Worker, the migrations or the environment package changed, or the lockfile or this workflow', () => {
+  it('deploys only when the website, its Worker, the migrations, the environment package, the UI document or its publisher changed, or the lockfile or this workflow', () => {
     expect(deployStep()).toContain(
-      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
+      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|packages/ui-document/|manifests/|scripts/publish-ui\\.ts$|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
     );
   });
 
@@ -158,7 +158,7 @@ describe('deploy-dev', () => {
     const step = deployStep().join('\n');
     const other = step.indexOf('*) echo ::error title=deploy-dev failed::d1 info shytalk-dev failed; exit 1 ;;');
     expect(other).toBeGreaterThan(step.indexOf('*Couldnt find a D1 DB named shytalk-dev*)'));
-    expect(step.match(/wrangler d1 info/g)).toHaveLength(1);
+    expect(step.match(/wrangler d1 info shytalk-dev --env dev 2>&1/g)).toHaveLength(1);
     expect(step.match(/wrangler d1 create/g)).toHaveLength(1);
   });
 
@@ -169,6 +169,23 @@ describe('deploy-dev', () => {
     expect(read).toBeGreaterThan(-1);
     expect(check).toBeGreaterThan(read);
     expect(step.indexOf('npx wrangler deploy --env dev ||')).toBeGreaterThan(check);
+  });
+
+  // shyden-labs/ShyTalk#79: the app's UI document, published to the migrated
+  // dev database through a remote binding before the Worker that serves it.
+  it('publishes the UI document from the repository root, by database id, after the marker and before the Worker deploys', () => {
+    const step = deployStep().join('\n');
+    const marker = step.indexOf('if [ $(printf %s $marker | jq -c [.[0].results[].name]) != [dev] ]; then');
+    const id = step.indexOf(
+      'ui_db=$(npx wrangler d1 info shytalk-dev --env dev --json | jq -er .uuid) || { echo ::error title=deploy-dev failed::the shytalk-dev id could not be read; exit 1; }',
+    );
+    const publish = step.indexOf(
+      '(cd $GITHUB_WORKSPACE && UI_ENVIRONMENT=dev UI_DATABASE_NAME=shytalk-dev UI_DATABASE_ID=$ui_db UI_PUBLISHED_BY=ci:deploy-dev node scripts/publish-ui.ts) || { echo ::error title=deploy-dev failed::the UI document was not published; exit 1; }',
+    );
+    expect(marker).toBeGreaterThan(-1);
+    expect(id).toBeGreaterThan(marker);
+    expect(publish).toBeGreaterThan(id);
+    expect(step.indexOf('npx wrangler deploy --env dev ||')).toBeGreaterThan(publish);
   });
 
   it('no longer deploys or deletes the echo Worker, which is gone (#31 AC5)', () => {
