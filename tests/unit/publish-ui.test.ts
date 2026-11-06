@@ -87,7 +87,7 @@ describe('remoteConfig', () => {
   it('binds only the named database, by id, as a remote binding', () => {
     expect(remoteConfig(target)).toEqual({
       name: 'shytalk-publish-ui',
-      compatibility_date: '2026-10-01',
+      compatibility_date: '2026-10-20',
       d1_databases: [{ binding: 'DB', database_name: 'shytalk-dev', database_id: 'uuid-1', remote: true }],
     });
   });

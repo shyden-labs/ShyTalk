@@ -106,7 +106,7 @@ jobs:
           # Plan 4 Task 2 (shyden-labs/ShyTalk#75, decisions 219, 220): the
           # database exists, is migrated and is marked `dev` before the Worker
           # deploys, or the site answers 503 to everyone. Only Wrangler
-          # 4.156.0's not-found message creates it; any other error stops the
+          # 4.157.0's not-found message creates it; any other error stops the
           # job, with no retry.
           info=$(npx wrangler d1 info shytalk-dev --env dev 2>&1) || {
             printf '%s\n' "$info"
