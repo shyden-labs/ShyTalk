@@ -85,8 +85,7 @@ export function d1UiStore(env: AuditEnv<UiStatement> & { DB: UiDatabase }): UiSt
   return {
     async insert(row, entry) {
       const insert = env.DB.prepare(INSERT_SQL).bind(row.body, row.audience, row.share, row.publishedAt, row.publishedBy);
-      await env.DB.batch([audit(env, entry)]); // MUTATION: audit outside the insert's batch
-      const [inserted] = await env.DB.batch([insert]);
+      const [inserted] = await env.DB.batch([insert, audit(env, entry)]);
       const version = (inserted?.results[0] as { version?: unknown } | undefined)?.version;
       if (typeof version !== 'number') throw new Error('the ui_documents insert answered no version');
       return version;
