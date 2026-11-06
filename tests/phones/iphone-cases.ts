@@ -28,7 +28,7 @@ export interface SafariPage {
 
 export interface IphoneCase {
   title: string;
-  run(page: SafariPage): Promise<void>;
+  run: (page: SafariPage) => Promise<void>;
 }
 
 const LANGUAGES = [
