@@ -89,6 +89,30 @@ describe('smokeTotals: faults', () => {
   });
 });
 
+describe('smokeTotals: the phones against the CI browsers’ total (shyden-labs/ShyTalk#112)', () => {
+  const PHONES = ['oneplus', 'iphone-air'] as const;
+  const onPhones = (status: Status) => ({ oneplus: status, 'iphone-air': status });
+
+  it('finds nothing wrong when every phone ran the CI total', () => {
+    const report = { suites: [{ title: 'f', specs: [spec('a', onPhones('expected')), spec('b', onPhones('expected'))] }] };
+    expect(smokeTotals(report, PHONES, 2).errors).toEqual([]);
+  });
+
+  it('fails when the phones agree with each other but not with the CI total, naming each', () => {
+    const report = { suites: [{ title: 'f', specs: [spec('a', onPhones('expected'))] }] };
+    expect(smokeTotals(report, PHONES, 2).errors).toEqual([
+      'oneplus ran 1 tests, the CI browsers each run 2',
+      'iphone-air ran 1 tests, the CI browsers each run 2',
+    ]);
+  });
+
+  it('names only the phone that differs from the CI total', () => {
+    const report = { suites: [{ title: 'f', specs: [spec('a', onPhones('expected')), spec('b', { oneplus: 'expected' })] }] };
+    expect(smokeTotals(report, PHONES, 2).errors).toContain('iphone-air ran 1 tests, the CI browsers each run 2');
+    expect(smokeTotals(report, PHONES, 2).errors).not.toContain('oneplus ran 2 tests, the CI browsers each run 2');
+  });
+});
+
 describe('main', () => {
   let log: MockInstance<typeof console.log>;
   let error: MockInstance<typeof console.error>;
