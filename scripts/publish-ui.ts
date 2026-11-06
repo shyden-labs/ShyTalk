@@ -65,7 +65,7 @@ export function readTarget(env: Record<string, string | undefined>): Target {
 export function remoteConfig(target: Target): object {
   return {
     name: 'shytalk-publish-ui',
-    compatibility_date: '2026-10-01',
+    compatibility_date: '2026-10-20',
     d1_databases: [{ binding: 'DB', database_name: target.databaseName, database_id: target.databaseId, remote: true }],
   };
 }

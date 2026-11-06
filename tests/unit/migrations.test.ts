@@ -15,7 +15,7 @@ describe('migration names: fixtures', () => {
   });
 
   // Git keeps no empty folder, and Wrangler stops on a missing one ("No
-  // migrations present", cli.js getMigrationsPath, 4.156.0), so the folder
+  // migrations present", cli.js getMigrationsPath, 4.157.0), so the folder
   // holds a .gitkeep until its first migration.
   it('passes the .gitkeep that keeps the folder, and no other dotfile', () => {
     expect(migrationProblems(['.gitkeep', '0001_a.sql'])).toEqual([]);
