@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tests/smoke",
     "build:web": "astro build --root apps/web",
     "test:smoke": "playwright test -c tests/smoke",
+    "test:phones": "node tests/phones/phone-smoke.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "lint": "eslint --max-warnings 0 .",
     "format": "prettier --write .",

@@ -9,7 +9,7 @@ import { safariPage, type WebDriverCall } from '../phones/safari.ts';
  * from its `safariConsole` log. Appium is stood in here.
  */
 
-const BASE = 'https://dev.shytalk.app';
+const BASE = 'https://site.example';
 
 /** One `safariNetwork` entry, as Appium returns it: the event JSON in `message`. */
 const network = (url: string, status: number, type = 'Document') => ({

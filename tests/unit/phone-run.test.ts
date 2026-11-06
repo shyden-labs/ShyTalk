@@ -111,10 +111,10 @@ function deps(overrides: Partial<PhoneDeps> = {}): PhoneDeps & { steps: string[]
 describe('runPhones', () => {
   it('runs the OnePlus, then the iPhone, then prints the verdict, and passes', async () => {
     const d = deps();
-    await expect(runPhones('https://dev.shytalk.app', d)).resolves.toBe(0);
+    await expect(runPhones('https://site.example', d)).resolves.toBe(0);
     expect(d.steps).toEqual([
       'forward',
-      'playwright https://dev.shytalk.app http://127.0.0.1:9333',
+      'playwright https://site.example http://127.0.0.1:9333',
       'unforward',
       'read report',
       'udid',
@@ -131,20 +131,20 @@ describe('runPhones', () => {
 
   it('refuses an address that is not https, before touching a phone', async () => {
     const d = deps();
-    await expect(runPhones('http://dev.shytalk.app', d)).resolves.toBe(1);
-    expect(d.steps).toEqual(['print phone-smoke: the address must start with https://, not http://dev.shytalk.app']);
+    await expect(runPhones('http://site.example', d)).resolves.toBe(1);
+    expect(d.steps).toEqual(['print phone-smoke: the address must start with https://, not http://site.example']);
   });
 
   it('fails, printing why, when a phone fails a test', async () => {
     const d = deps({ cases: [failing('a', 'no visible navigation')] });
-    await expect(runPhones('https://dev.shytalk.app', d)).resolves.toBe(1);
+    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
     expect(d.steps).toContain('print iphone-air: a FAILED: no visible navigation');
     expect(d.steps).toContain('print phone-smoke: iphone-air failed "a": no visible navigation');
   });
 
   it('removes the adb forward when Playwright cannot run, and fails naming why', async () => {
     const d = deps({ playwright: () => Promise.reject(new Error('npx not found')) });
-    await expect(runPhones('https://dev.shytalk.app', d)).resolves.toBe(1);
+    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
     expect(d.steps).toEqual(['forward', 'unforward', 'print phone-smoke: npx not found']);
   });
 
@@ -154,26 +154,26 @@ describe('runPhones', () => {
         throw new Error('Safari went away');
       },
     });
-    await expect(runPhones('https://dev.shytalk.app', d)).resolves.toBe(1);
+    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
     expect(d.steps.slice(-3)).toEqual(['close session s1', 'stop appium', 'print phone-smoke: Safari went away']);
   });
 
   it('stops Appium when no session opens', async () => {
     const d = deps({ openSession: () => Promise.reject(new Error('WebDriverAgent did not start')) });
-    await expect(runPhones('https://dev.shytalk.app', d)).resolves.toBe(1);
+    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
     expect(d.steps.slice(-2)).toEqual(['stop appium', 'print phone-smoke: WebDriverAgent did not start']);
     expect(d.steps.some((s) => s.startsWith('close session'))).toBe(false);
   });
 
   it('fails when the OnePlus run itself failed, even if its report reads clean', async () => {
     const d = deps({ playwright: () => Promise.resolve(1) });
-    await expect(runPhones('https://dev.shytalk.app', d)).resolves.toBe(1);
+    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
     expect(d.steps).toContain('print phone-smoke: Playwright exited 1 on the OnePlus');
   });
 
   it('runs the iPhone cases against the address it was given', async () => {
     const pageFor = vi.fn(() => page);
-    await runPhones('https://test.shytalk.app', deps({ page: pageFor }));
-    expect(pageFor).toHaveBeenCalledWith('s1', 'https://test.shytalk.app');
+    await runPhones('https://other.example', deps({ page: pageFor }));
+    expect(pageFor).toHaveBeenCalledWith('s1', 'https://other.example');
   });
 });
