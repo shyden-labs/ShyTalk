@@ -80,7 +80,7 @@ jobs:
       # dev origin Worker `shytalk-dev` on the Non-Prod account, the website's
       # front door (workers/web, plan 3 Task 1, shyden-labs/ShyTalk#51), only
       # when the site, its Worker, the migrations, the environment package, the
-      # lockfile or this file changed. It replaces the door spike's echo Worker, deleted in
+      # UI document or its publisher, the lockfile or this file changed. It replaces the door spike's echo Worker, deleted in
       # shyden-labs/ShyTalk#31. The origin refuses every request without the
       # door secret, so the deploy sets it from the dev environment (decision
       # 216). A rehearsal only bundles it, with no credential. Doors never
@@ -93,7 +93,7 @@ jobs:
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
         run: |
-          if ! grep -qE '^(apps/web/|workers/web/|migrations/|packages/environment/|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
+          if ! grep -qE '^(apps/web/|workers/web/|migrations/|packages/environment/|packages/ui-document/|manifests/|scripts/publish-ui\.ts$|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
             echo "Nothing deployable changed, so dev deploys nothing."
             exit 0
           fi
@@ -124,6 +124,13 @@ jobs:
             exit 1
           fi
           echo "Read back: shytalk-dev is marked dev."
+          # Plan 4 Task 6 (shyden-labs/ShyTalk#79): the app's UI document
+          # (manifests/ui.json) is published to the migrated database before the
+          # Worker that serves it deploys, through a Wrangler remote binding to
+          # the database by id (Shyden, 2026-11-06). It publishes nothing when
+          # dev already serves that document.
+          ui_db=$(npx wrangler d1 info shytalk-dev --env dev --json | jq -er '.uuid') || { echo "::error title=deploy-dev failed::the shytalk-dev id could not be read"; exit 1; }
+          (cd "$GITHUB_WORKSPACE" && UI_ENVIRONMENT=dev UI_DATABASE_NAME=shytalk-dev UI_DATABASE_ID="$ui_db" UI_PUBLISHED_BY=ci:deploy-dev node scripts/publish-ui.ts) || { echo "::error title=deploy-dev failed::the UI document was not published"; exit 1; }
           npx wrangler deploy --env dev || { echo "::error title=deploy-dev failed::workers/web did not deploy"; exit 1; }
           if [ -z "$DOOR_SECRET" ]; then
             echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the dev environment (decision 216); until then the dev origin refuses every request."

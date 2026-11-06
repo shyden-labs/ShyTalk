@@ -8,6 +8,7 @@ import { json } from '../http.ts';
 import type { WebEnv } from '../web.ts';
 import { getAuth, type AuthDatabase } from '../auth/better-auth.ts';
 import { handleSignIn, handleSignOut, type Provider, type SignInEnv } from './sign-in.ts';
+import { d1UiStore, handleUi } from './ui.ts';
 
 export const APP_API_PREFIX = '/api/app/';
 
@@ -19,6 +20,7 @@ const SIGN_IN: Record<string, Provider> = {
   [`${APP_API_PREFIX}sign-in/apple`]: 'apple',
 };
 const SIGN_OUT = `${APP_API_PREFIX}sign-out`;
+const UI = `${APP_API_PREFIX}ui`;
 
 type ReadyEnv = SignInEnv & { DB: AuthDatabase };
 
@@ -39,6 +41,11 @@ export function handleAppApi(request: Request, env: WebEnv): Promise<Response> {
   if (pathname === `${APP_API_PREFIX}health`) {
     if (request.method !== 'GET') return Promise.resolve(new Response(null, { status: 405, headers: { allow: 'GET' } }));
     return Promise.resolve(json(200, { ok: true, environment: env.ENVIRONMENT_NAME }));
+  }
+  if (pathname === UI) {
+    const { ENVIRONMENT_NAME, DB } = env;
+    if (DB === undefined || !isD1(DB)) return Promise.resolve(json(503, { error: 'ui_unavailable' }));
+    return handleUi(request, d1UiStore({ ENVIRONMENT_NAME, DB }));
   }
   const provider = SIGN_IN[pathname];
   if (provider !== undefined || pathname === SIGN_OUT) {

@@ -138,6 +138,46 @@ describe('/api/app/sign-in and sign-out', () => {
   });
 });
 
+// The UI document (plan 4 Task 6, shyden-labs/ShyTalk#79) is read from D1;
+// tests/integration/app-ui runs the real table.
+describe('/api/app/ui', () => {
+  /** A D1 stand-in: marked dev, answering `row` to the UI query. */
+  const withUi = (row: unknown): WebEnv => ({
+    ...env('dev'),
+    DB: {
+      prepare: () => ({
+        first: <T>() => Promise.resolve({ name: 'dev' } as T),
+        bind: () => ({ all: () => Promise.resolve({ results: [row] }) }),
+      }),
+      batch: () => Promise.resolve([]),
+      exec: () => Promise.resolve({}),
+    } as unknown as D1Like,
+  });
+
+  it('answers the stored everyone version with its ETag, behind the site headers', async () => {
+    const row = {
+      version: 7,
+      body: '{"schemaVersion":1}',
+      audience: 'everyone',
+      share: null,
+      undoes: null,
+      publishedAt: 1,
+      publishedBy: 'ci:deploy-dev',
+    };
+    const response = await handle(get('/api/app/ui'), withUi(row));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('etag')).toBe('"7"');
+    expect(await response.text()).toBe('{"schemaVersion":1}');
+    expect(response.headers.get('content-security-policy')).toBe(CONTENT_SECURITY_POLICY);
+  });
+
+  it('answers 503 ui_unavailable when the DB is not a D1 database', async () => {
+    const response = await handle(get('/api/app/ui'), env('dev'));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'ui_unavailable' });
+  });
+});
+
 // Later app routes depend on exactly which paths are the app's: `/api/app`
 // and below, never a sibling such as `/api/apps`.
 describe('isAppApi', () => {
