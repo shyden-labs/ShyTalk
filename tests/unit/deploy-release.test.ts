@@ -110,6 +110,23 @@ describe('deploy-release', () => {
     expect(deployStep()).toContain('*) echo ::error title=deploy-release failed::d1 info shytalk-$TARGET failed; exit 1 ;;');
   });
 
+  // shyden-labs/ShyTalk#79: the app's UI document reaches TEST from a release
+  // cut and PROD only from main, through the approved `production` run.
+  it('publishes the UI document to the target from the repository root, by database id, after the marker and before the Worker deploys', () => {
+    const step = deployStep();
+    const marker = step.indexOf('if [ $(printf %s $marker | jq --arg t $TARGET [.[0].results[].name] == [$t]) != true ]; then');
+    const id = step.indexOf(
+      'ui_db=$(npx wrangler d1 info shytalk-$TARGET --env $TARGET --json | jq -er .uuid) || { echo ::error title=deploy-release failed::the shytalk-$TARGET id could not be read; exit 1; }',
+    );
+    const publish = step.indexOf(
+      '(cd $GITHUB_WORKSPACE && UI_ENVIRONMENT=$TARGET UI_DATABASE_NAME=shytalk-$TARGET UI_DATABASE_ID=$ui_db UI_PUBLISHED_BY=ci:deploy-release node scripts/publish-ui.ts) || { echo ::error title=deploy-release failed::the UI document was not published to $TARGET; exit 1; }',
+    );
+    expect(marker).toBeGreaterThan(-1);
+    expect(id).toBeGreaterThan(marker);
+    expect(publish).toBeGreaterThan(id);
+    expect(step.indexOf('npx wrangler deploy --env $TARGET ||')).toBeGreaterThan(publish);
+  });
+
   // The TEST origin refuses every request without its door secret (decision
   // 216); PROD has no door (workers/web/src/web.ts).
   it('puts the door secret on TEST only, after the deploy, failing by name when test lacks it', () => {

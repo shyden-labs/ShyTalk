@@ -82,6 +82,14 @@ jobs:
             exit 1
           fi
           echo "Read back: shytalk-$TARGET is marked $TARGET."
+          # Plan 4 Task 6 (shyden-labs/ShyTalk#79): the app's UI document
+          # (manifests/ui.json) is published to the migrated database before the
+          # Worker that serves it deploys, through a Wrangler remote binding to
+          # the database by id (Shyden, 2026-11-06): TEST from a release cut,
+          # PROD only from main in the approved `production` run. It publishes
+          # nothing when the target already serves that document.
+          ui_db=$(npx wrangler d1 info "shytalk-$TARGET" --env "$TARGET" --json | jq -er '.uuid') || { echo "::error title=deploy-release failed::the shytalk-$TARGET id could not be read"; exit 1; }
+          (cd "$GITHUB_WORKSPACE" && UI_ENVIRONMENT="$TARGET" UI_DATABASE_NAME="shytalk-$TARGET" UI_DATABASE_ID="$ui_db" UI_PUBLISHED_BY=ci:deploy-release node scripts/publish-ui.ts) || { echo "::error title=deploy-release failed::the UI document was not published to $TARGET"; exit 1; }
           npx wrangler deploy --env "$TARGET" || { echo "::error title=deploy-release failed::workers/web did not deploy to $TARGET"; exit 1; }
           # App sign-in answers 503 until the Worker holds Better Auth's
           # secret (shyden-labs/ShyTalk#110); test and production each hold
