@@ -8,6 +8,7 @@ import { json } from '../http.ts';
 import type { WebEnv } from '../web.ts';
 import { getAuth, type AuthDatabase } from '../auth/better-auth.ts';
 import { handleSignIn, handleSignOut, type Provider, type SignInEnv } from './sign-in.ts';
+import { handleLive } from './announcer.ts';
 import { d1UiStore, handleUi } from './ui.ts';
 
 export const APP_API_PREFIX = '/api/app/';
@@ -21,6 +22,7 @@ const SIGN_IN: Record<string, Provider> = {
 };
 const SIGN_OUT = `${APP_API_PREFIX}sign-out`;
 const UI = `${APP_API_PREFIX}ui`;
+const LIVE = `${APP_API_PREFIX}live`;
 
 type ReadyEnv = SignInEnv & { DB: AuthDatabase };
 
@@ -47,6 +49,7 @@ export function handleAppApi(request: Request, env: WebEnv): Promise<Response> {
     if (DB === undefined || !isD1(DB)) return Promise.resolve(json(503, { error: 'ui_unavailable' }));
     return handleUi(request, d1UiStore({ ENVIRONMENT_NAME, DB }));
   }
+  if (pathname === LIVE) return live(request, env);
   const provider = SIGN_IN[pathname];
   if (provider !== undefined || pathname === SIGN_OUT) {
     const ready = readyForSignIn(env);
@@ -55,4 +58,13 @@ export function handleAppApi(request: Request, env: WebEnv): Promise<Response> {
     return provider === undefined ? handleSignOut(request, ready, auth) : handleSignIn(request, ready, auth, provider);
   }
   return Promise.resolve(json(404, { error: 'not_found' }));
+}
+
+/** `GET /api/app/live` (plan 4 Task 8): the WebSocket that tells the app a new UI is published. */
+async function live(request: Request, env: WebEnv): Promise<Response> {
+  if (request.method !== 'GET') return new Response(null, { status: 405, headers: { allow: 'GET' } });
+  const { ENVIRONMENT_NAME, DB, ANNOUNCER } = env;
+  if (ANNOUNCER === undefined || DB === undefined || !isD1(DB)) return json(503, { error: 'live_unavailable' });
+  const newest = await d1UiStore({ ENVIRONMENT_NAME, DB }).newest('everyone');
+  return handleLive(request, ANNOUNCER, newest?.version ?? null);
 }
