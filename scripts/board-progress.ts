@@ -8,7 +8,9 @@
  * Usage: node scripts/board-progress.ts <board-node-id> "<board title>"
  *
  * Epics are left out (an epic is the sum of its stories), and so is anything
- * labelled `post-launch`, which is not part of release-ready. A draft card is
+ * labelled `post-launch`, which is not part of release-ready, and so is a story
+ * closed as not planned or as a duplicate, which is dropped work, not finished
+ * work (#137: three such closes had counted as progress). A draft card is
  * planned work, so it counts as an open story. A pull-request card is finished
  * code, not work left, so it is left out, and a third line names every one. A
  * card the token cannot read could be open work, so it stops the read.
@@ -23,9 +25,13 @@ export interface BoardItem {
   state: 'OPEN' | 'CLOSED';
   createdAt: string;
   closedAt: string | null;
+  /** Why an issue was closed; `null` when open, for a draft, or when GitHub recorded none. */
+  stateReason: CloseReason | null;
   estimate: number | null;
   labels: string[];
 }
+
+export type CloseReason = 'COMPLETED' | 'NOT_PLANNED' | 'DUPLICATE' | 'REOPENED';
 
 export interface BoardRead {
   /** The issues and draft cards, which both counts include. */
@@ -75,9 +81,13 @@ const isEpic = (item: BoardItem): boolean => /^Epic\b/.test(item.title);
 const isDraft = (item: BoardItem): boolean => item.number === null;
 const isPostLaunch = (item: BoardItem): boolean => item.labels.includes('post-launch');
 
+/** A story closed as not planned or as a duplicate is dropped work, not finished work. */
+const isDropped = (item: BoardItem): boolean =>
+  item.state === 'CLOSED' && (item.stateReason === 'NOT_PLANNED' || item.stateReason === 'DUPLICATE');
+
 /** Whether a board item counts towards release-ready. */
 export function inScope(item: BoardItem): boolean {
-  return !isEpic(item) && !isPostLaunch(item);
+  return !isEpic(item) && !isPostLaunch(item) && !isDropped(item);
 }
 
 /** The UTC days of the window ending `today`, oldest first, none before `since`. */
@@ -188,6 +198,7 @@ interface RawNode {
     state?: 'OPEN' | 'CLOSED';
     createdAt?: string;
     closedAt?: string | null;
+    stateReason?: CloseReason | null;
     labels?: { nodes: { name: string }[] };
   } | null;
 }
@@ -234,6 +245,7 @@ function parseDraft(estimate: RawNode['estimate'], c: NonNullable<RawNode['conte
     state: 'OPEN',
     createdAt: c.createdAt,
     closedAt: null,
+    stateReason: null,
     estimate: estimate?.number ?? null,
     labels: [],
   };
@@ -249,6 +261,7 @@ function parseIssue(estimate: RawNode['estimate'], c: NonNullable<RawNode['conte
     state: c.state,
     createdAt: c.createdAt,
     closedAt: c.closedAt ?? null,
+    stateReason: c.stateReason ?? null,
     estimate: estimate?.number ?? null,
     labels: (c.labels?.nodes ?? []).map((l) => l.name),
   };
@@ -310,7 +323,7 @@ export const QUERY = `query($id: ID!, $endCursor: String) {
         content { __typename
           ... on DraftIssue { title createdAt }
           ... on PullRequest { number title }
-          ... on Issue { number title state createdAt closedAt labels(first: 20) { nodes { name } } }
+          ... on Issue { number title state stateReason createdAt closedAt labels(first: 20) { nodes { name } } }
         } } } } } }`;
 
 export function main(args: string[]): number {
