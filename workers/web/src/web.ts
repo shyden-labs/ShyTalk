@@ -12,6 +12,7 @@ import { createMarkerGuard, requireDoorSecret, type D1Like } from '../../../pack
 import { handleAppApi, isAppApi } from './app/router.ts';
 import { json } from './http.ts';
 import type { RateLimit } from './app/sign-in.ts';
+import type { AnnouncerNamespace } from './app/announcer.ts';
 
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
@@ -25,6 +26,10 @@ export interface WebEnv {
   DB?: D1Like;
   ASSETS: { fetch(request: Request): Promise<Response> };
   /** App sign-in's settings (plan 4 Task 3, shyden-labs/ShyTalk#76): see `AuthEnv`; absent, sign-in answers 503. */
+  /** The live announcement's Durable Object (plan 4 Task 8, shyden-labs/ShyTalk#81); absent, `/api/app/live` answers 503. */
+  ANNOUNCER?: AnnouncerNamespace;
+  /** The secret a deploy puts in the Worker and calls `/api/app/live/announce` with; absent, that route answers 503. */
+  ANNOUNCE_SECRET?: string;
   SITE_ORIGIN?: string;
   BETTER_AUTH_SECRET?: string;
   GOOGLE_CLIENT_IDS?: string;
@@ -76,6 +81,8 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
 /** Routes the request and puts the security headers on whatever answers. */
 export async function handle(request: Request, env: WebEnv): Promise<Response> {
   const answer = await route(request, env);
+  // A WebSocket upgrade's 101 carries the socket, which a copied Response would lose; it carries no page to protect.
+  if (answer.status === 101) return answer;
   const response = new Response(answer.body, answer);
   response.headers.set('content-security-policy', CONTENT_SECURITY_POLICY);
   response.headers.set('x-content-type-options', 'nosniff');

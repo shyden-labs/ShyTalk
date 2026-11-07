@@ -91,4 +91,15 @@ describe('app sign-in config', () => {
     expect(new Set(ids).size).toBe(3);
     for (const id of ids) expect(id).toMatch(/^[1-9][0-9]*$/);
   });
+
+  // The live announcement (plan 4 Task 8, shyden-labs/ShyTalk#81). Durable
+  // Object bindings are not inherited, so each environment names its own;
+  // the Free plan runs only SQLite-backed objects.
+  it.each(Object.keys(ORIGINS))('%s binds ANNOUNCER to the Announcer class and nothing else', (name) => {
+    expect(environment(name)['durable_objects']).toEqual({ bindings: [{ name: 'ANNOUNCER', class_name: 'Announcer' }] });
+  });
+
+  it('creates the Announcer as a SQLite-backed class in its first migration', () => {
+    expect(config()['migrations']).toEqual([{ tag: 'v1', new_sqlite_classes: ['Announcer'] }]);
+  });
 });

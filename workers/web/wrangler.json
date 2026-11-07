@@ -41,7 +41,15 @@
             "period": 60
           }
         }
-      ]
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "ANNOUNCER",
+            "class_name": "Announcer"
+          }
+        ]
+      }
     },
     "test": {
       "name": "shytalk-test",
@@ -69,7 +77,15 @@
             "period": 60
           }
         }
-      ]
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "ANNOUNCER",
+            "class_name": "Announcer"
+          }
+        ]
+      }
     },
     "dev": {
       "name": "shytalk-dev",
@@ -97,7 +113,21 @@
             "period": 60
           }
         }
-      ]
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "ANNOUNCER",
+            "class_name": "Announcer"
+          }
+        ]
+      }
     }
-  }
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["Announcer"]
+    }
+  ]
 }
