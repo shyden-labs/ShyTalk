@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { main, announceOrigin } from '../../scripts/announce-ui.ts';
 import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
@@ -116,6 +116,23 @@ describe('announce-ui', () => {
       'announce-ui: ANNOUNCE_ENVIRONMENT must be dev, test or prod, not staging',
     );
     expect(fake.calls).toEqual([]);
+  });
+
+  it('by default reads both configs from disk, sends with the global fetch and prints to stdout', async () => {
+    const sent: string[] = [];
+    vi.stubGlobal('fetch', (url: string) => {
+      sent.push(url);
+      return Promise.resolve(new Response(JSON.stringify({ announced: 4 }), { status: 200 }));
+    });
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    try {
+      expect(await main([], settings)).toBe(0);
+      expect(sent).toEqual(['https://shytalk-dev.shytalk-non-prod.workers.dev/api/app/live/announce']);
+      expect(stdout).toHaveBeenCalledWith('announce-ui: dev announced UI version 4\n');
+    } finally {
+      stdout.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('takes no arguments', async () => {

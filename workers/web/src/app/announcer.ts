@@ -142,14 +142,14 @@ export function handleLive(request: Request, namespace: AnnouncerNamespace, vers
 
 /** Whether `header` is `Bearer <secret>`, compared by digest so the time taken says nothing about the secret. */
 async function bearerMatches(header: string | null, secret: string): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const [given, wanted] = await Promise.all(
-    [header ?? '', `Bearer ${secret}`].map(async (text) => new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(text)))),
-  );
+  const digest = async (text: string): Promise<Uint8Array> =>
+    new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  const given = await digest(header ?? '');
+  const wanted = await digest(`Bearer ${secret}`);
   let difference = 0;
-  // Both are 32-byte digests, so every index is in both.
-  (wanted ?? new Uint8Array()).forEach((byte, index) => {
-    difference |= byte ^ (given?.[index] ?? 0);
+  // Both are 32-byte SHA-256 digests, so every index is in both.
+  wanted.forEach((byte, index) => {
+    difference |= byte ^ (given[index] as number);
   });
   return difference === 0;
 }

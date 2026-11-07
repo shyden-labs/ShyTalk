@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   Announcer,
   announce,
@@ -171,6 +171,37 @@ describe('Announcer', () => {
     await announcer.fetch(announceRequest({ version: 2 }));
     expect(runtime.server.listeners).toEqual([]);
     expect(runtime.client.listeners).toEqual([]);
+  });
+
+  // The runtime constructs the object with (ctx, env) only, so the default is the Workers runtime's own.
+  it('by default pairs sockets with the runtime WebSocketPair and answers 101 carrying the client end', async () => {
+    const client = new FakeSocket();
+    const server = new FakeSocket();
+    const answers: unknown[] = [];
+    class Pair {
+      0 = client;
+      1 = server;
+    }
+    class RuntimeResponse {
+      readonly init: unknown;
+      constructor(body: unknown, init: unknown) {
+        this.init = init;
+        answers.push({ body, init });
+      }
+    }
+    const state = new FakeState();
+    const request = connect(4);
+    vi.stubGlobal('WebSocketPair', Pair);
+    vi.stubGlobal('Response', RuntimeResponse);
+    try {
+      const response = await new Announcer(state, {}).fetch(request);
+      expect(response).toBeInstanceOf(RuntimeResponse);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(state.accepted).toEqual([server]);
+    expect(server.sent).toEqual(['{"type":"ui","version":4}']);
+    expect(answers).toEqual([{ body: null, init: { status: 101, webSocket: client } }]);
   });
 
   it('completes the close a socket starts', () => {
