@@ -45,11 +45,11 @@ describe('deploy-release', () => {
     ]);
   });
 
-  it('gives the job no key but its condition, runner, environment and steps', () => {
+  it('gives the job no key but its condition, runner, timeout, environment and steps', () => {
     const keys = jobs()
       .filter((line) => /^ {4}\S/.test(line))
       .map((line) => line.trim().split(':')[0]);
-    expect(keys).toEqual(['if', 'runs-on', 'environment', 'steps']);
+    expect(keys).toEqual(['if', 'runs-on', 'timeout-minutes', 'environment', 'steps']);
   });
 
   it('deploys main through production, a release cut through test, and rehearses in release-rehearsal', () => {

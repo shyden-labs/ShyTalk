@@ -39,6 +39,7 @@ jobs:
     # the last step is filled in.
     if: ${{ github.repository != 'shyden-labs/repo-template' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-26.04
+    timeout-minutes: 15
     # The dev credential lives in `dev`, which must let only `develop` deploy
     # (shyden-labs/repo-template#117), never as a repository secret. A pull request rehearses in
     # `dev-rehearsal`, which GitHub creates on first use and which holds nothing.

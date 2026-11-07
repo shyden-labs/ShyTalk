@@ -61,12 +61,12 @@ describe('deploy-dev', () => {
   });
 
   // No other job key may skip it or pass it on failure (`continue-on-error`).
-  it('gives the job no key but its condition, runner, environment and steps', () => {
+  it('gives the job no key but its condition, runner, timeout, environment and steps', () => {
     const keys = topLevel(workflow(), 'jobs')
       .split('\n')
       .filter((line) => /^ {4}\S/.test(line))
       .map((line) => line.trim().split(':')[0]);
-    expect(keys).toEqual(['if', 'runs-on', 'environment', 'steps']);
+    expect(keys).toEqual(['if', 'runs-on', 'timeout-minutes', 'environment', 'steps']);
   });
 
   // The project's own deploy (shyden-labs/ShyTalk#44; decisions 216, 217): the
