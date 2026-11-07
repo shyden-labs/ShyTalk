@@ -320,6 +320,75 @@ describe('GET /api/app/live', () => {
   });
 });
 
+const ANNOUNCE_SECRET = 'the-announce-secret';
+
+const announceCall = (headers: Record<string, string> = { authorization: `Bearer ${ANNOUNCE_SECRET}` }, method = 'POST'): Request =>
+  new Request('https://site.example.test/api/app/live/announce', { method, headers: { [DOOR_SECRET_HEADER]: SECRET, ...headers } });
+
+const withSecret = (env: WebEnv): WebEnv => ({ ...env, ANNOUNCE_SECRET });
+
+describe('POST /api/app/live/announce', () => {
+  it('announces the newest everyone version to the ui Announcer and names it', async () => {
+    const fake = fakeNamespace(() => new Response(null, { status: 204 }));
+    const response = await handle(announceCall(), withSecret(webEnv(6, fake)));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ announced: 6 });
+    expect(fake.names).toEqual(['ui']);
+    expect(new URL(fake.requests[0]?.url ?? '').pathname).toBe('/announce');
+    expect(await fake.requests[0]?.json()).toEqual({ version: 6 });
+  });
+
+  it('answers 404 no_ui_document while nothing is published, announcing nothing', async () => {
+    const fake = fakeNamespace(() => new Response(null, { status: 204 }));
+    const response = await handle(announceCall(), withSecret(webEnv(null, fake)));
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'no_ui_document' });
+    expect(fake.requests).toEqual([]);
+  });
+
+  it.each([
+    ['no authorization', {}],
+    ['a wrong secret', { authorization: 'Bearer not-the-secret' }],
+    ['a prefix of the secret', { authorization: `Bearer ${ANNOUNCE_SECRET.slice(0, -1)}` }],
+    ['the secret with more after it', { authorization: `Bearer ${ANNOUNCE_SECRET}x` }],
+    ['the secret without Bearer', { authorization: ANNOUNCE_SECRET }],
+  ])('answers 401 unauthorized to %s, announcing nothing', async (_case, headers) => {
+    const fake = fakeNamespace(() => new Response(null, { status: 204 }));
+    const response = await handle(announceCall(headers), withSecret(webEnv(6, fake)));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'unauthorized' });
+    expect(fake.requests).toEqual([]);
+  });
+
+  it('answers 503 live_unavailable in a Worker without the announce secret, whatever the caller sends', async () => {
+    const fake = fakeNamespace(() => new Response(null, { status: 204 }));
+    const response = await handle(announceCall({ authorization: 'Bearer ' }), webEnv(6, fake));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'live_unavailable' });
+    expect(fake.requests).toEqual([]);
+  });
+
+  it('answers 503 live_unavailable in a Worker without the Announcer', async () => {
+    const response = await handle(announceCall(), withSecret(webEnv(6)));
+    expect(response.status).toBe(503);
+  });
+
+  it('answers 405 to anything but POST', async () => {
+    const fake = fakeNamespace(() => new Response(null, { status: 204 }));
+    const response = await handle(announceCall(undefined, 'GET'), withSecret(webEnv(6, fake)));
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe('POST');
+    expect(fake.requests).toEqual([]);
+  });
+
+  it('answers 502 announce_failed when the Announcer refuses', async () => {
+    const fake = fakeNamespace(() => new Response(null, { status: 400 }));
+    const response = await handle(announceCall(), withSecret(webEnv(6, fake)));
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: 'announce_failed' });
+  });
+});
+
 describe('the site Worker main module', () => {
   it('exports the Announcer class the Wrangler config binds', async () => {
     const entry = await import('../../workers/web/src/index.ts');

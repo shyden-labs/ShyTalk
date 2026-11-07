@@ -8,7 +8,7 @@ import { json } from '../http.ts';
 import type { WebEnv } from '../web.ts';
 import { getAuth, type AuthDatabase } from '../auth/better-auth.ts';
 import { handleSignIn, handleSignOut, type Provider, type SignInEnv } from './sign-in.ts';
-import { handleLive } from './announcer.ts';
+import { handleAnnounce, handleLive } from './announcer.ts';
 import { d1UiStore, handleUi } from './ui.ts';
 
 export const APP_API_PREFIX = '/api/app/';
@@ -23,6 +23,7 @@ const SIGN_IN: Record<string, Provider> = {
 const SIGN_OUT = `${APP_API_PREFIX}sign-out`;
 const UI = `${APP_API_PREFIX}ui`;
 const LIVE = `${APP_API_PREFIX}live`;
+const LIVE_ANNOUNCE = `${LIVE}/announce`;
 
 type ReadyEnv = SignInEnv & { DB: AuthDatabase };
 
@@ -50,6 +51,7 @@ export function handleAppApi(request: Request, env: WebEnv): Promise<Response> {
     return handleUi(request, d1UiStore({ ENVIRONMENT_NAME, DB }));
   }
   if (pathname === LIVE) return live(request, env);
+  if (pathname === LIVE_ANNOUNCE) return liveAnnounce(request, env);
   const provider = SIGN_IN[pathname];
   if (provider !== undefined || pathname === SIGN_OUT) {
     const ready = readyForSignIn(env);
@@ -67,4 +69,13 @@ async function live(request: Request, env: WebEnv): Promise<Response> {
   if (ANNOUNCER === undefined || DB === undefined || !isD1(DB)) return json(503, { error: 'live_unavailable' });
   const newest = await d1UiStore({ ENVIRONMENT_NAME, DB }).newest('everyone');
   return handleLive(request, ANNOUNCER, newest?.version ?? null);
+}
+
+/** `POST /api/app/live/announce` (plan 4 Task 8): the deploy tells every open app the newest version. */
+async function liveAnnounce(request: Request, env: WebEnv): Promise<Response> {
+  const { ENVIRONMENT_NAME, DB, ANNOUNCER, ANNOUNCE_SECRET } = env;
+  if (ANNOUNCER === undefined || ANNOUNCE_SECRET === undefined || DB === undefined || !isD1(DB))
+    return json(503, { error: 'live_unavailable' });
+  const newest = await d1UiStore({ ENVIRONMENT_NAME, DB }).newest('everyone');
+  return handleAnnounce(request, ANNOUNCER, ANNOUNCE_SECRET, newest?.version ?? null);
 }

@@ -28,6 +28,8 @@ export interface WebEnv {
   /** App sign-in's settings (plan 4 Task 3, shyden-labs/ShyTalk#76): see `AuthEnv`; absent, sign-in answers 503. */
   /** The live announcement's Durable Object (plan 4 Task 8, shyden-labs/ShyTalk#81); absent, `/api/app/live` answers 503. */
   ANNOUNCER?: AnnouncerNamespace;
+  /** The secret a deploy puts in the Worker and calls `/api/app/live/announce` with; absent, that route answers 503. */
+  ANNOUNCE_SECRET?: string;
   SITE_ORIGIN?: string;
   BETTER_AUTH_SECRET?: string;
   GOOGLE_CLIENT_IDS?: string;

@@ -139,3 +139,39 @@ export function handleLive(request: Request, namespace: AnnouncerNamespace, vers
   if (version !== null) headers.set(UI_VERSION_HEADER, String(version));
   return announcerStub(namespace).fetch(new Request('https://announcer/connect', { headers }));
 }
+
+/** Whether `header` is `Bearer <secret>`, compared by digest so the time taken says nothing about the secret. */
+async function bearerMatches(header: string | null, secret: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const [given, wanted] = await Promise.all(
+    [header ?? '', `Bearer ${secret}`].map(async (text) => new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(text)))),
+  );
+  let difference = 0;
+  // Both are 32-byte digests, so every index is in both.
+  (wanted ?? new Uint8Array()).forEach((byte, index) => {
+    difference |= byte ^ (given?.[index] ?? 0);
+  });
+  return difference === 0;
+}
+
+/**
+ * `POST /api/app/live/announce`: the deploy's call after it publishes, with the
+ * announce secret it put in the Worker. It announces the newest `everyone`
+ * version, the server's own, never one the caller names.
+ */
+export async function handleAnnounce(
+  request: Request,
+  namespace: AnnouncerNamespace,
+  secret: string,
+  version: number | null,
+): Promise<Response> {
+  if (request.method !== 'POST') return new Response(null, { status: 405, headers: { allow: 'POST' } });
+  if (!(await bearerMatches(request.headers.get('authorization'), secret))) return json(401, { error: 'unauthorized' });
+  if (version === null) return json(404, { error: 'no_ui_document' });
+  try {
+    await announce({ ANNOUNCER: namespace }, version);
+  } catch {
+    return json(502, { error: 'announce_failed' });
+  }
+  return json(200, { announced: version });
+}

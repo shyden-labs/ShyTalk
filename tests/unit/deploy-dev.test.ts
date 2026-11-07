@@ -85,7 +85,7 @@ describe('deploy-dev', () => {
 
   it('deploys only when the website, its Worker, the migrations, the environment package, the UI document or its publisher changed, or the lockfile or this workflow', () => {
     expect(deployStep()).toContain(
-      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|packages/ui-document/|manifests/|scripts/publish-ui\\.ts$|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
+      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|packages/ui-document/|manifests/|scripts/publish-ui\\.ts$|scripts/announce-ui\\.ts$|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
     );
   });
 
@@ -186,6 +186,37 @@ describe('deploy-dev', () => {
     expect(id).toBeGreaterThan(marker);
     expect(publish).toBeGreaterThan(id);
     expect(step.indexOf('npx wrangler deploy --env dev ||')).toBeGreaterThan(publish);
+  });
+
+  // Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07, a secret
+  // endpoint): last, the deploy makes a fresh announce secret, masks it, puts
+  // it in the Worker and calls the Worker with it, so every open app hears the
+  // newest UI version. Nothing is stored: each deploy's secret is new.
+  it('tells open apps the UI version last, with a fresh masked secret it puts in the Worker', () => {
+    const step = deployStep().join('\n');
+    const betterAuth = step.indexOf('printf %s $BETTER_AUTH_SECRET | npx wrangler secret put BETTER_AUTH_SECRET --env dev ||');
+    const make = step.indexOf(
+      'announce_secret=$(openssl rand -hex 32) || { echo ::error title=deploy-dev failed::no announce secret was made; exit 1; }',
+    );
+    const mask = step.indexOf('echo ::add-mask::$announce_secret');
+    const put = step.indexOf(
+      'printf %s $announce_secret | npx wrangler secret put ANNOUNCE_SECRET --env dev || { echo ::error title=deploy-dev failed::the dev announce secret was not set; exit 1; }',
+    );
+    const call = step.indexOf(
+      '(cd $GITHUB_WORKSPACE && ANNOUNCE_ENVIRONMENT=dev ANNOUNCE_SECRET=$announce_secret node scripts/announce-ui.ts) || { echo ::error title=deploy-dev failed::open apps were not told the UI version; exit 1; }',
+    );
+    expect(betterAuth).toBeGreaterThan(-1);
+    expect(make).toBeGreaterThan(betterAuth);
+    expect(mask).toBeGreaterThan(make);
+    expect(put).toBeGreaterThan(mask);
+    expect(call).toBeGreaterThan(put);
+    expect(
+      step
+        .slice(call)
+        .split('\n')
+        .filter((line) => line.trim() !== ''),
+    ).toHaveLength(1);
+    expect(workflow()).not.toContain('secrets.ANNOUNCE_SECRET');
   });
 
   it('no longer deploys or deletes the echo Worker, which is gone (#31 AC5)', () => {

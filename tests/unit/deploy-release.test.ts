@@ -144,6 +144,31 @@ describe('deploy-release', () => {
     expect(step).not.toContain('secret put DOOR_SECRET --env $TARGET');
   });
 
+  // Plan 4 Task 8 (shyden-labs/ShyTalk#81): as on DEV, last, a fresh masked
+  // announce secret is put in the Worker and the Worker is called with it, on
+  // TEST and PROD alike (after the TEST-only door block).
+  it('tells open apps the UI version last on TEST and PROD, with a fresh masked secret it puts in the Worker', () => {
+    const step = deployStep();
+    const doorEnd = step.indexOf('npx wrangler secret put DOOR_SECRET --env test ||');
+    const make = step.indexOf(
+      'announce_secret=$(openssl rand -hex 32) || { echo ::error title=deploy-release failed::no announce secret was made; exit 1; }',
+    );
+    const mask = step.indexOf('echo ::add-mask::$announce_secret');
+    const put = step.indexOf(
+      'printf %s $announce_secret | npx wrangler secret put ANNOUNCE_SECRET --env $TARGET || { echo ::error title=deploy-release failed::the $TARGET announce secret was not set; exit 1; }',
+    );
+    const call = step.indexOf(
+      '(cd $GITHUB_WORKSPACE && ANNOUNCE_ENVIRONMENT=$TARGET ANNOUNCE_SECRET=$announce_secret node scripts/announce-ui.ts) || { echo ::error title=deploy-release failed::open apps on $TARGET were not told the UI version; exit 1; }',
+    );
+    expect(doorEnd).toBeGreaterThan(-1);
+    expect(make).toBeGreaterThan(doorEnd);
+    expect(mask).toBeGreaterThan(make);
+    expect(put).toBeGreaterThan(mask);
+    expect(call).toBeGreaterThan(put);
+    expect(step.slice(call).trim().split('\n')).toHaveLength(1);
+    expect(step).not.toContain('secrets.ANNOUNCE_SECRET');
+  });
+
   // App sign-in answers 503 until the Worker holds Better Auth's secret
   // (shyden-labs/ShyTalk#110); TEST and PROD each need their own.
   it('puts the Better Auth secret on TEST and PROD, after the deploy, failing by name when the environment lacks it', () => {

@@ -109,3 +109,11 @@ jobs:
             fi
             printf '%s' "$DOOR_SECRET" | npx wrangler secret put DOOR_SECRET --env test || { echo "::error title=deploy-release failed::the test door secret was not set"; exit 1; }
           fi
+          # Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07): last,
+          # every open app hears the newest UI version. Each deploy makes a
+          # fresh announce secret, puts it in the Worker and calls the Worker
+          # with it, so nothing is stored.
+          announce_secret=$(openssl rand -hex 32) || { echo "::error title=deploy-release failed::no announce secret was made"; exit 1; }
+          echo "::add-mask::$announce_secret"
+          printf '%s' "$announce_secret" | npx wrangler secret put ANNOUNCE_SECRET --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET announce secret was not set"; exit 1; }
+          (cd "$GITHUB_WORKSPACE" && ANNOUNCE_ENVIRONMENT="$TARGET" ANNOUNCE_SECRET="$announce_secret" node scripts/announce-ui.ts) || { echo "::error title=deploy-release failed::open apps on $TARGET were not told the UI version"; exit 1; }
