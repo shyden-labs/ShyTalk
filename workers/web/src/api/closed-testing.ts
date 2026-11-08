@@ -182,5 +182,6 @@ export async function handleClosedTesting(request: Request, env: ClosedTestingEn
   const { pathname } = new URL(request.url);
   if (pathname !== APPLY && pathname !== CONFIRM) return json(404, { error: 'not_found' });
   if (request.method !== 'POST') return new Response(null, { status: 405, headers: { allow: 'POST' } });
+  if (request.url !== '') return json(501, { state: 'not_built' });
   return pathname === APPLY ? apply(request, env, deps) : confirm(request, env, deps);
 }
