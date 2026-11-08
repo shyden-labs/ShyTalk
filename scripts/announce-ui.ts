@@ -23,6 +23,10 @@ const DOOR_CONFIG = 'workers/door/wrangler.json';
 const ENVIRONMENTS = ['dev', 'test', 'prod'];
 const SETTINGS = ['ANNOUNCE_ENVIRONMENT', 'ANNOUNCE_SECRET'] as const;
 
+/** How long a fresh secret may take to go live, and how often it is tried meanwhile. */
+const SECRET_CEILING_MS = 60_000;
+const SECRET_LOOK_MS = 2_000;
+
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 /** `environment`'s `name` var in the Wrangler config at `path`, failing naming both when it has none. */
@@ -55,6 +59,11 @@ export async function main(
   read: (path: string) => string = (path) => readFileSync(path, 'utf8'),
   send: Fetch = (url, init) => fetch(url, init),
   print: (line: string) => void = (line) => process.stdout.write(`${line}\n`),
+  wait: (ms: number) => Promise<void> = (ms) =>
+    new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    }),
+  now: () => number = Date.now,
 ): Promise<number> {
   if (args.length > 0) throw new Error('usage: node scripts/announce-ui.ts (no arguments; the deploy sets ANNOUNCE_* in the environment)');
   const missing = SETTINGS.filter((name) => !env[name]);
@@ -69,7 +78,29 @@ export async function main(
     if (!door) throw new Error(`announce-ui: missing DOOR_SECRET, which ${environment} needs`);
     headers[DOOR_SECRET_HEADER] = door;
   }
-  const response = await send(`${announceOrigin(read, environment)}/api/app/live/announce`, { method: 'POST', headers });
+  const url = `${announceOrigin(read, environment)}/api/app/live/announce`;
+  const ask = (): Promise<Response> => send(url, { method: 'POST', headers });
+
+  // The deploy has just put a fresh secret, a new Worker version that takes a moment to go live everywhere (shyden-labs/ShyTalk#154).
+  const started = now();
+  let response = await ask();
+  if (response.status === 401) {
+    print(
+      `announce-ui: ${environment} answered 401: waiting for the new announce secret to go live, for up to ${String(SECRET_CEILING_MS / 1000)} s`,
+    );
+    while (response.status === 401 && now() - started < SECRET_CEILING_MS) {
+      await wait(SECRET_LOOK_MS);
+      response = await ask();
+    }
+    if (response.status === 401) {
+      const refused = await body(response);
+      const error = typeof refused?.['error'] === 'string' ? ` ${refused['error']}` : '';
+      throw new Error(
+        `announce-ui: ${environment} answered 401${error} after waiting ${String(SECRET_CEILING_MS / 1000)} s for the new announce secret`,
+      );
+    }
+    print(`announce-ui: the new announce secret went live after ${String(Math.round((now() - started) / 1000))} s`);
+  }
   const answer = await body(response);
   if (response.status !== 200) {
     const error = typeof answer?.['error'] === 'string' ? ` ${answer['error']}` : '';
