@@ -74,6 +74,8 @@ describe('capabilities', () => {
       'appium:xcodeSigningId': 'Apple Development',
       'appium:updatedWDABundleId': 'com.shyden.WebDriverAgentRunner',
       'appium:showSafariConsoleLog': true,
+      // A press is a real tap on the screen, never a script's click (global rule 2026-10-31).
+      'appium:nativeWebTap': true,
       'appium:showSafariNetworkLog': true,
     });
     // Measured 2026-11-06: the performance log crashes appium-xcuitest-driver 11.11.2.

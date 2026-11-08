@@ -86,6 +86,8 @@ export function capabilities(udid: string): Record<string, unknown> {
     'appium:updatedWDABundleId': 'com.shyden.WebDriverAgentRunner',
     'appium:showSafariConsoleLog': true,
     'appium:showSafariNetworkLog': true,
+    // A press is a real tap on the screen, never a script's click (global rule 2026-10-31).
+    'appium:nativeWebTap': true,
     'appium:wdaLaunchTimeout': 240_000,
     'appium:newCommandTimeout': 120,
   };

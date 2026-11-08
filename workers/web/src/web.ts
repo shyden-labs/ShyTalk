@@ -9,6 +9,7 @@
  * no Worker serves from another environment's database.
  */
 import { createMarkerGuard, requireDoorSecret, type D1Like } from '../../../packages/environment/index.ts';
+import { handleClosedTesting, isClosedTesting, type ClosedTestingEnv } from './api/closed-testing.ts';
 import { handleAppApi, isAppApi } from './app/router.ts';
 import { json } from './http.ts';
 import type { RateLimit } from './app/sign-in.ts';
@@ -36,6 +37,8 @@ export interface WebEnv {
   APPLE_AUDIENCES?: string;
   /** Sign-in attempts per IP (wrangler.json `ratelimits`). */
   SIGN_IN_LIMIT?: RateLimit;
+  /** Closed-testing applications per IP (wrangler.json `ratelimits`); absent, the form answers 503. */
+  APPLY_LIMIT?: RateLimit;
 }
 
 const ENVIRONMENTS = new Set(['prod', 'test', 'dev']);
@@ -56,9 +59,14 @@ function markerGuard(environment: string, db: D1Like): ReturnType<typeof createM
   return guard;
 }
 
-/** The API: nothing yet (plan 3 Task 5 adds the closed-testing form). */
-export function handleApi(): Promise<Response> {
-  return Promise.resolve(json(404, { error: 'not_found' }));
+/** A Worker's D1 binding, which the unit tests' marker-only stand-ins are not. */
+const hasFullD1 = (env: WebEnv): env is WebEnv & ClosedTestingEnv => env.DB !== undefined && 'batch' in env.DB;
+
+/** The API: the closed-testing form (plan 3 Task 5, shyden-labs/ShyTalk#55). */
+export function handleApi(request: Request, env: WebEnv): Promise<Response> {
+  if (!isClosedTesting(new URL(request.url).pathname)) return Promise.resolve(json(404, { error: 'not_found' }));
+  if (!hasFullD1(env)) return Promise.resolve(json(503, { state: 'send_failed' }));
+  return handleClosedTesting(request, env);
 }
 
 async function route(request: Request, env: WebEnv): Promise<Response> {
@@ -74,7 +82,7 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   if (wrongStore) return wrongStore;
   const { pathname } = new URL(request.url);
   if (isAppApi(pathname)) return handleAppApi(request, env);
-  if (pathname.startsWith('/api/')) return handleApi();
+  if (pathname.startsWith('/api/')) return handleApi(request, env);
   return env.ASSETS.fetch(request);
 }
 

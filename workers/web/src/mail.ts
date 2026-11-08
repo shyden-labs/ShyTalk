@@ -24,6 +24,8 @@ export interface MailEnv extends AuditEnv {
   OCI_FINGERPRINT?: string | undefined;
   OCI_PRIVATE_KEY?: string | undefined;
   OCI_COMPARTMENT?: string | undefined;
+  /** Where the CI smoke's stand-in listens (`wrangler dev --var`); set nowhere deployed, and ignored on prod. */
+  MAIL_ENDPOINT?: string | undefined;
 }
 
 const UNAVAILABLE: MailResult = { ok: false, reason: 'unavailable' };
@@ -40,7 +42,7 @@ async function submit(env: MailEnv, message: MailMessage, now: Date): Promise<Ma
   const privateKey = await importKey(OCI_PRIVATE_KEY);
   if (privateKey === null) return UNAVAILABLE;
 
-  const url = mailEndpoint(MAIL_REGION);
+  const url = env.MAIL_ENDPOINT && env.ENVIRONMENT_NAME !== 'prod' ? new URL(env.MAIL_ENDPOINT) : mailEndpoint(MAIL_REGION);
   const body = JSON.stringify({
     sender: { senderAddress: { email: MAIL_FROM, name: 'ShyTalk' }, compartmentId: OCI_COMPARTMENT },
     recipients: { to: [{ email: message.to }] },

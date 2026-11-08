@@ -68,3 +68,18 @@ main {
   color: var(--muted);
   border-top: 1px solid currentcolor;
 }
+
+.closed-testing-form input[type='email'] {
+  display: block;
+  width: 100%;
+  max-width: 24rem;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0.5rem;
+}
+
+.closed-testing-form button,
+#confirm-button {
+  font: inherit;
+  padding: 0.5rem 1rem;
+}

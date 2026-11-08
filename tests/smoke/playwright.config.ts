@@ -6,10 +6,11 @@
  * (tests/smoke/tsconfig.json), which Playwright's own types need.
  */
 import { defineConfig, devices } from '@playwright/test';
+import { generateKeyPairSync } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
 import { SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
-import { SMOKE_TARGETS } from './targets.ts';
+import { MAIL_STAND_IN_PORT, SMOKE_TARGETS } from './targets.ts';
 
 const PORT = 8787;
 
@@ -32,6 +33,27 @@ const LOCAL_D1 = `--config workers/web/wrangler.json --env dev --local --persist
 const MARKER_SQL =
   "CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT 'dev' WHERE NOT EXISTS (SELECT 1 FROM environment_marker);";
 
+/**
+ * The sender signs every request, so it needs settings and a real key even for
+ * the stand-in (tests/smoke/mail-stand-in.ts). A throwaway key each run, on one
+ * line for the shell; the sender's parser ignores white space inside it.
+ */
+const { privateKey } = generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+  privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  publicKeyEncoding: { type: 'spki', format: 'pem' },
+});
+const MAIL_VARS = [
+  `MAIL_ENDPOINT:http://127.0.0.1:${String(MAIL_STAND_IN_PORT)}/submit`,
+  'OCI_TENANCY:smoke',
+  'OCI_USER:smoke',
+  'OCI_FINGERPRINT:smoke',
+  'OCI_COMPARTMENT:smoke',
+  `OCI_PRIVATE_KEY:${privateKey.trim().replace(/\n/g, ' ')}`,
+]
+  .map((value) => `--var "${value}"`)
+  .join(' ');
+
 export default defineConfig({
   testDir: '.',
   forbidOnly: true,
@@ -44,16 +66,24 @@ export default defineConfig({
     extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret },
   },
   projects: SMOKE_TARGETS.map((name) => ({ name, use: { ...devices[DEVICE[name]] } })),
-  webServer: {
-    command: [
-      `npx wrangler d1 migrations apply DB ${LOCAL_D1}`,
-      `npx wrangler d1 execute DB ${LOCAL_D1} --command "${MARKER_SQL}"`,
-      `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --var DOOR_SECRET:${secret}`,
-    ].join(' && '),
-    // Playwright counts a 403 as up: the door answers before the secret is sent.
-    url: `http://127.0.0.1:${String(PORT)}/`,
-    cwd: ROOT,
-    reuseExistingServer: false,
-    stdout: 'pipe',
-  },
+  webServer: [
+    {
+      command: `node tests/smoke/mail-stand-in.ts ${String(MAIL_STAND_IN_PORT)}`,
+      url: `http://127.0.0.1:${String(MAIL_STAND_IN_PORT)}/health`,
+      cwd: ROOT,
+      reuseExistingServer: false,
+    },
+    {
+      command: [
+        `npx wrangler d1 migrations apply DB ${LOCAL_D1}`,
+        `npx wrangler d1 execute DB ${LOCAL_D1} --command "${MARKER_SQL}"`,
+        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --var DOOR_SECRET:${secret} ${MAIL_VARS}`,
+      ].join(' && '),
+      // Playwright counts a 403 as up: the door answers before the secret is sent.
+      url: `http://127.0.0.1:${String(PORT)}/`,
+      cwd: ROOT,
+      reuseExistingServer: false,
+      stdout: 'pipe',
+    },
+  ],
 });

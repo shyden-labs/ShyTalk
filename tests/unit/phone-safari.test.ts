@@ -158,3 +158,42 @@ describe('safariPage: reading the page', () => {
     expect(steps.indexOf('/session/s1/timeouts')).toBeLessThan(steps.indexOf('/session/s1/execute/async'));
   });
 });
+
+describe('safariPage: tap and waitForText', () => {
+  const ELEMENT = 'element-6066-11e4-a52e-4f735466cecf';
+
+  it('finds the element and clicks it through WebDriver', async () => {
+    const calls: [string, string, unknown][] = [];
+    const call: WebDriverCall = (method, path, body) => {
+      calls.push([method, path, body]);
+      return Promise.resolve(path.endsWith('/element') ? { [ELEMENT]: 'e-1' } : null);
+    };
+    await safariPage(call, 's1', BASE).tap('#confirm-button');
+    expect(calls).toEqual([
+      ['POST', '/session/s1/element', { using: 'css selector', value: '#confirm-button' }],
+      ['POST', '/session/s1/element/e-1/click', {}],
+    ]);
+  });
+
+  it('looks again until the text comes', async () => {
+    const fake = appium({}, ['Old', 'New']);
+    const waits: number[] = [];
+    const page = safariPage(fake.call, 's1', BASE, undefined, undefined, (ms) => {
+      waits.push(ms);
+      return Promise.resolve();
+    });
+    await expect(page.waitForText('h1', 'New')).resolves.toBeUndefined();
+    expect(waits).toEqual([250]);
+  });
+
+  it('fails at its ceiling, naming what it found', async () => {
+    const stuck: WebDriverCall = () => Promise.resolve('Old');
+    const page = safariPage(stuck, 's1', BASE, undefined, undefined, () => Promise.resolve());
+    await expect(page.waitForText('h1', 'New')).rejects.toThrow('h1 held "Old", not "New", after 15000 ms');
+  });
+
+  it('waits by the real clock when nothing stands in', async () => {
+    const fake = appium({}, ['Old', 'New']);
+    await expect(safariPage(fake.call, 's1', BASE).waitForText('h1', 'New')).resolves.toBeUndefined();
+  });
+});

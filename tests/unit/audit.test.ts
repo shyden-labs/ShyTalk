@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { audit, AUDIT_SQL, type AuditEnv } from '../../workers/web/src/audit.ts';
+import { audit, auditIfChanged, AUDIT_IF_CHANGED_SQL, AUDIT_SQL, type AuditEnv } from '../../workers/web/src/audit.ts';
 
 /**
  * The audit statement (plan 3 Task 8, shyden-labs/ShyTalk#59). Unit: the DB
@@ -37,6 +37,21 @@ function env(environment: AuditEnv['ENVIRONMENT_NAME']): { env: AuditEnv; prepar
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('auditIfChanged', () => {
+  it('writes its row only when the statement before it changed something', () => {
+    const { env: e, prepared } = env('dev');
+    auditIfChanged(e, { actor: 'public', action: 'applicant.confirmed', detail: { language: 'th' } });
+    expect(prepared[0]?.sql).toBe(AUDIT_IF_CHANGED_SQL);
+    expect(AUDIT_IF_CHANGED_SQL).toContain('WHERE changes() > 0');
+    expect(prepared[0]?.bound.slice(1)).toEqual(['public', 'applicant.confirmed', null, '{"language":"th"}', 'dev']);
+  });
+
+  it('refuses a credential key as audit() does', () => {
+    const { env: e } = env('dev');
+    expect(() => auditIfChanged(e, { actor: 'a', action: 'b', detail: { token: 'x' } })).toThrow('token');
+  });
 });
 
 describe('audit', () => {

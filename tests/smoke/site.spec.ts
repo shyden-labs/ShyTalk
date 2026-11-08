@@ -60,4 +60,41 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
   });
+
+  // The closed-testing pages (shyden-labs/ShyTalk#55 AC6). Nothing here applies:
+  // the phones test a deployed address, where an application sends real mail.
+  test(`${lang}: the closed-testing page shows the form and every statement in ${lang}, passes axe, with no CSP refusal`, async ({
+    page,
+  }) => {
+    const refusals = cspRefusals(page);
+    const response = await page.goto(`${prefix}/closed-testing`, { waitUntil: 'load' });
+    expect.soft(response?.status()).toBe(200);
+    await expect.soft(page.locator('html')).toHaveAttribute('lang', lang);
+    for (const line of ['noAccess', 'moreDetails', 'safeList', 'removed', 'retention']) {
+      const statement = page.locator(`[data-line="${line}"]`);
+      await expect.soft(statement).toBeVisible();
+      await expect.soft(statement).toHaveText(t(locale, `closedTesting.${line}`));
+    }
+    await expect.soft(page.getByLabel(t(locale, 'closedTesting.emailLabel'))).toBeVisible();
+    await expect.soft(page.getByLabel(t(locale, 'closedTesting.adultLabel'))).toBeVisible();
+    await expect.soft(page.getByRole('button', { name: t(locale, 'closedTesting.submit') })).toBeVisible();
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+    expect(refusals).toEqual([]);
+  });
+
+  test(`${lang}: the confirm page passes axe, and its button with a dead link shows link-expired in ${lang}, with no CSP refusal`, async ({
+    page,
+  }) => {
+    const refusals = cspRefusals(page);
+    await page.goto(`${prefix}/closed-testing/confirm?t=no-such-link`, { waitUntil: 'load' });
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+    await page.getByRole('button', { name: t(locale, 'closedTesting.confirmButton') }).click();
+    await page.waitForURL(`**${prefix}/closed-testing/link-expired`);
+    const heading = page.getByRole('heading', { level: 1 });
+    await expect.soft(heading).toBeVisible();
+    await expect.soft(heading).toHaveText(t(locale, 'closedTesting.expiredHeading'));
+    expect(refusals).toEqual([]);
+  });
 }

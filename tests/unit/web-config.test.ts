@@ -99,15 +99,16 @@ describe('app sign-in config', () => {
     expect(Object.keys(environment(name)['vars'] as Config).filter((key) => key.startsWith('OCI_'))).toEqual([]);
   });
 
-  it.each(Object.keys(ORIGINS))('%s limits sign-in to 10 a minute', (name) => {
-    const [limit, ...others] = environment(name)['ratelimits'] as Config[];
+  it.each(Object.keys(ORIGINS))('%s limits sign-in to 10 a minute and closed-testing applications to 5', (name) => {
+    const [signIn, apply, ...others] = environment(name)['ratelimits'] as Config[];
     expect(others).toEqual([]);
-    expect(limit).toMatchObject({ name: 'SIGN_IN_LIMIT', simple: { limit: 10, period: 60 } });
+    expect(signIn).toMatchObject({ name: 'SIGN_IN_LIMIT', simple: { limit: 10, period: 60 } });
+    expect(apply).toMatchObject({ name: 'APPLY_LIMIT', simple: { limit: 5, period: 60 } });
   });
 
   it('gives each environment its own counter: dev and test share an account, so they must not share a namespace', () => {
-    const ids = Object.keys(ORIGINS).map((name) => ((environment(name)['ratelimits'] as Config[])[0] as Config)['namespace_id']);
-    expect(new Set(ids).size).toBe(3);
+    const ids = Object.keys(ORIGINS).flatMap((name) => (environment(name)['ratelimits'] as Config[]).map((limit) => limit['namespace_id']));
+    expect(new Set(ids).size).toBe(6);
     for (const id of ids) expect(id).toMatch(/^[1-9][0-9]*$/);
   });
 

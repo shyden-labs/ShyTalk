@@ -1,0 +1,72 @@
+---
+import Base from '../layouts/Base.astro';
+import { t, type Locale } from '../i18n/t.ts';
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const line = (key: string): string => t(locale, `closedTesting.${key}`);
+
+/** Said before the button (design 3 item 2). */
+const statements = ['noAccess', 'moreDetails', 'safeList', 'removed', 'retention'] as const;
+---
+
+<Base locale={locale} title={line('heading')}>
+  <h1>{line('heading')}</h1>
+  <p>{line('intro')}</p>
+  <ul>
+    {statements.map((statement) => <li data-line={statement}>{line(statement)}</li>)}
+  </ul>
+  <noscript><p>{line('noScript')}</p></noscript>
+  <form
+    id="apply-form"
+    class="closed-testing-form"
+    data-locale={locale}
+    data-sent={line('sent')}
+    data-invalid={line('invalid')}
+    data-too-many={line('tooMany')}
+    data-send-failed={line('sendFailed')}
+  >
+    <p>
+      <label for="apply-email">{line('emailLabel')}</label>
+      <input id="apply-email" name="email" type="email" autocomplete="email" required />
+    </p>
+    <p>
+      <input id="apply-adult" name="adult" type="checkbox" required />
+      <label for="apply-adult">{line('adultLabel')}</label>
+    </p>
+    <p><button id="apply-submit" type="submit">{line('submit')}</button></p>
+  </form>
+  <p id="apply-answer" role="status" hidden></p>
+</Base>
+
+<script>
+  import { applyMessage } from '../closed-testing/answers.ts';
+
+  const form = document.querySelector<HTMLFormElement>('#apply-form');
+  const answer = document.querySelector<HTMLElement>('#apply-answer');
+  const button = document.querySelector<HTMLButtonElement>('#apply-submit');
+
+  async function statusOf(body: unknown): Promise<number> {
+    try {
+      const response = await fetch('/api/closed-testing', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      return response.status;
+    } catch {
+      return 0;
+    }
+  }
+
+  if (form && answer && button) {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      const fields = new FormData(form);
+      void statusOf({ email: fields.get('email'), adult: fields.get('adult') === 'on', locale: form.dataset['locale'] }).then((status) => {
+        answer.textContent = form.dataset[applyMessage(status)] ?? '';
+        answer.hidden = false;
+        button.disabled = false;
+      });
+    });
+  }
+</script>
