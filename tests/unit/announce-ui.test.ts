@@ -88,8 +88,8 @@ describe('announce-ui', () => {
   });
 
   it('fails naming the status and the error when the Worker refuses', async () => {
-    const fake = fakeFetch(new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }));
-    await expect(main([], settings, read, fake.fetch, () => undefined)).rejects.toThrow('announce-ui: dev answered 401 unauthorized');
+    const fake = fakeFetch(new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 }));
+    await expect(main([], settings, read, fake.fetch, () => undefined)).rejects.toThrow('announce-ui: dev answered 403 forbidden');
   });
 
   it('fails naming the status when the answer is not JSON', async () => {
@@ -138,5 +138,82 @@ describe('announce-ui', () => {
   it('takes no arguments', async () => {
     const fake = fakeFetch(new Response(null, { status: 200 }));
     await expect(main(['dev'], settings, read, fake.fetch, () => undefined)).rejects.toThrow('usage: node scripts/announce-ui.ts');
+  });
+});
+
+describe('waiting for the fresh secret to go live (shyden-labs/ShyTalk#154)', () => {
+  const settings = { ANNOUNCE_ENVIRONMENT: 'dev', ANNOUNCE_SECRET: 'fresh-secret', DOOR_SECRET: 'door' };
+  const unauthorized = (): Response => Response.json({ error: 'unauthorized' }, { status: 401 });
+  const announced = (): Response => Response.json({ announced: 7 }, { status: 200 });
+
+  /** Answers in order, the last for ever; each wait moves the clock on by what it was asked. */
+  function stand(...answers: (() => Response)[]) {
+    let clock = 0;
+    let calls = 0;
+    const lines: string[] = [];
+    return {
+      lines,
+      calls: () => calls,
+      send: () => {
+        const answer = answers[Math.min(calls, answers.length - 1)] as () => Response;
+        calls += 1;
+        return Promise.resolve(answer());
+      },
+      print: (line: string) => {
+        lines.push(line);
+      },
+      wait: (ms: number) => {
+        clock += ms;
+        return Promise.resolve();
+      },
+      now: () => clock,
+    };
+  }
+
+  it('asks again while the answer is 401, saying what it waits for and how long it took', async () => {
+    const s = stand(unauthorized, unauthorized, announced);
+    expect(await main([], settings, read, s.send, s.print, s.wait, s.now)).toBe(0);
+    expect(s.calls()).toBe(3);
+    expect(s.lines).toEqual([
+      'announce-ui: dev answered 401: waiting for the new announce secret to go live, for up to 60 s',
+      'announce-ui: the new announce secret went live after 4 s',
+      'announce-ui: dev announced UI version 7',
+    ]);
+  });
+
+  it('says nothing about waiting when the secret is live at once', async () => {
+    const s = stand(announced);
+    await main([], settings, read, s.send, s.print, s.wait, s.now);
+    expect(s.lines).toEqual(['announce-ui: dev announced UI version 7']);
+  });
+
+  it('fails at the ceiling, naming the status and the wait', async () => {
+    const s = stand(unauthorized);
+    await expect(main([], settings, read, s.send, s.print, s.wait, s.now)).rejects.toThrow(
+      'announce-ui: dev answered 401 unauthorized after waiting 60 s for the new announce secret',
+    );
+    expect(s.calls()).toBe(31);
+  });
+
+  it('fails at the ceiling when the 401 is not JSON', async () => {
+    const s = stand(() => new Response('Unauthorized', { status: 401 }));
+    await expect(main([], settings, read, s.send, s.print, s.wait, s.now)).rejects.toThrow(
+      'announce-ui: dev answered 401 after waiting 60 s for the new announce secret',
+    );
+  });
+
+  it('fails at once on any other refusal', async () => {
+    const s = stand(() => Response.json({ error: 'ui_unavailable' }, { status: 503 }));
+    await expect(main([], settings, read, s.send, s.print, s.wait, s.now)).rejects.toThrow('announce-ui: dev answered 503 ui_unavailable');
+    expect(s.calls()).toBe(1);
+  });
+
+  it('waits by the real clock when none is stood in', async () => {
+    vi.useFakeTimers();
+    const s = stand(unauthorized, announced);
+    const announcing = main([], settings, read, s.send, s.print);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(await announcing).toBe(0);
+    vi.useRealTimers();
   });
 });
