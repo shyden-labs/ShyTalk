@@ -36,10 +36,19 @@ const sha256 = async (value: string): Promise<Uint8Array> =>
  */
 export async function requireDoorSecret(request: Request, configured: string | undefined): Promise<Response | null> {
   const given = request.headers.get(DOOR_SECRET_HEADER) ?? '';
+  return (await secretsMatch(given, configured)) ? null : plain(403, 'Forbidden');
+}
+
+/**
+ * Whether `given` is the configured secret. Both are hashed and the 32-byte
+ * digests compared without an early exit, so timing reveals neither length
+ * nor content; an unset or empty configured secret matches nothing.
+ */
+export async function secretsMatch(given: string, configured: string | undefined): Promise<boolean> {
   const [a, b] = await Promise.all([sha256(given), sha256(configured ?? '')]);
   let difference = 0;
   for (let i = 0; i < a.length; i += 1) difference |= (a[i] as number) ^ (b[i] as number);
-  return difference === 0 && configured ? null : plain(403, 'Forbidden');
+  return difference === 0 && Boolean(configured);
 }
 
 const MARKER_SQL = 'SELECT name FROM environment_marker LIMIT 1';

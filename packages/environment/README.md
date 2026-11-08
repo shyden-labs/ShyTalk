@@ -3,6 +3,7 @@
 The origin side of the front doors (design 4.17, shyden-labs/ShyTalk#28). Each TEST and DEV origin Worker uses both checks before it serves a request.
 
 - `requireDoorSecret(request, configured)`: `null` when the request carries the environment's door secret in `x-shytalk-door-secret`, otherwise a plain 403. Both values are hashed with SHA-256 and the digests compared in constant time, so neither length nor content leaks through timing. An unset or empty configured secret refuses everything.
+- `secretsMatch(given, configured)`: the same constant-time comparison as a boolean, for any other secret (the doors' mail secret, shyden-labs/ShyTalk#88). An unset or empty configured secret matches nothing.
 - `createMarkerGuard(expected, { databases, buckets }).assertEnvironmentMarkers()`: `null` when every D1 database and R2 bucket names `expected`, otherwise a plain 503 and one logged line naming the store. Make one guard per isolate (at module scope): a pass is kept for the isolate's life, and a failure is checked again on the next request. Given no store at all, it fails.
 
 ## The markers
