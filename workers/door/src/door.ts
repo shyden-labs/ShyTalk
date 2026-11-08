@@ -3,8 +3,11 @@
  * answering test.shytalk.app or dev.shytalk.app. It passes every request,
  * WebSocket upgrades included, to its environment's workers.dev origin and
  * adds that environment's door secret, which the origin requires
- * (packages/environment). It holds no binding and does nothing else.
+ * (packages/environment). Its one binding, EMAIL, serves the reserved mail
+ * route alone (`mail.ts`, shyden-labs/ShyTalk#88).
  */
+
+import type { DoorMailEnv } from './mail.ts';
 
 export const DOOR_SECRET_HEADER = 'x-shytalk-door-secret';
 
@@ -13,6 +16,9 @@ export interface DoorEnv {
   ORIGIN: string;
   /** The environment's door secret (a Wrangler secret, never a var). */
   DOOR_SECRET: string;
+  /** The mail route's binding and secret (`mail.ts`); absent, that route answers 503. */
+  EMAIL?: DoorMailEnv['EMAIL'];
+  MAIL_SECRET?: string;
 }
 
 type Send = (request: Request) => Promise<Response>;

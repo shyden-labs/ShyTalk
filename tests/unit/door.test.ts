@@ -155,4 +155,30 @@ describe('door: the Worker entry', () => {
     expect(runtimeFetch.mock.calls[0]?.[0].url).toBe('https://origin.example.test/x');
     expect(await response.text()).toBe('from origin');
   });
+  it('sends POST /__door/mail to the mail route, never to the origin', async () => {
+    const runtimeFetch = vi.fn<(request: Request) => Promise<Response>>(() => Promise.resolve(new Response('from origin')));
+    vi.stubGlobal('fetch', runtimeFetch);
+    const send = vi.fn(() => Promise.resolve({ messageId: 'm-1' }));
+    const request = new Request('https://door.example.test/__door/mail', {
+      method: 'POST',
+      headers: { 'x-shytalk-mail-secret': 'the-mail-secret' },
+      body: JSON.stringify({ to: 'member@example.test', subject: 'Code', text: '482913' }),
+    });
+
+    const response = await door.fetch(request, { ...ENV, MAIL_SECRET: 'the-mail-secret', EMAIL: { send } });
+
+    expect(runtimeFetch).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await response.json()).toEqual({ ok: true, messageId: 'm-1' });
+  });
+
+  it.each(['/__door/mail/x', '/__door/mailbox', '/api/x'])('still forwards %s to the origin', async (path) => {
+    const runtimeFetch = vi.fn<(request: Request) => Promise<Response>>(() => Promise.resolve(new Response('from origin')));
+    vi.stubGlobal('fetch', runtimeFetch);
+
+    await door.fetch(new Request(`https://door.example.test${path}`, { method: 'POST', body: 'x' }), ENV);
+
+    expect(runtimeFetch).toHaveBeenCalledTimes(1);
+    expect(runtimeFetch.mock.calls[0]?.[0].url).toBe(`https://origin.example.test${path}`);
+  });
 });

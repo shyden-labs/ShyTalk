@@ -8,11 +8,13 @@
     "test": {
       "name": "shytalk-door-test",
       "routes": [{ "pattern": "test.shytalk.app", "custom_domain": true }],
+      "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["no-reply@dev.shytalk.app"] }],
       "vars": { "ORIGIN": "https://shytalk-test.shytalk-non-prod.workers.dev" }
     },
     "dev": {
       "name": "shytalk-door-dev",
       "routes": [{ "pattern": "dev.shytalk.app", "custom_domain": true }],
+      "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["no-reply@dev.shytalk.app"] }],
       "vars": { "ORIGIN": "https://shytalk-dev.shytalk-non-prod.workers.dev" }
     }
   }
