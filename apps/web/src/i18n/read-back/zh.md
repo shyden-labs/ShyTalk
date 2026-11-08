@@ -56,3 +56,4 @@
 | closedTesting.mailSubject | Confirm your email for ShyTalk closed testing | 确认您的电子邮箱以参加 ShyTalk 封闭测试 | Please confirm your email address to participate in the ShyTalk closed beta. |
 | closedTesting.mailIntro | Someone applied for ShyTalk closed testing with this address. To confirm it, open this link and press the button within 48 hours: | 有人使用此地址申请了 ShyTalk 封闭测试。如需确认，请在 48 小时内打开此链接并按下按钮： | Someone has used this address to apply for the ShyTalk closed beta. To confirm, please open this link and press the button within 48 hours: |
 | closedTesting.mailIgnore | If this was not you, ignore this email and the address is removed after 48 hours. | 如果这不是您本人，请忽略此邮件，此地址将在 48 小时后被删除。 | If this is not you, please ignore this email. This address will be deleted in 48 hours. |
+| footer.englishOnly | This page is available in English only. | 此页面仅提供英文版。 | This page is available in English only. |

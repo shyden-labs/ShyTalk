@@ -9,6 +9,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from './fixture.ts';
 import AxeBuilder from '@axe-core/playwright';
 import { t } from '../../apps/web/src/i18n/t.ts';
+import { LEGAL_DOCS, legalLines, legalLocale, legalPath } from '../../apps/web/src/legal/legal.ts';
 
 const LANGUAGES = [
   { lang: 'en', locale: 'en', prefix: '' },
@@ -59,6 +60,36 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     await page.goto(`${prefix}/`, { waitUntil: 'load' });
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+  });
+
+  // The legal pages (shyden-labs/ShyTalk#56 AC4): each language's footer opens the right text.
+  test(`${lang}: each footer legal link opens the right page, with its note if any, passing axe, with no CSP refusal`, async ({ page }) => {
+    const refusals = cspRefusals(page);
+    const words = legalLines(legalLocale(locale));
+    await page.goto(`${prefix}/`, { waitUntil: 'load' });
+    for (const doc of LEGAL_DOCS) {
+      await page
+        .getByRole('contentinfo')
+        .getByRole('link', { name: t(locale, `footer.${doc}`), exact: true })
+        .click();
+      await page.waitForURL((url) => `${url.pathname}${url.search}` === legalPath(locale, doc));
+      const heading = page.getByRole('heading', { level: 1 });
+      await expect.soft(heading).toBeVisible();
+      await expect.soft(heading).toHaveText(words[doc].title);
+      await expect.soft(page.locator('html')).toHaveAttribute('lang', legalLocale(locale));
+      await expect.soft(page.locator('[data-governs]')).toHaveText(words.common.governs);
+      if (locale === 'en' || locale === 'id') {
+        await expect.soft(page.locator('[data-english-only]:visible')).toHaveCount(0);
+      } else {
+        const note = page.locator(`[data-english-only="${locale}"]`);
+        await expect.soft(note).toBeVisible();
+        await expect.soft(note).toHaveText(t(locale, 'footer.englishOnly'));
+      }
+      const { violations } = await new AxeBuilder({ page }).analyze();
+      expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+      await page.goto(`${prefix}/`, { waitUntil: 'load' });
+    }
+    expect(refusals).toEqual([]);
   });
 
   // The closed-testing pages (shyden-labs/ShyTalk#55 AC6). Nothing here applies:

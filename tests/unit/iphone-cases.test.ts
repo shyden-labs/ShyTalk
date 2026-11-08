@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 
 /**
  * Each case of the iPhone copy checks what its Playwright twin checks
@@ -19,6 +20,8 @@ function selectorText(locale: Locale, selector: string): string {
   if (selector === 'label[for="apply-adult"]') return t(locale, 'closedTesting.adultLabel');
   if (selector === '#apply-submit') return t(locale, 'closedTesting.submit');
   if (selector === '#confirm-button') return t(locale, 'closedTesting.confirmButton');
+  if (selector === '[data-governs]') return legalLines(legalLocale(locale)).common.governs;
+  if (selector.startsWith('[data-english-only')) return t(locale, 'footer.englishOnly');
   return t(locale, 'home.heading');
 }
 
@@ -26,6 +29,7 @@ function selectorText(locale: Locale, selector: string): string {
 function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { visited: string[] } {
   const locale = LOCALE[lang] ?? 'en';
   const visited: string[] = [];
+  let onLegalPage = false;
   return {
     visited,
     goto: (path) => {
@@ -33,10 +37,14 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
       return Promise.resolve(path.endsWith('/no-such-page') ? 404 : 200);
     },
     cspRefusals: () => Promise.resolve([]),
-    attribute: (selector, name) => Promise.resolve(selector === 'html' && name === 'lang' ? lang : null),
-    isVisible: () => Promise.resolve(true),
+    attribute: (selector, name) =>
+      Promise.resolve(selector === 'html' && name === 'lang' ? (onLegalPage ? legalLocale(locale) : lang) : null),
+    isVisible: (selector) => Promise.resolve(selector !== '[data-english-only]:not([hidden])'),
     text: (selector) => Promise.resolve(selectorText(locale, selector)),
-    tap: () => Promise.resolve(),
+    tap: () => {
+      onLegalPage = true;
+      return Promise.resolve();
+    },
     waitForText: () => Promise.resolve(),
     visibleLinks: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
@@ -156,5 +164,46 @@ describe('the iPhone cases', () => {
 
   it.each(named('the confirm page'))('%s: fails on a CSP refusal', async (_, c) => {
     await expect(c.run(safari(langOf(c.title), { cspRefusals: () => Promise.resolve(['refused']) }))).rejects.toThrow();
+  });
+
+  it('holds a legal-links case in every language', () => {
+    expect(named('each footer legal link')).toHaveLength(5);
+  });
+
+  it.each(named('each footer legal link'))('%s: taps each link, reads its heading in the right language, and checks axe', async (_, c) => {
+    const lang = langOf(c.title);
+    const locale = LOCALE[lang] ?? 'en';
+    const words = legalLines(legalLocale(locale));
+    const tapped: string[] = [];
+    const waited: string[] = [];
+    let axe = 0;
+    await c.run(
+      safari(lang, {
+        attribute: () => Promise.resolve(legalLocale(locale)),
+        tap: (selector) => {
+          tapped.push(selector);
+          return Promise.resolve();
+        },
+        waitForText: (_selector, text) => {
+          waited.push(text);
+          return Promise.resolve();
+        },
+        axeViolations: () => {
+          axe += 1;
+          return Promise.resolve([]);
+        },
+      }),
+    );
+    expect(tapped).toEqual(['privacy', 'terms', 'guidelines'].map((doc) => `footer a[data-legal="${doc}"]`));
+    expect(waited).toEqual([words.privacy.title, words.terms.title, words.guidelines.title]);
+    expect(axe).toBe(3);
+  });
+
+  it.each(named('each footer legal link'))('%s: fails when a page is in the wrong language', async (_, c) => {
+    await expect(c.run(safari(langOf(c.title), { attribute: () => Promise.resolve('fr') }))).rejects.toThrow();
+  });
+
+  it.each(named('each footer legal link'))('%s: fails on any axe violation', async (_, c) => {
+    await expect(c.run(safari(langOf(c.title), { axeViolations: () => Promise.resolve(['label: 1']) }))).rejects.toThrow();
   });
 });
