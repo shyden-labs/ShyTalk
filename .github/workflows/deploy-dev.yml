@@ -88,13 +88,14 @@ jobs:
       # deploy from here: they live in the production account and deploy only
       # through `production`, with Shyden's approval.
       - name: Deploy the changed areas to dev
+        id: deploy
         env:
           DEPLOY_REHEARSAL: ${{ github.event_name == 'pull_request' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
         run: |
-          if ! grep -qE '^(apps/web/|workers/web/|migrations/|packages/environment/|packages/ui-document/|manifests/|scripts/publish-ui\.ts$|scripts/announce-ui\.ts$|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
+          if ! grep -qE '^(apps/web/|workers/web/|migrations/|packages/environment/|packages/mail/|packages/ui-document/|manifests/|scripts/publish-ui\.ts$|scripts/announce-ui\.ts$|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
             echo "Nothing deployable changed, so dev deploys nothing."
             exit 0
           fi
@@ -153,3 +154,28 @@ jobs:
           echo "::add-mask::$announce_secret"
           printf '%s' "$announce_secret" | npx wrangler secret put ANNOUNCE_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev announce secret was not set"; exit 1; }
           (cd "$GITHUB_WORKSPACE" && ANNOUNCE_ENVIRONMENT=dev ANNOUNCE_SECRET="$announce_secret" node scripts/announce-ui.ts) || { echo "::error title=deploy-dev failed::open apps were not told the UI version"; exit 1; }
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+      # shyden-labs/ShyTalk#88: the Oracle mail secrets are in no other step's
+      # environment; this last step runs only after the step above deployed,
+      # and runs nothing but `wrangler secret put`. It is not a hard boundary:
+      # earlier steps share this runner (files, GITHUB_ENV, GITHUB_PATH), and
+      # they hold the Cloudflare token, which could reach Worker secrets
+      # anyway, so a separate job would cost a runner and protect no more.
+      - name: Put the Oracle mail secrets
+        if: steps.deploy.outputs.deployed == 'true'
+        working-directory: workers/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_COMPARTMENT: ${{ secrets.OCI_COMPARTMENT }}
+        run: |
+          for name in OCI_TENANCY OCI_USER OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_COMPARTMENT; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=$name missing::Set $name in the dev environment (shyden-labs/ShyTalk#88); until then dev sends no mail."
+              exit 1
+            fi
+            printf '%s' "${!name}" | npx wrangler secret put "$name" --env dev || { echo "::error title=deploy-dev failed::the dev $name was not set"; exit 1; }
+          done

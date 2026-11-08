@@ -83,9 +83,9 @@ describe('deploy-dev', () => {
     expect(workflow()).not.toContain('deploy-dev is not filled in');
   });
 
-  it('deploys only when the website, its Worker, the migrations, the environment package, the UI document or its publisher changed, or the lockfile or this workflow', () => {
+  it('deploys only when the website, its Worker, the migrations, the environment or mail package, the UI document or its publisher changed, or the lockfile or this workflow', () => {
     expect(deployStep()).toContain(
-      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|packages/ui-document/|manifests/|scripts/publish-ui\\.ts$|scripts/announce-ui\\.ts$|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
+      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|packages/mail/|packages/ui-document/|manifests/|scripts/publish-ui\\.ts$|scripts/announce-ui\\.ts$|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
     );
   });
 
@@ -134,6 +134,61 @@ describe('deploy-dev', () => {
     expect(missing).toBeGreaterThan(deploy);
     expect(put).toBeGreaterThan(missing);
     expect(step).toContain('BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}');
+  });
+
+  // shyden-labs/ShyTalk#88: the five Oracle secrets reach only a last step of
+  // their own, which runs nothing but `wrangler secret put`, and only after the
+  // deploy step deployed (it records `deployed=true` last). The build and the
+  // UI scripts never see the private key.
+  const ORACLE = ['OCI_TENANCY', 'OCI_USER', 'OCI_FINGERPRINT', 'OCI_PRIVATE_KEY', 'OCI_COMPARTMENT'];
+  const SECRETS_STEP = 'Put the Oracle mail secrets';
+  const stepNamed = (name: string): string[] => {
+    const lines = topLevel(workflow(), 'jobs').split('\n');
+    const start = lines.indexOf(`      - name: ${name}`);
+    expect(start).toBeGreaterThan(-1);
+    const next = lines.findIndex((line, index) => index > start && line.startsWith('      - name: '));
+    return lines.slice(start, next === -1 ? undefined : next).filter((line) => line.trim() !== '');
+  };
+
+  it('keeps every Oracle secret out of the deploy step', () => {
+    expect(stepNamed('Deploy the changed areas to dev').join('\n')).not.toContain('OCI_');
+  });
+
+  it('records that it deployed, as the last line of the deploy step', () => {
+    const step = stepNamed('Deploy the changed areas to dev');
+    expect(step).toContain('        id: deploy');
+    expect(step.at(-1)).toBe('          echo deployed=true >> $GITHUB_OUTPUT');
+  });
+
+  it('puts the secrets in the last step, only after a deploy, from workers/web', () => {
+    const names = topLevel(workflow(), 'jobs')
+      .split('\n')
+      .filter((line) => line.startsWith('      - name: '));
+    expect(names.at(-1)).toBe(`      - name: ${SECRETS_STEP}`);
+    const step = stepNamed(SECRETS_STEP);
+    expect(step).toContain('        if: steps.deploy.outputs.deployed == true');
+    expect(step).toContain('        working-directory: workers/web');
+  });
+
+  it('gives that step only the Cloudflare token and the five Oracle secrets', () => {
+    const step = stepNamed(SECRETS_STEP);
+    expect(step.slice(step.indexOf('        env:') + 1, step.indexOf('        run: |'))).toEqual([
+      '          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}',
+      ...ORACLE.map((name) => `          ${name}: \${{ secrets.${name} }}`),
+    ]);
+  });
+
+  it('runs nothing in that step but the secret puts, stopping by name on a missing one', () => {
+    const step = stepNamed(SECRETS_STEP);
+    expect(step.slice(step.indexOf('        run: |') + 1)).toEqual([
+      `          for name in ${ORACLE.join(' ')}; do`,
+      '            if [ -z ${!name} ]; then',
+      '              echo ::error title=$name missing::Set $name in the dev environment (shyden-labs/ShyTalk#88); until then dev sends no mail.',
+      '              exit 1',
+      '            fi',
+      '            printf %s ${!name} | npx wrangler secret put $name --env dev || { echo ::error title=deploy-dev failed::the dev $name was not set; exit 1; }',
+      '          done',
+    ]);
   });
 
   // Plan 4 Task 2 (shyden-labs/ShyTalk#75): before the Worker deploys, its
@@ -210,12 +265,17 @@ describe('deploy-dev', () => {
     expect(mask).toBeGreaterThan(make);
     expect(put).toBeGreaterThan(mask);
     expect(call).toBeGreaterThan(put);
+    // Only the deployed marker follows it in this step (shyden-labs/ShyTalk#88).
+    const after = step
+      .slice(call)
+      .split('\n')
+      .filter((line) => line.trim() !== '');
     expect(
-      step
-        .slice(call)
-        .split('\n')
-        .filter((line) => line.trim() !== ''),
-    ).toHaveLength(1);
+      after.slice(
+        1,
+        after.findIndex((line) => line.startsWith('      - name: ')),
+      ),
+    ).toEqual(['          echo deployed=true >> $GITHUB_OUTPUT']);
     expect(workflow()).not.toContain('secrets.ANNOUNCE_SECRET');
   });
 
