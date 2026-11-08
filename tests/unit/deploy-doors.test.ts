@@ -14,12 +14,14 @@ const workflow = () => withoutYamlQuotes(withoutYamlComments(readFileSync(WORKFL
 const jobs = () => topLevel(workflow(), 'jobs').split('\n');
 
 describe('deploy-doors', () => {
-  it('runs on a push to main touching the door, and otherwise only by hand', () => {
+  // The door imports packages/mail and packages/environment (ShyTalk#88), so
+  // a change there redeploys it too.
+  it('runs on a push to main touching the door or a package it imports, and otherwise only by hand', () => {
     expect(topLevel(workflow(), 'on').split('\n')).toEqual([
       'on:',
       '  push:',
       '    branches: [main]',
-      '    paths: [workers/door/**, .github/workflows/deploy-doors.yml]',
+      '    paths: [workers/door/**, packages/mail/**, packages/environment/**, .github/workflows/deploy-doors.yml]',
       '  workflow_dispatch:',
     ]);
   });
@@ -47,6 +49,27 @@ describe('deploy-doors', () => {
     const lastCheck = Math.max(text.indexOf('if [ -z $DOOR_SECRET_TEST ]'), text.indexOf('if [ -z $DOOR_SECRET_DEV ]'));
     expect(lastCheck).toBeGreaterThan(-1);
     expect(text.indexOf('npx wrangler deploy')).toBeGreaterThan(lastCheck);
+  });
+
+  // ShyTalk#88: each door sends its environment's mail, so each holds that
+  // environment's mail secret, checked with the door secrets before any deploy.
+  it('checks both mail secrets before deploying either door, failing by name', () => {
+    const text = jobs().join('\n');
+    const lastCheck = Math.max(text.indexOf('if [ -z $MAIL_SECRET_TEST ]'), text.indexOf('if [ -z $MAIL_SECRET_DEV ]'));
+    expect(text.indexOf('if [ -z $MAIL_SECRET_TEST ]')).toBeGreaterThan(-1);
+    expect(text.indexOf('if [ -z $MAIL_SECRET_DEV ]')).toBeGreaterThan(-1);
+    expect(text.indexOf('npx wrangler deploy')).toBeGreaterThan(lastCheck);
+    expect(text).toContain('::error title=MAIL_SECRET_TEST missing::');
+    expect(text).toContain('::error title=MAIL_SECRET_DEV missing::');
+  });
+
+  it.each([
+    ['test', 'MAIL_SECRET_TEST'],
+    ['dev', 'MAIL_SECRET_DEV'],
+  ])('puts the %s mail secret from %s', (name, variable) => {
+    const text = jobs().join('\n');
+    expect(text).toContain(`${variable}: \${{ secrets.${variable} }}`);
+    expect(text).toContain(`printf %s $${variable} | npx wrangler secret put MAIL_SECRET --env ${name} ||`);
   });
 
   it('deploys from the door folder and nothing else', () => {

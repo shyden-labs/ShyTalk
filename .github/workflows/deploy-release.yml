@@ -59,6 +59,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          MAIL_SECRET: ${{ secrets.MAIL_SECRET }}
         run: |
           npm run build:web || { echo "::error title=deploy-release failed::the website did not build"; exit 1; }
           cd workers/web
@@ -108,6 +109,13 @@ jobs:
               exit 1
             fi
             printf '%s' "$DOOR_SECRET" | npx wrangler secret put DOOR_SECRET --env test || { echo "::error title=deploy-release failed::the test door secret was not set"; exit 1; }
+            # shyden-labs/ShyTalk#88: TEST sends through its door with this
+            # secret; PROD sends with its own binding and holds none.
+            if [ -z "$MAIL_SECRET" ]; then
+              echo "::error title=MAIL_SECRET missing::Set MAIL_SECRET in the test environment (shyden-labs/ShyTalk#88), the same value as MAIL_SECRET_TEST in production; until then test mail answers unavailable."
+              exit 1
+            fi
+            printf '%s' "$MAIL_SECRET" | npx wrangler secret put MAIL_SECRET --env test || { echo "::error title=deploy-release failed::the test mail secret was not set"; exit 1; }
           fi
           # Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07): last,
           # every open app hears the newest UI version. Each deploy makes a

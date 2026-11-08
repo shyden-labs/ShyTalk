@@ -12,7 +12,7 @@ name: deploy-doors
 on:
   push:
     branches: [main]
-    paths: ['workers/door/**', '.github/workflows/deploy-doors.yml']
+    paths: ['workers/door/**', 'packages/mail/**', 'packages/environment/**', '.github/workflows/deploy-doors.yml']
   workflow_dispatch:
 
 # A door deploy stopped halfway leaves one door older than the other, so a
@@ -51,6 +51,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET_TEST: ${{ secrets.DOOR_SECRET_TEST }}
           DOOR_SECRET_DEV: ${{ secrets.DOOR_SECRET_DEV }}
+          MAIL_SECRET_TEST: ${{ secrets.MAIL_SECRET_TEST }}
+          MAIL_SECRET_DEV: ${{ secrets.MAIL_SECRET_DEV }}
         run: |
           if [ -z "$DOOR_SECRET_TEST" ]; then
             echo "::error title=DOOR_SECRET_TEST missing::Set DOOR_SECRET_TEST in the production environment (decision 216)."
@@ -60,7 +62,19 @@ jobs:
             echo "::error title=DOOR_SECRET_DEV missing::Set DOOR_SECRET_DEV in the production environment (decision 216)."
             exit 1
           fi
+          # shyden-labs/ShyTalk#88: each door sends its environment's mail
+          # only for a caller holding that environment's mail secret.
+          if [ -z "$MAIL_SECRET_TEST" ]; then
+            echo "::error title=MAIL_SECRET_TEST missing::Set MAIL_SECRET_TEST in the production environment (shyden-labs/ShyTalk#88); the test Worker holds the same value."
+            exit 1
+          fi
+          if [ -z "$MAIL_SECRET_DEV" ]; then
+            echo "::error title=MAIL_SECRET_DEV missing::Set MAIL_SECRET_DEV in the production environment (shyden-labs/ShyTalk#88); the dev Worker holds the same value."
+            exit 1
+          fi
           npx wrangler deploy --env test || { echo "::error title=deploy-doors failed::the test door did not deploy"; exit 1; }
           printf '%s' "$DOOR_SECRET_TEST" | npx wrangler secret put DOOR_SECRET --env test || { echo "::error title=deploy-doors failed::the test door secret was not set"; exit 1; }
+          printf '%s' "$MAIL_SECRET_TEST" | npx wrangler secret put MAIL_SECRET --env test || { echo "::error title=deploy-doors failed::the test mail secret was not set"; exit 1; }
           npx wrangler deploy --env dev || { echo "::error title=deploy-doors failed::the dev door did not deploy"; exit 1; }
           printf '%s' "$DOOR_SECRET_DEV" | npx wrangler secret put DOOR_SECRET --env dev || { echo "::error title=deploy-doors failed::the dev door secret was not set"; exit 1; }
+          printf '%s' "$MAIL_SECRET_DEV" | npx wrangler secret put MAIL_SECRET --env dev || { echo "::error title=deploy-doors failed::the dev mail secret was not set"; exit 1; }

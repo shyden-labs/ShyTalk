@@ -144,6 +144,24 @@ describe('deploy-release', () => {
     expect(step).not.toContain('secret put DOOR_SECRET --env $TARGET');
   });
 
+  // ShyTalk#88: TEST sends through its door with its mail secret; PROD sends
+  // with its own binding and holds none.
+  it('puts the mail secret on TEST only, after the deploy, failing by name when test lacks it', () => {
+    const step = deployStep();
+    const deploy = step.indexOf('npx wrangler deploy --env $TARGET ||');
+    const onlyTest = step.indexOf('if [ $TARGET = test ]; then');
+    const missing = step.indexOf('if [ -z $MAIL_SECRET ]; then');
+    const put = step.indexOf('printf %s $MAIL_SECRET | npx wrangler secret put MAIL_SECRET --env test ||');
+    expect(deploy).toBeGreaterThan(-1);
+    expect(onlyTest).toBeGreaterThan(deploy);
+    expect(missing).toBeGreaterThan(onlyTest);
+    expect(put).toBeGreaterThan(missing);
+    expect(step).toContain('MAIL_SECRET: ${{ secrets.MAIL_SECRET }}');
+    expect(step).toContain('::error title=MAIL_SECRET missing::');
+    expect(step).not.toContain('secret put MAIL_SECRET --env prod');
+    expect(step).not.toContain('secret put MAIL_SECRET --env $TARGET');
+  });
+
   // Plan 4 Task 8 (shyden-labs/ShyTalk#81): as on DEV, last, a fresh masked
   // announce secret is put in the Worker and the Worker is called with it, on
   // TEST and PROD alike (after the TEST-only door block).

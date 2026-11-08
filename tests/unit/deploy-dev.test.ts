@@ -83,9 +83,9 @@ describe('deploy-dev', () => {
     expect(workflow()).not.toContain('deploy-dev is not filled in');
   });
 
-  it('deploys only when the website, its Worker, the migrations, the environment package, the UI document or its publisher changed, or the lockfile or this workflow', () => {
+  it('deploys only when the website, its Worker, the migrations, the environment or mail package, the UI document or its publisher changed, or the lockfile or this workflow', () => {
     expect(deployStep()).toContain(
-      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|packages/ui-document/|manifests/|scripts/publish-ui\\.ts$|scripts/announce-ui\\.ts$|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
+      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|packages/mail/|packages/ui-document/|manifests/|scripts/publish-ui\\.ts$|scripts/announce-ui\\.ts$|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
     );
   });
 
@@ -120,6 +120,20 @@ describe('deploy-dev', () => {
     expect(missing).toBeGreaterThan(deploy);
     expect(put).toBeGreaterThan(missing);
     expect(step).toContain('DOOR_SECRET: ${{ secrets.DOOR_SECRET }}');
+  });
+
+  // ShyTalk#88: dev mail answers unavailable until the Worker holds the
+  // secret its door also holds.
+  it('puts the mail secret after the deploy, and fails naming it when the environment lacks it', () => {
+    const step = deployStep().join('\n');
+    const deploy = step.indexOf('npx wrangler deploy --env dev ||');
+    const missing = step.indexOf('if [ -z $MAIL_SECRET ]; then');
+    const put = step.indexOf('printf %s $MAIL_SECRET | npx wrangler secret put MAIL_SECRET --env dev ||');
+    expect(deploy).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(deploy);
+    expect(put).toBeGreaterThan(missing);
+    expect(step).toContain('MAIL_SECRET: ${{ secrets.MAIL_SECRET }}');
+    expect(step).toContain('::error title=MAIL_SECRET missing::');
   });
 
   // #76: dev app sign-in answers 503 until the Worker holds Better Auth's
