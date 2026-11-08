@@ -83,9 +83,9 @@ describe('deploy-dev', () => {
     expect(workflow()).not.toContain('deploy-dev is not filled in');
   });
 
-  it('deploys only when the website, its Worker, the migrations, the environment package, the UI document or its publisher changed, or the lockfile or this workflow', () => {
+  it('deploys only when the website, its Worker, the migrations, the environment or mail package, the UI document or its publisher changed, or the lockfile or this workflow', () => {
     expect(deployStep()).toContain(
-      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|packages/ui-document/|manifests/|scripts/publish-ui\\.ts$|scripts/announce-ui\\.ts$|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
+      '          if ! grep -qE ^(apps/web/|workers/web/|migrations/|packages/environment/|packages/mail/|packages/ui-document/|manifests/|scripts/publish-ui\\.ts$|scripts/announce-ui\\.ts$|package-lock\\.json$|\\.github/workflows/deploy-dev\\.yml$) changed-files.txt; then',
     );
   });
 
@@ -134,6 +134,35 @@ describe('deploy-dev', () => {
     expect(missing).toBeGreaterThan(deploy);
     expect(put).toBeGreaterThan(missing);
     expect(step).toContain('BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}');
+  });
+
+  // shyden-labs/ShyTalk#88: dev mails through Oracle with its own user's key,
+  // so the deploy puts the five Oracle secrets after the Worker exists, and
+  // stops naming the one the dev environment lacks.
+  const ORACLE = ['OCI_TENANCY', 'OCI_USER', 'OCI_FINGERPRINT', 'OCI_PRIVATE_KEY', 'OCI_COMPARTMENT'];
+
+  it.each(ORACLE)('passes %s from the dev environment to the deploy', (name) => {
+    expect(deployStep().join('\n')).toContain(`          ${name}: \${{ secrets.${name} }}`);
+  });
+
+  it('puts the five Oracle secrets after the deploy and before open apps are told, stopping by name on a missing one', () => {
+    const step = deployStep().join('\n');
+    const deploy = step.indexOf('npx wrangler deploy --env dev ||');
+    const loop = step.indexOf(`for name in ${ORACLE.join(' ')}; do`);
+    const missing = step.indexOf('if [ -z ${!name} ]; then');
+    const named = step.indexOf(
+      'echo ::error title=$name missing::Set $name in the dev environment (shyden-labs/ShyTalk#88); until then dev sends no mail.',
+    );
+    const put = step.indexOf(
+      'printf %s ${!name} | npx wrangler secret put $name --env dev || { echo ::error title=deploy-dev failed::the dev $name was not set; exit 1; }',
+    );
+    const announce = step.indexOf('announce_secret=$(openssl rand -hex 32)');
+    expect(deploy).toBeGreaterThan(-1);
+    expect(loop).toBeGreaterThan(deploy);
+    expect(missing).toBeGreaterThan(loop);
+    expect(named).toBeGreaterThan(missing);
+    expect(put).toBeGreaterThan(named);
+    expect(announce).toBeGreaterThan(put);
   });
 
   // Plan 4 Task 2 (shyden-labs/ShyTalk#75): before the Worker deploys, its

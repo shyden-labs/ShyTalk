@@ -189,6 +189,35 @@ describe('deploy-release', () => {
     expect(onlyTest === -1 || put < onlyTest).toBe(true);
   });
 
+  // shyden-labs/ShyTalk#88: TEST and PROD each mail through Oracle with their
+  // own user's key, held in this run's GitHub environment (PROD's in
+  // production, behind Shyden's approval).
+  const ORACLE = ['OCI_TENANCY', 'OCI_USER', 'OCI_FINGERPRINT', 'OCI_PRIVATE_KEY', 'OCI_COMPARTMENT'];
+
+  it.each(ORACLE)('passes %s from the run environment to the deploy', (name) => {
+    expect(deployStep()).toContain(`          ${name}: \${{ secrets.${name} }}`);
+  });
+
+  it('puts the five Oracle secrets on TEST and PROD after the deploy, stopping by name on a missing one', () => {
+    const step = deployStep();
+    const deploy = step.indexOf('npx wrangler deploy --env $TARGET ||');
+    const loop = step.indexOf(`for name in ${ORACLE.join(' ')}; do`);
+    const missing = step.indexOf('if [ -z ${!name} ]; then');
+    const named = step.indexOf(
+      'echo ::error title=$name missing::Set $name in this runs GitHub environment (shyden-labs/ShyTalk#88); until then $TARGET sends no mail.',
+    );
+    const put = step.indexOf(
+      'printf %s ${!name} | npx wrangler secret put $name --env $TARGET || { echo ::error title=deploy-release failed::the $TARGET $name was not set; exit 1; }',
+    );
+    expect(deploy).toBeGreaterThan(-1);
+    expect(loop).toBeGreaterThan(deploy);
+    expect(missing).toBeGreaterThan(loop);
+    expect(named).toBeGreaterThan(missing);
+    expect(put).toBeGreaterThan(named);
+    // Before the TEST-only door block, so PROD gets them too.
+    expect(step.indexOf('if [ $TARGET = test ]; then')).toBeGreaterThan(put);
+  });
+
   it('never deploys a door', () => {
     expect(workflow()).not.toContain('workers/door');
   });
