@@ -41,7 +41,7 @@ const APPLY = '/api/closed-testing';
 const CONFIRM = `${APPLY}/confirm`;
 
 /** Every application answers no sooner than this, so a known address takes as long as a send. */
-export const ANSWER_FLOOR_MS = 1_500;
+export const ANSWER_FLOOR_MS = 3_000;
 /** No second mail to an address within this long of the last. */
 export const RESEND_WINDOW_MS = 10 * 60_000;
 /** An unconfirmed sign-up, and so its link, lasts this long (design 3 item 4). */

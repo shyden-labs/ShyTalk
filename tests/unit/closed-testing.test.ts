@@ -324,6 +324,11 @@ describe('apply: an address that must not be sent to', () => {
 });
 
 describe('apply: the answer’s time', () => {
+  // One send on DEV took about 1.7 s (shyden-labs/ShyTalk#55, 2026-11-09), past the first floor of 1.5 s.
+  it('waits at least 3 s, well past a measured send', () => {
+    expect(ANSWER_FLOOR_MS).toBe(3_000);
+  });
+
   it('waits only what the send left of the floor', async () => {
     const { env, deps, pauses } = setting();
     let clock = NOW;
