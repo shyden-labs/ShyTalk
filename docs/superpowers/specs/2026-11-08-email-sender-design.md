@@ -36,7 +36,7 @@ ShyTalk sends its own sign-in codes from `no-reply@shytalk.app` through Cloudfla
 - **DMARC:** onboarding writes `_dmarc` records; they are edited to `v=DMARC1; p=quarantine; rua=mailto:dmarc@shyden.co.uk`, moving to `p=reject` after two clean weeks. Reports to another domain need that domain's consent record (RFC 7489 section 7.1): `shytalk.app._report._dmarc.shyden.co.uk TXT "v=DMARC1"`, and the `dmarc@shyden.co.uk` mailbox must exist. Both are in shyden.co.uk's DNS and hosting, outside this repo: Shyden's step.
 - **Reasons:** `sendMail` maps each `E_*` code to a short `reason` (`rate-limit`, `daily-limit`, `suppressed`, `sender-not-verified`, `delivery-failed`, `suspended`, `unavailable`, `invalid`); an unknown code maps to `unknown` with the code kept in the audit row.
 - **Audit:** every send writes one audit row (`mail.sent` or `mail.failed`, with the reason), without the code or the body (as #60 AC3 asks).
-- **Tests:** unit tests stand in the binding and the door's fetch: each `E_*` code to its reason, the door refusing a missing or wrong `MAIL_SECRET`, the door forwarding every other path unchanged, no body in any log line. An integration test in CI sends one mail on dev to a mailbox whose headers are read (SPF, DKIM, DMARC pass).
+- **Tests:** unit tests stand in the binding and the door's fetch: each `E_*` code to its reason, the door refusing a missing or wrong `MAIL_SECRET`, the door forwarding every other path unchanged, no body in any log line. No CI test sends mail (Shyden, 2026-11-08): AC3 is proven by one measured send to a Gmail and an Outlook inbox, headers saved as evidence on #88, so CI needs no mailbox credential and spends none of the shared quota.
 
 ## Steps that are Shyden's (his identity and his consoles)
 
