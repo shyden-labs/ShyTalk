@@ -40,7 +40,10 @@ let pkcs1: string;
 
 beforeAll(() => {
   pkcs8 = generateKeyPairSync('rsa', {
-    modulusLength: 2048,
+    // 1024 bits: the signature path is the same, and making a key takes
+    // 10-40 ms where 2048 bits took up to 1,032 ms (measured 2026-11-08),
+    // past the 1 s hook limit.
+    modulusLength: 1024,
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
     publicKeyEncoding: { type: 'spki', format: 'pem' },
   }).privateKey;

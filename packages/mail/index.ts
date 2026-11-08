@@ -33,7 +33,8 @@ const REASONS: Record<number, MailReason> = {
   503: 'unavailable',
 };
 
-const ERROR_CODE = /^[A-Za-z]+$/;
+/** Oracle's `code`: a plain word, which the submission endpoint leads with the status (`400 MissingParameter`, measured 2026-11-08). */
+const ERROR_CODE = /^(?:\d{3} )?([A-Za-z]+)$/;
 
 const field = (body: unknown, name: string): unknown =>
   typeof body === 'object' && body !== null ? (body as Record<string, unknown>)[name] : undefined;
@@ -42,7 +43,8 @@ const field = (body: unknown, name: string): unknown =>
 export function failureFor(status: number, body: unknown): MailFailure {
   const failure: MailFailure = { ok: false, reason: REASONS[status] ?? 'unknown', status };
   const code = field(body, 'code');
-  return typeof code === 'string' && ERROR_CODE.test(code) ? { ...failure, error: code } : failure;
+  const word = typeof code === 'string' ? ERROR_CODE.exec(code)?.[1] : undefined;
+  return word === undefined ? failure : { ...failure, error: word };
 }
 
 /** The result of a SubmitEmail answer for the one recipient `to`. */
