@@ -13,6 +13,7 @@ import { handleAppApi, isAppApi } from './app/router.ts';
 import { json } from './http.ts';
 import type { RateLimit } from './app/sign-in.ts';
 import type { AnnouncerNamespace } from './app/announcer.ts';
+import type { EmailSender } from '../../../packages/mail/index.ts';
 
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
@@ -36,6 +37,10 @@ export interface WebEnv {
   APPLE_AUDIENCES?: string;
   /** Sign-in attempts per IP (wrangler.json `ratelimits`). */
   SIGN_IN_LIMIT?: RateLimit;
+  /** PROD's mail binding, locked to no-reply@shytalk.app (`mail.ts`, shyden-labs/ShyTalk#88). */
+  EMAIL?: EmailSender;
+  /** TEST and DEV: the secret their door's mail route requires (a Wrangler secret). */
+  MAIL_SECRET?: string;
 }
 
 const ENVIRONMENTS = new Set(['prod', 'test', 'dev']);

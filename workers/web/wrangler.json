@@ -42,6 +42,7 @@
           }
         }
       ],
+      "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["no-reply@shytalk.app"] }],
       "durable_objects": {
         "bindings": [
           {

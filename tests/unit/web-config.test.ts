@@ -99,6 +99,16 @@ describe('app sign-in config', () => {
     expect(environment(name)['durable_objects']).toEqual({ bindings: [{ name: 'ANNOUNCER', class_name: 'Announcer' }] });
   });
 
+  // ShyTalk#88: only PROD holds a mail binding, and it may send only as the live sender;
+  // TEST and DEV send through their door.
+  it('prod may send only as no-reply@shytalk.app', () => {
+    expect(environment('prod')['send_email']).toEqual([{ name: 'EMAIL', allowed_sender_addresses: ['no-reply@shytalk.app'] }]);
+  });
+
+  it.each(['test', 'dev'])('%s holds no mail binding', (name) => {
+    expect(environment(name)['send_email']).toBeUndefined();
+  });
+
   it('creates the Announcer as a SQLite-backed class in its first migration', () => {
     expect(config()['migrations']).toEqual([{ tag: 'v1', new_sqlite_classes: ['Announcer'] }]);
   });
