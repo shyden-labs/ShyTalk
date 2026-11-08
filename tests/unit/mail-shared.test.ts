@@ -43,6 +43,21 @@ describe('failureFor', () => {
     expect(failureFor(400, { code: TO })).toEqual({ ok: false, reason: 'invalid', status: 400 });
   });
 
+  // Measured 2026-11-08 (shyden-labs/ShyTalk#88): the submission endpoint
+  // answers `{"code": "400 MissingParameter", ...}`, the status before the word.
+  it("keeps the word of a code that leads with Oracle's status", () => {
+    expect(failureFor(400, { code: '400 MissingParameter' })).toEqual({
+      ok: false,
+      reason: 'invalid',
+      status: 400,
+      error: 'MissingParameter',
+    });
+  });
+
+  it('keeps no code whose part after the status is not letters only', () => {
+    expect(failureFor(404, { code: `404 ${TO}` })).toEqual({ ok: false, reason: 'sender-not-approved', status: 404 });
+  });
+
   it('never keeps the message, which may echo the address or the code', () => {
     const text = JSON.stringify(failureFor(400, { code: 'InvalidParameter', message: `to ${TO}: 123456` }));
     expect(text).not.toContain(TO);
