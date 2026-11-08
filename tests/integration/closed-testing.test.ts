@@ -228,12 +228,16 @@ describe('confirming', () => {
     expect(await auditCount('applicant.confirmed')).toBe(0);
   });
 
-  it('lets exactly one of 20 confirms at once through, with one audit row', async () => {
-    await apply();
-    const token = tokenIn(mails[0]);
-    const answers = await Promise.all(Array.from({ length: 20 }, () => confirm(token)));
-    expect(answers.filter(({ status }) => status === 200)).toHaveLength(1);
-    expect(answers.filter(({ status }) => status === 410)).toHaveLength(19);
-    expect(await auditCount('applicant.confirmed')).toBe(1);
+  // Ten rounds: this test once failed inside the test proxy when a statement was held across an await (#55).
+  it('lets exactly one of 20 confirms at once through, with one audit row each, ten times over', async () => {
+    for (let round = 0; round < 10; round += 1) {
+      mails = [];
+      await apply(`round-${String(round)}@example.test`);
+      const token = tokenIn(mails[0]);
+      const answers = await Promise.all(Array.from({ length: 20 }, () => confirm(token)));
+      expect(answers.filter(({ status }) => status === 200)).toHaveLength(1);
+      expect(answers.filter(({ status }) => status === 410)).toHaveLength(19);
+      expect(await auditCount('applicant.confirmed')).toBe(round + 1);
+    }
   });
 });

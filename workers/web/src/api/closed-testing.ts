@@ -41,7 +41,7 @@ const APPLY = '/api/closed-testing';
 const CONFIRM = `${APPLY}/confirm`;
 
 /** Every application answers no sooner than this, so a known address takes as long as a send. */
-export const ANSWER_FLOOR_MS = 1_500;
+export const ANSWER_FLOOR_MS = 3_000;
 /** No second mail to an address within this long of the last. */
 export const RESEND_WINDOW_MS = 10 * 60_000;
 /** An unconfirmed sign-up, and so its link, lasts this long (design 3 item 4). */
@@ -167,12 +167,13 @@ async function confirm(request: Request, env: ClosedTestingEnv, deps: ClosedTest
   if (typeof token !== 'string' || token === '') return json(410, { state: 'expired' });
 
   const now = (deps.now ?? Date.now)();
+  const hash = await hashToken(token);
   const { DB } = env;
   // The expiry runs first, so a token past its life finds no row.
   const answers = await DB.batch([
     DB.prepare(EXPIRE_SQL).bind(now - UNCONFIRMED_LIFE_MS),
     auditIfChanged(env, { actor: PUBLIC, action: 'applicant.expired' }),
-    DB.prepare(CONFIRM_SQL).bind(now, await hashToken(token)),
+    DB.prepare(CONFIRM_SQL).bind(now, hash),
     auditIfChanged(env, { actor: PUBLIC, action: 'applicant.confirmed' }),
   ]);
   return changed(answers, 2) ? json(200, { state: 'confirmed' }) : json(410, { state: 'expired' });
