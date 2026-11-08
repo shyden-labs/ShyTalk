@@ -65,19 +65,38 @@ describe('app sign-in config', () => {
   const doorOrigin = (name: string): string => `https://${door.env[name]?.routes[0]?.pattern ?? 'no-door-route'}`;
   const ORIGINS = { prod: 'https://shytalk.app', test: doorOrigin('test'), dev: doorOrigin('dev') };
 
+  // shyden-labs/ShyTalk#88: live mails from Singapore as no-reply@shytalk.app;
+  // dev and test from London as no-reply@ the dev door's host, whose email
+  // domain and approved sender exist in Oracle's London region only.
+  const DEV_SENDER = `no-reply@${door.env['dev']?.routes[0]?.pattern ?? 'no-door-route'}`;
+  const MAIL = {
+    prod: { region: 'ap-singapore-1', from: 'no-reply@shytalk.app' },
+    test: { region: 'uk-london-1', from: DEV_SENDER },
+    dev: { region: 'uk-london-1', from: DEV_SENDER },
+  };
+
   // The audiences Google signs app tokens for, from project `shytalk-app`
   // (made 2026-11-05): Android tokens name the web client, iOS tokens the iOS
   // client. The three Android clients only bind the package to its keys.
   const GOOGLE_WEB = '415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com';
   const GOOGLE_IOS = '415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com';
 
-  it.each(Object.entries(ORIGINS))('%s holds its origin, the client IDs and the bundle ID as vars', (name, origin) => {
-    expect(environment(name)['vars']).toEqual({
-      ENVIRONMENT_NAME: name,
-      SITE_ORIGIN: origin,
-      GOOGLE_CLIENT_IDS: `${GOOGLE_WEB},${GOOGLE_IOS}`,
-      APPLE_AUDIENCES: 'com.shyden.shytalk',
-    });
+  it.each(Object.entries(ORIGINS))(
+    '%s holds its origin, the client IDs, the bundle ID and its mail region and sender as vars',
+    (name, origin) => {
+      expect(environment(name)['vars']).toEqual({
+        ENVIRONMENT_NAME: name,
+        SITE_ORIGIN: origin,
+        GOOGLE_CLIENT_IDS: `${GOOGLE_WEB},${GOOGLE_IOS}`,
+        APPLE_AUDIENCES: 'com.shyden.shytalk',
+        MAIL_REGION: MAIL[name as keyof typeof MAIL].region,
+        MAIL_FROM: MAIL[name as keyof typeof MAIL].from,
+      });
+    },
+  );
+
+  it.each(Object.keys(ORIGINS))('%s holds no Oracle setting as a var: those are secrets', (name) => {
+    expect(Object.keys(environment(name)['vars'] as Config).filter((key) => key.startsWith('OCI_'))).toEqual([]);
   });
 
   it.each(Object.keys(ORIGINS))('%s limits sign-in to 10 a minute', (name) => {
