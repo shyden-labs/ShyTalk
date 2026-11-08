@@ -53,17 +53,13 @@ jobs:
       # 219, 220). A rehearsal only bundles both environments, with no
       # credential.
       - name: Deploy the website
+        id: deploy
         env:
           DEPLOY_REHEARSAL: ${{ github.event_name == 'pull_request' }}
           TARGET: ${{ github.ref == 'refs/heads/main' && 'prod' || 'test' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
-          OCI_USER: ${{ secrets.OCI_USER }}
-          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
-          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
-          OCI_COMPARTMENT: ${{ secrets.OCI_COMPARTMENT }}
         run: |
           npm run build:web || { echo "::error title=deploy-release failed::the website did not build"; exit 1; }
           cd workers/web
@@ -105,15 +101,6 @@ jobs:
             exit 1
           fi
           printf '%s' "$BETTER_AUTH_SECRET" | npx wrangler secret put BETTER_AUTH_SECRET --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET Better Auth secret was not set"; exit 1; }
-          # shyden-labs/ShyTalk#88: TEST and PROD each mail through Oracle
-          # with their own user's key, from this run's GitHub environment.
-          for name in OCI_TENANCY OCI_USER OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_COMPARTMENT; do
-            if [ -z "${!name}" ]; then
-              echo "::error title=$name missing::Set $name in this run's GitHub environment (shyden-labs/ShyTalk#88); until then $TARGET sends no mail."
-              exit 1
-            fi
-            printf '%s' "${!name}" | npx wrangler secret put "$name" --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET $name was not set"; exit 1; }
-          done
           # The TEST origin refuses every request without its door secret
           # (decision 216); PROD has no door.
           if [ "$TARGET" = test ]; then
@@ -131,3 +118,26 @@ jobs:
           echo "::add-mask::$announce_secret"
           printf '%s' "$announce_secret" | npx wrangler secret put ANNOUNCE_SECRET --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET announce secret was not set"; exit 1; }
           (cd "$GITHUB_WORKSPACE" && ANNOUNCE_ENVIRONMENT="$TARGET" ANNOUNCE_SECRET="$announce_secret" node scripts/announce-ui.ts) || { echo "::error title=deploy-release failed::open apps on $TARGET were not told the UI version"; exit 1; }
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+      # shyden-labs/ShyTalk#88: the Oracle mail secrets reach only this last
+      # step, which runs nothing but `wrangler secret put`, and only after the
+      # step above deployed: the build and the UI scripts never see the key.
+      - name: Put the Oracle mail secrets
+        if: steps.deploy.outputs.deployed == 'true'
+        working-directory: workers/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TARGET: ${{ github.ref == 'refs/heads/main' && 'prod' || 'test' }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_COMPARTMENT: ${{ secrets.OCI_COMPARTMENT }}
+        run: |
+          for name in OCI_TENANCY OCI_USER OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_COMPARTMENT; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=$name missing::Set $name in this run's GitHub environment (shyden-labs/ShyTalk#88); until then $TARGET sends no mail."
+              exit 1
+            fi
+            printf '%s' "${!name}" | npx wrangler secret put "$name" --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET $name was not set"; exit 1; }
+          done
