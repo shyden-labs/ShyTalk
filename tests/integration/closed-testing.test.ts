@@ -33,7 +33,11 @@ const deps = (): ClosedTestingDeps => ({
 
 const apply = (email = ANN, locale = 'en'): Promise<Response> =>
   handleClosedTesting(
-    new Request(`${ORIGIN}/api/closed-testing`, { method: 'POST', body: JSON.stringify({ email, adult: true, locale }) }),
+    new Request(`${ORIGIN}/api/closed-testing`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, adult: true, locale }),
+    }),
     env,
     deps(),
   );
@@ -91,7 +95,6 @@ describe('applying', () => {
     expect(mails).toHaveLength(1);
     expect(JSON.stringify(row)).not.toContain(tokenIn(mails[0]));
     expect(await auditCount('applicant.applied')).toBe(1);
-    expect(await auditCount('applicant.confirm_sent')).toBe(1);
     expect(await auditCount('applicant.expired')).toBe(0);
   });
 
@@ -100,6 +103,45 @@ describe('applying', () => {
     clock += 11 * 60_000;
     await apply(ANN);
     expect((await rows()).map(({ email }) => email)).toEqual([ANN]);
+  });
+
+  it('sends one mail for 20 applications at once, however long the sender takes', async () => {
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const slow: ClosedTestingDeps = {
+      ...deps(),
+      send: async (message) => {
+        mails.push(message);
+        await held;
+        return sendResult;
+      },
+    };
+    const request = (): Request =>
+      new Request(`${ORIGIN}/api/closed-testing`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: ANN, adult: true, locale: 'en' }),
+      });
+    const answering = Array.from({ length: 20 }, () => handleClosedTesting(request(), env, slow));
+    // The 19 others answer while the first send is still held.
+    const answers = await Promise.all(
+      answering.map((answer) =>
+        Promise.race([
+          answer,
+          new Promise<null>((resolve) =>
+            setTimeout(() => {
+              resolve(null);
+            }, 2_000),
+          ),
+        ]),
+      ),
+    );
+    release();
+    await Promise.all(answering);
+    expect(answers.filter((answer) => answer?.status === 202)).toHaveLength(19);
+    expect(mails).toHaveLength(1);
   });
 
   it('sends nothing to the same address within 10 minutes, and audits no change', async () => {
@@ -134,7 +176,7 @@ describe('applying', () => {
     sendResult = { ok: false, reason: 'unavailable' };
     expect((await apply()).status).toBe(503);
     expect((await rows())[0]?.confirm_sent_at).toBeNull();
-    expect(await auditCount('applicant.confirm_sent')).toBe(0);
+    expect(await auditCount('applicant.send_failed')).toBe(1);
     sendResult = { ok: true, messageId: 'm-2' };
     expect((await apply()).status).toBe(202);
     expect(mails).toHaveLength(2);

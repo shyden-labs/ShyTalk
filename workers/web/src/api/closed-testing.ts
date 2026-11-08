@@ -13,7 +13,7 @@
 import { LOCALES, localePath, t, type Locale } from '../../../../apps/web/src/i18n/t.ts';
 import { checkMessage, type MailMessage, type MailResult } from '../../../../packages/mail/index.ts';
 import type { RateLimit } from '../app/sign-in.ts';
-import { audit, auditIfChanged, type AuditDatabase } from '../audit.ts';
+import { auditIfChanged, type AuditDatabase } from '../audit.ts';
 import { json } from '../http.ts';
 import { sendMail, type MailEnv } from '../mail.ts';
 
@@ -52,12 +52,17 @@ const STATEMENTS = ['noAccess', 'moreDetails', 'safeList', 'removed', 'retention
 const PUBLIC = 'public';
 
 const EXPIRE_SQL = 'DELETE FROM applicants WHERE confirmed_at IS NULL AND applied_at < ?';
-/** Takes the address unless it is confirmed or was sent to within the window; what it changes says whether to send. */
-const APPLY_SQL = `INSERT INTO applicants (email, locale, applied_at, confirm_hash) VALUES (?, ?, ?, ?)
+/**
+ * Takes the address and claims its send in one write, unless it is confirmed or
+ * was claimed within the window: what it changes says whether to send, so
+ * applications at the same moment send one mail, however long the sender takes.
+ */
+const APPLY_SQL = `INSERT INTO applicants (email, locale, applied_at, confirm_sent_at, confirm_hash) VALUES (?, ?, ?, ?, ?)
   ON CONFLICT (email) DO UPDATE SET locale = excluded.locale, applied_at = excluded.applied_at,
-    confirm_hash = excluded.confirm_hash, confirm_sent_at = NULL
+    confirm_sent_at = excluded.confirm_sent_at, confirm_hash = excluded.confirm_hash
   WHERE confirmed_at IS NULL AND (confirm_sent_at IS NULL OR confirm_sent_at < ?)`;
-const SENT_SQL = 'UPDATE applicants SET confirm_sent_at = ? WHERE email = ?';
+/** A failed send gives its claim back, unless a later application has since made its own. */
+const RELEASE_SQL = 'UPDATE applicants SET confirm_sent_at = NULL WHERE email = ? AND confirm_hash = ?';
 /** Clearing the hash makes the token work once, however many confirms arrive together. */
 const CONFIRM_SQL = 'UPDATE applicants SET confirmed_at = ?, confirm_hash = NULL WHERE confirm_hash = ? AND confirmed_at IS NULL';
 
@@ -125,7 +130,9 @@ async function apply(request: Request, env: ClosedTestingEnv, deps: ClosedTestin
   const { success } = await APPLY_LIMIT.limit({ key: request.headers.get('cf-connecting-ip') ?? 'unknown' });
   if (!success) return json(429, { state: 'slow_down' });
 
-  const application = applicationFrom(await bodyOf(request));
+  // Any other type is one a form on another site could send without a preflight, which this Worker never grants.
+  const isJson = request.headers.get('content-type')?.split(';')[0] === 'application/json';
+  const application = isJson ? applicationFrom(await bodyOf(request)) : null;
   if (application === null) return json(400, { state: 'invalid' });
 
   const now = deps.now ?? Date.now;
@@ -138,20 +145,21 @@ async function apply(request: Request, env: ClosedTestingEnv, deps: ClosedTestin
 
   const { email, locale } = application;
   const token = (deps.token ?? newToken)();
+  const hash = await hashToken(token);
   const { DB } = env;
   const answers = await DB.batch([
     DB.prepare(EXPIRE_SQL).bind(started - UNCONFIRMED_LIFE_MS),
     auditIfChanged(env, { actor: PUBLIC, action: 'applicant.expired' }),
-    DB.prepare(APPLY_SQL).bind(email, locale, started, await hashToken(token), started - RESEND_WINDOW_MS),
+    DB.prepare(APPLY_SQL).bind(email, locale, started, started, hash, started - RESEND_WINDOW_MS),
     auditIfChanged(env, { actor: PUBLIC, action: 'applicant.applied', detail: { language: locale } }),
   ]);
   if (!changed(answers, 2)) return answerAfterFloor(202, 'sent');
 
   const send = deps.send ?? ((message: MailMessage) => sendMail(env, message));
   const sent = await send(confirmMail(application, SITE_ORIGIN, token));
-  if (!sent.ok) return answerAfterFloor(503, 'send_failed');
-  await DB.batch([DB.prepare(SENT_SQL).bind(now(), email), audit(env, { actor: PUBLIC, action: 'applicant.confirm_sent' })]);
-  return answerAfterFloor(202, 'sent');
+  if (sent.ok) return answerAfterFloor(202, 'sent');
+  await DB.batch([DB.prepare(RELEASE_SQL).bind(email, hash), auditIfChanged(env, { actor: PUBLIC, action: 'applicant.send_failed' })]);
+  return answerAfterFloor(503, 'send_failed');
 }
 
 async function confirm(request: Request, env: ClosedTestingEnv, deps: ClosedTestingDeps): Promise<Response> {

@@ -204,6 +204,32 @@ describe('apply: refusals', () => {
   });
 });
 
+describe('apply: from another site', () => {
+  // A page elsewhere can only send JSON after a preflight, which this Worker never grants.
+  it.each(['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data'])(
+    'answers 400 invalid for a %s body a cross-site form could send, storing and sending nothing',
+    async (type) => {
+      const { env, deps, batches, mails } = setting();
+      const request = new Request(`${ORIGIN}/api/closed-testing`, {
+        method: 'POST',
+        headers: { 'content-type': type },
+        body: JSON.stringify(GOOD),
+      });
+      const answer = await handleClosedTesting(request, env, deps);
+      expect(answer.status).toBe(400);
+      expect(batches).toEqual([]);
+      expect(mails).toEqual([]);
+    },
+  );
+
+  it('takes application/json with a charset', async () => {
+    const { env, deps } = setting();
+    const headers = { 'content-type': 'application/json; charset=utf-8' };
+    const request = new Request(`${ORIGIN}/api/closed-testing`, { method: 'POST', headers, body: JSON.stringify(GOOD) });
+    expect((await handleClosedTesting(request, env, deps)).status).toBe(202);
+  });
+});
+
 describe('apply: a new address', () => {
   it('answers 202 sent and sends one mail', async () => {
     const { env, deps, mails } = setting();
@@ -228,6 +254,7 @@ describe('apply: a new address', () => {
       'ann@example.test',
       'en',
       NOW,
+      NOW,
       sha256('raw-token'),
       NOW - RESEND_WINDOW_MS,
     ]);
@@ -249,19 +276,17 @@ describe('apply: a new address', () => {
     const { env, deps, batches } = setting();
     await handleClosedTesting(apply(GOOD), env, deps);
     const rows = audits(batches);
-    expect(rows.map((values) => values[2])).toEqual(['applicant.expired', 'applicant.applied', 'applicant.confirm_sent']);
+    expect(rows.map((values) => values[2])).toEqual(['applicant.expired', 'applicant.applied']);
     for (const values of rows) expect(values[1]).toBe('public');
     expect(JSON.stringify(rows)).not.toContain('ann@example.test');
     expect(find(batches, 'WHERE changes() > 0')).toBeDefined();
   });
 
-  it('records the send, audited, after the mail went', async () => {
+  it('claims the send in its one write, before the mail goes, and writes nothing after', async () => {
     const { env, deps, batches } = setting();
     await handleClosedTesting(apply(GOOD), env, deps);
-    expect(batches).toHaveLength(2);
-    expect(batches[1]?.[0]?.sql).toContain('UPDATE applicants SET confirm_sent_at');
-    expect(batches[1]?.[0]?.values).toEqual([NOW, 'ann@example.test']);
-    expect(batches[1]?.[1]?.values[2]).toBe('applicant.confirm_sent');
+    expect(batches).toHaveLength(1);
+    expect(find(batches, 'INSERT INTO applicants')?.sql).toContain('confirm_sent_at = excluded.confirm_sent_at');
   });
 });
 
@@ -288,7 +313,7 @@ describe('apply: an address that must not be sent to', () => {
     expect(answer.status).toBe(202);
     expect(await answer.json()).toEqual({ state: 'sent' });
     expect(mails).toEqual([]);
-    expect(find(batches, 'confirm_sent_at = ?')).toBeUndefined();
+    expect(batches).toHaveLength(1);
   });
 
   it('waits out the floor, so it takes as long as a send', async () => {
@@ -334,7 +359,10 @@ describe('apply: the sender fails', () => {
     const answer = await handleClosedTesting(apply(GOOD), env, deps);
     expect(answer.status).toBe(503);
     expect(await answer.json()).toEqual({ state: 'send_failed' });
-    expect(find(batches, 'confirm_sent_at = ?')).toBeUndefined();
+    const release = find(batches, 'SET confirm_sent_at = NULL WHERE');
+    expect(release?.values).toEqual(['ann@example.test', sha256('raw-token')]);
+    expect(audits(batches).at(-1)?.[2]).toBe('applicant.send_failed');
+    expect(JSON.stringify(audits(batches))).not.toContain('ann@example.test');
   });
 });
 
