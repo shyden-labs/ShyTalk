@@ -167,12 +167,13 @@ async function confirm(request: Request, env: ClosedTestingEnv, deps: ClosedTest
   if (typeof token !== 'string' || token === '') return json(410, { state: 'expired' });
 
   const now = (deps.now ?? Date.now)();
+  const hash = await hashToken(token);
   const { DB } = env;
   // The expiry runs first, so a token past its life finds no row.
   const answers = await DB.batch([
     DB.prepare(EXPIRE_SQL).bind(now - UNCONFIRMED_LIFE_MS),
     auditIfChanged(env, { actor: PUBLIC, action: 'applicant.expired' }),
-    DB.prepare(CONFIRM_SQL).bind(now, await hashToken(token)),
+    DB.prepare(CONFIRM_SQL).bind(now, hash),
     auditIfChanged(env, { actor: PUBLIC, action: 'applicant.confirmed' }),
   ]);
   return changed(answers, 2) ? json(200, { state: 'confirmed' }) : json(410, { state: 'expired' });
