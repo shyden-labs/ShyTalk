@@ -119,9 +119,12 @@ jobs:
           printf '%s' "$announce_secret" | npx wrangler secret put ANNOUNCE_SECRET --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET announce secret was not set"; exit 1; }
           (cd "$GITHUB_WORKSPACE" && ANNOUNCE_ENVIRONMENT="$TARGET" ANNOUNCE_SECRET="$announce_secret" node scripts/announce-ui.ts) || { echo "::error title=deploy-release failed::open apps on $TARGET were not told the UI version"; exit 1; }
           echo "deployed=true" >> "$GITHUB_OUTPUT"
-      # shyden-labs/ShyTalk#88: the Oracle mail secrets reach only this last
-      # step, which runs nothing but `wrangler secret put`, and only after the
-      # step above deployed: the build and the UI scripts never see the key.
+      # shyden-labs/ShyTalk#88: the Oracle mail secrets are in no other step's
+      # environment; this last step runs only after the step above deployed,
+      # and runs nothing but `wrangler secret put`. It is not a hard boundary:
+      # earlier steps share this runner (files, GITHUB_ENV, GITHUB_PATH), and
+      # they hold the Cloudflare token, which could reach Worker secrets
+      # anyway, so a separate job would cost a runner and protect no more.
       - name: Put the Oracle mail secrets
         if: steps.deploy.outputs.deployed == 'true'
         working-directory: workers/web
