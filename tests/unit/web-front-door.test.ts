@@ -59,6 +59,27 @@ const request = (path: string, secret: string | null = SECRET): Request =>
   new Request(`https://site.example.test${path}`, { headers: secret === null ? {} : { [DOOR_SECRET_HEADER]: secret } });
 
 describe('routing', () => {
+  it('hands the closed-testing form a full D1, whose own route rules then answer', async () => {
+    const { env: e } = env('dev');
+    const response = await handle(request('/api/closed-testing'), {
+      ...e,
+      DB: { ...(e.DB as D1Like), batch: () => Promise.resolve([]) } as D1Like,
+    });
+    expect(response.status).toBe(405);
+  });
+
+  // A marker-only DB is not a full D1, so the form answers 503: reaching it at all is what this shows.
+  it.each(['/api/closed-testing', '/api/closed-testing/confirm'])('sends %s to the closed-testing form', async (path) => {
+    const { env: e, asked } = env('dev');
+    const response = await handle(
+      new Request(`https://site.example.test${path}`, { method: 'POST', headers: { [DOOR_SECRET_HEADER]: SECRET } }),
+      e,
+    );
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ state: 'send_failed' });
+    expect(asked).toEqual([]);
+  });
+
   it('sends /api/* to the API, which answers 404 JSON for now', async () => {
     const { env: e, asked } = env('dev');
     const response = await handle(request('/api/x'), e);

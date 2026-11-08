@@ -29,3 +29,30 @@
 | notFound.title | Page not found | Không tìm thấy trang | Page not found |
 | notFound.body | There is no page at this address. | Không có trang nào ở địa chỉ này. | There are no pages at this address. |
 | notFound.home | Go to the home page | Về trang chủ | Back to homepage |
+| closedTesting.heading | Apply for closed testing | Đăng ký tham gia thử nghiệm kín | Register to participate in the closed-loop trial. |
+| closedTesting.intro | Closed testing lets a small group try the ShyTalk app before it launches. | Thử nghiệm kín cho phép một nhóm nhỏ dùng thử ứng dụng ShyTalk trước khi ra mắt. | Closed testing allows a small group to try out the ShyTalk app before its official launch. |
+| closedTesting.noAccess | Sending this form does not give access to closed testing. | Việc gửi biểu mẫu này không mang lại quyền tham gia thử nghiệm kín. | Submitting this form does not grant you the right to participate in the closed trial. |
+| closedTesting.moreDetails | If you are preliminarily selected, you will be asked for more details. | Nếu bạn được chọn sơ bộ, bạn sẽ được yêu cầu cung cấp thêm thông tin. | If you are shortlisted, you will be asked to provide further information. |
+| closedTesting.safeList | Add support@shytalk.app to your safe list so that messages reach you. | Hãy thêm support@shytalk.app vào danh sách người gửi an toàn để thư đến được với bạn. | Add support@shytalk.app to your list of safe senders so that emails reach you. |
+| closedTesting.removed | If you are not selected, your details are removed. | Nếu bạn không được chọn, thông tin của bạn sẽ bị xóa. | If you are not selected, your information will be deleted. |
+| closedTesting.retention | Your details are kept only until closed testing ends. | Thông tin của bạn chỉ được lưu giữ cho đến khi thử nghiệm kín kết thúc. | Your information will only be retained until the closed-door trial is complete. |
+| closedTesting.emailLabel | Email address | Địa chỉ email | Email address |
+| closedTesting.adultLabel | Tick to confirm you are 18 or older | Đánh dấu để xác nhận bạn từ 18 tuổi trở lên | Check this box to confirm you are 18 years or older. |
+| closedTesting.submit | Send application | Gửi đơn đăng ký | Submit your application |
+| closedTesting.sent | Thank you. If this address still needs confirming, an email with a link is on its way. | Cảm ơn bạn. Nếu địa chỉ này vẫn cần xác nhận, một email kèm liên kết đang được gửi đến bạn. | Thank you. If this address still needs confirmation, an email with a link is being sent to you. |
+| closedTesting.invalid | Enter a valid email address and confirm you are 18 or older. | Hãy nhập địa chỉ email hợp lệ và xác nhận bạn từ 18 tuổi trở lên. | Please enter a valid email address and confirm that you are 18 years or older. |
+| closedTesting.sendFailed | The email could not be sent. Please try again later. | Không thể gửi email. Vui lòng thử lại sau. | Unable to send email. Please try again later. |
+| closedTesting.tooMany | Too many attempts. Please wait a minute and try again. | Có quá nhiều lần thử. Vui lòng đợi một phút rồi thử lại. | There have been too many attempts. Please wait a minute and try again. |
+| closedTesting.noScript | This form needs JavaScript to be turned on. | Biểu mẫu này cần bật JavaScript. | This form requires JavaScript to be enabled. |
+| closedTesting.confirmHeading | Confirm your email | Xác nhận email của bạn | Confirm your email |
+| closedTesting.confirmBody | Press the button to confirm this email address for closed testing. | Nhấn nút để xác nhận địa chỉ email này cho thử nghiệm kín. | Click the button to confirm this email address for the closed trial. |
+| closedTesting.confirmButton | Confirm this email | Xác nhận email này | Confirm this email |
+| closedTesting.confirmFailed | The email address could not be confirmed just now. Please try again later. | Hiện không thể xác nhận địa chỉ email. Vui lòng thử lại sau. | Email address cannot be verified at this time. Please try again later. |
+| closedTesting.confirmedHeading | Email address confirmed | Đã xác nhận địa chỉ email | Email address confirmed |
+| closedTesting.confirmedBody | Thank you. Your address is on the closed testing list. | Cảm ơn bạn. Địa chỉ của bạn đã có trong danh sách thử nghiệm kín. | Thank you. Your address is already on the closed testing list. |
+| closedTesting.expiredHeading | This link has expired | Liên kết này đã hết hạn | This link has expired. |
+| closedTesting.expiredBody | This link has already been used or is more than 48 hours old. | Liên kết này đã được sử dụng hoặc đã quá 48 giờ. | This link has already been used or is over 48 hours old. |
+| closedTesting.expiredApply | Apply again | Đăng ký lại | Register again |
+| closedTesting.mailSubject | Confirm your email for ShyTalk closed testing | Xác nhận email của bạn cho thử nghiệm kín ShyTalk | Confirm your email for the ShyTalk closed trial. |
+| closedTesting.mailIntro | Someone applied for ShyTalk closed testing with this address. To confirm it, open this link and press the button within 48 hours: | Có người đã đăng ký thử nghiệm kín ShyTalk bằng địa chỉ này. Để xác nhận, hãy mở liên kết này và nhấn nút trong vòng 48 giờ: | Someone has already signed up for the ShyTalk closed beta using this address. To confirm, open this link and click the button within 48 hours: |
+| closedTesting.mailIgnore | If this was not you, ignore this email and the address is removed after 48 hours. | Nếu đó không phải là bạn, hãy bỏ qua email này và địa chỉ sẽ bị xóa sau 48 giờ. | If this isn't you, please ignore this email, and the address will be deleted after 48 hours. |

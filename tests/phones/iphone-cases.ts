@@ -24,6 +24,10 @@ export interface SafariPage {
   links(name: string): Promise<number>;
   /** axe's violations on the current page, as `id: node count`. */
   axeViolations(): Promise<string[]>;
+  /** A real tap on the element, through WebDriverAgent. */
+  tap(selector: string): Promise<void>;
+  /** Waits for `selector` to hold exactly `text`, failing at a ceiling and naming what it found. */
+  waitForText(selector: string, text: string): Promise<void>;
 }
 
 export interface IphoneCase {
@@ -42,6 +46,9 @@ const LANGUAGES = [
 /** Playwright's `getByRole('navigation')` and `getByRole('heading', { level: 1 })`, as CSS. */
 const NAV = 'nav, [role="navigation"]';
 const H1 = 'h1, [role="heading"][aria-level="1"]';
+
+const STATEMENTS = ['noAccess', 'moreDetails', 'safeList', 'removed', 'retention'] as const;
+const CONFIRM_BUTTON = '#confirm-button';
 
 /** The checks both "answers" cases share: the page's language and navigation, and no CSP refusal. */
 async function inLanguageWithoutRefusal(page: SafariPage, lang: string): Promise<void> {
@@ -81,6 +88,36 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       run: async (page) => {
         await page.goto(`${prefix}/`);
         assert.deepEqual(await page.axeViolations(), []);
+      },
+    },
+    {
+      title: `${lang}: the closed-testing page shows the form and every statement in ${lang}, passes axe, with no CSP refusal`,
+      run: async (page) => {
+        assert.equal(await page.goto(`${prefix}/closed-testing`), 200);
+        assert.equal(await page.attribute('html', 'lang'), lang);
+        for (const line of STATEMENTS) {
+          const selector = `[data-line="${line}"]`;
+          assert.ok(await page.isVisible(selector), `${line} is not visible`);
+          assert.equal(await page.text(selector), t(locale, `closedTesting.${line}`));
+        }
+        assert.equal(await page.text('label[for="apply-email"]'), t(locale, 'closedTesting.emailLabel'));
+        assert.equal(await page.text('label[for="apply-adult"]'), t(locale, 'closedTesting.adultLabel'));
+        assert.ok(await page.isVisible('#apply-email'), 'no visible email box');
+        assert.ok(await page.isVisible('#apply-adult'), 'no visible age box');
+        assert.equal(await page.text('#apply-submit'), t(locale, 'closedTesting.submit'));
+        assert.deepEqual(await page.axeViolations(), []);
+        assert.deepEqual(await page.cspRefusals(), []);
+      },
+    },
+    {
+      title: `${lang}: the confirm page passes axe, and its button with a dead link shows link-expired in ${lang}, with no CSP refusal`,
+      run: async (page) => {
+        await page.goto(`${prefix}/closed-testing/confirm?t=no-such-link`);
+        assert.deepEqual(await page.axeViolations(), []);
+        assert.equal(await page.text(CONFIRM_BUTTON), t(locale, 'closedTesting.confirmButton'));
+        await page.tap(CONFIRM_BUTTON);
+        await page.waitForText(H1, t(locale, 'closedTesting.expiredHeading'));
+        assert.deepEqual(await page.cspRefusals(), []);
       },
     },
   ];

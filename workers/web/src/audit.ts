@@ -9,6 +9,13 @@ import type { WebEnv } from './web.ts';
 
 export const AUDIT_SQL = 'INSERT INTO audit (at, actor, action, subject, detail, environment) VALUES (?, ?, ?, ?, ?, ?)';
 
+/**
+ * The same row, written only if the statement before it in the batch changed
+ * something, for a write that may rightly change nothing (a token already used).
+ */
+export const AUDIT_IF_CHANGED_SQL =
+  'INSERT INTO audit (at, actor, action, subject, detail, environment) SELECT ?, ?, ?, ?, ?, ? WHERE changes() > 0';
+
 /** The part of a D1 database `audit()` uses; `Statement` is D1's prepared statement. */
 export interface AuditDatabase<Statement> {
   prepare(sql: string): { bind(...values: unknown[]): Statement };
@@ -60,11 +67,10 @@ function forbiddenKey(value: unknown): string | null {
   return null;
 }
 
-/** The audit row for `entry` in this environment, bound and ready to batch. */
-export function audit<Statement>(env: AuditEnv<Statement>, entry: AuditEntry): Statement {
+function auditRow<Statement>(sql: string, env: AuditEnv<Statement>, entry: AuditEntry): Statement {
   const key = forbiddenKey(entry.detail);
   if (key !== null) throw new Error(`audit detail must not hold a key named ${key}`);
-  return env.DB.prepare(AUDIT_SQL).bind(
+  return env.DB.prepare(sql).bind(
     Date.now(),
     entry.actor,
     entry.action,
@@ -72,4 +78,14 @@ export function audit<Statement>(env: AuditEnv<Statement>, entry: AuditEntry): S
     entry.detail === undefined ? null : JSON.stringify(entry.detail),
     env.ENVIRONMENT_NAME,
   );
+}
+
+/** The audit row for `entry` in this environment, bound and ready to batch. */
+export function audit<Statement>(env: AuditEnv<Statement>, entry: AuditEntry): Statement {
+  return auditRow(AUDIT_SQL, env, entry);
+}
+
+/** The audit row for `entry`, landing only if the batch's previous statement changed something. */
+export function auditIfChanged<Statement>(env: AuditEnv<Statement>, entry: AuditEntry): Statement {
+  return auditRow(AUDIT_IF_CHANGED_SQL, env, entry);
 }

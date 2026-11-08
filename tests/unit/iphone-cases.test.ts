@@ -11,6 +11,17 @@ import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 const LOCALE: Record<string, Locale> = { en: 'en', id: 'id', th: 'th', vi: 'vi', 'zh-Hans': 'zh' };
 const PREFIX: Record<string, string> = { en: '', id: '/id', th: '/th', vi: '/vi', 'zh-Hans': '/zh' };
 
+/** What each selector holds on the site as it should be. */
+function selectorText(locale: Locale, selector: string): string {
+  const line = /data-line="(\w+)"/.exec(selector)?.[1];
+  if (line !== undefined) return t(locale, `closedTesting.${line}`);
+  if (selector === 'label[for="apply-email"]') return t(locale, 'closedTesting.emailLabel');
+  if (selector === 'label[for="apply-adult"]') return t(locale, 'closedTesting.adultLabel');
+  if (selector === '#apply-submit') return t(locale, 'closedTesting.submit');
+  if (selector === '#confirm-button') return t(locale, 'closedTesting.confirmButton');
+  return t(locale, 'home.heading');
+}
+
 /** Safari showing the site as it should be, in `lang`; `broken` replaces one answer. */
 function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { visited: string[] } {
   const locale = LOCALE[lang] ?? 'en';
@@ -24,7 +35,9 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     cspRefusals: () => Promise.resolve([]),
     attribute: (selector, name) => Promise.resolve(selector === 'html' && name === 'lang' ? lang : null),
     isVisible: () => Promise.resolve(true),
-    text: () => Promise.resolve(t(locale, 'home.heading')),
+    text: (selector) => Promise.resolve(selectorText(locale, selector)),
+    tap: () => Promise.resolve(),
+    waitForText: () => Promise.resolve(),
     visibleLinks: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     axeViolations: () => Promise.resolve([]),
@@ -81,5 +94,67 @@ describe('the iPhone cases', () => {
 
   it.each(cases('the home page passes axe').map((c) => [c.title, c] as const))('%s: fails on any axe violation', async (_, c) => {
     await expect(c.run(safari(langOf(c.title), { axeViolations: () => Promise.resolve(['color-contrast: 1']) }))).rejects.toThrow();
+  });
+
+  const named = (start: string) => cases(start).map((c) => [c.title, c] as const);
+
+  it('holds both closed-testing cases in every language', () => {
+    expect(named('the closed-testing page shows')).toHaveLength(5);
+    expect(named('the confirm page')).toHaveLength(5);
+  });
+
+  it.each(named('the closed-testing page shows'))('%s: fails on anything but 200', async (_, c) => {
+    await expect(c.run(safari(langOf(c.title), { goto: () => Promise.resolve(404) }))).rejects.toThrow();
+  });
+
+  it.each(named('the closed-testing page shows'))('%s: fails when a statement is hidden', async (_, c) => {
+    const hidden = (selector: string): Promise<boolean> => Promise.resolve(!selector.includes('retention'));
+    await expect(c.run(safari(langOf(c.title), { isVisible: hidden }))).rejects.toThrow('retention');
+  });
+
+  it.each(named('the closed-testing page shows'))('%s: fails when a statement holds other words', async (_, c) => {
+    await expect(c.run(safari(langOf(c.title), { text: () => Promise.resolve('other words') }))).rejects.toThrow();
+  });
+
+  it.each(named('the closed-testing page shows'))('%s: fails on a CSP refusal', async (_, c) => {
+    await expect(c.run(safari(langOf(c.title), { cspRefusals: () => Promise.resolve(['refused']) }))).rejects.toThrow();
+  });
+
+  it.each(named('the closed-testing page shows'))('%s: fails on any axe violation', async (_, c) => {
+    await expect(c.run(safari(langOf(c.title), { axeViolations: () => Promise.resolve(['label: 1']) }))).rejects.toThrow();
+  });
+
+  it.each(named('the confirm page'))('%s: fails on any axe violation', async (_, c) => {
+    await expect(c.run(safari(langOf(c.title), { axeViolations: () => Promise.resolve(['label: 1']) }))).rejects.toThrow();
+  });
+
+  it.each(named('the confirm page'))('%s: taps the button, then waits for the expired heading', async (_, c) => {
+    const lang = langOf(c.title);
+    const tapped: string[] = [];
+    const waited: [string, string][] = [];
+    await c.run(
+      safari(lang, {
+        tap: (selector) => {
+          tapped.push(selector);
+          return Promise.resolve();
+        },
+        waitForText: (selector, text) => {
+          waited.push([selector, text]);
+          return Promise.resolve();
+        },
+      }),
+    );
+    expect(tapped).toEqual(['#confirm-button']);
+    expect(waited[0]?.[1]).toBe(t(LOCALE[lang] ?? 'en', 'closedTesting.expiredHeading'));
+  });
+
+  it.each(named('the confirm page'))('%s: fails when the heading never comes', async (_, c) => {
+    await expect(c.run(safari(langOf(c.title), { waitForText: () => Promise.reject(new Error('no heading')) }))).rejects.toThrow(
+      'no heading',
+    );
+  });
+
+  it.each(named('the confirm page'))('%s: fails on a CSP refusal', async (_, c) => {
+    await expect(c.run(safari(langOf(c.title), { cspRefusals: () => Promise.resolve(['refused']) }))).rejects.toThrow();
   });
 });

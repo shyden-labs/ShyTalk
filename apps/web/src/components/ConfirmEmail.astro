@@ -1,0 +1,59 @@
+---
+import Base from '../layouts/Base.astro';
+import { localePath, t, type Locale } from '../i18n/t.ts';
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const line = (key: string): string => t(locale, `closedTesting.${key}`);
+---
+
+<Base locale={locale} title={line('confirmHeading')}>
+  <h1>{line('confirmHeading')}</h1>
+  <p>{line('confirmBody')}</p>
+  <noscript><p>{line('noScript')}</p></noscript>
+  <p>
+    <button
+      id="confirm-button"
+      type="button"
+      data-confirmed={localePath(locale, '/closed-testing/confirmed')}
+      data-expired={localePath(locale, '/closed-testing/link-expired')}
+    >
+      {line('confirmButton')}
+    </button>
+  </p>
+  <p id="confirm-answer" role="status" hidden>{line('confirmFailed')}</p>
+</Base>
+
+<script>
+  import { confirmTarget } from '../closed-testing/answers.ts';
+
+  const button = document.querySelector<HTMLButtonElement>('#confirm-button');
+  const failed = document.querySelector<HTMLElement>('#confirm-answer');
+
+  async function statusOf(token: string): Promise<number> {
+    try {
+      const response = await fetch('/api/closed-testing/confirm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ t: token }) });
+      return response.status;
+    } catch {
+      return 0;
+    }
+  }
+
+  // Only this press confirms: opening the link, as mail scanners do, changes nothing.
+  if (button && failed) {
+    button.addEventListener('click', () => {
+      button.disabled = true;
+      void statusOf(new URLSearchParams(location.search).get('t') ?? '').then((status) => {
+        const target = confirmTarget(status);
+        if (target === null) {
+          failed.hidden = false;
+          button.disabled = false;
+          return;
+        }
+        location.assign((target === 'confirmed' ? button.dataset['confirmed'] : button.dataset['expired']) ?? '/');
+      });
+    });
+  }
+</script>

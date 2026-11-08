@@ -29,3 +29,30 @@
 | notFound.title | Page not found | 找不到页面 | Page Not Found |
 | notFound.body | There is no page at this address. | 此地址没有页面。 | No pages are available at this address. |
 | notFound.home | Go to the home page | 返回首页 | Return to homepage |
+| closedTesting.heading | Apply for closed testing | 申请封闭测试 | Apply for closed testing |
+| closedTesting.intro | Closed testing lets a small group try the ShyTalk app before it launches. | 封闭测试让一小部分人在 ShyTalk 应用发布前抢先试用。 | The closed beta test allowed a small group of people to try out the ShyTalk app before its official release. |
+| closedTesting.noAccess | Sending this form does not give access to closed testing. | 提交此表单并不代表获得封闭测试资格。 | Submitting this form does not guarantee access to the closed beta test. |
+| closedTesting.moreDetails | If you are preliminarily selected, you will be asked for more details. | 如果您通过初步筛选，将需要提供更多信息。 | If you pass the initial screening, you will need to provide more information. |
+| closedTesting.safeList | Add support@shytalk.app to your safe list so that messages reach you. | 请将 support@shytalk.app 加入安全发件人名单，以确保能收到邮件。 | Please add support@shytalk.app to your secure sender list to ensure you receive emails. |
+| closedTesting.removed | If you are not selected, your details are removed. | 如果您未入选，您的信息将被删除。 | If you are not selected, your information will be deleted. |
+| closedTesting.retention | Your details are kept only until closed testing ends. | 您的信息仅保留到封闭测试结束。 | Your information will only be retained until the closed test ends. |
+| closedTesting.emailLabel | Email address | 电子邮箱地址 | Email address |
+| closedTesting.adultLabel | Tick to confirm you are 18 or older | 勾选以确认您已年满 18 岁 | Check the box to confirm you are 18 years of age or older. |
+| closedTesting.submit | Send application | 提交申请 | Submit an application |
+| closedTesting.sent | Thank you. If this address still needs confirming, an email with a link is on its way. | 谢谢。如果此地址仍需确认，一封带链接的邮件正在发送给您。 | Thank you. If you still need to confirm this address, an email with a link is being sent to you. |
+| closedTesting.invalid | Enter a valid email address and confirm you are 18 or older. | 请输入有效的电子邮箱地址，并确认您已年满 18 岁。 | Please enter a valid email address and confirm that you are 18 years of age or older. |
+| closedTesting.sendFailed | The email could not be sent. Please try again later. | 邮件无法发送。请稍后再试。 | The email could not be sent. Please try again later. |
+| closedTesting.tooMany | Too many attempts. Please wait a minute and try again. | 尝试次数过多。请等待一分钟后再试。 | Too many attempts. Please wait one minute before trying again. |
+| closedTesting.noScript | This form needs JavaScript to be turned on. | 此表单需要启用 JavaScript。 | This form requires JavaScript to be enabled. |
+| closedTesting.confirmHeading | Confirm your email | 确认您的电子邮箱 | Confirm your email address |
+| closedTesting.confirmBody | Press the button to confirm this email address for closed testing. | 请按下按钮，为封闭测试确认此电子邮箱地址。 | Please press the button to confirm this email address for the closed test. |
+| closedTesting.confirmButton | Confirm this email | 确认此电子邮箱 | Confirm this email address |
+| closedTesting.confirmFailed | The email address could not be confirmed just now. Please try again later. | 目前无法确认此电子邮箱地址。请稍后再试。 | This email address cannot be verified at this time. Please try again later. |
+| closedTesting.confirmedHeading | Email address confirmed | 电子邮箱地址已确认 | The email address has been confirmed. |
+| closedTesting.confirmedBody | Thank you. Your address is on the closed testing list. | 谢谢。您的地址已在封闭测试名单中。 | Thank you. Your address is already on the closed testing list. |
+| closedTesting.expiredHeading | This link has expired | 此链接已过期 | This link has expired. |
+| closedTesting.expiredBody | This link has already been used or is more than 48 hours old. | 此链接已被使用过，或发出已超过 48 小时。 | This link has been used or was posted more than 48 hours ago. |
+| closedTesting.expiredApply | Apply again | 重新申请 | Reapply |
+| closedTesting.mailSubject | Confirm your email for ShyTalk closed testing | 确认您的电子邮箱以参加 ShyTalk 封闭测试 | Please confirm your email address to participate in the ShyTalk closed beta. |
+| closedTesting.mailIntro | Someone applied for ShyTalk closed testing with this address. To confirm it, open this link and press the button within 48 hours: | 有人使用此地址申请了 ShyTalk 封闭测试。如需确认，请在 48 小时内打开此链接并按下按钮： | Someone has used this address to apply for the ShyTalk closed beta. To confirm, please open this link and press the button within 48 hours: |
+| closedTesting.mailIgnore | If this was not you, ignore this email and the address is removed after 48 hours. | 如果这不是您本人，请忽略此邮件，此地址将在 48 小时后被删除。 | If this is not you, please ignore this email. This address will be deleted in 48 hours. |

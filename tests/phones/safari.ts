@@ -35,6 +35,13 @@ return el ? (el.textContent ?? '').replace(/\\s+/g, ' ').trim() : null;`;
 const AXE = `const done = arguments[arguments.length - 1];
 axe.run(document).then((r) => done(r.violations.map((v) => ({ id: v.id, nodes: v.nodes.length }))));`;
 
+/** How long a page may take to show what a tap leads to, and how often it is looked at meanwhile. */
+const TEXT_CEILING_MS = 15_000;
+const TEXT_LOOK_MS = 250;
+
+/** The W3C WebDriver key of an element's id in a find answer. */
+const ELEMENT = 'element-6066-11e4-a52e-4f735466cecf';
+
 /** How long axe may take on a page before WebDriver gives up on it. */
 const AXE_TIMEOUT_MS = 60_000;
 const AXE_FILE = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
@@ -56,6 +63,7 @@ export function safariPage(
   base: string,
   read: (file: string) => string = (file) => readFileSync(file, 'utf8'),
   token: () => string = visitTokens(),
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 ): SafariPage {
   const at = `/session/${session}`;
   const log = async (type: 'safariNetwork' | 'safariConsole') =>
@@ -110,6 +118,19 @@ export function safariPage(
       await call('POST', `${at}/timeouts`, { script: AXE_TIMEOUT_MS });
       const violations = (await call('POST', `${at}/execute/async`, { script: AXE, args: [] })) as { id: string; nodes: number }[];
       return violations.map(({ id, nodes }) => `${id}: ${String(nodes)}`);
+    },
+    async tap(selector) {
+      const found = (await call('POST', `${at}/element`, { using: 'css selector', value: selector })) as Record<string, string>;
+      await call('POST', `${at}/element/${String(found[ELEMENT])}/click`, {});
+    },
+    async waitForText(selector, text) {
+      let seen: unknown = null;
+      for (let waited = 0; waited <= TEXT_CEILING_MS; waited += TEXT_LOOK_MS) {
+        seen = await run(TEXT, selector);
+        if (seen === text) return;
+        await wait(TEXT_LOOK_MS);
+      }
+      throw new Error(`${selector} held ${JSON.stringify(seen)}, not ${JSON.stringify(text)}, after ${String(TEXT_CEILING_MS)} ms`);
     },
   };
 }

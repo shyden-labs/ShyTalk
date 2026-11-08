@@ -94,6 +94,22 @@ describe('mailEndpoint', () => {
   });
 });
 
+describe('the CI smoke’s stand-in for Oracle (MAIL_ENDPOINT)', () => {
+  const STAND_IN = 'http://127.0.0.1:8788/submit';
+
+  it.each(['dev', 'test'] as const)('%s posts to it when it is set', async (name) => {
+    const stand = oracle(accepted);
+    await sendMail(environment({ ENVIRONMENT_NAME: name, MAIL_ENDPOINT: STAND_IN }).env, MESSAGE, clock);
+    expect(sentRequest(stand).url).toBe(STAND_IN);
+  });
+
+  it('prod ignores it, so mail can never be turned aside on the live site', async () => {
+    const stand = oracle(accepted);
+    await sendMail(environment({ ENVIRONMENT_NAME: 'prod', MAIL_ENDPOINT: STAND_IN }).env, MESSAGE, clock);
+    expect(sentRequest(stand).url).toBe(mailEndpoint('uk-london-1').href);
+  });
+});
+
 describe('sendMail', () => {
   it("posts the SubmitEmail body once to the region's endpoint", async () => {
     const stand = oracle(accepted);
