@@ -229,7 +229,7 @@ describe('confirming', () => {
   });
 
   // Ten rounds: this test once failed inside the test proxy when a statement was held across an await (#55).
-  it('lets exactly one of 20 confirms at once through, with one audit row each, ten times over', async () => {
+  it.each([...Array(40).keys()])('lets exactly one of 20 confirms at once through, repeat %i', async () => {
     for (let round = 0; round < 10; round += 1) {
       mails = [];
       await apply(`round-${String(round)}@example.test`);
