@@ -60,6 +60,12 @@ describe('the legal text', () => {
     }
   });
 
+  it.each(LEGAL_DOCS)('%s has words under every heading', (doc) => {
+    const blocks = legalBlocks(legalLines('en')[doc]);
+    const bare = blocks.filter(({ kind }, at) => kind === 'heading' && (at === blocks.length - 1 || blocks[at + 1]?.kind === 'heading'));
+    expect(bare).toEqual([]);
+  });
+
   it('holds the same keys, in the same order, in English and Indonesian', () => {
     expect(JSON.stringify(legalLines('id'), (_key, value: unknown) => (typeof value === 'string' ? '' : value))).toBe(
       JSON.stringify(legalLines('en'), (_key, value: unknown) => (typeof value === 'string' ? '' : value)),
