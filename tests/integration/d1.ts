@@ -27,6 +27,49 @@ export interface LocalDevEnv {
 }
 
 /**
+ * Miniflare's proxy frees a statement's address once garbage collection
+ * finalises it, and a statement given to `batch` is unreachable as soon as the
+ * call returns, while its request can still be queued behind others
+ * (shyden-labs/ShyTalk#159: 5 of 40 runs of 20 confirms at once). So every
+ * statement stays reachable until the proxy is disposed.
+ */
+class KeptStatement implements D1Statement {
+  readonly proxied: D1Statement;
+  private readonly kept: D1Statement[];
+
+  constructor(proxied: D1Statement, kept: D1Statement[]) {
+    this.proxied = proxied;
+    this.kept = kept;
+    kept.push(proxied);
+  }
+
+  bind(...values: unknown[]): D1Statement {
+    return new KeptStatement(this.proxied.bind(...values), this.kept);
+  }
+
+  run(): Promise<unknown> {
+    return this.proxied.run();
+  }
+
+  first<T>(): Promise<T | null> {
+    return this.proxied.first<T>();
+  }
+
+  all<T = Record<string, unknown>>(): Promise<D1Result<T>> {
+    return this.proxied.all<T>();
+  }
+}
+
+function keepingStatements(db: D1): D1 {
+  const kept: D1Statement[] = [];
+  return {
+    prepare: (sql) => new KeptStatement(db.prepare(sql), kept),
+    batch: <T = unknown>(statements: D1Statement[]) => db.batch<T>(statements.map((statement) => (statement as KeptStatement).proxied)),
+    exec: (sql) => db.exec(sql),
+  };
+}
+
+/**
  * Wrangler's `getPlatformProxy`, typed here: Wrangler's own declarations pull
  * in miniflare's, which need @cloudflare/workers-types and more that this
  * repository does not install, and lib checks are on. Loaded through a
@@ -54,5 +97,5 @@ export async function localDev(): Promise<{ env: LocalDevEnv; dispose: () => Pro
     persist: { path: join(inject('d1Persist'), 'v3') },
     remoteBindings: false,
   });
-  return { env: proxy.env, dispose: proxy.dispose };
+  return { env: { ...proxy.env, DB: keepingStatements(proxy.env.DB) }, dispose: proxy.dispose };
 }
