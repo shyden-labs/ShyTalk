@@ -1,6 +1,6 @@
 # Passkeys, TOTP backup and recovery codes: design (shyden-labs/ShyTalk#134)
 
-Status: DRAFT, written 2026-11-09 while Shyden was away. Not approved. Questions for him are at the end.
+Status: DRAFT, written 2026-11-09. Its questions were answered 2026-11-10 (end of file); it is reviewed and approved before the plan is written.
 
 ## Intent
 
@@ -20,7 +20,7 @@ Everyday sign-in to ShyTalk is free, quick and needs no email (Shyden, 2026-11-0
 
 - Email codes and email recovery: #133.
 - The staff TOTP gate: #61. It reuses this TOTP store (see below) and is not built here.
-- The app's screens. The app shell (epic #11) is not built yet. This ticket ships the server API and the website's passkey pages.
+- The app's screens and the `.well-known` app files: shyden-labs/ShyTalk#166 under the app shell (epic #11). This ticket ships the server API and the website's passkey pages.
 - Passwords. ShyTalk has none and this adds none.
 
 ## Anti-goals
@@ -40,11 +40,11 @@ Everyday sign-in to ShyTalk is free, quick and needs no email (Shyden, 2026-11-0
 ### Passkeys: Better Auth's passkey plugin (builder's call, recorded)
 
 - `rpID` is the environment's own host (`shytalk.app`, `dev.shytalk.app`, `test.shytalk.app`), so a dev passkey never works on prod.
-- `origin` lists `SITE_ORIGIN` plus the Android app origins from a new var `ANDROID_APK_ORIGINS` (empty until Shyden supplies the certificate hashes).
+- `origin` is `SITE_ORIGIN` alone. The Android app origins (`ANDROID_APK_ORIGINS`) come with shyden-labs/ShyTalk#166.
 - `userVerification: "required"`: the phone's biometric step or PIN is asked every time.
 - Registration needs a session, except during sign-up (#133), where `resolveUser` admits only the user whose sign-up is in progress. Until #133 lands, `requireSession` stays true.
 - The challenge is stored server-side, used once and expires in 300 s (the plugin's behaviour, checked by a test: replaying an answer gets 401).
-- The Worker serves `/.well-known/assetlinks.json` and `/.well-known/apple-app-site-association` from vars. Each is a 404 until its values exist, never a placeholder.
+- The `/.well-known/assetlinks.json` and `/.well-known/apple-app-site-association` files come with shyden-labs/ShyTalk#166, not here.
 
 ### TOTP and recovery codes: ShyTalk's own endpoints (builder's call, recorded)
 
@@ -78,13 +78,13 @@ Actions: `method.add`, `method.remove`, `method.use` (detail: kind and passkey i
 
 - Unit: everything above with mocks (TOTP steps, the code clash, the last-method rule, hashing, the challenge used once).
 - Integration (CI, real D1 via Miniflare): every endpoint's happy and refused paths.
-- Real phones: a passkey registered and used on the OnePlus (Chrome) and the iPhone Air (Safari) against `dev.shytalk.app`, through the website's own passkey page, by real touches. The app's own passkey proof belongs to the app shell (see question 1).
+- Real phones: a passkey registered and used on the OnePlus (Chrome) and the iPhone Air (Safari) against `dev.shytalk.app`, through the website's own passkey page, by real touches. The app's own passkey proof is shyden-labs/ShyTalk#166.
 
 ## Left to the builder
 
 Names, file layout, the website page's look (it follows the existing `ui-document` style), the TOTP library (`@better-auth/utils/otp`, already installed with Better Auth, preferred over a new dependency).
 
-## Questions for Shyden (parked 2026-11-09)
+## Questions for Shyden (parked 2026-11-09, answered 2026-11-10)
 
-1. **Phone proof of goal 1.** The app shell is not built (epic #11, P3), so the app cannot make a passkey yet. My recommendation: ship the server and the website's passkey page now, prove passkeys on both phones' browsers against dev, and file an app-side ticket ("the app registers and uses passkeys") under epic #11 to do the in-app proof. The alternative is that #134 waits for the app shell, and #133 and its chain wait with it.
-2. **Android and iOS identity values** for the `.well-known` files: the Play app-signing certificate's SHA-256 (Play Console, App integrity) and the Apple Team ID (developer.apple.com, Membership). They are needed only for the app-side ticket in question 1. Both are public values.
+1. **Phone proof of goal 1: answered.** Shyden, 2026-11-10: ship the server and the website's passkey page now and prove passkeys on both phones' browsers against dev (the phones are free in the evening). The in-app proof is shyden-labs/ShyTalk#166 under epic #11.
+2. **Android and iOS identity values** (the Play app-signing certificate's SHA-256 and the Apple Team ID): moved to shyden-labs/ShyTalk#166, the only ticket that needs them.
