@@ -60,13 +60,17 @@ export function licenceProblems(lock: Lockfile, exceptions: Exception[] = EXCEPT
     const excepted = exceptions.some((exception) => exception.name.test(packageName(path)));
     if (typeof licence !== 'string' || licence.trim() === '') {
       problems.push(`${path}: no licence recorded`);
-    } else if (/[()]/.test(licence)) {
+      continue;
+    }
+    // One pair of brackets around the whole expression changes nothing.
+    const bare = /^\(([^()]*)\)$/.exec(licence)?.[1] ?? licence;
+    if (/[()]/.test(bare)) {
       problems.push(`${path}: ${licence} has brackets; read it by hand`);
-    } else if (allowed(licence, [PERMISSIVE])) {
+    } else if (allowed(bare, [PERMISSIVE])) {
       continue;
     } else if (!excepted) {
       problems.push(`${path}: ${licence} is not permissive and has no exception`);
-    } else if (!allowed(licence, [PERMISSIVE, WEAK_COPYLEFT])) {
+    } else if (!allowed(bare, [PERMISSIVE, WEAK_COPYLEFT])) {
       problems.push(`${path}: ${licence} is not allowed, even with an exception`);
     }
   }
