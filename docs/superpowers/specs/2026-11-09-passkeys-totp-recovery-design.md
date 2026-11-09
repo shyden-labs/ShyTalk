@@ -1,0 +1,90 @@
+# Passkeys, TOTP backup and recovery codes: design (shyden-labs/ShyTalk#134)
+
+Status: DRAFT, written 2026-11-09 while Shyden was away. Not approved. Questions for him are at the end.
+
+## Intent
+
+Everyday sign-in to ShyTalk is free, quick and needs no email (Shyden, 2026-11-08). A member signs in with a passkey (Face ID or fingerprint). If their device cannot hold a passkey, they use an authenticator app instead (TOTP). One-time recovery codes are the first way back. Email recovery after a 24-hour wait (#133) is the last. A session, once started, lasts until someone ends it on purpose.
+
+## Goals (the ticket's acceptance criteria)
+
+1. Passkeys (WebAuthn): register, then sign in, on Android and iPhone. The server keeps only the public key. Each sign-in answers a fresh one-time challenge. A replayed or wrong answer gets 401.
+2. TOTP (RFC 6238, 6 digits, 30 s) for members without a passkey. The secret is stored encrypted, a code already used is refused, and tries are rate-limited.
+3. Ten one-time recovery codes, shown once and stored only hashed. Making a new set ends the old one.
+4. A member lists and removes passkeys and the authenticator from any signed-in device. The last sign-in method cannot be removed without adding another first.
+5. Sessions never end through age or disuse. They end only by sign-out, a revoke from another device, staff, or a completed recovery (#133).
+6. A member sees every signed-in device and revokes any of them. A revoked device's next request gets 401.
+7. Every method added, removed or used, every recovery code used, and every session ended writes an audit row with no secret in it.
+
+## Non-goals
+
+- Email codes and email recovery: #133.
+- The staff TOTP gate: #61. It reuses this TOTP store (see below) and is not built here.
+- The app's screens. The app shell (epic #11) is not built yet. This ticket ships the server API and the website's passkey pages.
+- Passwords. ShyTalk has none and this adds none.
+
+## Anti-goals
+
+- Never a secret in a log, an audit row or a response after setup: no TOTP seed, recovery code or challenge.
+- No member is ever locked out by this ticket alone: the last-method rule (goal 4) holds on every path.
+
+## Constraints (measured 2026-11-09)
+
+- The Worker runs Better Auth 1.7.17 on D1 with the `bearer` plugin. Sign-in rows go to `audit` (append-only) after the session, and the session is deleted if that write fails (decision 222, `workers/web/src/app/sign-in.ts`).
+- `@better-auth/passkey@1.7.17`: MIT, built on `@simplewebauthn/server` 13 (MIT). It supports `rpID`, a list of `origin`s, and registration without a session through `requireSession: false` and `resolveUser`.
+- Better Auth's `two-factor` plugin is a SECOND step after another sign-in, and it stores backup codes plain or encrypted, never hashed (`types.d.mts`, `backup-codes/index.d.mts`). It cannot meet goal 2 (TOTP as a sign-in method in its own right) or goal 3 (hashed codes) as shipped.
+- The app is React Native + Expo (spec 2026-10-24). On Android, a passkey made by the app reports an origin of `android:apk-key-hash:<base64url SHA-256 of the signing certificate>`, and the domain must publish `/.well-known/assetlinks.json` with `delegate_permission/common.get_login_creds`. On iOS, the domain must publish `/.well-known/apple-app-site-association` with `webcredentials.apps: ["<TeamID>.com.shyden.shytalk"]`. Neither value is in this repo.
+
+## Design
+
+### Passkeys: Better Auth's passkey plugin (builder's call, recorded)
+
+- `rpID` is the environment's own host (`shytalk.app`, `dev.shytalk.app`, `test.shytalk.app`), so a dev passkey never works on prod.
+- `origin` lists `SITE_ORIGIN` plus the Android app origins from a new var `ANDROID_APK_ORIGINS` (empty until Shyden supplies the certificate hashes).
+- `userVerification: "required"`: the phone's biometric step or PIN is asked every time.
+- Registration needs a session, except during sign-up (#133), where `resolveUser` admits only the user whose sign-up is in progress. Until #133 lands, `requireSession` stays true.
+- The challenge is stored server-side, used once and expires in 300 s (the plugin's behaviour, checked by a test: replaying an answer gets 401).
+- The Worker serves `/.well-known/assetlinks.json` and `/.well-known/apple-app-site-association` from vars. Each is a 404 until its values exist, never a placeholder.
+
+### TOTP and recovery codes: ShyTalk's own endpoints (builder's call, recorded)
+
+The two-factor plugin cannot do it (see Constraints), so the Worker has its own small module on Better Auth's adapter and session creation.
+
+- **Table `sign_in_method`:** `id`, `user_id`, `kind` (`totp`), `secret_enc` (AES-GCM, with a key derived from a new Wrangler secret `TOTP_KEY`, separate from `BETTER_AUTH_SECRET`), `last_step` (the last 30 s step accepted, so a used code is refused), `created_at`. One TOTP per member.
+- **Table `recovery_code`:** `user_id`, `set_id`, `hash` (SHA-256 of a 16-character Crockford base32 code, 80 random bits, shown as four groups of four; at 80 bits a slow hash adds nothing), `used_at`. A new set deletes the old set's rows in the same batch as its audit row.
+- **Setup (`POST /api/app/totp/setup`, session required):** answers the `otpauth://` URI once. It stays pending until `POST /api/app/totp/confirm {code}` proves the app holds it. Then it is live, and the first setup of any method also issues the recovery codes.
+- **Sign-in (`POST /api/app/sign-in/totp {email, code}`):** the previous, current and next steps are accepted, and a step at or below `last_step` is refused. Unknown email, no TOTP, wrong code: the same 401 `sign_in_refused` (no account discovery). Limits: the existing `SIGN_IN_LIMIT` per IP, plus 5 wrong codes per account lock TOTP sign-in for 15 minutes (the same numbers as #61). The email identifies the account (builder's call: every account has a verified email, from #133 or from Google/Apple).
+- **Recovery code (`POST /api/app/sign-in/recovery-code {email, code}`):** marks the code used in the same batch as the session's audit row, then starts a session. The answer tells the app how many codes are left. It has the same refusals and limits as TOTP sign-in, with its own 5-wrong-tries lock.
+
+### Methods and devices
+
+- `GET /api/app/sign-in-methods` lists passkeys (name, created, last used), whether TOTP is on, and recovery codes left.
+- `DELETE` on a passkey or the TOTP answers 409 `last_method` when it would leave no passkey and no TOTP. Google and Apple links count as methods. Recovery codes do not count: they are a way back, not a method.
+- `GET /api/app/sessions` lists the member's sessions (device name from the user agent, created, last seen, which one is this device). `DELETE /api/app/sessions/:id` ends one using the same attempt, success and failure chain as sign-out (`handleSignOut`). The revoked device's next request gets 401 because its row is gone (no session cache is configured).
+
+### Sessions never expire through age (builder's call, recorded)
+
+Better Auth needs an `expiresAt`. Set `session.expiresIn` to 100 years and `session.updateAge` to 1 day, and keep `cookieCache` off. A test pins both values and pins that a session left unused for 8 simulated days still answers. Ends happen only through the paths in goal 5.
+
+Measured limit: Better Auth also uses `expiresIn` as the website cookie's `Max-Age`, and browsers cap a cookie at 400 days (Chrome). The app's bearer token has no such cap. A website session left unused for over 400 days therefore ends in the browser, though its server row lives on. Goal 5 is about the app, so this is recorded and not worked around.
+
+Passkey challenges last 300 s (`MAX_AGE_IN_SECONDS` in the plugin, read 2026-11-09).
+
+### Audit
+
+Actions: `method.add`, `method.remove`, `method.use` (detail: kind and passkey id; never the code), `recovery_code.use` (detail: codes left), `recovery_codes.new`, `session.start`, and `session.end.*` (existing). A sign-in whose audit row fails is undone, as in `handleSignIn`.
+
+## Proof
+
+- Unit: everything above with mocks (TOTP steps, the code clash, the last-method rule, hashing, the challenge used once).
+- Integration (CI, real D1 via Miniflare): every endpoint's happy and refused paths.
+- Real phones: a passkey registered and used on the OnePlus (Chrome) and the iPhone Air (Safari) against `dev.shytalk.app`, through the website's own passkey page, by real touches. The app's own passkey proof belongs to the app shell (see question 1).
+
+## Left to the builder
+
+Names, file layout, the website page's look (it follows the existing `ui-document` style), the TOTP library (`@better-auth/utils/otp`, already installed with Better Auth, preferred over a new dependency).
+
+## Questions for Shyden (parked 2026-11-09)
+
+1. **Phone proof of goal 1.** The app shell is not built (epic #11, P3), so the app cannot make a passkey yet. My recommendation: ship the server and the website's passkey page now, prove passkeys on both phones' browsers against dev, and file an app-side ticket ("the app registers and uses passkeys") under epic #11 to do the in-app proof. The alternative is that #134 waits for the app shell, and #133 and its chain wait with it.
+2. **Android and iOS identity values** for the `.well-known` files: the Play app-signing certificate's SHA-256 (Play Console, App integrity) and the Apple Team ID (developer.apple.com, Membership). They are needed only for the app-side ticket in question 1. Both are public values.
