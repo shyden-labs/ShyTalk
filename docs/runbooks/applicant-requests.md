@@ -8,7 +8,7 @@ Both commands read or change the live database, so they use the live Cloudflare 
 
 ```sh
 npx wrangler d1 execute shytalk-prod --remote --env prod --config workers/web/wrangler.json \
-  --command "SELECT email, locale, applied_at, confirmed_at FROM applicants WHERE email = 'person@example.test'"
+  --command "SELECT email, locale, applied_at, confirmed_at FROM applicants WHERE email = 'person@example.test'; INSERT INTO audit (at, actor, action, environment) VALUES (unixepoch() * 1000, 'staff:owner', 'applicant.looked_up', 'prod')"
 ```
 
 No row means the address is not held. `applied_at` and `confirmed_at` are milliseconds since 1970. An unconfirmed row goes by itself 48 hours after applying, on the next write to the table.

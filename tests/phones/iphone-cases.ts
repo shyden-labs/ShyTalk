@@ -8,6 +8,7 @@
  */
 import assert from 'node:assert/strict';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 
 /** What a case can ask of Safari; tests/phones/safari.ts drives it through Appium. */
 export interface SafariPage {
@@ -88,6 +89,29 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       run: async (page) => {
         await page.goto(`${prefix}/`);
         assert.deepEqual(await page.axeViolations(), []);
+      },
+    },
+    {
+      title: `${lang}: each footer legal link opens the right page, with its note if any, passing axe, with no CSP refusal`,
+      run: async (page) => {
+        const words = legalLines(legalLocale(locale));
+        await page.goto(`${prefix}/`);
+        for (const doc of LEGAL_DOCS) {
+          await page.tap(`footer a[data-legal="${doc}"]`);
+          await page.waitForText(H1, words[doc].title);
+          assert.equal(await page.attribute('html', 'lang'), legalLocale(locale));
+          assert.equal(await page.text('[data-governs]'), words.common.governs);
+          if (locale === 'en' || locale === 'id') {
+            assert.equal(await page.isVisible('[data-english-only]:not([hidden])'), false);
+          } else {
+            const note = `[data-english-only="${locale}"]`;
+            assert.ok(await page.isVisible(note), 'no visible note');
+            assert.equal(await page.text(note), t(locale, 'footer.englishOnly'));
+          }
+          assert.deepEqual(await page.axeViolations(), []);
+          assert.deepEqual(await page.cspRefusals(), []);
+          await page.goto(`${prefix}/`);
+        }
       },
     },
     {

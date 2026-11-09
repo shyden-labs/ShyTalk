@@ -1,0 +1,48 @@
+---
+import Base from '../layouts/Base.astro';
+import { t } from '../i18n/t.ts';
+import { ENGLISH_ONLY_LOCALES, LEGAL_VERSION, legalBlocks, legalLines, type LegalDoc, type LegalLocale } from '../legal/legal.ts';
+
+interface Props {
+  locale: LegalLocale;
+  doc: LegalDoc;
+}
+const { locale, doc } = Astro.props;
+const lines = legalLines(locale);
+const [title, ...blocks] = legalBlocks(lines[doc]);
+const heading = title?.kind === 'title' ? title.text : '';
+---
+
+<Base locale={locale} title={heading}>
+  {
+    locale === 'en' &&
+      ENGLISH_ONLY_LOCALES.map((from) => (
+        <p data-english-only={from} lang={from === 'zh' ? 'zh-Hans' : from} hidden>
+          {t(from, 'footer.englishOnly')}
+        </p>
+      ))
+  }
+  <h1>{heading}</h1>
+  <p>{lines.common.version.replace('{date}', LEGAL_VERSION)}</p>
+  <p data-governs>{lines.common.governs}</p>
+  {
+    blocks.map((block) => {
+      if (block.kind === 'list')
+        return (
+          <ul>
+            {block.items.map((item) => (
+              <li>{item}</li>
+            ))}
+          </ul>
+        );
+      return block.kind === 'heading' ? <h2>{block.text}</h2> : <p>{block.text}</p>;
+    })
+  }
+</Base>
+
+<script>
+  import { englishOnlyNoteLocale } from '../legal/legal.ts';
+
+  const from = englishOnlyNoteLocale(location.search);
+  if (from !== null) document.querySelector<HTMLElement>(`[data-english-only="${from}"]`)?.removeAttribute('hidden');
+</script>

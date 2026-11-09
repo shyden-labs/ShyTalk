@@ -38,6 +38,32 @@ const googleColumn = (locale: string): string[] =>
     .map((row) => row.split(' | ').at(-1)?.replace(/ \|$/, '') ?? '');
 
 describe('the copy guard', () => {
+  it('finds neither first person nor refused words in the legal English', () => {
+    const lines: string[] = [];
+    const walk = (node: unknown): void => {
+      if (typeof node === 'string') lines.push(node);
+      else if (node && typeof node === 'object') Object.values(node).forEach(walk);
+    };
+    walk(JSON.parse(readFileSync('apps/web/src/legal/en.json', 'utf8')));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line, line).not.toMatch(FIRST_PERSON);
+      expect(line, line).not.toMatch(REFUSED);
+    }
+  });
+
+  it('finds neither first person nor refused words in the legal Indonesian read-back', () => {
+    const rows = readFileSync('apps/web/src/legal/read-back-id.md', 'utf8')
+      .split('\n')
+      .filter((row) => row.startsWith('| ') && !row.startsWith('| Key ') && !row.startsWith('| ---'))
+      .map((row) => row.split(' | ').at(-1)?.replace(/ \|$/, '') ?? '');
+    expect(rows.length).toBeGreaterThan(0);
+    for (const line of rows) {
+      expect(line, line).not.toMatch(FIRST_PERSON);
+      expect(line, line).not.toMatch(REFUSED);
+    }
+  });
+
   it('finds none of the refused words in the English', () => {
     for (const line of englishLines()) expect(line, line).not.toMatch(REFUSED);
   });
