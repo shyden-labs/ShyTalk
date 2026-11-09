@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createAuth, type ShyTalkAuth } from '../../workers/web/src/auth/better-auth.ts';
 import { END_SESSION_SQL, handleSignIn, handleSignOut, type SignInEnv } from '../../workers/web/src/app/sign-in.ts';
 import { APPLE_ID, GOOGLE_IDS, issuer, type Issuer } from '../support/id-tokens.ts';
@@ -26,7 +26,7 @@ const settings = {
 
 beforeAll(async () => {
   ({ env: local, dispose } = await localDev());
-  provider = await issuer();
+  provider = await issuer(inject('idTokenKeys'));
   auth = createAuth(settings, { database: local.DB, googleKeys: provider.keys, appleKeys: provider.keys });
   env = { ...settings, DB: local.DB, SIGN_IN_LIMIT: { limit: () => Promise.resolve({ success: true }) } };
 });

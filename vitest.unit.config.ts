@@ -10,6 +10,7 @@ export default {
   plugins: [failOnWarnings],
   test: {
     include: ['tests/unit/**/*.test.ts'],
+    globalSetup: ['tests/setup/id-token-keys.ts'],
     setupFiles: UNIT_SETUP,
     testTimeout: 1_000,
     hookTimeout: 1_000,

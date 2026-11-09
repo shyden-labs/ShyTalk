@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { createAuth, getAuth, type AuthDatabase, type AuthEnv, type ShyTalkAuth } from '../../workers/web/src/auth/better-auth.ts';
 import { END_SESSION_SQL, handleSignIn, handleSignOut, type SignInEnv } from '../../workers/web/src/app/sign-in.ts';
@@ -17,7 +17,7 @@ let provider: Issuer;
 let jwks: Issuer['keys'];
 
 beforeAll(async () => {
-  provider = await issuer();
+  provider = await issuer(inject('idTokenKeys'));
   jwks = provider.keys;
 });
 
