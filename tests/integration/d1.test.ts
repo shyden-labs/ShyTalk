@@ -7,7 +7,8 @@ import { localDev, type LocalDevEnv } from './d1.ts';
  * The D1 test helper (shyden-labs/ShyTalk#159): Miniflare's proxy frees a
  * statement's address once garbage collection finalises it, and a statement
  * passed to `batch` is unreachable when the call returns, while its request
- * may still be queued behind others.
+ * may still be queued behind others. It sends the free 100 ms later, so the
+ * burst below has to outlast that.
  */
 setFlagsFromString('--expose-gc');
 const collectGarbage = runInNewContext('gc') as () => void;
@@ -24,9 +25,9 @@ afterAll(async () => {
 });
 
 describe('the D1 test helper', () => {
-  it('keeps 20 batches at once whole while garbage collection runs, twenty times over', async () => {
-    for (let round = 0; round < 20; round += 1) {
-      const batches = Array.from({ length: 20 }, () =>
+  it('keeps 200 batches at once whole while garbage collection runs, five times over', async () => {
+    for (let round = 0; round < 5; round += 1) {
+      const batches = Array.from({ length: 200 }, () =>
         dev.DB.batch<{ n: number }>([dev.DB.prepare('SELECT 1 AS n'), dev.DB.prepare('SELECT 2 AS n')]),
       );
       collectGarbage();
@@ -34,7 +35,7 @@ describe('the D1 test helper', () => {
       collectGarbage();
       const answers = await Promise.all(batches);
       expect(answers.map(([first, second]) => [first?.results[0]?.n, second?.results[0]?.n])).toEqual(
-        Array.from({ length: 20 }, () => [1, 2]),
+        Array.from({ length: 200 }, () => [1, 2]),
       );
     }
   });
