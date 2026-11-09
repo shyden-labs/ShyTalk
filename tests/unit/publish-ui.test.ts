@@ -3,6 +3,13 @@ import { describe, it, expect, vi } from 'vitest';
 /** Wrangler itself never loads in a unit test: the script's default loader gets this stand-in. */
 const wranglerModule = vi.hoisted(() => ({ getPlatformProxy: vi.fn() }));
 vi.mock('wrangler', () => wranglerModule);
+/**
+ * Even mocked, the first `import('wrangler')` makes Vitest resolve the real
+ * package: 140-573 ms on this Mac, past 1 s under load (shyden-labs/ShyTalk#147).
+ * Paid here, while the file loads, so no test's 1 s limit carries it.
+ */
+const WRANGLER = 'wrangler';
+await import(/* @vite-ignore */ WRANGLER);
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {

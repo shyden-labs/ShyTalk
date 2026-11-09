@@ -11,7 +11,7 @@ export default {
   plugins: [failOnWarnings],
   test: {
     include: ['tests/integration/**/*.test.ts'],
-    globalSetup: ['tests/integration/global-setup.ts'],
+    globalSetup: ['tests/integration/global-setup.ts', 'tests/setup/id-token-keys.ts'],
     // Every file opens the same local D1 (the global setup's `d1Persist`), so
     // files run one at a time: in parallel, their workerd processes write the
     // one SQLite file at once and D1 answers SQLITE_BUSY (PR #120's first run,

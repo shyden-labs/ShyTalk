@@ -1,4 +1,5 @@
-import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type JWK, type JWTVerifyGetKey } from 'jose';
+import { createLocalJWKSet, importJWK, SignJWT, type JWK, type JWTVerifyGetKey } from 'jose';
+import type { IdTokenKeys } from '../setup/id-token-keys.ts';
 
 /**
  * Google and Apple ID tokens for the sign-in tests (plan 4 Task 3,
@@ -39,11 +40,18 @@ export const sha256Hex = async (value: string): Promise<string> =>
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 
-/** A fresh signing key, a foreign one, and token makers for both. */
-export async function issuer(): Promise<Issuer> {
-  const pair = await generateKeyPair('RS256');
-  const foreign = (await generateKeyPair('RS256')).privateKey;
-  const publicJwk: JWK = { ...(await exportJWK(pair.publicKey)), kid: 'k1', alg: 'RS256', use: 'sig' };
+/** The public half of a private RSA JWK. */
+const publicOf = ({ d: _d, p: _p, q: _q, dp: _dp, dq: _dq, qi: _qi, ...rest }: JWK): JWK => rest;
+
+/**
+ * Token makers signing with `keys`, the run's keys from the unit setup
+ * (`inject('idTokenKeys')`, tests/setup/id-token-keys.ts), and the provider
+ * key set holding only the signing key's public half.
+ */
+export async function issuer(keys: IdTokenKeys): Promise<Issuer> {
+  const signing = await importJWK(keys.signing, 'RS256');
+  const foreign = await importJWK(keys.foreign, 'RS256');
+  const publicJwk: JWK = { ...publicOf(keys.signing), kid: 'k1', alg: 'RS256', use: 'sig' };
   const idToken = async (claims: Claims = {}): Promise<string> => {
     const now = Math.floor(Date.now() / 1000);
     const body: Record<string, unknown> = {
@@ -59,7 +67,7 @@ export async function issuer(): Promise<Issuer> {
       .setSubject(claims.sub ?? 'google-sub-1')
       .setIssuedAt(now - 60)
       .setExpirationTime(now + (claims.expiresIn ?? 600))
-      .sign(claims.foreign === true ? foreign : pair.privateKey);
+      .sign(claims.foreign === true ? foreign : signing);
   };
   return {
     keys: createLocalJWKSet({ keys: [publicJwk] }),
