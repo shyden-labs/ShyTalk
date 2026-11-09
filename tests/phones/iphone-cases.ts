@@ -58,13 +58,57 @@ async function inLanguageWithoutRefusal(page: SafariPage, lang: string): Promise
   assert.deepEqual(await page.cspRefusals(), []);
 }
 
+/**
+ * Runs every check in order, even after one fails, then fails once naming
+ * each failure: Playwright's `expect.soft`, for node's assert (one journey,
+ * all its assertions; Shyden 2026-11-09, shyden-labs/ShyTalk#151).
+ */
+async function softly(checks: (() => Promise<void>)[]): Promise<void> {
+  const failures: string[] = [];
+  for (const check of checks) {
+    try {
+      await check();
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  if (failures.length > 0) throw new assert.AssertionError({ message: failures.join('\n') });
+}
+
 function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
   return [
     {
-      title: `${lang}: the home page answers 200 in ${lang}, with no CSP refusal`,
+      title: `${lang}: the home page answers 200 in ${lang}, shows its heading and no roadmap button, passes axe, with no CSP refusal`,
       run: async (page) => {
-        assert.equal(await page.goto(`${prefix}/`), 200);
-        await inLanguageWithoutRefusal(page, lang);
+        await softly([
+          async () => {
+            assert.equal(await page.goto(`${prefix}/`), 200);
+          },
+          async () => {
+            assert.equal(await page.attribute('html', 'lang'), lang);
+          },
+          async () => {
+            assert.ok(await page.isVisible(NAV), 'no visible navigation');
+          },
+          async () => {
+            assert.deepEqual(await page.cspRefusals(), []);
+          },
+          async () => {
+            assert.ok(await page.isVisible(H1), 'no visible top heading');
+          },
+          async () => {
+            assert.equal(await page.text(H1), t(locale, 'home.heading'));
+          },
+          async () => {
+            assert.ok((await page.visibleLinks(t(locale, 'home.apply'))) > 0, 'no visible apply link');
+          },
+          async () => {
+            assert.equal(await page.links(t(locale, 'home.roadmap')), 0);
+          },
+          async () => {
+            assert.deepEqual(await page.axeViolations(), []);
+          },
+        ]);
       },
     },
     {
@@ -72,23 +116,6 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       run: async (page) => {
         assert.equal(await page.goto(`${prefix}/no-such-page`), 404);
         await inLanguageWithoutRefusal(page, lang);
-      },
-    },
-    {
-      title: `${lang}: the home page shows its heading in ${lang}, and no roadmap button`,
-      run: async (page) => {
-        await page.goto(`${prefix}/`);
-        assert.ok(await page.isVisible(H1), 'no visible top heading');
-        assert.equal(await page.text(H1), t(locale, 'home.heading'));
-        assert.ok((await page.visibleLinks(t(locale, 'home.apply'))) > 0, 'no visible apply link');
-        assert.equal(await page.links(t(locale, 'home.roadmap')), 0);
-      },
-    },
-    {
-      title: `${lang}: the home page passes axe`,
-      run: async (page) => {
-        await page.goto(`${prefix}/`);
-        assert.deepEqual(await page.axeViolations(), []);
       },
     },
     {

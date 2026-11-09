@@ -88,21 +88,39 @@ describe('the iPhone cases', () => {
     },
   );
 
-  it.each(cases('the home page shows').map((c) => [c.title, c] as const))(
+  it.each(cases('the home page answers').map((c) => [c.title, c] as const))(
     '%s: fails on a hidden or wrong heading, a hidden apply link or a roadmap link',
     async (_, c) => {
       const lang = langOf(c.title);
       const roadmap = t(LOCALE[lang] ?? 'en', 'home.roadmap');
-      await expect(c.run(safari(lang, { isVisible: () => Promise.resolve(false) }))).rejects.toThrow();
-      await expect(c.run(safari(lang, { text: () => Promise.resolve('Something else') }))).rejects.toThrow();
-      await expect(c.run(safari(lang, { visibleLinks: () => Promise.resolve(0) }))).rejects.toThrow();
+      await expect(c.run(safari(lang, { isVisible: (selector) => Promise.resolve(selector.startsWith('nav')) }))).rejects.toThrow(
+        'no visible top heading',
+      );
+      await expect(c.run(safari(lang, { text: () => Promise.resolve('Something else') }))).rejects.toThrow('Something else');
+      await expect(c.run(safari(lang, { visibleLinks: () => Promise.resolve(0) }))).rejects.toThrow('no visible apply link');
       await expect(c.run(safari(lang, { links: (name) => Promise.resolve(name === roadmap ? 1 : 0) }))).rejects.toThrow();
     },
   );
 
-  it.each(cases('the home page passes axe').map((c) => [c.title, c] as const))('%s: fails on any axe violation', async (_, c) => {
-    await expect(c.run(safari(langOf(c.title), { axeViolations: () => Promise.resolve(['color-contrast: 1']) }))).rejects.toThrow();
+  it.each(cases('the home page answers').map((c) => [c.title, c] as const))('%s: fails on any axe violation', async (_, c) => {
+    await expect(c.run(safari(langOf(c.title), { axeViolations: () => Promise.resolve(['color-contrast: 1']) }))).rejects.toThrow(
+      'color-contrast: 1',
+    );
   });
+
+  // One journey, all its assertions (Shyden 2026-11-09, shyden-labs/ShyTalk#151):
+  // the home page is opened once, and every check runs even after one fails.
+  it.each(cases('the home page answers').map((c) => [c.title, c] as const))(
+    '%s: opens the home page once and names every failing check, not only the first',
+    async (_, c) => {
+      const lang = langOf(c.title);
+      const page = safari(lang);
+      await c.run(page);
+      expect(page.visited).toEqual([`${PREFIX[lang] ?? '?'}/`]);
+      const broken = c.run(safari(lang, { goto: () => Promise.resolve(500), axeViolations: () => Promise.resolve(['color-contrast: 1']) }));
+      await expect(broken).rejects.toThrow(/500[\s\S]*color-contrast: 1/);
+    },
+  );
 
   const named = (start: string) => cases(start).map((c) => [c.title, c] as const);
 
