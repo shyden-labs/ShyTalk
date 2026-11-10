@@ -84,6 +84,18 @@ const call: WebDriverCall = async (method, path, body) => {
 export function realDeps(): PhoneDeps {
   let appium: ChildProcess | undefined;
   return {
+    async mailboxPassword() {
+      // Shyden stored it 2026-11-10; `-w` prints the password alone, which goes nowhere but this process's environment.
+      const { stdout } = await exec('security', [
+        'find-generic-password',
+        '-s',
+        'shytalk-test-mailbox',
+        '-a',
+        'shytalk-tests@shyden.co.uk',
+        '-w',
+      ]);
+      return stdout.trim();
+    },
     async forward() {
       // Chrome opens its DevTools socket once it runs; about:blank starts it without a page of ours.
       await exec('adb', ['shell', 'am', 'start', '-n', 'com.android.chrome/com.google.android.apps.chrome.Main', '-d', 'about:blank']);

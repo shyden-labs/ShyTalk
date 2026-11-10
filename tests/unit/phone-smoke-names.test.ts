@@ -8,12 +8,13 @@ import { describe, it, expect, vi } from 'vitest';
  * recorded without running; nothing reaches a browser.
  */
 const declared = vi.hoisted(() => [] as string[]);
-vi.mock('@playwright/test', () => ({
-  test: (title: string) => {
+vi.mock('@playwright/test', () => {
+  const test = (title: string) => {
     declared.push(title);
-  },
-  expect: () => undefined,
-}));
+  };
+  // tests/smoke/fixture.ts adds its fixtures to Playwright's test; the stand-in records titles either way.
+  return { test: Object.assign(test, { extend: () => test }), expect: () => undefined };
+});
 vi.mock('@axe-core/playwright', () => ({ default: vi.fn() }));
 
 import { IPHONE_CASES } from '../phones/iphone-cases.ts';

@@ -69,6 +69,8 @@ export function safariPage(
   const log = async (type: 'safariNetwork' | 'safariConsole') =>
     ((await call('POST', `${at}/se/log`, { type })) as LogEntry[]).map(({ message }) => JSON.parse(message) as Record<string, unknown>);
   const run = (script: string, ...args: unknown[]) => call('POST', `${at}/execute/sync`, { script, args });
+  const find = async (selector: string) =>
+    String(((await call('POST', `${at}/element`, { using: 'css selector', value: selector })) as Record<string, string>)[ELEMENT]);
   let refusals: string[] = [];
 
   return {
@@ -76,7 +78,7 @@ export function safariPage(
       await log('safariNetwork');
       await log('safariConsole');
       refusals = [];
-      const url = `${base}${path}?phone-smoke=${token()}`;
+      const url = `${base}${path}${path.includes('?') ? '&' : '?'}phone-smoke=${token()}`;
       await call('POST', `${at}/url`, { url });
       const documents = (await log('safariNetwork'))
         .filter((entry) => entry.method === 'Network.responseReceived')
@@ -120,8 +122,10 @@ export function safariPage(
       return violations.map(({ id, nodes }) => `${id}: ${String(nodes)}`);
     },
     async tap(selector) {
-      const found = (await call('POST', `${at}/element`, { using: 'css selector', value: selector })) as Record<string, string>;
-      await call('POST', `${at}/element/${String(found[ELEMENT])}/click`, {});
+      await call('POST', `${at}/element/${await find(selector)}/click`, {});
+    },
+    async type(selector, text) {
+      await call('POST', `${at}/element/${await find(selector)}/value`, { text });
     },
     async waitForText(selector, text) {
       let seen: unknown = null;
