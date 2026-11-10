@@ -69,9 +69,9 @@ The two-factor plugin cannot do it (see Constraints), so the Worker has its own 
 
 ### Sessions never expire through age (builder's call, recorded)
 
-Better Auth needs an `expiresAt`. Set `session.expiresIn` to 100 years and `session.updateAge` to 1 day, and keep `cookieCache` off. A test pins both values and pins that a session left unused for 8 simulated days still answers. Ends happen only through the paths in goal 5.
+Better Auth needs an `expiresAt`, and it uses `session.expiresIn` as the website cookie's `Max-Age`, refusing anything over 400 days (measured 2026-11-11: "Cookies Max-Age SHOULD NOT be greater than 400 days"). So `session.expiresIn` is 400 days (34,560,000 s) and `session.updateAge` 1 day, `cookieCache` stays off, and a `databaseHooks.session.create.before` hook stores every session row to end 100 years after it starts. Better Auth refreshes a row only when its expiry is within `expiresIn` of now, so these rows are never rewritten by use. Tests pin the options, the 100-year row, and that an app session left unused for 401 days still answers (builder's call, recorded).
 
-Measured limit: Better Auth also uses `expiresIn` as the website cookie's `Max-Age`, and browsers cap a cookie at 400 days (Chrome). The app's bearer token has no such cap. A website session left unused for over 400 days therefore ends in the browser, though its server row lives on. Goal 5 is about the app, so this is recorded and not worked around.
+Measured limit: the website cookie is set once at sign-in with a 400-day `Max-Age` and, since the row is never refreshed, is not re-set; a website session therefore ends in the browser 400 days after sign-in, though its row lives on. Goal 5 is about the app's bearer token, which has no such limit, so this is recorded and not worked around.
 
 Passkey challenges last 300 s (`MAX_AGE_IN_SECONDS` in the plugin, read 2026-11-09).
 
