@@ -107,7 +107,12 @@ async function signInWith(auth: ShyTalkAuth, credential: SoftCredential, replay?
   const options = await auth.api.generatePasskeyAuthenticationOptions({ headers: new Headers({ origin: ORIGIN }), returnHeaders: true });
   const { challenge } = options.response as { challenge: string };
   const response = replay ?? (await assert(credential, { rpId: 'dev.site.example', origin: ORIGIN, challenge }));
-  const headers = new Headers({ origin: ORIGIN, cookie: cookiesFrom(options.headers) });
+  const headers = new Headers({
+    origin: ORIGIN,
+    cookie: cookiesFrom(options.headers),
+    'x-forwarded-for': '203.0.113.9',
+    'cf-connecting-ip': '203.0.113.9',
+  });
   try {
     const answer = await auth.api.verifyPasskeyAuthentication({ headers, body: { response } });
     return { answer: answer as { session: { token: string; userId: string } }, response };
@@ -148,6 +153,16 @@ describe('the passkey plugin as ShyTalk sets it up', () => {
     const { credential } = await registerWith(auth, await member(auth, store));
     const { answer } = await signInWith(auth, credential);
     expect(answer?.session.userId).toBe('u-1');
+  });
+
+  it('keeps no IP address on the session it starts (nothing needs it, and sessions last until ended)', async () => {
+    const { auth, store } = world();
+    const { credential } = await registerWith(auth, await member(auth, store));
+    const { answer } = await signInWith(auth, credential);
+    const row = store['session']?.find(({ token }) => token === answer?.session.token);
+    expect(row).toBeDefined();
+    // Better Auth writes an empty string when it is told not to keep the address.
+    expect(row?.['ipAddress']).toBe('');
   });
 
   it('refuses a sign-in answer replayed against a fresh challenge', async () => {

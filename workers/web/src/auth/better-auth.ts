@@ -93,6 +93,9 @@ export function createAuth(env: AuthEnv, deps: AuthDeps) {
     // Link a Google or Apple sign-in to an existing member only on a verified email at both ends (shyden-labs/ShyTalk#133):
     // no trusted providers, since a trusted one links even when the provider has not verified the email.
     account: { accountLinking: { enabled: true } },
+    // No IP address on a session (shyden-labs/ShyTalk#134): nothing needs it (rate limits are Cloudflare's, by the
+    // connecting address, never stored), and sessions last until ended, so it would be kept for ever.
+    advanced: { ipAddress: { disableIpTracking: true } },
     // A session ends only by sign-out, a revoke, staff or a completed recovery, never by age or disuse (shyden-labs/ShyTalk#134,
     // Shyden 2026-11-08). Better Auth sets the website cookie's Max-Age from expiresIn and refuses more than 400 days, so the
     // cookie keeps that ceiling while each session row is stored to end in 100 years. Better Auth refreshes a row only once its
