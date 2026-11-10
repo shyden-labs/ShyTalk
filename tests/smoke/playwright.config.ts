@@ -6,7 +6,7 @@
  * (tests/smoke/tsconfig.json), which Playwright's own types need.
  */
 import { defineConfig, devices } from '@playwright/test';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
 import { SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
@@ -50,6 +50,8 @@ const MAIL_VARS = [
   'OCI_FINGERPRINT:smoke',
   'OCI_COMPARTMENT:smoke',
   `OCI_PRIVATE_KEY:${privateKey.trim().replace(/\n/g, ' ')}`,
+  // Email codes (shyden-labs/ShyTalk#133) need Better Auth's secret to key their hashes: a throwaway one each run.
+  `BETTER_AUTH_SECRET:${randomBytes(32).toString('hex')}`,
 ]
   .map((value) => `--var "${value}"`)
   .join(' ');

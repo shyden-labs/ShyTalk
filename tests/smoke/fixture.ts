@@ -15,7 +15,7 @@
  * and the mail is read from the real test mailbox (tests/phones/test-mailbox.ts).
  */
 import { test as base } from '@playwright/test';
-import { plusAddress, waitForMail } from '../phones/test-mailbox.ts';
+import { plusAddress, waitForAnyMail, waitForMail, type Mail } from '../phones/test-mailbox.ts';
 import { MAIL_STAND_IN_PORT } from './targets.ts';
 
 export { expect } from '@playwright/test';
@@ -26,6 +26,8 @@ export interface Mailbox {
   address: string;
   /** The mail the site sent to `address`: its subject and confirm link. */
   mail(): Promise<{ subject: string; confirmLink: string }>;
+  /** Any mail the site sent to `address`: its subject and text (shyden-labs/ShyTalk#133's code mails). */
+  anyMail(): Promise<Mail>;
 }
 
 const STAND_IN = `http://127.0.0.1:${String(MAIL_STAND_IN_PORT)}`;
@@ -44,16 +46,22 @@ export const test = base.extend<{ mailbox: Mailbox }, { mailSource: MailSource }
           const { subject, confirmLink } = await waitForMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' });
           return { subject, confirmLink };
         },
+        anyMail: () => waitForAnyMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' }),
       });
       return;
     }
     const address = `journey-${tag}@example.test`;
+    const fromStandIn = async (): Promise<Mail> => {
+      const mailed = await request.get(`${STAND_IN}/mail?to=${encodeURIComponent(address)}`);
+      if (mailed.status() !== 200) throw new Error(`the stand-in answered ${String(mailed.status())} for ${address}`);
+      const { subject, bodyText } = (await mailed.json()) as { subject: string; bodyText: string };
+      return { subject, text: bodyText };
+    };
     await use({
       address,
+      anyMail: fromStandIn,
       mail: async () => {
-        const mailed = await request.get(`${STAND_IN}/mail?to=${encodeURIComponent(address)}`);
-        if (mailed.status() !== 200) throw new Error(`the stand-in answered ${String(mailed.status())} for ${address}`);
-        const { subject, bodyText } = (await mailed.json()) as { subject: string; bodyText: string };
+        const { subject, text: bodyText } = await fromStandIn();
         const confirmLink = CONFIRM_LINK.exec(bodyText)?.[0];
         if (confirmLink === undefined) throw new Error(`the mail holds no confirm link: ${bodyText}`);
         return { subject, confirmLink };

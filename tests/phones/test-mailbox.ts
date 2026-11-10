@@ -40,8 +40,8 @@ export function plusAddress(tag: string): string {
   return `${USER}+${tag}@${DOMAIN}`;
 }
 
-/** Waits for the mail sent to `plusAddress(tag)`, looking every 5 s and failing at 120 s. */
-export async function waitForMail(tag: string, deps: WaitDeps): Promise<Mail & { confirmLink: string }> {
+/** Waits for any mail sent to `plusAddress(tag)`, looking every 5 s and failing at 120 s. */
+export async function waitForAnyMail(tag: string, deps: WaitDeps): Promise<Mail> {
   if (deps.password === '')
     throw new Error('TEST_MAILBOX_PASSWORD is unset: the phone run reads it from the Keychain (service shytalk-test-mailbox)');
   const now = deps.now ?? Date.now;
@@ -52,17 +52,28 @@ export async function waitForMail(tag: string, deps: WaitDeps): Promise<Mail & {
     const started = now();
     for (;;) {
       const mail = await box.latest(folder);
-      if (mail !== null) {
-        const confirmLink = CONFIRM_LINK.exec(mail.text)?.[0];
-        if (confirmLink === undefined) throw new Error(`the mail in ${folder} (${JSON.stringify(mail.subject)}) holds no confirm link`);
-        return { ...mail, confirmLink };
-      }
+      if (mail !== null) return mail;
       if (now() - started + LOOK_EVERY_MS > CEILING_MS) throw new Error(`no mail reached ${folder} within ${String(CEILING_MS / 1000)} s`);
       await pause(LOOK_EVERY_MS);
     }
   } finally {
     await box.close();
   }
+}
+
+/** Waits for the closed-testing mail sent to `plusAddress(tag)` and its confirm link. */
+export async function waitForMail(tag: string, deps: WaitDeps): Promise<Mail & { confirmLink: string }> {
+  const mail = await waitForAnyMail(tag, deps);
+  const confirmLink = CONFIRM_LINK.exec(mail.text)?.[0];
+  if (confirmLink === undefined) throw new Error(`the mail in INBOX.${tag} (${JSON.stringify(mail.subject)}) holds no confirm link`);
+  return { ...mail, confirmLink };
+}
+
+/** The 6-digit code a code mail holds on a line of its own (shyden-labs/ShyTalk#133). */
+export function codeIn(mail: Mail): string {
+  const code = /^\d{6}$/m.exec(mail.text)?.[0];
+  if (code === undefined) throw new Error(`the mail ${JSON.stringify(mail.subject)} holds no 6-digit code line`);
+  return code;
 }
 
 async function openImap(password: string): Promise<MailboxReader> {

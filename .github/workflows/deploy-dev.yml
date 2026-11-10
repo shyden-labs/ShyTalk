@@ -94,6 +94,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          TOTP_KEY: ${{ secrets.TOTP_KEY }}
         run: |
           if ! grep -qE '^(apps/web/|workers/web/|migrations/|packages/environment/|packages/mail/|packages/ui-document/|manifests/|scripts/publish-ui\.ts$|scripts/announce-ui\.ts$|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
             echo "Nothing deployable changed, so dev deploys nothing."
@@ -146,6 +147,14 @@ jobs:
             exit 1
           fi
           printf '%s' "$BETTER_AUTH_SECRET" | npx wrangler secret put BETTER_AUTH_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev Better Auth secret was not set"; exit 1; }
+          # shyden-labs/ShyTalk#134: authenticator-app sign-in answers 503 until
+          # the Worker holds TOTP_KEY. It seals stored secrets, so it is kept in
+          # the dev environment, never made fresh here.
+          if [ -z "$TOTP_KEY" ]; then
+            echo "::error title=TOTP_KEY missing::Set TOTP_KEY in the dev environment (shyden-labs/ShyTalk#134); until then dev authenticator-app sign-in answers 503."
+            exit 1
+          fi
+          printf '%s' "$TOTP_KEY" | npx wrangler secret put TOTP_KEY --env dev || { echo "::error title=deploy-dev failed::the dev authenticator key was not set"; exit 1; }
           # Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07): last,
           # every open app hears the newest UI version. Each deploy makes a
           # fresh announce secret, puts it in the Worker and calls the Worker

@@ -136,6 +136,22 @@ describe('deploy-dev', () => {
     expect(step).toContain('BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}');
   });
 
+  // shyden-labs/ShyTalk#134: the authenticator app's sign-in answers 503 until
+  // the Worker holds TOTP_KEY. It seals stored secrets, so it is kept in the dev
+  // environment (never made fresh per deploy) and put after the Worker exists.
+  it('puts the authenticator key after the Better Auth secret, and stops naming it when the environment lacks it', () => {
+    const step = deployStep().join('\n');
+    const betterAuth = step.indexOf('printf %s $BETTER_AUTH_SECRET | npx wrangler secret put BETTER_AUTH_SECRET --env dev ||');
+    const missing = step.indexOf('if [ -z $TOTP_KEY ]; then');
+    const put = step.indexOf(
+      'printf %s $TOTP_KEY | npx wrangler secret put TOTP_KEY --env dev || { echo ::error title=deploy-dev failed::the dev authenticator key was not set; exit 1; }',
+    );
+    expect(betterAuth).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(betterAuth);
+    expect(put).toBeGreaterThan(missing);
+    expect(step).toContain('TOTP_KEY: ${{ secrets.TOTP_KEY }}');
+  });
+
   // shyden-labs/ShyTalk#88: the five Oracle secrets reach only a last step of
   // their own, which runs nothing but `wrangler secret put`, and only after the
   // deploy step deployed (it records `deployed=true` last). The build and the

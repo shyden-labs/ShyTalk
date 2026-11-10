@@ -103,6 +103,82 @@ describe('/api/app/sign-in and sign-out', () => {
     },
   );
 
+  it.each(['/api/app/email/start', '/api/app/email/verify'])(
+    '%s reaches the email-code handler (a body not sent as JSON answers 400)',
+    async (path) => {
+      const response = await handle(postTo(path, '{}'), ready());
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'bad_request' });
+    },
+  );
+
+  it('/api/app/recovery/cancel reaches the recovery handler (a body not sent as JSON answers 400)', async () => {
+    const response = await handle(postTo('/api/app/recovery/cancel', '{}'), ready());
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'bad_request' });
+  });
+
+  it('/api/app/recovery reaches the pending-recovery handler (POST answers 405)', async () => {
+    const response = await handle(postTo('/api/app/recovery', '{}'), ready());
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe('GET');
+  });
+
+  it.each(['/api/app/sign-in/totp', '/api/app/sign-in/recovery-code'])(
+    '%s reaches the code sign-in handler (a body not sent as JSON answers 400)',
+    async (path) => {
+      const response = await handle(postTo(path, '{}'), { ...ready(), TOTP_KEY: 'a-test-totp-key' });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'bad_request' });
+    },
+  );
+
+  it.each(['/api/app/sign-in/totp', '/api/app/totp/setup', '/api/app/totp/confirm'])(
+    'without TOTP_KEY, %s answers 503 sign_in_unavailable',
+    async (path) => {
+      const response = await handle(postTo(path, '{}'), ready());
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'sign_in_unavailable' });
+    },
+  );
+
+  it.each(['/api/app/totp/setup', '/api/app/totp/confirm'])(
+    '%s reaches the authenticator setup handler (a body not sent as JSON answers 400)',
+    async (path) => {
+      const response = await handle(postTo(path, '{}'), { ...ready(), TOTP_KEY: 'a-test-totp-key' });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'bad_request' });
+    },
+  );
+
+  it.each([
+    '/api/app/passkey/register/options',
+    '/api/app/passkey/register/verify',
+    '/api/app/passkey/sign-in/options',
+    '/api/app/passkey/sign-in/verify',
+  ])('%s reaches the passkey handler (a body not sent as JSON answers 400)', async (path) => {
+    const response = await handle(postTo(path, '{}'), ready());
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'bad_request' });
+  });
+
+  it.each([
+    ['/api/app/sign-in-methods', 'GET'],
+    ['/api/app/sign-in-methods/passkey/pk-1', 'DELETE'],
+    ['/api/app/sessions', 'GET'],
+    ['/api/app/sessions/s-1', 'DELETE'],
+  ])('%s reaches the methods handler (POST answers 405, allowing %s)', async (path, allowed) => {
+    const response = await handle(postTo(path, '{}'), ready());
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe(allowed);
+  });
+
+  it('/api/app/recovery-codes reaches the methods handler (GET answers 405, allowing POST)', async () => {
+    const response = await handle(get('/api/app/recovery-codes'), ready());
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe('POST');
+  });
+
   it('/api/app/sign-out reaches the sign-out handler (GET answers 405)', async () => {
     const response = await handle(get('/api/app/sign-out'), ready());
     expect(response.status).toBe(405);
@@ -123,9 +199,22 @@ describe('/api/app/sign-in and sign-out', () => {
       'a DB without exec',
       { DB: { prepare: () => ({ first: <T>() => Promise.resolve({ name: 'dev' } as T) }), batch: () => Promise.resolve([]) } as D1Like },
     ],
-  ])('without %s, sign-in and sign-out answer 503 sign_in_unavailable', async (_name, missing) => {
+  ])('without %s, sign-in, sign-out and email codes answer 503 sign_in_unavailable', async (_name, missing) => {
     const partial = { ...ready(), ...missing } as WebEnv;
-    for (const path of ['/api/app/sign-in/google', '/api/app/sign-in/apple', '/api/app/sign-out']) {
+    for (const path of [
+      '/api/app/sign-in/google',
+      '/api/app/sign-in/apple',
+      '/api/app/sign-out',
+      '/api/app/email/start',
+      '/api/app/email/verify',
+      '/api/app/recovery',
+      '/api/app/recovery/cancel',
+      '/api/app/sign-in/recovery-code',
+      '/api/app/passkey/register/options',
+      '/api/app/passkey/sign-in/verify',
+      '/api/app/sign-in-methods',
+      '/api/app/sessions/s-1',
+    ]) {
       const response = await handle(postTo(path, '{}'), partial);
       expect(response.status).toBe(503);
       expect(await response.json()).toEqual({ error: 'sign_in_unavailable' });

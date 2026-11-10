@@ -9,7 +9,8 @@
 import assert from 'node:assert/strict';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
-import { plusAddress, waitForMail } from './test-mailbox.ts';
+import { codeIn, plusAddress, waitForAnyMail, waitForMail } from './test-mailbox.ts';
+import { base32, totpAt } from '../support/totp.ts';
 
 /** What a case can ask of Safari; tests/phones/safari.ts drives it through Appium. */
 export interface SafariPage {
@@ -203,4 +204,72 @@ const JOURNEY: IphoneCase = {
   },
 };
 
-export const IPHONE_CASES: IphoneCase[] = [...LANGUAGES.flatMap(({ lang, locale, prefix }) => casesFor(lang, locale, prefix)), JOURNEY];
+/**
+ * Joining, in English, once (tests/smoke/site.spec.ts, shyden-labs/ShyTalk#133,
+ * #134): the code goes out for real to this run's plus-address and is read
+ * over IMAP; the authenticator's code is computed from the key the page shows,
+ * as the member's app would; then the account page, sign-out, and signing back
+ * in with the app's next code.
+ */
+const SIGN_UP_JOURNEY: IphoneCase = {
+  title: 'joining with the mailed code and an authenticator app, then signing back in with it',
+  run: async (page) => {
+    const tag = `iphone-air-${String(Date.now())}`;
+    const address = plusAddress(tag);
+    await page.goto('/sign-up');
+    await page.type('#email-address', address);
+    await page.tap('#email-submit');
+    await page.waitForText('#email-answer', t('en', 'account.sent'));
+    const codeMail = await waitForAnyMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' });
+    assert.equal(codeMail.subject, t('en', 'email.codeSubject'));
+    await page.type('#email-code', codeIn(codeMail));
+    await page.tap('#code-submit');
+    await page.waitForText('#email-answer', t('en', 'account.signUpConfirmed'));
+    assert.equal(await page.isVisible('#email-address'), false, 'the address form stays after the code was accepted');
+
+    await page.tap('#setup-authenticator');
+    const secret = base32(await page.text('[data-testid="totp-secret"]'));
+    await page.type('#totp-code', await totpAt(secret, 0));
+    await page.tap('#totp-confirm');
+    await page.waitForText('#codes-title', t('en', 'account.codesTitle'));
+    const codes = (await page.text('[data-testid="recovery-codes"]')).split(' ');
+    assert.equal(codes.length, 10, `ten recovery codes, not ${String(codes.length)}`);
+    await page.tap('#codes-saved');
+
+    await page.waitForText(H1, t('en', 'account.accountTitle'));
+    assert.equal(await page.text('[data-testid="method-authenticator"]'), t('en', 'account.authenticatorOn'));
+    await page.tap('#sign-out');
+    await page.waitForText(H1, t('en', 'account.signInTitle'));
+    await page.type('#signin-email', address);
+    await page.type('#signin-code', await totpAt(secret, 1));
+    await page.tap('#signin-submit');
+    await page.waitForText(H1, t('en', 'account.accountTitle'));
+  },
+};
+
+/**
+ * The recovery pages, in English, once (tests/smoke/site.spec.ts,
+ * shyden-labs/ShyTalk#133): the code step appears after a start, and the
+ * cancel page answers only once its button is tapped.
+ */
+const RECOVERY_PAGES: IphoneCase = {
+  title: 'asking to recover shows the code step, and a cancel link answers on its press',
+  run: async (page) => {
+    await page.goto('/recover');
+    await page.type('#email-address', plusAddress(`iphone-air-recover-${String(Date.now())}`));
+    await page.tap('#email-submit');
+    await page.waitForText('#email-answer', t('en', 'account.sent'));
+    assert.equal(await page.isVisible('#email-code'), true, 'no code field after the start');
+    await page.goto('/recover/cancel/#not-a-real-token');
+    assert.equal(await page.isVisible('#cancel-answer'), false, 'the cancel page answered before its button was tapped');
+    await page.tap('#cancel-button');
+    await page.waitForText('#cancel-answer', t('en', 'account.cancelled'));
+  },
+};
+
+export const IPHONE_CASES: IphoneCase[] = [
+  ...LANGUAGES.flatMap(({ lang, locale, prefix }) => casesFor(lang, locale, prefix)),
+  JOURNEY,
+  SIGN_UP_JOURNEY,
+  RECOVERY_PAGES,
+];

@@ -14,6 +14,7 @@ const mailbox = vi.hoisted(() => ({
   waitForMail: vi.fn(() =>
     Promise.resolve({ subject: 'Confirm', text: 'body', confirmLink: 'https://dev.example/closed-testing/confirm?t=abc' }),
   ),
+  waitForAnyMail: vi.fn(() => Promise.resolve({ subject: 'Your ShyTalk code', text: '\n402913\n' })),
 }));
 vi.mock('../phones/test-mailbox.ts', () => mailbox);
 
@@ -24,6 +25,7 @@ const load = async () => ((await import(/* @vite-ignore */ FIXTURE)) as { test: 
 interface Mailbox {
   address: string;
   mail: () => Promise<{ subject: string; confirmLink: string }>;
+  anyMail: () => Promise<{ subject: string; text: string }>;
 }
 type MailboxFixture = (
   deps: { mailSource: string; request: { get: (url: string) => Promise<{ status: () => number; json: () => Promise<unknown> }> } },
@@ -89,6 +91,26 @@ describe('the smoke suite’s test', () => {
     });
     expect(connectOverCDP).toHaveBeenCalledWith('http://127.0.0.1:9333');
     expect(order).toEqual(['use', 'close']);
+  });
+});
+
+describe('the mailbox fixture: any mail (shyden-labs/ShyTalk#133)', () => {
+  it('from the stand-in, gives the subject and text of the mail to its address', async () => {
+    const { box, get } = await mailboxFrom('stand-in', { status: 200, body: { subject: 'Your ShyTalk code', bodyText: '\n402913\n' } });
+    expect(await box.anyMail()).toEqual({ subject: 'Your ShyTalk code', text: '\n402913\n' });
+    expect(get).toHaveBeenCalledWith(`http://127.0.0.1:8788/mail?to=${encodeURIComponent(box.address)}`);
+  });
+
+  it('from the stand-in, fails naming the status when no mail came', async () => {
+    const { box } = await mailboxFrom('stand-in', { status: 404, body: {} });
+    await expect(box.anyMail()).rejects.toThrow('the stand-in answered 404 for journey-oneplus-1700000000000@example.test');
+  });
+
+  it('from IMAP, waits for any mail in its folder with the password from the environment', async () => {
+    vi.stubEnv('TEST_MAILBOX_PASSWORD', 'secret');
+    const { box } = await mailboxFrom('imap');
+    expect(await box.anyMail()).toEqual({ subject: 'Your ShyTalk code', text: '\n402913\n' });
+    expect(mailbox.waitForAnyMail).toHaveBeenCalledWith('oneplus-1700000000000', { password: 'secret' });
   });
 });
 

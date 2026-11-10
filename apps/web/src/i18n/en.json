@@ -65,5 +65,41 @@
     "title": "Page not found",
     "body": "There is no page at this address.",
     "home": "Go to the home page"
+  },
+  "email": {
+    "codeSubject": "Your ShyTalk code",
+    "signUpIntro": "Use this code to confirm your email address and finish joining ShyTalk:",
+    "recoveryIntro": "Use this code to start recovering your ShyTalk account:",
+    "codeLife": "The code works once, for 10 minutes.",
+    "ignore": "If this was not you, ignore this email. Nothing changes without the code.",
+    "existsSubject": "Your ShyTalk account",
+    "existsBody": "Someone asked to join ShyTalk with this email address, which already has an account. Sign in with a passkey, an authenticator app, Google or Apple.",
+    "existsRecover": "If every way to sign in is lost, recover the account here:",
+    "recoveryStartedSubject": "Your ShyTalk account is being recovered",
+    "recoveryStartedBody": "A recovery of your ShyTalk account has started. From {completesAt}, a new way to sign in can be added, and every other device will be signed out.",
+    "recoveryCancel": "If this was not you, cancel the recovery now:"
+  },
+  "account": {
+    "signUpTitle": "Join ShyTalk",
+    "signUpIntro": "Enter your email address. A 6-digit code is sent to it, to confirm the address is yours.",
+    "recoverTitle": "Recover your account",
+    "recoverIntro": "If every way to sign in is lost, a code sent to your email address starts a recovery. A new way to sign in can be added 24 hours later, and the recovery can be cancelled until then.",
+    "emailLabel": "Email address",
+    "sendCode": "Send code",
+    "codeLabel": "6-digit code",
+    "confirmCode": "Confirm",
+    "sent": "An email is on its way. If it holds a code, enter it here: it works once, for 10 minutes.",
+    "invalid": "Enter a valid email address, and the code as 6 digits.",
+    "tooMany": "Too many tries. Please wait a few minutes and try again.",
+    "sendFailed": "The email could not be sent. Please try again later.",
+    "codeRefused": "That code is not right, or it has expired. Ask for a new one if needed.",
+    "failed": "Something went wrong. Please try again later.",
+    "signUpConfirmed": "Your email address is confirmed.",
+    "recoveryStarted": "The recovery has started. From {completesAt}, a new way to sign in can be added on this device.",
+    "cancelTitle": "Cancel a recovery",
+    "cancelIntro": "Press the button to cancel the recovery of your ShyTalk account.",
+    "cancelButton": "Cancel the recovery",
+    "cancelled": "Nothing is being recovered on this account now.",
+    "noScript": "This page needs JavaScript to work."
   }
 }

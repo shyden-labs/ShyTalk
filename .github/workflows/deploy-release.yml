@@ -60,6 +60,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          TOTP_KEY: ${{ secrets.TOTP_KEY }}
         run: |
           npm run build:web || { echo "::error title=deploy-release failed::the website did not build"; exit 1; }
           cd workers/web
@@ -101,6 +102,14 @@ jobs:
             exit 1
           fi
           printf '%s' "$BETTER_AUTH_SECRET" | npx wrangler secret put BETTER_AUTH_SECRET --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET Better Auth secret was not set"; exit 1; }
+          # Authenticator-app sign-in answers 503 until the Worker holds TOTP_KEY
+          # (shyden-labs/ShyTalk#134); it seals stored secrets, so test and
+          # production each keep their own value, never made fresh here.
+          if [ -z "$TOTP_KEY" ]; then
+            echo "::error title=TOTP_KEY missing::Set TOTP_KEY in this run's GitHub environment (shyden-labs/ShyTalk#134); until then $TARGET authenticator-app sign-in answers 503."
+            exit 1
+          fi
+          printf '%s' "$TOTP_KEY" | npx wrangler secret put TOTP_KEY --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET authenticator key was not set"; exit 1; }
           # The TEST origin refuses every request without its door secret
           # (decision 216); PROD has no door.
           if [ "$TARGET" = test ]; then
