@@ -24,6 +24,8 @@ interface Report {
 }
 
 export interface PhoneDeps {
+  /** The test mailbox's password, from this Mac's Keychain (service shytalk-test-mailbox). */
+  mailboxPassword(): Promise<string>;
   /** Forwards Chrome's DevTools socket on the OnePlus; answers the endpoint. */
   forward(): Promise<string>;
   unforward(): Promise<void>;
@@ -100,6 +102,9 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
   }
   const errors: string[] = [];
   try {
+    // Both phones' closed-testing journey reads its mail from the real test mailbox (shyden-labs/ShyTalk#150):
+    // the OnePlus's Playwright inherits this environment, and the iPhone's cases run in this process.
+    process.env.TEST_MAILBOX_PASSWORD = await d.mailboxPassword();
     const endpoint = await d.forward();
     let code: number;
     try {

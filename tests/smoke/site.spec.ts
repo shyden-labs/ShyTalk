@@ -125,3 +125,32 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     expect(refusals).toEqual([]);
   });
 }
+
+/**
+ * The closed-testing journey, in English, once per browser (shyden-labs/ShyTalk#55
+ * AC7, shyden-labs/ShyTalk#150): apply through the real form with real typing
+ * and clicks, follow the mailed link, press the button, see "confirmed". CI's
+ * mail goes to the stand-in; the phones' goes out for real, to the test mailbox
+ * (the `mailbox` fixture). Each browser applies once, inside APPLY_LIMIT's 5 a minute.
+ */
+test('applying and following the mailed link confirms the address', async ({ page, mailbox }) => {
+  await page.goto('/closed-testing', { waitUntil: 'load' });
+  await page.getByLabel(t('en', 'closedTesting.emailLabel')).pressSequentially(mailbox.address);
+  await page.getByLabel(t('en', 'closedTesting.adultLabel')).check();
+  await page.getByRole('button', { name: t('en', 'closedTesting.submit') }).click();
+  const answer = page.getByRole('status');
+  await expect(answer).toBeVisible();
+  await expect(answer).toHaveText(t('en', 'closedTesting.sent'));
+
+  const { subject, confirmLink } = await mailbox.mail();
+  expect(subject).toBe(t('en', 'closedTesting.mailSubject'));
+
+  // The Worker builds the link from its own SITE_ORIGIN; the CI smoke serves the same path locally.
+  const { pathname, search } = new URL(confirmLink);
+  await page.goto(`${pathname}${search}`, { waitUntil: 'load' });
+  await page.getByRole('button', { name: t('en', 'closedTesting.confirmButton') }).click();
+  await page.waitForURL('**/closed-testing/confirmed');
+  const heading = page.getByRole('heading', { level: 1 });
+  await expect(heading).toBeVisible();
+  await expect(heading).toHaveText(t('en', 'closedTesting.confirmedHeading'));
+});

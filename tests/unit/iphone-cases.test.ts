@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
@@ -8,6 +8,15 @@ import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
  * (shyden-labs/ShyTalk#112): here Safari is a stand-in page that behaves as
  * the site should, and each test breaks one thing a case must catch.
  */
+
+// The real test mailbox is stood in: a unit test reaches no IMAP server.
+const mailbox = vi.hoisted(() => ({
+  plusAddress: vi.fn((tag: string) => `box+${tag}@mail.test`),
+  waitForMail: vi.fn<(tag: string, deps: { password: string }) => Promise<{ subject: string; text: string; confirmLink: string }>>(() =>
+    Promise.resolve({ subject: 'subject', text: 'body', confirmLink: 'https://dev.example/closed-testing/confirm?t=abc' }),
+  ),
+}));
+vi.mock('../phones/test-mailbox.ts', () => mailbox);
 
 const LOCALE: Record<string, Locale> = { en: 'en', id: 'id', th: 'th', vi: 'vi', 'zh-Hans': 'zh' };
 const PREFIX: Record<string, string> = { en: '', id: '/id', th: '/th', vi: '/vi', 'zh-Hans': '/zh' };
@@ -45,6 +54,7 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
       onLegalPage = true;
       return Promise.resolve();
     },
+    type: () => Promise.resolve(),
     waitForText: () => Promise.resolve(),
     visibleLinks: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
@@ -58,11 +68,14 @@ const langOf = (title: string): string => title.split(':')[0] ?? '';
 const cases = (start: string) => IPHONE_CASES.filter(({ title }) => kind(title).startsWith(start));
 
 describe('the iPhone cases', () => {
-  it.each(IPHONE_CASES.map((c) => [c.title, c] as const))('%s: passes on the site as it should be', async (_, c) => {
-    const page = safari(langOf(c.title));
-    await expect(c.run(page)).resolves.toBeUndefined();
-    expect(page.visited[0]?.startsWith(PREFIX[langOf(c.title)] ?? '?')).toBe(true);
-  });
+  it.each(IPHONE_CASES.filter(({ title }) => langOf(title) in LOCALE).map((c) => [c.title, c] as const))(
+    '%s: passes on the site as it should be',
+    async (_, c) => {
+      const page = safari(langOf(c.title));
+      await expect(c.run(page)).resolves.toBeUndefined();
+      expect(page.visited[0]?.startsWith(PREFIX[langOf(c.title)] ?? '?')).toBe(true);
+    },
+  );
 
   it.each(cases('the home page answers').map((c) => [c.title, c] as const))('%s: fails on anything but 200', async (_, c) => {
     await expect(c.run(safari(langOf(c.title), { goto: () => Promise.resolve(500) }))).rejects.toThrow();
@@ -223,5 +236,87 @@ describe('the iPhone cases', () => {
 
   it.each(named('each footer legal link'))('%s: fails on any axe violation', async (_, c) => {
     await expect(c.run(safari(langOf(c.title), { axeViolations: () => Promise.resolve(['label: 1']) }))).rejects.toThrow();
+  });
+});
+
+describe('the iPhone closed-testing journey', () => {
+  const TITLE = 'applying and following the mailed link confirms the address';
+  const journey = () => {
+    const found = IPHONE_CASES.find(({ title }) => title === TITLE);
+    if (found === undefined) throw new Error(`no case titled ${TITLE}`);
+    return found;
+  };
+  const sent = t('en', 'closedTesting.sent');
+
+  beforeEach(() => {
+    mailbox.plusAddress.mockClear();
+    mailbox.waitForMail.mockClear();
+    mailbox.waitForMail.mockResolvedValue({
+      subject: t('en', 'closedTesting.mailSubject'),
+      text: 'body',
+      confirmLink: 'https://dev.example/closed-testing/confirm?t=abc',
+    });
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
+    vi.stubEnv('TEST_MAILBOX_PASSWORD', 'secret');
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('is in the suite once', () => {
+    expect(IPHONE_CASES.filter(({ title }) => title === TITLE)).toHaveLength(1);
+  });
+
+  it('applies with its own plus-address by real typing and taps, reads the mail, follows its link and confirms', async () => {
+    const steps: string[] = [];
+    mailbox.waitForMail.mockImplementation((tag: string, deps: { password: string }) => {
+      steps.push(`mail ${tag} ${deps.password}`);
+      return Promise.resolve({
+        subject: t('en', 'closedTesting.mailSubject'),
+        text: 'body',
+        confirmLink: 'https://dev.example/closed-testing/confirm?t=abc',
+      });
+    });
+    const page = safari('en', {
+      goto: (path) => (steps.push(`goto ${path}`), Promise.resolve(200)),
+      type: (selector, text) => (steps.push(`type ${selector} ${text}`), Promise.resolve()),
+      tap: (selector) => (steps.push(`tap ${selector}`), Promise.resolve()),
+      waitForText: (selector, text) => (steps.push(`wait ${selector} ${text}`), Promise.resolve()),
+    });
+    await journey().run(page);
+    expect(mailbox.plusAddress).toHaveBeenCalledWith('iphone-air-1700000000000');
+    expect(steps).toEqual([
+      'goto /closed-testing',
+      'type #apply-email box+iphone-air-1700000000000@mail.test',
+      'tap #apply-adult',
+      'tap #apply-submit',
+      `wait #apply-answer ${sent}`,
+      'mail iphone-air-1700000000000 secret',
+      'goto /closed-testing/confirm?t=abc',
+      'tap #confirm-button',
+      `wait h1, [role="heading"][aria-level="1"] ${t('en', 'closedTesting.confirmedHeading')}`,
+    ]);
+  });
+
+  it('fails when the mail has another subject', async () => {
+    mailbox.waitForMail.mockResolvedValue({
+      subject: 'Other',
+      text: 'body',
+      confirmLink: 'https://dev.example/closed-testing/confirm?t=abc',
+    });
+    await expect(journey().run(safari('en'))).rejects.toThrow('Other');
+  });
+
+  it('fails without reading mail when the sent answer never shows', async () => {
+    const page = safari('en', { waitForText: () => Promise.reject(new Error('#apply-answer held null')) });
+    await expect(journey().run(page)).rejects.toThrow('#apply-answer held null');
+    expect(mailbox.waitForMail).not.toHaveBeenCalled();
+  });
+
+  it('passes an empty password when none is set, which waitForMail refuses by name', async () => {
+    vi.stubEnv('TEST_MAILBOX_PASSWORD', undefined);
+    await journey().run(safari('en'));
+    expect(mailbox.waitForMail).toHaveBeenCalledWith('iphone-air-1700000000000', { password: '' });
   });
 });

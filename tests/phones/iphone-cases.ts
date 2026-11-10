@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
+import { plusAddress, waitForMail } from './test-mailbox.ts';
 
 /** What a case can ask of Safari; tests/phones/safari.ts drives it through Appium. */
 export interface SafariPage {
@@ -27,6 +28,8 @@ export interface SafariPage {
   axeViolations(): Promise<string[]>;
   /** A real tap on the element, through WebDriverAgent. */
   tap(selector: string): Promise<void>;
+  /** Real typing into the element, key by key on the iPhone's keyboard, through WebDriverAgent. */
+  type(selector: string, text: string): Promise<void>;
   /** Waits for `selector` to hold exactly `text`, failing at a ceiling and naming what it found. */
   waitForText(selector: string, text: string): Promise<void>;
 }
@@ -174,4 +177,30 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
   ];
 }
 
-export const IPHONE_CASES: IphoneCase[] = LANGUAGES.flatMap(({ lang, locale, prefix }) => casesFor(lang, locale, prefix));
+/**
+ * The closed-testing journey, in English, once (tests/smoke/site.spec.ts's last
+ * test, shyden-labs/ShyTalk#150): its mail goes out for real, to the test
+ * mailbox's plus-address for this run. The confirmed page's own heading stands
+ * for Playwright's wait on its address: no other page shows it.
+ */
+const JOURNEY: IphoneCase = {
+  title: 'applying and following the mailed link confirms the address',
+  run: async (page) => {
+    const tag = `iphone-air-${String(Date.now())}`;
+    await page.goto('/closed-testing');
+    await page.type('#apply-email', plusAddress(tag));
+    await page.tap('#apply-adult');
+    await page.tap('#apply-submit');
+    await page.waitForText('#apply-answer', t('en', 'closedTesting.sent'));
+
+    const { subject, confirmLink } = await waitForMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' });
+    assert.equal(subject, t('en', 'closedTesting.mailSubject'));
+
+    const { pathname, search } = new URL(confirmLink);
+    await page.goto(`${pathname}${search}`);
+    await page.tap(CONFIRM_BUTTON);
+    await page.waitForText(H1, t('en', 'closedTesting.confirmedHeading'));
+  },
+};
+
+export const IPHONE_CASES: IphoneCase[] = [...LANGUAGES.flatMap(({ lang, locale, prefix }) => casesFor(lang, locale, prefix)), JOURNEY];

@@ -49,6 +49,13 @@ describe('safariPage: goto', () => {
     ]);
   });
 
+  it('adds its token after a query the path already has, so a confirm link keeps its own', async () => {
+    const fake = appium({ safariNetwork: [[], [network(`${BASE}/closed-testing/confirm`, 200)]] });
+    const page = safariPage(fake.call, 's1', BASE, undefined, () => 'v1');
+    await page.goto('/closed-testing/confirm?t=abc');
+    expect(fake.calls[2]).toEqual(['POST', '/session/s1/url', { url: `${BASE}/closed-testing/confirm?t=abc&phone-smoke=v1` }]);
+  });
+
   it('asks for each page fresh, with a token no earlier visit used: Safari answered 304 from its cache across sessions (2026-11-07)', async () => {
     const fake = appium({ safariNetwork: [[], [network(`${BASE}/`, 200)], [], [network(`${BASE}/`, 200)]] });
     const page = safariPage(fake.call, 's1', BASE);
@@ -172,6 +179,19 @@ describe('safariPage: tap and waitForText', () => {
     expect(calls).toEqual([
       ['POST', '/session/s1/element', { using: 'css selector', value: '#confirm-button' }],
       ['POST', '/session/s1/element/e-1/click', {}],
+    ]);
+  });
+
+  it('types into the element key by key through WebDriver, as the iPhone’s keyboard does', async () => {
+    const calls: [string, string, unknown][] = [];
+    const call: WebDriverCall = (method, path, body) => {
+      calls.push([method, path, body]);
+      return Promise.resolve(path.endsWith('/element') ? { [ELEMENT]: 'e-2' } : null);
+    };
+    await safariPage(call, 's1', BASE).type('#apply-email', 'a+b@mail.test');
+    expect(calls).toEqual([
+      ['POST', '/session/s1/element', { using: 'css selector', value: '#apply-email' }],
+      ['POST', '/session/s1/element/e-2/value', { text: 'a+b@mail.test' }],
     ]);
   });
 

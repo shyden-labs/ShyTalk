@@ -8,7 +8,7 @@ import { plusAddress, waitForMail, type MailboxReader } from '../phones/test-mai
  * reader waits on that folder. The IMAP connection is stood in here.
  */
 
-const MAIL = { subject: 'Confirm your email', text: 'Hello\nhttps://dev.shytalk.app/closed-testing/confirm?t=abc_DEF-1\nBye' };
+const MAIL = { subject: 'Confirm your email', text: 'Hello\nhttps://site.example/closed-testing/confirm?t=abc_DEF-1\nBye' };
 
 function reader(answers: ({ subject: string; text: string } | null)[]): MailboxReader & { folders: string[]; closed: number } {
   const folders: string[] = [];
@@ -46,7 +46,7 @@ describe('waitForMail', () => {
     const { now, pause } = clock();
     await expect(waitForMail('iphone-7', { password: 'pw', open: () => Promise.resolve(box), now, pause })).resolves.toEqual({
       ...MAIL,
-      confirmLink: 'https://dev.shytalk.app/closed-testing/confirm?t=abc_DEF-1',
+      confirmLink: 'https://site.example/closed-testing/confirm?t=abc_DEF-1',
     });
     expect(box.folders).toEqual(['INBOX.iphone-7']);
     expect(box.closed).toBe(1);

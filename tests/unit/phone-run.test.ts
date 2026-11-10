@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { runCases, phoneVerdict, capabilities, runPhones, type PhoneDeps } from '../phones/run.ts';
 import type { IphoneCase, SafariPage } from '../phones/iphone-cases.ts';
 
@@ -94,6 +94,7 @@ function deps(overrides: Partial<PhoneDeps> = {}): PhoneDeps & { steps: string[]
     };
   return {
     steps,
+    mailboxPassword: step('mailbox password', 'secret'),
     forward: step('forward', 'http://127.0.0.1:9333'),
     unforward: step('unforward'),
     playwright: step('playwright', 0),
@@ -111,10 +112,32 @@ function deps(overrides: Partial<PhoneDeps> = {}): PhoneDeps & { steps: string[]
 }
 
 describe('runPhones', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('hands the test mailbox’s password from the Keychain to both phones’ runs', async () => {
+    vi.stubEnv('TEST_MAILBOX_PASSWORD', undefined);
+    const seen: (string | undefined)[] = [];
+    const d = deps({
+      playwright: () => (seen.push(process.env.TEST_MAILBOX_PASSWORD), Promise.resolve(0)),
+      cases: [{ title: 'a', run: () => (seen.push(process.env.TEST_MAILBOX_PASSWORD), Promise.resolve()) }],
+    });
+    await expect(runPhones('https://site.example', d)).resolves.toBe(0);
+    expect(seen).toEqual(['secret', 'secret']);
+  });
+
+  it('fails naming why, before touching a phone, when the Keychain gives no password', async () => {
+    const d = deps({ mailboxPassword: () => Promise.reject(new Error('security: item not found')) });
+    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    expect(d.steps).toEqual(['print phone-smoke: security: item not found']);
+  });
+
   it('runs the OnePlus, then the iPhone, then prints the verdict, and passes', async () => {
     const d = deps();
     await expect(runPhones('https://site.example', d)).resolves.toBe(0);
     expect(d.steps).toEqual([
+      'mailbox password',
       'forward',
       'playwright https://site.example http://127.0.0.1:9333',
       'unforward',
@@ -147,7 +170,7 @@ describe('runPhones', () => {
   it('removes the adb forward when Playwright cannot run, and fails naming why', async () => {
     const d = deps({ playwright: () => Promise.reject(new Error('npx not found')) });
     await expect(runPhones('https://site.example', d)).resolves.toBe(1);
-    expect(d.steps).toEqual(['forward', 'unforward', 'print phone-smoke: npx not found']);
+    expect(d.steps).toEqual(['mailbox password', 'forward', 'unforward', 'print phone-smoke: npx not found']);
   });
 
   it('closes the session and stops Appium when a case throws outside its checks', async () => {
