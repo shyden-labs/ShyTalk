@@ -17,3 +17,23 @@ export function verifyMessage(status: number): VerifyMessage {
 export function cancelMessage(status: number): 'cancelled' | 'failed' {
   return status === 200 ? 'cancelled' : 'failed';
 }
+
+/** A sign-in's answer (plan 7 Task 7, #134): null goes on to the account page; every refusal reads the same. */
+export function signInMessage(status: number): 'tooMany' | 'signInRefused' | 'failed' | null {
+  if (status === 200) return null;
+  if (status === 429) return 'tooMany';
+  if (status === 400 || status === 401) return 'signInRefused';
+  return 'failed';
+}
+
+/** Removing a way to sign in: null when removed; the last one stays. */
+export function removeMessage(status: number): 'lastMethod' | 'failed' | null {
+  if (status === 200) return null;
+  return status === 409 ? 'lastMethod' : 'failed';
+}
+
+/** The authenticator link's secret, shown as groups of four for typing into an app by hand. */
+export function setupKey(uri: string): string {
+  const secret = new URL(uri).searchParams.get('secret') ?? '';
+  return (secret.match(/.{1,4}/g) ?? []).join(' ');
+}
