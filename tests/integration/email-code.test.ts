@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { MailMessage } from '../../packages/mail/index.ts';
-import { addressHash } from '../../workers/web/src/app/email-code.ts';
+import { addressHash, newToken } from '../../workers/web/src/app/email-code.ts';
 import { handleEmailStart, handleEmailVerify, type EmailDeps, type EmailEnv } from '../../workers/web/src/app/email-routes.ts';
 import { localDev, type LocalDevEnv } from './d1.ts';
 
@@ -25,7 +25,7 @@ const deps: EmailDeps = {
   },
   code: () => code,
   now: Date.now,
-  token: () => crypto.randomUUID(),
+  token: newToken,
 };
 
 beforeAll(async () => {
