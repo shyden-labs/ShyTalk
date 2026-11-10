@@ -26,6 +26,7 @@ An email address is confirmed once, when an account is made, and used again only
 - Registering the passkey or TOTP, and issuing recovery codes: #134. This ticket hands #134 a one-purpose token (below).
 - Telling open devices instantly: #169.
 - Email sign-in. There is none; email is never an everyday way in.
+- Age, country and parent consent (epic #14) and the consent step (#142). Sign-up here asks only for the address; both must be in the sign-up journey before it reaches production, which only Shyden releases. Until then sign-up is exercised on dev and test only (recorded for Shyden, 2026-11-11).
 
 ## Anti-goals
 
