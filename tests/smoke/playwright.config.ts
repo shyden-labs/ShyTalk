@@ -52,6 +52,8 @@ const MAIL_VARS = [
   `OCI_PRIVATE_KEY:${privateKey.trim().replace(/\n/g, ' ')}`,
   // Email codes (shyden-labs/ShyTalk#133) need Better Auth's secret to key their hashes: a throwaway one each run.
   `BETTER_AUTH_SECRET:${randomBytes(32).toString('hex')}`,
+  // The authenticator app's sign-in seals its secrets with TOTP_KEY (shyden-labs/ShyTalk#134): a throwaway one each run.
+  `TOTP_KEY:${randomBytes(32).toString('hex')}`,
 ]
   .map((value) => `--var "${value}"`)
   .join(' ');
