@@ -30,7 +30,7 @@ An email address is confirmed once, when an account is made, and used again only
 
 ## Anti-goals
 
-- No account discovery: no reply or status tells whether an address has an account. Timing is not equalised (builder's call, recorded): a recovery start for an unknown address sends nothing and answers sooner; equalising it would mean a fake send.
+- No account discovery: no reply or status tells whether an address has an account, and every start answers no sooner than 3 s (as the closed-testing form's `ANSWER_FLOOR_MS` does), so whether a mail was due cannot be timed. One measured exception, recorded: during a mail outage, a due send answers 502 while a recovery for an unknown address (nothing due) answers 202; goal 5 requires the failure to be shown and a caller cannot cause an outage.
 - No code, token or address in a log or an audit row.
 - No session from an email code alone.
 - Nothing on a clock: expired rows are removed by the requests that pass them, never by a cron.
@@ -66,7 +66,7 @@ An email address is confirmed once, when an account is made, and used again only
 
 ### Verify: `POST /api/app/email/verify {email, purpose, code}`
 
-- Same IP limit. Wrong code: `wrong_tries` + 1, 401 `code_refused`; the 5th wrong try deletes the row. No row, expired or spent: the same 401.
+- Same IP limit. Every attempt, right or wrong, first reserves a try with one conditional UPDATE (`wrong_tries < 5` and not expired); only an attempt that reserved one compares its guess, so verifies at one moment cannot pass the limit together. Wrong code: 401 `code_refused`, and the row is deleted once its tries are used. No row, expired, no try left or spent: the same 401.
 - Right code: the row is deleted first, and the request goes on only if that delete changed one row, so two verifies racing with the same code succeed once.
   - **sign-up:** a `sign-up` token (30 minutes) holding the confirmed address is answered: `{signUpToken}`. No user and no session are made yet. #134's setup endpoints accept this token in place of a session; finishing setup there creates the user (`emailVerified` 1) with its first method and recovery codes in one batch, then the session (builder's call: the account is created when it can first be signed into, so an abandoned sign-up leaves no account behind; goal 2's 'creates the account' happens at that moment, recorded for Shyden). If a user with that address appeared meanwhile (a Google sign-in), setup answers 409 `account_exists`.
   - **recovery:** an `account_recovery` row is started, a `recovery` token (valid until `completes_at` + 24 h) is answered with `completesAt`, the address is emailed a notice with the cancel link, and `recovery.start` is audited, all in one batch except the mail. If a recovery is already pending, a new verify answers a new `recovery` token for it and spends the old one; the 24-hour clock is never restarted and no second notice is sent (builder's call). A recovery not completed within 24 hours of `completes_at` lapses: it is read as not pending, its token is refused, and the next verify starts a new one (the row is marked `cancelled` with `ended_at` in that same batch, audited as `recovery.lapse`).
