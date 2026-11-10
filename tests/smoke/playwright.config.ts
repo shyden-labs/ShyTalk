@@ -69,7 +69,16 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${String(PORT)}`,
     extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret },
   },
-  projects: SMOKE_TARGETS.map((name) => ({ name, use: { ...devices[DEVICE[name]] } })),
+  // Locally no Cloudflare sets the connecting address, so every request would share SIGN_IN_LIMIT's one 'unknown' key
+  // (10 a minute); each browser gets its own documentation-range address (RFC 5737) to stay inside it.
+  projects: SMOKE_TARGETS.map((name, index) => ({
+    name,
+    // A project's headers replace the top-level ones, so the door secret is repeated here.
+    use: {
+      ...devices[DEVICE[name]],
+      extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret, 'cf-connecting-ip': `198.51.100.${String(index + 1)}` },
+    },
+  })),
   webServer: [
     {
       command: `node tests/smoke/mail-stand-in.ts ${String(MAIL_STAND_IN_PORT)}`,
