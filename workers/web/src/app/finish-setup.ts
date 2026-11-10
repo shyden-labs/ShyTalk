@@ -66,7 +66,8 @@ export async function prepareSetup(
 
   if (identity.kind === 'sign-up') {
     statements.push(
-      DB.prepare(CREATE_USER_SQL).bind(userId, identity.email.slice(0, identity.email.indexOf('@')), identity.email, at, at),
+      // No name until the member chooses one: the address's local part often holds a real name.
+      DB.prepare(CREATE_USER_SQL).bind(userId, '', identity.email, at, at),
       audit(env, { actor, action: 'user.create', subject: actor, detail: { via: 'email' } }),
     );
   } else if (identity.kind === 'recovery') {

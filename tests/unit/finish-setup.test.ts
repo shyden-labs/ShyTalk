@@ -73,13 +73,8 @@ describe('finishSetup: a sign-up', () => {
     const [guard, made] = w.batches;
     expect(guard).toEqual([{ sql: 'UPDATE one_time_token SET used_at = ? WHERE token_hash = ? AND used_at IS NULL', values: [NOW, 'th'] }]);
     const created = made?.find(({ sql }) => sql.startsWith('INSERT INTO "user"'));
-    expect(created?.values).toEqual([
-      'u-new',
-      'new.person',
-      'new.person@example.test',
-      new Date(NOW).toISOString(),
-      new Date(NOW).toISOString(),
-    ]);
+    // No name until the member chooses one: the address's local part often holds a real name.
+    expect(created?.values).toEqual(['u-new', '', 'new.person@example.test', new Date(NOW).toISOString(), new Date(NOW).toISOString()]);
     expect(actions(made ?? [])).toEqual(['user.create', 'method.add', 'recovery_codes.new']);
     expect(answer.recoveryCodes).toHaveLength(10);
     expect(answer.userId).toBe('u-new');
