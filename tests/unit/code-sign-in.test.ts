@@ -79,6 +79,8 @@ describe('POST /api/app/sign-in/totp and /sign-in/recovery-code', () => {
     expect((await appSession(signedIn, w.auth))?.userId).toBe('u-1');
     const started = w.audits.find(({ values }) => values[2] === 'session.start');
     expect(started?.values.slice(1, 5)).toEqual(['user:u-1', 'session.start', 'user:u-1', JSON.stringify({ method: 'totp' })]);
+    const used = w.audits.find(({ values }) => values[2] === 'method.use');
+    expect(used?.values.slice(1, 5)).toEqual(['user:u-1', 'method.use', 'user:u-1', JSON.stringify({ kind: 'totp' })]);
     expect(JSON.stringify(w.audits)).not.toContain('123456');
   });
 

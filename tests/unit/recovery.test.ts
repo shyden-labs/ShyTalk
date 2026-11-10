@@ -129,6 +129,19 @@ describe('POST /api/app/recovery/cancel', () => {
     ]);
   });
 
+  it("cancels the link's recovery even in a browser signed in as someone else", async () => {
+    const { env, batches } = setting(null, { id: 3, user_id: 'u-owner' });
+    expect((await handleRecoveryCancel(request('POST', { cancelToken: 'cancel-me' }), env, signedIn, () => NOW)).status).toBe(200);
+    const written = batches.at(-1) ?? [];
+    expect(written.find(({ sql }) => sql.startsWith("UPDATE account_recovery SET state = 'cancelled'"))?.values).toEqual([NOW, 3]);
+    expect(written.find(({ sql }) => sql.startsWith('INSERT INTO audit'))?.values.slice(1, 5)).toEqual([
+      'public',
+      'recovery.cancel',
+      'user:u-owner',
+      JSON.stringify({ by: 'email-link' }),
+    ]);
+  });
+
   it('cancels by the email link token, matching its hash, without a session', async () => {
     const { env, batches, all } = setting(PENDING, { id: 3, user_id: 'u-1' });
     expect(await answerOf(await handleRecoveryCancel(request('POST', { cancelToken: 'cancel-me' }), env, signedOut, () => NOW))).toEqual({

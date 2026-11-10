@@ -64,6 +64,8 @@ function setting(rows: Rows = {}) {
 const signedIn = () => Promise.resolve(SESSION);
 const signedOut = () => Promise.resolve(null);
 const request = (method: string, path: string): Request => new Request(`${ORIGIN}/api/app/${path}`, { method });
+const jsonPost = (path: string): Request =>
+  new Request(`${ORIGIN}/api/app/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
 const answerOf = async (response: Response) => ({ status: response.status, body: await response.json() });
 
 describe('GET /api/app/sign-in-methods', () => {
@@ -225,13 +227,20 @@ describe('the methods and sessions routes', () => {
 describe('POST /api/app/recovery-codes', () => {
   it("replaces the member's codes with a new set of ten, shown once, audited in the same batch", async () => {
     const { env, batches } = setting();
-    const response = await handleMethods(request('POST', 'recovery-codes'), env, signedIn);
+    const response = await handleMethods(jsonPost('recovery-codes'), env, signedIn);
     expect(response.status).toBe(200);
     const { recoveryCodes } = (await response.json()) as { recoveryCodes: string[] };
     expect(recoveryCodes).toHaveLength(10);
     const made = batches.at(-1) ?? [];
     expect(made[0]).toEqual({ sql: 'DELETE FROM recovery_code WHERE user_id = ?', values: ['u-1'] });
     expect(made.at(-1)?.values[2]).toBe('recovery_codes.new');
+  });
+
+  it('answers 400 to a request that is not sent as JSON, making no codes (a form on another site cannot send JSON)', async () => {
+    const { env, all } = setting();
+    const form = new Request(`${ORIGIN}/api/app/recovery-codes`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' });
+    expect((await handleMethods(form, env, signedIn)).status).toBe(400);
+    expect(all()).toEqual([]);
   });
 
   it('answers 404 to a path below it, making no codes', async () => {

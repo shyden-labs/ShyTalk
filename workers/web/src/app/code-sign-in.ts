@@ -82,7 +82,11 @@ export async function handleCodeSignIn(
   const verified = await verify(email, code, now());
   if (verified === null) return json(401, { error: 'sign_in_refused' });
 
-  const used = kind === 'recovery-code' ? [{ action: 'recovery_code.use', detail: { left: verified.left } }] : [];
+  // Every method used is audited (AC7): an authenticator as a method, a recovery code as a code with those left.
+  const used =
+    kind === 'recovery-code'
+      ? [{ action: 'recovery_code.use', detail: { left: verified.left } }]
+      : [{ action: 'method.use', detail: { kind: 'totp' } }];
   const started = await startSession(env, auth, verified.userId, { method: kind }, used);
   if (started instanceof Response) return started;
   return withSession(auth, started.token, {

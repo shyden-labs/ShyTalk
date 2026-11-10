@@ -10,6 +10,7 @@
  */
 import { audit, auditIfChanged, type AuditDatabase } from '../audit.ts';
 import { json } from '../http.ts';
+import { objectBody } from './email-routes.ts';
 import { replaceRecoveryCodes, type CodeSignInEnv } from './recovery-codes.ts';
 import { signedOut, type AppSession } from './session.ts';
 
@@ -121,6 +122,8 @@ export async function handleMethods(
 
   if (area === 'recovery-codes') {
     if (parts.length > 1) return notFound();
+    // JSON only: a form on another site can send none, so it cannot make new codes with the member's cookie.
+    if ((await objectBody(request)) === null) return json(400, { error: 'bad_request' });
     // A new set ends the old one (AC3); the codes are shown once, here.
     const actor = `user:${session.userId}`;
     const { statements, codes } = await replaceRecoveryCodes(env as unknown as CodeSignInEnv, session.userId, actor);

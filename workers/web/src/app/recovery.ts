@@ -71,15 +71,18 @@ export async function handleRecoveryCancel(
   if (body === null) return json(400, { error: 'bad_request' });
 
   const { DB } = env;
-  const session = await sessionOf(request);
+  const cancelToken = body['cancelToken'];
   let found: { id: number; userId: string; actor: string; by: 'session' | 'email-link' } | null = null;
-  if (session !== null) {
-    const pending = await pendingFor(env, session.userId);
-    if (pending !== undefined) found = { id: pending.id, userId: session.userId, actor: `user:${session.userId}`, by: 'session' };
-  } else if (typeof body['cancelToken'] === 'string' && body['cancelToken'] !== '') {
-    const [answer] = await DB.batch([DB.prepare(BY_CANCEL_TOKEN_SQL).bind(await tokenHash(body['cancelToken']))]);
+  // The notice's link names its recovery: it wins over whatever account the browser is signed into.
+  if (typeof cancelToken === 'string' && cancelToken !== '') {
+    const [answer] = await DB.batch([DB.prepare(BY_CANCEL_TOKEN_SQL).bind(await tokenHash(cancelToken))]);
     const row = answer?.results?.[0] as { id: number; user_id: string } | undefined;
     if (row !== undefined) found = { id: row.id, userId: row.user_id, actor: 'public', by: 'email-link' };
+  } else {
+    const session = await sessionOf(request);
+    const pending = session === null ? undefined : await pendingFor(env, session.userId);
+    if (session !== null && pending !== undefined)
+      found = { id: pending.id, userId: session.userId, actor: `user:${session.userId}`, by: 'session' };
   }
   if (found === null) return OK();
 
