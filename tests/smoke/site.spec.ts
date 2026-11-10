@@ -186,7 +186,7 @@ test('joining with the mailed code and an authenticator app, then signing back i
   await expect(key).toBeVisible();
   const secret = base32((await key.textContent()) ?? '');
   await page.getByLabel(t('en', 'account.authenticatorCodeLabel')).pressSequentially(await totpAt(secret, 0));
-  await page.getByRole('button', { name: t('en', 'account.confirmAuthenticator') }).click();
+  await page.getByRole('button', { name: t('en', 'account.confirmAuthenticator'), exact: true }).click();
 
   const codes = page.getByTestId('recovery-codes').getByRole('listitem');
   await expect(codes).toHaveCount(10);
@@ -197,12 +197,12 @@ test('joining with the mailed code and an authenticator app, then signing back i
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(t('en', 'account.accountTitle'));
   await expect(page.getByTestId('method-authenticator')).toHaveText(t('en', 'account.authenticatorOn'));
   await expect(page.getByTestId('devices').getByRole('listitem')).toHaveCount(1);
-  await page.getByRole('button', { name: t('en', 'account.signOut') }).click();
+  await page.getByRole('button', { name: t('en', 'account.signOut'), exact: true }).click();
 
   await page.waitForURL('**/sign-in/');
   await page.getByLabel(t('en', 'account.emailLabel')).pressSequentially(mailbox.address);
   await page.getByLabel(t('en', 'account.authenticatorCodeLabel')).pressSequentially(await totpAt(secret, 1));
-  await page.getByRole('button', { name: t('en', 'account.signInWithAuthenticator') }).click();
+  await page.getByRole('button', { name: t('en', 'account.signInWithAuthenticator'), exact: true }).click();
   await page.waitForURL('**/account/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(t('en', 'account.accountTitle'));
 });
