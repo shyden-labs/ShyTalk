@@ -1,0 +1,225 @@
+---
+import Base from '../layouts/Base.astro';
+import { localePath, t, type Locale } from '../i18n/t.ts';
+
+/**
+ * Joining and recovering (plan 6 Task 6 and plan 7 Task 7,
+ * shyden-labs/ShyTalk#133, #134): an emailed code confirms the address, then
+ * the member chooses a passkey or an authenticator app, and the ten recovery
+ * codes are shown once. A sign-up token lives in `sessionStorage` only; a
+ * recovery token waits in `localStorage` until its recovery may complete.
+ */
+interface Props {
+  locale: Locale;
+  purpose: 'sign-up' | 'recovery';
+}
+const { locale, purpose } = Astro.props;
+const line = (key: string): string => t(locale, `account.${key}`);
+const title = line(purpose === 'sign-up' ? 'signUpTitle' : 'recoverTitle');
+const messages = ['sent', 'invalid', 'tooMany', 'sendFailed', 'codeRefused', 'failed', 'signUpConfirmed', 'recoveryStarted', 'passkeyFailed'];
+const data = Object.fromEntries(messages.map((key) => [`data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`, line(key)]));
+---
+
+<Base locale={locale} title={title}>
+  <h1>{title}</h1>
+  <p>{line(purpose === 'sign-up' ? 'signUpIntro' : 'recoverIntro')}</p>
+  <noscript><p>{line('noScript')}</p></noscript>
+  <div id="email-flow" data-locale={locale} data-purpose={purpose} data-account={localePath(locale, '/account/')} {...data}>
+    <form id="email-form">
+      <p>
+        <label for="email-address">{line('emailLabel')}</label>
+        <input id="email-address" name="email" type="email" autocomplete="email" required />
+      </p>
+      <p><button id="email-submit" type="submit">{line('sendCode')}</button></p>
+    </form>
+    <form id="code-form" hidden>
+      <p>
+        <label for="email-code">{line('codeLabel')}</label>
+        <input id="email-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required />
+      </p>
+      <p><button id="code-submit" type="submit">{line('confirmCode')}</button></p>
+    </form>
+    <p id="email-answer" role="status" hidden></p>
+
+    <section id="choose-method" hidden>
+      <h2>{line('chooseMethodTitle')}</h2>
+      <p>{line('chooseMethodIntro')}</p>
+      <p><button id="setup-passkey" type="button">{line('setUpPasskey')}</button></p>
+      <p><button id="setup-authenticator" type="button">{line('useAuthenticator')}</button></p>
+    </section>
+
+    <section id="authenticator-setup" hidden>
+      <p>{line('authenticatorIntro')}</p>
+      <p>{line('authenticatorKeyLabel')}: <code data-testid="totp-secret"></code></p>
+      <p><a id="authenticator-link" href="#">{line('authenticatorLink')}</a></p>
+      <form id="totp-form">
+        <p>
+          <label for="totp-code">{line('authenticatorCodeLabel')}</label>
+          <input id="totp-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required />
+        </p>
+        <p><button id="totp-confirm" type="submit">{line('confirmAuthenticator')}</button></p>
+      </form>
+    </section>
+
+    <section id="codes" hidden>
+      <h2 id="codes-title">{line('codesTitle')}</h2>
+      <p>{line('codesIntro')}</p>
+      <ul data-testid="recovery-codes"></ul>
+      <p><button id="codes-saved" type="button">{line('codesSaved')}</button></p>
+    </section>
+  </div>
+</Base>
+
+<script>
+  import { startRegistration, type PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
+  import { applyMessage } from '../closed-testing/answers.ts';
+  import { setupKey, verifyMessage } from '../account/answers.ts';
+  import { call } from '../account/api.ts';
+
+  const SIGN_UP_KEY = 'shytalk.signUpToken';
+  const RECOVERY_KEY = 'shytalk.recovery';
+
+  const root = document.querySelector<HTMLElement>('#email-flow');
+  const emailForm = document.querySelector<HTMLFormElement>('#email-form');
+  const codeForm = document.querySelector<HTMLFormElement>('#code-form');
+  const answer = document.querySelector<HTMLElement>('#email-answer');
+  const choose = document.querySelector<HTMLElement>('#choose-method');
+  const authenticator = document.querySelector<HTMLElement>('#authenticator-setup');
+  const totpForm = document.querySelector<HTMLFormElement>('#totp-form');
+  const codes = document.querySelector<HTMLElement>('#codes');
+
+  const field = (form: HTMLFormElement, name: string): string => String(new FormData(form).get(name) ?? '').trim();
+  const say = (key: string, completesAt?: string): void => {
+    if (!root || !answer) return;
+    const text = root.dataset[key] ?? '';
+    answer.textContent = completesAt === undefined ? text : text.replace('{completesAt}', new Date(completesAt).toLocaleString(root.dataset['locale']));
+    answer.hidden = false;
+  };
+
+  interface Recovery {
+    token: string;
+    completesAt: string;
+  }
+  function storedRecovery(): Recovery | null {
+    try {
+      const stored = JSON.parse(localStorage.getItem(RECOVERY_KEY) ?? 'null') as Recovery | null;
+      return stored && typeof stored.token === 'string' && typeof stored.completesAt === 'string' ? stored : null;
+    } catch {
+      return null;
+    }
+  }
+  function setupToken(): string {
+    if (root?.dataset['purpose'] === 'sign-up') return sessionStorage.getItem(SIGN_UP_KEY) ?? '';
+    return storedRecovery()?.token ?? '';
+  }
+
+  function showChoice(): void {
+    if (emailForm) emailForm.hidden = true;
+    if (codeForm) codeForm.hidden = true;
+    if (choose) choose.hidden = false;
+  }
+
+  function showCodes(body: unknown): void {
+    const list = codes?.querySelector('ul');
+    const recoveryCodes = (body as { recoveryCodes?: unknown } | null)?.recoveryCodes;
+    sessionStorage.removeItem(SIGN_UP_KEY);
+    localStorage.removeItem(RECOVERY_KEY);
+    if (!codes || !list || !Array.isArray(recoveryCodes)) {
+      location.assign(root?.dataset['account'] ?? '/');
+      return;
+    }
+    list.replaceChildren(
+      ...recoveryCodes.map((code) => {
+        const item = document.createElement('li');
+        item.textContent = String(code);
+        return item;
+      }),
+    );
+    if (choose) choose.hidden = true;
+    if (authenticator) authenticator.hidden = true;
+    if (answer) answer.hidden = true;
+    codes.hidden = false;
+  }
+
+  if (root && emailForm && codeForm && answer && choose && authenticator && totpForm && codes) {
+    const purpose = root.dataset['purpose'];
+    const recovery = purpose === 'recovery' ? storedRecovery() : null;
+    if (recovery !== null) {
+      say('recoveryStarted', recovery.completesAt);
+      if (Date.now() >= Date.parse(recovery.completesAt)) showChoice();
+    }
+
+    emailForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      void call('email/start', { email: field(emailForm, 'email'), purpose, locale: root.dataset['locale'] }).then(({ status }) => {
+        say(applyMessage(status));
+        if (status === 202) codeForm.hidden = false;
+      });
+    });
+
+    codeForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      void call('email/verify', { email: field(emailForm, 'email'), purpose, code: field(codeForm, 'code') }).then(({ status, body }) => {
+        const message = verifyMessage(status);
+        if (message !== 'confirmed') {
+          say(message);
+          return;
+        }
+        const answered = body as { signUpToken?: string; recoveryToken?: string; completesAt?: string };
+        if (purpose === 'sign-up') {
+          sessionStorage.setItem(SIGN_UP_KEY, answered.signUpToken ?? '');
+          say('signUpConfirmed');
+          showChoice();
+          return;
+        }
+        const started: Recovery = { token: answered.recoveryToken ?? '', completesAt: answered.completesAt ?? '' };
+        localStorage.setItem(RECOVERY_KEY, JSON.stringify(started));
+        emailForm.hidden = true;
+        codeForm.hidden = true;
+        say('recoveryStarted', started.completesAt);
+        if (Date.now() >= Date.parse(started.completesAt)) showChoice();
+      });
+    });
+
+    document.querySelector('#setup-passkey')?.addEventListener('click', () => {
+      const token = setupToken();
+      void (async () => {
+        const options = await call('passkey/register/options', { token });
+        if (options.status !== 200) return say('passkeyFailed');
+        try {
+          const response = await startRegistration({ optionsJSON: options.body as PublicKeyCredentialCreationOptionsJSON });
+          const verified = await call('passkey/register/verify', { response, token });
+          if (verified.status !== 200) return say('passkeyFailed');
+          showCodes(verified.body);
+        } catch {
+          say('passkeyFailed');
+        }
+      })();
+    });
+
+    document.querySelector('#setup-authenticator')?.addEventListener('click', () => {
+      void call('totp/setup', { token: setupToken() }).then(({ status, body }) => {
+        const uri = (body as { uri?: unknown } | null)?.uri;
+        if (status !== 200 || typeof uri !== 'string') return say(verifyMessage(status) === 'tooMany' ? 'tooMany' : 'failed');
+        const secret = authenticator.querySelector('[data-testid="totp-secret"]');
+        const link = authenticator.querySelector<HTMLAnchorElement>('#authenticator-link');
+        if (secret) secret.textContent = setupKey(uri);
+        if (link) link.href = uri;
+        choose.hidden = true;
+        authenticator.hidden = false;
+      });
+    });
+
+    totpForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      void call('totp/confirm', { code: field(totpForm, 'code'), token: setupToken() }).then(({ status, body }) => {
+        if (status === 200) return showCodes(body);
+        say(verifyMessage(status));
+      });
+    });
+
+    document.querySelector('#codes-saved')?.addEventListener('click', () => {
+      location.assign(root.dataset['account'] ?? '/');
+    });
+  }
+</script>

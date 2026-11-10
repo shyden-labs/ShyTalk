@@ -45,6 +45,7 @@
   "dependencies": {
     "@better-auth/passkey": "1.7.17",
     "@better-auth/utils": "0.5.1",
+    "@simplewebauthn/browser": "13.3.0",
     "better-auth": "1.7.17",
     "better-call": "1.4.5",
     "jose": "6.2.15",
