@@ -13,6 +13,14 @@ import { SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
 import { MAIL_STAND_IN_PORT, SMOKE_TARGETS } from './targets.ts';
 
 const PORT = 8787;
+/**
+ * Served over https, as every real environment is: DEV's https SITE_ORIGIN makes
+ * Better Auth's session cookie `Secure`, which Playwright's WebKit refuses over
+ * plain http even on 127.0.0.1 (shyden-labs/ShyTalk#134). wrangler makes its
+ * own self-signed certificate, so the browsers and the readiness check ignore
+ * certificate errors.
+ */
+const SITE = `https://127.0.0.1:${String(PORT)}`;
 
 /** Each target's desktop browser (shyden-labs/ShyTalk#109); the suite runs unchanged on all of them. */
 const DEVICE = { chromium: 'Desktop Chrome', firefox: 'Desktop Firefox', webkit: 'Desktop Safari' } as const;
@@ -66,7 +74,8 @@ export default defineConfig({
   // Playwright resolves a relative outputFile from this config's folder, so it is made absolute.
   reporter: [['list'], ['json', { outputFile: `${ROOT}${SMOKE_REPORT}` }]],
   use: {
-    baseURL: `http://127.0.0.1:${String(PORT)}`,
+    baseURL: SITE,
+    ignoreHTTPSErrors: true,
     extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret },
   },
   // Locally no Cloudflare sets the connecting address, so every request would share SIGN_IN_LIMIT's one 'unknown' key
@@ -90,10 +99,11 @@ export default defineConfig({
       command: [
         `npx wrangler d1 migrations apply DB ${LOCAL_D1}`,
         `npx wrangler d1 execute DB ${LOCAL_D1} --command "${MARKER_SQL}"`,
-        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --var DOOR_SECRET:${secret} ${MAIL_VARS}`,
+        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --local-protocol https --var DOOR_SECRET:${secret} ${MAIL_VARS}`,
       ].join(' && '),
       // Playwright counts a 403 as up: the door answers before the secret is sent.
-      url: `http://127.0.0.1:${String(PORT)}/`,
+      url: `${SITE}/`,
+      ignoreHTTPSErrors: true,
       cwd: ROOT,
       reuseExistingServer: false,
       stdout: 'pipe',
