@@ -6,13 +6,21 @@
  * (tests/smoke/tsconfig.json), which Playwright's own types need.
  */
 import { defineConfig, devices } from '@playwright/test';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
 import { SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
 import { MAIL_STAND_IN_PORT, SMOKE_TARGETS } from './targets.ts';
 
 const PORT = 8787;
+/**
+ * Served over https, as every real environment is: DEV's https SITE_ORIGIN makes
+ * Better Auth's session cookie `Secure`, which Playwright's WebKit refuses over
+ * plain http even on 127.0.0.1 (shyden-labs/ShyTalk#134). wrangler makes its
+ * own self-signed certificate, so the browsers and the readiness check ignore
+ * certificate errors.
+ */
+const SITE = `https://127.0.0.1:${String(PORT)}`;
 
 /** Each target's desktop browser (shyden-labs/ShyTalk#109); the suite runs unchanged on all of them. */
 const DEVICE = { chromium: 'Desktop Chrome', firefox: 'Desktop Firefox', webkit: 'Desktop Safari' } as const;
@@ -50,6 +58,10 @@ const MAIL_VARS = [
   'OCI_FINGERPRINT:smoke',
   'OCI_COMPARTMENT:smoke',
   `OCI_PRIVATE_KEY:${privateKey.trim().replace(/\n/g, ' ')}`,
+  // Email codes (shyden-labs/ShyTalk#133) need Better Auth's secret to key their hashes: a throwaway one each run.
+  `BETTER_AUTH_SECRET:${randomBytes(32).toString('hex')}`,
+  // The authenticator app's sign-in seals its secrets with TOTP_KEY (shyden-labs/ShyTalk#134): a throwaway one each run.
+  `TOTP_KEY:${randomBytes(32).toString('hex')}`,
 ]
   .map((value) => `--var "${value}"`)
   .join(' ');
@@ -62,10 +74,20 @@ export default defineConfig({
   // Playwright resolves a relative outputFile from this config's folder, so it is made absolute.
   reporter: [['list'], ['json', { outputFile: `${ROOT}${SMOKE_REPORT}` }]],
   use: {
-    baseURL: `http://127.0.0.1:${String(PORT)}`,
+    baseURL: SITE,
+    ignoreHTTPSErrors: true,
     extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret },
   },
-  projects: SMOKE_TARGETS.map((name) => ({ name, use: { ...devices[DEVICE[name]] } })),
+  // Locally no Cloudflare sets the connecting address, so every request would share SIGN_IN_LIMIT's one 'unknown' key
+  // (10 a minute); each browser gets its own documentation-range address (RFC 5737) to stay inside it.
+  projects: SMOKE_TARGETS.map((name, index) => ({
+    name,
+    // A project's headers replace the top-level ones, so the door secret is repeated here.
+    use: {
+      ...devices[DEVICE[name]],
+      extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret, 'cf-connecting-ip': `198.51.100.${String(index + 1)}` },
+    },
+  })),
   webServer: [
     {
       command: `node tests/smoke/mail-stand-in.ts ${String(MAIL_STAND_IN_PORT)}`,
@@ -77,10 +99,11 @@ export default defineConfig({
       command: [
         `npx wrangler d1 migrations apply DB ${LOCAL_D1}`,
         `npx wrangler d1 execute DB ${LOCAL_D1} --command "${MARKER_SQL}"`,
-        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --var DOOR_SECRET:${secret} ${MAIL_VARS}`,
+        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --local-protocol https --var DOOR_SECRET:${secret} ${MAIL_VARS}`,
       ].join(' && '),
       // Playwright counts a 403 as up: the door answers before the secret is sent.
-      url: `http://127.0.0.1:${String(PORT)}/`,
+      url: `${SITE}/`,
+      ignoreHTTPSErrors: true,
       cwd: ROOT,
       reuseExistingServer: false,
       stdout: 'pipe',

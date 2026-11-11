@@ -1,0 +1,42 @@
+---
+import Base from '../layouts/Base.astro';
+import { t, type Locale } from '../i18n/t.ts';
+
+/**
+ * The recovery notice's cancel link (plan 6 Task 6, shyden-labs/ShyTalk#133).
+ * The token rides in the fragment, which no server or log sees, and only the
+ * button's press cancels: opening the link, as mail scanners do, changes nothing.
+ */
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const line = (key: string): string => t(locale, `account.${key}`);
+---
+
+<Base locale={locale} title={line('cancelTitle')}>
+  <h1>{line('cancelTitle')}</h1>
+  <p>{line('cancelIntro')}</p>
+  <noscript><p>{line('noScript')}</p></noscript>
+  <p><button id="cancel-button" type="button" data-cancelled={line('cancelled')} data-failed={line('failed')}>{line('cancelButton')}</button></p>
+  <p id="cancel-answer" role="status" hidden></p>
+</Base>
+
+<script>
+  import { cancelMessage } from '../account/answers.ts';
+  import { call } from '../account/api.ts';
+
+  const button = document.querySelector<HTMLButtonElement>('#cancel-button');
+  const answer = document.querySelector<HTMLElement>('#cancel-answer');
+
+  if (button && answer) {
+    button.addEventListener('click', () => {
+      button.disabled = true;
+      void call('recovery/cancel', { cancelToken: location.hash.slice(1) }).then(({ status }) => {
+        answer.textContent = button.dataset[cancelMessage(status)] ?? '';
+        answer.hidden = false;
+        button.disabled = false;
+      });
+    });
+  }
+</script>

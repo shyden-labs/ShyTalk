@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { plusAddress, waitForMail, type MailboxReader } from '../phones/test-mailbox.ts';
+import { codeIn, plusAddress, waitForAnyMail, waitForMail, type MailboxReader } from '../phones/test-mailbox.ts';
 
 /**
  * The phones' closed-testing journey reads the real test mailbox
@@ -88,5 +88,28 @@ describe('waitForMail', () => {
       'TEST_MAILBOX_PASSWORD is unset: the phone run reads it from the Keychain (service shytalk-test-mailbox)',
     );
     expect(open).not.toHaveBeenCalled();
+  });
+});
+
+describe('waitForAnyMail and codeIn (shyden-labs/ShyTalk#133)', () => {
+  it('answers whatever mail reaches INBOX.<tag>, link or not, and closes', async () => {
+    const box = reader([{ subject: 'Your ShyTalk code', text: 'Use this code:\n\n402913\n' }]);
+    const { now, pause } = clock();
+    await expect(waitForAnyMail('c1', { password: 'pw', open: () => Promise.resolve(box), now, pause })).resolves.toEqual({
+      subject: 'Your ShyTalk code',
+      text: 'Use this code:\n\n402913\n',
+    });
+    expect(box.folders).toEqual(['INBOX.c1']);
+    expect(box.closed).toBe(1);
+  });
+
+  it('finds the 6-digit code on a line of its own', () => {
+    expect(codeIn({ subject: 's', text: 'Valid 10 minutes\n\n402913\n\nIgnore otherwise' })).toBe('402913');
+  });
+
+  it('fails naming the subject when the mail holds no code line', () => {
+    expect(() => codeIn({ subject: 'Your ShyTalk account', text: 'Ten minutes, 1234567 is not a code' })).toThrow(
+      'the mail "Your ShyTalk account" holds no 6-digit code line',
+    );
   });
 });

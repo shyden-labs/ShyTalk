@@ -8,6 +8,8 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixture.ts';
+import { codeIn } from '../phones/test-mailbox.ts';
+import { base32, totpAt } from '../support/totp.ts';
 import AxeBuilder from '@axe-core/playwright';
 import { t } from '../../apps/web/src/i18n/t.ts';
 import { LEGAL_DOCS, legalLines, legalLocale, legalPath } from '../../apps/web/src/legal/legal.ts';
@@ -153,4 +155,74 @@ test('applying and following the mailed link confirms the address', async ({ pag
   const heading = page.getByRole('heading', { level: 1 });
   await expect(heading).toBeVisible();
   await expect(heading).toHaveText(t('en', 'closedTesting.confirmedHeading'));
+});
+
+/**
+ * Joining, in English, once per browser (shyden-labs/ShyTalk#133, #134): the
+ * real form with real typing; the code read from the mail the site sent; an
+ * authenticator app set up from the key the page shows (its code computed as
+ * the member's app would); the ten recovery codes shown once; the account page;
+ * sign-out; and signing back in with the app's next code. The authenticator
+ * path runs unchanged in every browser; passkeys are proven on the phones by
+ * real touches (spec 2026-11-09, Proof).
+ */
+test('joining with the mailed code and an authenticator app, then signing back in with it', async ({ page, mailbox }) => {
+  await page.goto('/sign-up', { waitUntil: 'load' });
+  await page.getByLabel(t('en', 'account.emailLabel')).pressSequentially(mailbox.address);
+  await page.getByRole('button', { name: t('en', 'account.sendCode') }).click();
+  const answer = page.getByRole('status');
+  await expect(answer).toBeVisible();
+  await expect(answer).toHaveText(t('en', 'account.sent'));
+
+  const mail = await mailbox.anyMail();
+  expect(mail.subject).toBe(t('en', 'email.codeSubject'));
+  await page.getByLabel(t('en', 'account.codeLabel')).pressSequentially(codeIn(mail));
+  await page.getByRole('button', { name: t('en', 'account.confirmCode') }).click();
+  await expect(answer).toHaveText(t('en', 'account.signUpConfirmed'));
+  await expect(page.getByLabel(t('en', 'account.emailLabel'))).toBeHidden();
+
+  await page.getByRole('button', { name: t('en', 'account.useAuthenticator') }).click();
+  const key = page.getByTestId('totp-secret');
+  await expect(key).toBeVisible();
+  const secret = base32((await key.textContent()) ?? '');
+  await page.getByLabel(t('en', 'account.authenticatorCodeLabel')).pressSequentially(await totpAt(secret, 0));
+  await page.getByRole('button', { name: t('en', 'account.confirmAuthenticator'), exact: true }).click();
+
+  const codes = page.getByTestId('recovery-codes').getByRole('listitem');
+  await expect(codes).toHaveCount(10);
+  await expect(codes.first()).toHaveText(/^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+  await page.getByRole('button', { name: t('en', 'account.codesSaved') }).click();
+
+  await page.waitForURL('**/account/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(t('en', 'account.accountTitle'));
+  await expect(page.getByTestId('method-authenticator')).toHaveText(t('en', 'account.authenticatorOn'));
+  await expect(page.getByTestId('devices').getByRole('listitem')).toHaveCount(1);
+  await page.getByRole('button', { name: t('en', 'account.signOut'), exact: true }).click();
+
+  await page.waitForURL('**/sign-in/');
+  await page.getByLabel(t('en', 'account.emailLabel')).pressSequentially(mailbox.address);
+  await page.getByLabel(t('en', 'account.authenticatorCodeLabel')).pressSequentially(await totpAt(secret, 1));
+  await page.getByRole('button', { name: t('en', 'account.signInWithAuthenticator'), exact: true }).click();
+  await page.waitForURL('**/account/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(t('en', 'account.accountTitle'));
+});
+
+/**
+ * The recovery pages, in English (shyden-labs/ShyTalk#133): asking to recover
+ * shows the code step whether or not the address has an account, and the
+ * notice's cancel page answers by its button only.
+ */
+test('asking to recover shows the code step, and a cancel link answers on its press', async ({ page, mailbox }) => {
+  await page.goto('/recover', { waitUntil: 'load' });
+  await page.getByLabel(t('en', 'account.emailLabel')).pressSequentially(mailbox.address);
+  await page.getByRole('button', { name: t('en', 'account.sendCode') }).click();
+  const answer = page.getByRole('status');
+  await expect(answer).toHaveText(t('en', 'account.sent'));
+  await expect(page.getByLabel(t('en', 'account.codeLabel'))).toBeVisible();
+
+  await page.goto('/recover/cancel/#not-a-real-token', { waitUntil: 'load' });
+  const cancelAnswer = page.getByRole('status');
+  await expect(cancelAnswer).toBeHidden();
+  await page.getByRole('button', { name: t('en', 'account.cancelButton') }).click();
+  await expect(cancelAnswer).toHaveText(t('en', 'account.cancelled'));
 });

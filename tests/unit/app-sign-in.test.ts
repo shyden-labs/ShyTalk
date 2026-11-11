@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, inject, it, vi } from 'vitest';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { createAuth, getAuth, type AuthDatabase, type AuthEnv, type ShyTalkAuth } from '../../workers/web/src/auth/better-auth.ts';
 import { END_SESSION_SQL, handleSignIn, handleSignOut, type SignInEnv } from '../../workers/web/src/app/sign-in.ts';
@@ -354,6 +354,36 @@ describe('POST /api/app/sign-in/apple', () => {
   });
 });
 
+describe('linking Google and Apple by a verified email (shyden-labs/ShyTalk#133)', () => {
+  let w: World;
+  beforeEach(() => {
+    w = world();
+  });
+
+  it('pins Better Auth linking: on, with no trusted provider (a trusted one links without email_verified)', () => {
+    expect(w.auth.options.account).toEqual({ accountLinking: { enabled: true } });
+  });
+
+  it('links an Apple sign-in to the Google member with the same verified email: one user, two accounts', async () => {
+    expect((await google(w, await idToken({ sub: 'g-link', email: 'linked@example.test' }))).status).toBe(200);
+    expect((await apple(w, await appleToken('n-l', { sub: 'a-link', email: 'linked@example.test' }), 'n-l')).status).toBe(200);
+    expect(rows(w, 'user')).toHaveLength(1);
+    expect(
+      rows(w, 'account')
+        .map((row) => row['providerId'])
+        .sort(),
+    ).toEqual(['apple', 'google']);
+  });
+
+  it('does not link a Google sign-in whose email is not verified: 401, still one account', async () => {
+    expect((await apple(w, await appleToken('n-u', { sub: 'a-only', email: 'unverified@example.test' }), 'n-u')).status).toBe(200);
+    const response = await google(w, await idToken({ sub: 'g-unverified', email: 'unverified@example.test', email_verified: false }));
+    expect(response.status).toBe(401);
+    expect(rows(w, 'user')).toHaveLength(1);
+    expect(rows(w, 'account')).toHaveLength(1);
+  });
+});
+
 describe('the app session and sign-out', () => {
   let w: World;
   beforeEach(() => {
@@ -367,6 +397,30 @@ describe('the app session and sign-out', () => {
       method,
       headers: { authorization: `Bearer ${token}`, 'cf-connecting-ip': '203.0.113.7' },
     });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('pins the session cookie at the 400-day Better Auth ceiling, refreshed at most daily (shyden-labs/ShyTalk#134 AC5)', () => {
+    expect(w.auth.options.session).toEqual({ expiresIn: 34_560_000, updateAge: 86_400 });
+  });
+
+  it('stores every session row to end 100 years after it starts (shyden-labs/ShyTalk#134 AC5)', async () => {
+    const before = Date.now();
+    await signedIn();
+    const expiresAt = new Date(first(w.store['session'])['expiresAt'] as Date).getTime();
+    const hundredYears = 100 * 365.25 * 86_400_000;
+    expect(expiresAt).toBeGreaterThanOrEqual(before + hundredYears);
+    expect(expiresAt).toBeLessThan(Date.now() + hundredYears + 1_000);
+  });
+
+  it('keeps an app session left unused for 401 days, past the cookie ceiling (shyden-labs/ShyTalk#134 AC5)', async () => {
+    const { token, userId } = await signedIn();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 401 * 86_400_000);
+    expect((await appSession(bearer('anything', token, 'GET'), w.auth))?.userId).toBe(userId);
+  });
 
   it('appSession returns the user for a live bearer token', async () => {
     const { token, userId } = await signedIn();

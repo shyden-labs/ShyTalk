@@ -1,0 +1,173 @@
+---
+import Base from '../layouts/Base.astro';
+import { localePath, t, type Locale } from '../i18n/t.ts';
+
+/**
+ * The member's account (plan 7 Task 7, shyden-labs/ShyTalk#134): any recovery
+ * waiting on it, the ways to sign in, new recovery codes, the signed-in
+ * devices, and signing out. Signed out, it goes to the sign-in page.
+ */
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const line = (key: string): string => t(locale, `account.${key}`);
+const keys = ['authenticatorOn', 'authenticatorOff', 'codesLeft', 'remove', 'lastMethod', 'failed', 'thisDevice', 'signOutDevice', 'recoveryPending'];
+const data = Object.fromEntries(keys.map((key) => [`data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`, line(key)]));
+---
+
+<Base locale={locale} title={line('accountTitle')}>
+  <h1>{line('accountTitle')}</h1>
+  <noscript><p>{line('noScript')}</p></noscript>
+  <div id="account" data-locale={locale} data-sign-in={localePath(locale, '/sign-in/')} {...data}>
+    <section id="recovery-pending" hidden>
+      <p id="recovery-pending-text"></p>
+      <p><button id="recovery-cancel" type="button">{line('cancelButton')}</button></p>
+    </section>
+
+    <section>
+      <h2>{line('methodsTitle')}</h2>
+      <h3>{line('passkeysLabel')}</h3>
+      <ul id="passkeys"></ul>
+      <h3>{line('authenticatorLabel')}</h3>
+      <p><span data-testid="method-authenticator"></span> <button id="remove-authenticator" type="button" hidden>{line('remove')}</button></p>
+      <p id="codes-left"></p>
+      <p><button id="new-codes" type="button">{line('newCodes')}</button></p>
+      <ul id="new-code-list" hidden></ul>
+    </section>
+
+    <section>
+      <h2>{line('devicesTitle')}</h2>
+      <ul data-testid="devices"></ul>
+    </section>
+
+    <p id="account-answer" role="status" hidden></p>
+    <p><button id="sign-out" type="button">{line('signOut')}</button></p>
+  </div>
+</Base>
+
+<script>
+  import { removeMessage } from '../account/answers.ts';
+  import { call, type Answer } from '../account/api.ts';
+
+  interface Methods {
+    passkeys: { id: string; name: string | null; createdAt: string }[];
+    authenticator: boolean;
+    recoveryCodesLeft: number;
+  }
+  interface Devices {
+    sessions: { id: string; startedAt: string; device: string | null; current: boolean }[];
+  }
+
+  const root = document.querySelector<HTMLElement>('#account');
+  const answer = document.querySelector<HTMLElement>('#account-answer');
+  const text = (key: string): string => root?.dataset[key] ?? '';
+  const when = (iso: string): string => new Date(iso).toLocaleString(root?.dataset['locale']);
+  const say = (key: string): void => {
+    if (!answer) return;
+    answer.textContent = text(key);
+    answer.hidden = false;
+  };
+
+  function item(label: string, action?: { text: string; run: () => void }): HTMLLIElement {
+    const entry = document.createElement('li');
+    entry.append(label);
+    if (action !== undefined) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = action.text;
+      button.addEventListener('click', action.run);
+      entry.append(' ', button);
+    }
+    return entry;
+  }
+
+  /** Signed out goes to the sign-in page; any other failure says so. */
+  function usable({ status }: Answer): boolean {
+    if (status === 401) location.assign(text('signIn') || '/');
+    else if (status !== 200) say('failed');
+    return status === 200;
+  }
+
+  async function remove(path: string): Promise<void> {
+    const message = removeMessage((await call(path, undefined, 'DELETE')).status);
+    if (message !== null) return say(message);
+    await showMethods();
+  }
+
+  async function showMethods(): Promise<void> {
+    const answered = await call('sign-in-methods', undefined, 'GET');
+    if (!usable(answered)) return;
+    const methods = answered.body as Methods;
+    document
+      .querySelector('#passkeys')
+      ?.replaceChildren(
+        ...methods.passkeys.map((passkey) =>
+          item(passkey.name ?? when(passkey.createdAt), { text: text('remove'), run: () => void remove(`sign-in-methods/passkey/${encodeURIComponent(passkey.id)}`) }),
+        ),
+      );
+    const state = document.querySelector('[data-testid="method-authenticator"]');
+    if (state) state.textContent = text(methods.authenticator ? 'authenticatorOn' : 'authenticatorOff');
+    document.querySelector('#remove-authenticator')?.toggleAttribute('hidden', !methods.authenticator);
+    const left = document.querySelector('#codes-left');
+    if (left) left.textContent = text('codesLeft').replace('{count}', String(methods.recoveryCodesLeft));
+  }
+
+  async function showDevices(): Promise<void> {
+    const answered = await call('sessions', undefined, 'GET');
+    if (!usable(answered)) return;
+    const { sessions } = answered.body as Devices;
+    document.querySelector('[data-testid="devices"]')?.replaceChildren(
+      ...sessions.map((session) => {
+        const label = `${session.device ?? ''} ${when(session.startedAt)}`.trim();
+        if (session.current) return item(`${label} (${text('thisDevice')})`);
+        return item(label, {
+          text: text('signOutDevice'),
+          run: () =>
+            void call(`sessions/${encodeURIComponent(session.id)}`, undefined, 'DELETE').then((ended) => {
+              if (usable(ended)) void showDevices();
+            }),
+        });
+      }),
+    );
+  }
+
+  async function showRecovery(): Promise<void> {
+    const answered = await call('recovery', undefined, 'GET');
+    if (!usable(answered)) return;
+    const pending = (answered.body as { pending: { startedAt: string } | null }).pending;
+    const section = document.querySelector<HTMLElement>('#recovery-pending');
+    const words = document.querySelector('#recovery-pending-text');
+    if (!section || !words) return;
+    section.hidden = pending === null;
+    if (pending !== null) words.textContent = text('recoveryPending').replace('{startedAt}', when(pending.startedAt));
+  }
+
+  if (root && answer) {
+    void showMethods().then(() => Promise.all([showDevices(), showRecovery()]));
+
+    document.querySelector('#remove-authenticator')?.addEventListener('click', () => void remove('sign-in-methods/totp'));
+
+    document.querySelector('#recovery-cancel')?.addEventListener('click', () => {
+      void call('recovery/cancel', {}).then((cancelled) => {
+        if (usable(cancelled)) void showRecovery();
+      });
+    });
+
+    document.querySelector('#new-codes')?.addEventListener('click', () => {
+      void call('recovery-codes', {}).then((made) => {
+        if (!usable(made)) return;
+        const list = document.querySelector<HTMLElement>('#new-code-list');
+        const codes = (made.body as { recoveryCodes: string[] }).recoveryCodes;
+        if (!list) return;
+        list.replaceChildren(...codes.map((code) => item(code)));
+        list.hidden = false;
+        void showMethods();
+      });
+    });
+
+    document.querySelector('#sign-out')?.addEventListener('click', () => {
+      void call('sign-out', {}).then(() => location.assign(text('signIn') || '/'));
+    });
+  }
+</script>

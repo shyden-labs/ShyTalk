@@ -179,6 +179,26 @@ describe('deploy-release', () => {
     expect(step).not.toContain('secrets.ANNOUNCE_SECRET');
   });
 
+  // Authenticator-app sign-in answers 503 until the Worker holds TOTP_KEY
+  // (shyden-labs/ShyTalk#134); it seals stored secrets, so TEST and PROD each
+  // keep their own in their GitHub environment.
+  it('puts the authenticator key on TEST and PROD after the Better Auth secret, failing by name when the environment lacks it', () => {
+    const step = deployStep();
+    const betterAuth = step.indexOf('printf %s $BETTER_AUTH_SECRET | npx wrangler secret put BETTER_AUTH_SECRET --env $TARGET ||');
+    const missing = step.indexOf('if [ -z $TOTP_KEY ]; then');
+    const named = step.indexOf(
+      'echo ::error title=TOTP_KEY missing::Set TOTP_KEY in this runs GitHub environment (shyden-labs/ShyTalk#134); until then $TARGET authenticator-app sign-in answers 503.',
+    );
+    const put = step.indexOf('printf %s $TOTP_KEY | npx wrangler secret put TOTP_KEY --env $TARGET ||');
+    expect(betterAuth).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(betterAuth);
+    expect(named).toBeGreaterThan(missing);
+    expect(put).toBeGreaterThan(named);
+    expect(step).toContain('TOTP_KEY: ${{ secrets.TOTP_KEY }}');
+    const onlyTest = step.indexOf('if [ $TARGET = test ]; then');
+    expect(onlyTest === -1 || put < onlyTest).toBe(true);
+  });
+
   // App sign-in answers 503 until the Worker holds Better Auth's secret
   // (shyden-labs/ShyTalk#110); TEST and PROD each need their own.
   it('puts the Better Auth secret on TEST and PROD, after the deploy, failing by name when the environment lacks it', () => {

@@ -37,6 +37,8 @@ export interface WebEnv {
   APPLE_AUDIENCES?: string;
   /** Sign-in attempts per IP (wrangler.json `ratelimits`). */
   SIGN_IN_LIMIT?: RateLimit;
+  /** Seals authenticator-app secrets (a Wrangler secret, shyden-labs/ShyTalk#134). */
+  TOTP_KEY?: string;
   /** Closed-testing applications per IP (wrangler.json `ratelimits`); absent, the form answers 503. */
   APPLY_LIMIT?: RateLimit;
 }
