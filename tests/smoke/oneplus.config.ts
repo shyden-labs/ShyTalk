@@ -26,7 +26,11 @@ export default defineConfig<object, { mailSource: MailSource }>({
   retries: 0,
   // One phone, one Chrome: tests take turns.
   workers: 1,
-  reporter: [['list'], ['json', { outputFile: `${ROOT}test-results/phone-oneplus.json` }]],
+  reporter: [
+    ['list'],
+    ['json', { outputFile: `${ROOT}test-results/phone-oneplus.json` }],
+    ['./assertion-counts.ts', { outputFile: `${ROOT}test-results/phone-oneplus-assertions.json` }],
+  ],
   // Chrome on Android refuses a set window size (measured 2026-11-06): the phone's own screen it is.
   use: { baseURL: address, viewport: null, mailSource: 'imap' },
   projects: [{ name: 'oneplus' }],
