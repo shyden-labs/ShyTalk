@@ -20,8 +20,8 @@ const data = Object.fromEntries(keys.map((key) => [`data-${key.replace(/[A-Z]/g,
   <h1>{line('accountTitle')}</h1>
   <noscript><p>{line('noScript')}</p></noscript>
   <div id="account" data-locale={locale} data-sign-in={localePath(locale, '/sign-in/')} {...data}>
-    <section id="recovery-pending" hidden>
-      <p id="recovery-pending-text"></p>
+    <section id="recovery-pending" data-testid="recovery-pending" hidden>
+      <p id="recovery-pending-text" data-testid="recovery-pending-text"></p>
       <p><button id="recovery-cancel" type="button">{line('cancelButton')}</button></p>
     </section>
 

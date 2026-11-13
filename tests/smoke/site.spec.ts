@@ -205,7 +205,33 @@ test('joining with the mailed code and an authenticator app, then signing back i
   await page.getByRole('button', { name: t('en', 'account.signInWithAuthenticator'), exact: true }).click();
   await page.waitForURL('**/account/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(t('en', 'account.accountTitle'));
+  const pending = page.getByTestId('recovery-pending');
+  await expect(pending).toBeHidden();
+
+  // A recovery started for this address shows on the signed-in device, which cancels it there (#133 AC3).
+  const signUpCode = codeIn(mail);
+  await page.goto('/recover', { waitUntil: 'load' });
+  await page.getByLabel(t('en', 'account.emailLabel')).pressSequentially(mailbox.address);
+  await page.getByRole('button', { name: t('en', 'account.sendCode') }).click();
+  await expect(answer).toHaveText(t('en', 'account.sent'));
+  // Each mail source answers only the newest mail: wait until the recovery code has replaced the sign-up one.
+  await expect.poll(async () => codeIn(await mailbox.anyMail())).not.toBe(signUpCode);
+  await page.getByLabel(t('en', 'account.codeLabel')).pressSequentially(codeIn(await mailbox.anyMail()));
+  await page.getByRole('button', { name: t('en', 'account.confirmCode') }).click();
+  await expect(answer).toHaveText(filled(t('en', 'account.recoveryStarted'), '{completesAt}'));
+
+  await page.goto('/account/', { waitUntil: 'load' });
+  await expect(pending).toBeVisible();
+  await expect(page.getByTestId('recovery-pending-text')).toHaveText(filled(t('en', 'account.recoveryPending'), '{startedAt}'));
+  await page.getByRole('button', { name: t('en', 'account.cancelButton'), exact: true }).click();
+  await expect(pending).toBeHidden();
 });
+
+/** Matches `line` with its one `placeholder` filled by any text. */
+function filled(line: string, placeholder: string): RegExp {
+  const escaped = line.split(placeholder).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`^${escaped.join('.+')}$`);
+}
 
 /**
  * The recovery pages, in English (shyden-labs/ShyTalk#133): asking to recover
