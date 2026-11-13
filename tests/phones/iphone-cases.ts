@@ -98,6 +98,9 @@ async function softly(checks: (() => Promise<void>)[]): Promise<void> {
   if (failures.length > 0) throw new assert.AssertionError({ message: failures.join('\n') });
 }
 
+/** Every page's viewport tag: the keyboard resizes the page, never pans over it (shyden-labs/ShyTalk#189). */
+const VIEWPORT = 'width=device-width, initial-scale=1, interactive-widget=resizes-content';
+
 function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
   return [
     counted(
@@ -112,6 +115,10 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
           },
           async () => {
             check.equal(await page.attribute('html', 'lang'), lang);
+          },
+          async () => {
+            // The keyboard resizes the page, never pans over it (shyden-labs/ShyTalk#189).
+            check.equal(await page.attribute('meta[name="viewport"]', 'content'), VIEWPORT);
           },
           async () => {
             check.ok(await page.isVisible(NAV), 'no visible navigation');

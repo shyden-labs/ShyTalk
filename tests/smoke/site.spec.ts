@@ -43,6 +43,10 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     const response = await page.goto(`${prefix}/`, { waitUntil: 'load' });
     expect.soft(response?.status()).toBe(200);
     await expect.soft(page.locator('html')).toHaveAttribute('lang', lang);
+    // The keyboard resizes the page, never pans over it (shyden-labs/ShyTalk#189).
+    await expect
+      .soft(page.locator('meta[name="viewport"]'))
+      .toHaveAttribute('content', 'width=device-width, initial-scale=1, interactive-widget=resizes-content');
     await expect.soft(page.getByRole('navigation')).toBeVisible();
     const homeHeading = page.getByRole('heading', { level: 1 });
     await expect.soft(homeHeading).toBeVisible();
