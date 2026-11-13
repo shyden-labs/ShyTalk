@@ -65,6 +65,7 @@ describe('finishSetup on D1', () => {
       .bind('u-recovers', 'Member', 'recovers@example.test', at, at)
       .run();
     const older = await (await auth.$context).internalAdapter.createSession('u-recovers');
+    const another = await (await auth.$context).internalAdapter.createSession('u-recovers');
     const hash = await tokenHash('recovery-finish');
     await local.DB.prepare(
       "INSERT INTO one_time_token (token_hash, purpose, user_id, email, expires_at) VALUES (?, 'recovery', ?, NULL, ?)",
@@ -80,9 +81,47 @@ describe('finishSetup on D1', () => {
     const finished = await finishSetup(env, auth, identity, 'totp', Date.now());
     if (finished instanceof Response) throw new Error(`refused ${String(finished.status)}`);
     expect(await appSession(bearer(older.token), auth)).toBeNull();
+    expect(await appSession(bearer(another.token), auth)).toBeNull();
     expect((await appSession(bearer(finished.token ?? ''), auth))?.userId).toBe('u-recovers');
+    // One session.end row per session ended, naming it and the reason, never its token (shyden-labs/ShyTalk#177).
+    const ends = await local.DB.prepare("SELECT actor, subject, detail FROM audit WHERE action = 'session.end' AND subject = ? ORDER BY id")
+      .bind('user:u-recovers')
+      .all<{ actor: string; subject: string; detail: string }>();
+    expect(
+      ends.results.map(({ detail }) => JSON.parse(detail) as unknown).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    ).toEqual(
+      [
+        { revoked: older.id, reason: 'recovery' },
+        { revoked: another.id, reason: 'recovery' },
+      ].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    );
+    expect(
+      ends.results.every(
+        ({ actor, detail }) => actor === 'user:u-recovers' && !detail.includes(older.token) && !detail.includes(another.token),
+      ),
+    ).toBe(true);
     const left = await local.DB.prepare('SELECT COUNT(*) AS n FROM passkey WHERE "userId" = ?').bind('u-recovers').first<{ n: number }>();
     expect(left?.n).toBe(0);
+  });
+
+  it('writes no session.end row for a recovering member with no session left (shyden-labs/ShyTalk#177)', async () => {
+    const at = new Date().toISOString();
+    await local.DB.prepare('INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES (?, ?, ?, 1, ?, ?)')
+      .bind('u-no-sessions', 'Member', 'no-sessions@example.test', at, at)
+      .run();
+    const hash = await tokenHash('recovery-no-sessions');
+    await local.DB.prepare(
+      "INSERT INTO one_time_token (token_hash, purpose, user_id, email, expires_at) VALUES (?, 'recovery', ?, NULL, ?)",
+    )
+      .bind(hash, 'u-no-sessions', Date.now() + 600_000)
+      .run();
+    const identity = { kind: 'recovery', userId: 'u-no-sessions', recoveryId: 998, tokenHash: hash } as const;
+    const finished = await finishSetup(env, auth, identity, 'totp', Date.now());
+    if (finished instanceof Response) throw new Error(`refused ${String(finished.status)}`);
+    const ends = await local.DB.prepare("SELECT COUNT(*) AS n FROM audit WHERE action = 'session.end' AND subject = ?")
+      .bind('user:u-no-sessions')
+      .first<{ n: number }>();
+    expect(ends?.n).toBe(0);
   });
 
   it('refuses a second finish with the same token', async () => {
