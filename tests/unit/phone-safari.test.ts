@@ -176,17 +176,93 @@ describe('safariPage: reading the page', () => {
 describe('safariPage: tap and waitForText', () => {
   const ELEMENT = 'element-6066-11e4-a52e-4f735466cecf';
 
-  it('finds the element and clicks it through WebDriver', async () => {
+  /**
+   * Appium's web click stalled in Safari's remote debugger and no pointer event reached the page, while a
+   * native touch arrived as a real touch, 68 pt above its aim (measured on the iPhone Air 2026-11-14,
+   * shyden-labs/ShyTalk#190). So a tap is a native touch at the element's centre plus Safari's content
+   * offset, measured once by an inert calibration touch.
+   */
+  const TOUCH_AT = (x: number, y: number) => ({
+    actions: [
+      {
+        type: 'pointer',
+        id: 'finger',
+        parameters: { pointerType: 'touch' },
+        actions: [
+          { type: 'pointerMove', duration: 0, x, y },
+          { type: 'pointerDown', button: 0 },
+          { type: 'pause', duration: 80 },
+          { type: 'pointerUp', button: 0 },
+        ],
+      },
+    ],
+  });
+  const NATIVE = (x: number, y: number): [string, string, unknown][] => [
+    ['GET', '/session/s1/context', undefined],
+    ['POST', '/session/s1/context', { name: 'NATIVE_APP' }],
+    ['POST', '/session/s1/actions', TOUCH_AT(x, y)],
+    ['POST', '/session/s1/context', { name: 'WEBVIEW_7' }],
+  ];
+
+  /** Appium answering each execute from a queue, its web context named WEBVIEW_7, and touches failing on demand. */
+  function phone(executes: unknown[], touchFails = false) {
     const calls: [string, string, unknown][] = [];
     const call: WebDriverCall = (method, path, body) => {
       calls.push([method, path, body]);
-      return Promise.resolve(path.endsWith('/element') ? { [ELEMENT]: 'e-1' } : null);
+      if (path.includes('/execute/')) return Promise.resolve(executes.shift() ?? null);
+      if (method === 'GET' && path.endsWith('/context')) return Promise.resolve('WEBVIEW_7');
+      if (path.endsWith('/actions') && touchFails) return Promise.reject(new Error('touch refused'));
+      return Promise.resolve(null);
     };
-    await safariPage(call, 's1', BASE).tap('#confirm-button');
-    expect(calls).toEqual([
-      ['POST', '/session/s1/element', { using: 'css selector', value: '#confirm-button' }],
-      ['POST', '/session/s1/element/e-1/click', {}],
+    return { call, calls, scripts: () => calls.filter(([, path]) => path.includes('/execute/')).map(([, , body]) => body) };
+  }
+
+  it('measures Safari’s offset with one inert touch, then touches the element’s centre natively', async () => {
+    const fake = phone([
+      { x: 210, y: 373 },
+      { x: 210, y: 305 },
+      { x: 26, y: 515 },
     ]);
+    await safariPage(fake.call, 's1', BASE).tap('#apply-adult');
+    const [arm, received, centre] = fake.scripts() as { script: string; args: unknown[] }[];
+    expect(arm?.args).toEqual([]);
+    expect(received?.args).toEqual([]);
+    expect(centre?.args).toEqual(['#apply-adult']);
+    expect(fake.calls.filter(([, path]) => !path.includes('/execute/'))).toEqual([...NATIVE(210, 373), ...NATIVE(26, 583)]);
+  });
+
+  it('measures the offset once per page, not per tap', async () => {
+    const fake = phone([
+      { x: 210, y: 373 },
+      { x: 210, y: 305 },
+      { x: 26, y: 515 },
+      { x: 100, y: 200 },
+    ]);
+    const page = safariPage(fake.call, 's1', BASE);
+    await page.tap('#apply-adult');
+    await page.tap('#apply-submit');
+    expect(fake.calls.filter(([, path]) => path.endsWith('/actions')).map(([, , body]) => body)).toEqual([
+      TOUCH_AT(210, 373),
+      TOUCH_AT(26, 583),
+      TOUCH_AT(100, 268),
+    ]);
+  });
+
+  it('fails, naming why, when the calibration touch never reaches the page', async () => {
+    const fake = phone([{ x: 210, y: 373 }, null]);
+    await expect(safariPage(fake.call, 's1', BASE).tap('#apply-adult')).rejects.toThrow(/calibration touch never reached the page/);
+  });
+
+  it('fails, naming the selector, when no element matches, touching nothing more', async () => {
+    const fake = phone([{ x: 210, y: 373 }, { x: 210, y: 305 }, null]);
+    await expect(safariPage(fake.call, 's1', BASE).tap('#gone')).rejects.toThrow(/#gone/);
+    expect(fake.calls.filter(([, path]) => path.endsWith('/actions'))).toHaveLength(1);
+  });
+
+  it('returns to the web page even when a touch fails', async () => {
+    const fake = phone([{ x: 210, y: 373 }], true);
+    await expect(safariPage(fake.call, 's1', BASE).tap('#apply-adult')).rejects.toThrow(/touch refused/);
+    expect(fake.calls.at(-1)).toEqual(['POST', '/session/s1/context', { name: 'WEBVIEW_7' }]);
   });
 
   it('types into the element key by key through WebDriver, as the iPhone’s keyboard does', async () => {
