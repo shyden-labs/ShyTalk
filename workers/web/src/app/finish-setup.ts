@@ -29,6 +29,10 @@ const CREATE_USER_SQL = 'INSERT INTO "user" (id, name, email, "emailVerified", "
 const SPEND_TOKEN_SQL = 'UPDATE one_time_token SET used_at = ? WHERE token_hash = ? AND used_at IS NULL';
 const COMPLETE_RECOVERY_SQL = "UPDATE account_recovery SET state = 'completed', ended_at = ? WHERE id = ? AND state = 'pending'";
 const END_SESSIONS_SQL = 'DELETE FROM session WHERE "userId" = ?';
+/** One `session.end` row per session a recovery ends, naming the session, never its token (shyden-labs/ShyTalk#177). */
+const AUDIT_SESSIONS_ENDED_SQL =
+  'INSERT INTO audit (at, actor, action, subject, detail, environment) ' +
+  "SELECT ?, ?, 'session.end', ?, json_object('revoked', id, 'reason', 'recovery'), ? FROM session WHERE \"userId\" = ?";
 const REMOVE_PASSKEYS_SQL = 'DELETE FROM passkey WHERE "userId" = ?';
 const REMOVE_TOTP_SQL = "DELETE FROM sign_in_method WHERE user_id = ? AND kind = 'totp'";
 const CODES_HELD_SQL = 'SELECT COUNT(*) AS n FROM recovery_code WHERE user_id = ? AND used_at IS NULL';
@@ -78,6 +82,7 @@ export async function prepareSetup(
     statements.push(
       DB.prepare(COMPLETE_RECOVERY_SQL).bind(now, identity.recoveryId),
       auditIfChanged(env, { actor, action: 'recovery.complete', subject: actor }),
+      DB.prepare(AUDIT_SESSIONS_ENDED_SQL).bind(Date.now(), actor, actor, env.ENVIRONMENT_NAME, userId),
       DB.prepare(END_SESSIONS_SQL).bind(userId),
       DB.prepare(REMOVE_PASSKEYS_SQL).bind(userId),
       removed('passkey'),

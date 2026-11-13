@@ -123,6 +123,31 @@ describe('finishSetup: the token is spent first', () => {
   });
 });
 
+describe('finishSetup: a recovery audits each session it ends (shyden-labs/ShyTalk#177)', () => {
+  it('writes one session.end row per session of the member, naming the session and never its token, just before the delete', async () => {
+    const w = world();
+    await finishSetup(w.env, w.auth, { kind: 'recovery', userId: 'u-1', recoveryId: 3, tokenHash: 'th' }, 'passkey', NOW);
+    const made = w.batches[1] ?? [];
+    const ended = made.findIndex(({ sql }) => sql === 'DELETE FROM session WHERE "userId" = ?');
+    expect(made[ended - 1]?.sql).toBe(
+      'INSERT INTO audit (at, actor, action, subject, detail, environment) ' +
+        "SELECT ?, ?, 'session.end', ?, json_object('revoked', id, 'reason', 'recovery'), ? FROM session WHERE \"userId\" = ?",
+    );
+    expect(made[ended - 1]?.values).toEqual([expect.any(Number), 'user:u-1', 'user:u-1', 'dev', 'u-1']);
+  });
+
+  it('writes no session.end row for a sign-up or a signed-in member adding a method', async () => {
+    for (const identity of [
+      { kind: 'sign-up', userId: 'u-new', email: 'n@example.test', tokenHash: 'th' },
+      { kind: 'session', userId: 'u-1' },
+    ] as const) {
+      const w = world({ codesHeld: 1 });
+      await finishSetup(w.env, w.auth, identity, 'totp', NOW);
+      expect(w.all().filter(({ sql }) => sql.includes("'session.end'"))).toEqual([]);
+    }
+  });
+});
+
 describe('finishSetup: a recovery removes the old methods', () => {
   it('removes old passkeys and the old authenticator when a passkey is set up, auditing each kind removed', async () => {
     const w = world();
