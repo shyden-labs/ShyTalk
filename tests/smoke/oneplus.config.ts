@@ -24,6 +24,8 @@ export default defineConfig<object, { mailSource: MailSource }>({
   testMatch: 'site.spec.ts',
   forbidOnly: true,
   retries: 0,
+  // Real mail took 48 s on 2026-11-13; the mail reader waits up to 120 s, so each test gets 180 s (shyden-labs/ShyTalk#185).
+  timeout: 180_000,
   // One phone, one Chrome: tests take turns.
   workers: 1,
   reporter: [

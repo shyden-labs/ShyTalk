@@ -13,7 +13,8 @@ const USER = 'shytalk-tests';
 const DOMAIN = 'shyden.co.uk';
 const HOST = 'mail.shyden.co.uk';
 const LOOK_EVERY_MS = 5_000;
-const CEILING_MS = 120_000;
+/** How long the phone run waits for a mail; the phone config gives each test longer (shyden-labs/ShyTalk#185). */
+export const MAIL_CEILING_MS = 120_000;
 const CONFIRM_LINK = /https:\/\/\S+\/closed-testing\/confirm\?t=\S+/;
 
 export interface Mail {
@@ -53,7 +54,8 @@ export async function waitForAnyMail(tag: string, deps: WaitDeps): Promise<Mail>
     for (;;) {
       const mail = await box.latest(folder);
       if (mail !== null) return mail;
-      if (now() - started + LOOK_EVERY_MS > CEILING_MS) throw new Error(`no mail reached ${folder} within ${String(CEILING_MS / 1000)} s`);
+      if (now() - started + LOOK_EVERY_MS > MAIL_CEILING_MS)
+        throw new Error(`no mail reached ${folder} within ${String(MAIL_CEILING_MS / 1000)} s`);
       await pause(LOOK_EVERY_MS);
     }
   } finally {
