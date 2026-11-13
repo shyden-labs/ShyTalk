@@ -12,6 +12,8 @@ import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 
 // The real test mailbox is stood in: a unit test reaches no IMAP server.
 const mailbox = vi.hoisted(() => ({
+  // The real reader's ceiling (tests/phones/test-mailbox.ts), which the recovery mail wait uses (shyden-labs/ShyTalk#185).
+  MAIL_CEILING_MS: 120_000,
   plusAddress: vi.fn((tag: string) => `box+${tag}@mail.test`),
   waitForMail: vi.fn<(tag: string, deps: { password: string }) => Promise<{ subject: string; text: string; confirmLink: string }>>(() =>
     Promise.resolve({ subject: 'subject', text: 'body', confirmLink: 'https://dev.example/closed-testing/confirm?t=abc' }),
@@ -507,7 +509,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
       });
     running.catch(() => undefined);
     // Each wait sets its next timer only after its look answers, so time moves a second at a time.
-    for (let second = 0; second < 70 && !state.settled; second += 1) await vi.advanceTimersByTimeAsync(1_000);
+    for (let second = 0; second < 130 && !state.settled; second += 1) await vi.advanceTimersByTimeAsync(1_000);
     await running;
   }
 
@@ -596,7 +598,20 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     mailbox.waitForAnyMail.mockReset();
     mailbox.waitForAnyMail.mockResolvedValue({ subject: t('en', 'email.codeSubject'), text: 'code 111111' });
     const { page } = accountPages();
-    await expect(run(page)).rejects.toThrow('waited 60 s for the recovery code mail');
+    await expect(run(page)).rejects.toThrow('waited 120 s for the recovery code mail');
+  });
+
+  it('waits as long as the mail reader for the recovery code: real mail took 48 s (shyden-labs/ShyTalk#185)', async () => {
+    mailbox.waitForAnyMail.mockReset();
+    const sent = Date.now();
+    mailbox.waitForAnyMail
+      .mockResolvedValueOnce({ subject: t('en', 'email.codeSubject'), text: 'code 111111' })
+      .mockImplementation(() =>
+        Promise.resolve({ subject: t('en', 'email.codeSubject'), text: Date.now() - sent < 90_000 ? 'code 111111' : 'code 222222' }),
+      );
+    const { page, steps } = accountPages();
+    await run(page);
+    expect(steps).toContain('type #email-code 222222');
   });
 });
 

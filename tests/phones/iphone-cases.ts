@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
-import { codeIn, plusAddress, waitForAnyMail, waitForMail } from './test-mailbox.ts';
+import { codeIn, MAIL_CEILING_MS, plusAddress, waitForAnyMail, waitForMail } from './test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import { countingCheck, type Check } from './check.ts';
 
@@ -288,11 +288,16 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     await page.tap('#email-submit');
     await check.waitForText(page, '#email-answer', t('en', 'account.sent'));
     // The mailbox answers only its newest mail: wait for the recovery code to replace the sign-up one.
+    // Real mail took 48 s (2026-11-13): wait as long as the mail reader does (shyden-labs/ShyTalk#185).
     const recoveryCode = await check.poll(() =>
-      waitFor('the recovery code mail', async () => {
-        const code = codeIn(await waitForAnyMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' }));
-        return code === signUpCode ? null : code;
-      }),
+      waitFor(
+        'the recovery code mail',
+        async () => {
+          const code = codeIn(await waitForAnyMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' }));
+          return code === signUpCode ? null : code;
+        },
+        MAIL_CEILING_MS,
+      ),
     );
     await page.type('#email-code', recoveryCode);
     await page.tap('#code-submit');
@@ -324,12 +329,12 @@ const WAIT_CEILING_MS = 60_000;
 const WAIT_EVERY_MS = 1_000;
 
 /** Looks every second until `look` answers something other than null, failing at a ceiling that names `what`. */
-async function waitFor<T>(what: string, look: () => Promise<T | null>): Promise<T> {
+async function waitFor<T>(what: string, look: () => Promise<T | null>, ceilingMs = WAIT_CEILING_MS): Promise<T> {
   const started = Date.now();
   for (;;) {
     const found = await look();
     if (found !== null) return found;
-    if (Date.now() - started >= WAIT_CEILING_MS) throw new Error(`waited ${String(WAIT_CEILING_MS / 1000)} s for ${what}`);
+    if (Date.now() - started >= ceilingMs) throw new Error(`waited ${String(ceilingMs / 1000)} s for ${what}`);
     await new Promise<void>((done) => setTimeout(done, WAIT_EVERY_MS));
   }
 }

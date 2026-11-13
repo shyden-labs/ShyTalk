@@ -8,7 +8,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixture.ts';
-import { codeIn } from '../phones/test-mailbox.ts';
+import { codeIn, MAIL_CEILING_MS } from '../phones/test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import AxeBuilder from '@axe-core/playwright';
 import { t } from '../../apps/web/src/i18n/t.ts';
@@ -216,7 +216,8 @@ test('joining with the mailed code and an authenticator app, then signing back i
   await page.getByRole('button', { name: t('en', 'account.sendCode') }).click();
   await expect(answer).toHaveText(t('en', 'account.sent'));
   // Each mail source answers only the newest mail: wait until the recovery code has replaced the sign-up one.
-  await expect.poll(async () => codeIn(await mailbox.anyMail())).not.toBe(signUpCode);
+  // Real mail took 48 s on the phones (2026-11-13): poll as long as the mail reader waits (shyden-labs/ShyTalk#185).
+  await expect.poll(async () => codeIn(await mailbox.anyMail()), { timeout: MAIL_CEILING_MS }).not.toBe(signUpCode);
   await page.getByLabel(t('en', 'account.codeLabel')).pressSequentially(codeIn(await mailbox.anyMail()));
   await page.getByRole('button', { name: t('en', 'account.confirmCode') }).click();
   await expect(answer).toHaveText(filled(t('en', 'account.recoveryStarted'), '{completesAt}'));
