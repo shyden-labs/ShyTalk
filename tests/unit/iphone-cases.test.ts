@@ -22,6 +22,13 @@ const mailbox = vi.hoisted(() => ({
 }));
 vi.mock('../phones/test-mailbox.ts', () => mailbox);
 
+// The authenticator's code is stood in: the real one awaits WebCrypto outside fake time, so a journey's waits on fake
+// time could start after the test had moved its clock on (a race seen on CI, shyden-labs/ShyTalk#180).
+vi.mock('../support/totp.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../support/totp.ts')>()),
+  totpAt: vi.fn(() => Promise.resolve('123456')),
+}));
+
 const LOCALE: Record<string, Locale> = { en: 'en', id: 'id', th: 'th', vi: 'vi', 'zh-Hans': 'zh' };
 const PREFIX: Record<string, string> = { en: '', id: '/id', th: '/th', vi: '/vi', 'zh-Hans': '/zh' };
 
