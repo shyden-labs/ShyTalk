@@ -82,7 +82,7 @@ async function softly(checks: (() => Promise<void>)[]): Promise<void> {
 function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
   return [
     {
-      title: `${lang}: the home page answers 200 in ${lang}, shows its heading and no roadmap button, passes axe, with no CSP refusal`,
+      title: `${lang}: the home page answers 200 in ${lang}, shows its heading and no roadmap button, passes axe, and each footer legal link opens the right page, with its note if any, passing axe, with no CSP refusal`,
       run: async (page) => {
         await softly([
           async () => {
@@ -113,20 +113,10 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
             assert.deepEqual(await page.axeViolations(), []);
           },
         ]);
-      },
-    },
-    {
-      title: `${lang}: an unknown page answers 404 in ${lang}, with no CSP refusal`,
-      run: async (page) => {
-        assert.equal(await page.goto(`${prefix}/no-such-page`), 404);
-        await inLanguageWithoutRefusal(page, lang);
-      },
-    },
-    {
-      title: `${lang}: each footer legal link opens the right page, with its note if any, passing axe, with no CSP refusal`,
-      run: async (page) => {
+        // Then each footer legal link (shyden-labs/ShyTalk#56 AC4; #180: one journey, as both opened the home page
+        // first). A legal page in a language without its own text is the English page with an English footer, so the
+        // next link in this language is found back on the home page; not after the last.
         const words = legalLines(legalLocale(locale));
-        await page.goto(`${prefix}/`);
         for (const doc of LEGAL_DOCS) {
           await page.tap(`footer a[data-legal="${doc}"]`);
           await page.waitForText(H1, words[doc].title);
@@ -141,8 +131,15 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
           }
           assert.deepEqual(await page.axeViolations(), []);
           assert.deepEqual(await page.cspRefusals(), []);
-          await page.goto(`${prefix}/`);
+          if (doc !== LEGAL_DOCS.at(-1)) await page.goto(`${prefix}/`);
         }
+      },
+    },
+    {
+      title: `${lang}: an unknown page answers 404 in ${lang}, with no CSP refusal`,
+      run: async (page) => {
+        assert.equal(await page.goto(`${prefix}/no-such-page`), 404);
+        await inLanguageWithoutRefusal(page, lang);
       },
     },
     {
@@ -244,8 +241,54 @@ const SIGN_UP_JOURNEY: IphoneCase = {
     await page.type('#signin-code', await totpAt(secret, 1));
     await page.tap('#signin-submit');
     await page.waitForText(H1, t('en', 'account.accountTitle'));
+    assert.equal(await page.isVisible(NOTICE), false, 'a recovery notice before any recovery started');
+
+    // A recovery started for this address shows on this signed-in device, which cancels it there
+    // (as tests/smoke/site.spec.ts does; shyden-labs/ShyTalk#133 AC3, #180).
+    const signUpCode = codeIn(codeMail);
+    await page.goto('/recover');
+    await page.type('#email-address', address);
+    await page.tap('#email-submit');
+    await page.waitForText('#email-answer', t('en', 'account.sent'));
+    // The mailbox answers only its newest mail: wait for the recovery code to replace the sign-up one.
+    const recoveryCode = await waitFor('the recovery code mail', async () => {
+      const code = codeIn(await waitForAnyMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' }));
+      return code === signUpCode ? null : code;
+    });
+    await page.type('#email-code', recoveryCode);
+    await page.tap('#code-submit');
+    const started = matching(t('en', 'account.recoveryStarted'), '{completesAt}');
+    await waitFor('the recovery-started answer', async () => (started.test(await page.text('#email-answer')) ? true : null));
+
+    await page.goto('/account/');
+    await waitFor('the recovery notice', async () => ((await page.isVisible(NOTICE)) ? true : null));
+    assert.match(await page.text('#recovery-pending-text'), matching(t('en', 'account.recoveryPending'), '{startedAt}'));
+    await page.tap('#recovery-cancel');
+    await waitFor('the recovery notice to hide', async () => ((await page.isVisible(NOTICE)) ? null : true));
   },
 };
+
+const NOTICE = '#recovery-pending';
+
+/** `line` as a pattern, its one `placeholder` standing for any text. */
+function matching(line: string, placeholder: string): RegExp {
+  const parts = line.split(placeholder).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`^${parts.join('.+')}$`);
+}
+
+const WAIT_CEILING_MS = 60_000;
+const WAIT_EVERY_MS = 1_000;
+
+/** Looks every second until `look` answers something other than null, failing at a ceiling that names `what`. */
+async function waitFor<T>(what: string, look: () => Promise<T | null>): Promise<T> {
+  const started = Date.now();
+  for (;;) {
+    const found = await look();
+    if (found !== null) return found;
+    if (Date.now() - started >= WAIT_CEILING_MS) throw new Error(`waited ${String(WAIT_CEILING_MS / 1000)} s for ${what}`);
+    await new Promise<void>((done) => setTimeout(done, WAIT_EVERY_MS));
+  }
+}
 
 /**
  * The recovery pages, in English, once (tests/smoke/site.spec.ts,

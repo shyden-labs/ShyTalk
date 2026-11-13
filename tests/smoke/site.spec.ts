@@ -33,7 +33,10 @@ function cspRefusals(page: Page): string[] {
 
 for (const { lang, locale, prefix } of LANGUAGES) {
   // One journey, all its assertions (Shyden 2026-11-09, shyden-labs/ShyTalk#151): the home page opens once.
-  test(`${lang}: the home page answers 200 in ${lang}, shows its heading and no roadmap button, passes axe, with no CSP refusal`, async ({
+  // The home page, then each footer legal link from it (shyden-labs/ShyTalk#56 AC4; #180: one journey, as both opened
+  // the home page first). A legal page in a language without its own text is the English page with an English footer,
+  // so the next link in this language is found back on the home page.
+  test(`${lang}: the home page answers 200 in ${lang}, shows its heading and no roadmap button, passes axe, and each footer legal link opens the right page, with its note if any, passing axe, with no CSP refusal`, async ({
     page,
   }) => {
     const refusals = cspRefusals(page);
@@ -41,30 +44,15 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     expect.soft(response?.status()).toBe(200);
     await expect.soft(page.locator('html')).toHaveAttribute('lang', lang);
     await expect.soft(page.getByRole('navigation')).toBeVisible();
-    const heading = page.getByRole('heading', { level: 1 });
-    await expect.soft(heading).toBeVisible();
-    await expect.soft(heading).toHaveText(t(locale, 'home.heading'));
+    const homeHeading = page.getByRole('heading', { level: 1 });
+    await expect.soft(homeHeading).toBeVisible();
+    await expect.soft(homeHeading).toHaveText(t(locale, 'home.heading'));
     await expect.soft(page.getByRole('link', { name: t(locale, 'home.apply') })).toBeVisible();
     await expect.soft(page.getByRole('link', { name: t(locale, 'home.roadmap') })).toHaveCount(0);
-    const { violations } = await new AxeBuilder({ page }).analyze();
-    expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
-    expect.soft(refusals).toEqual([]);
-  });
+    const home = await new AxeBuilder({ page }).analyze();
+    expect.soft(home.violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
 
-  test(`${lang}: an unknown page answers 404 in ${lang}, with no CSP refusal`, async ({ page }) => {
-    const refusals = cspRefusals(page);
-    const response = await page.goto(`${prefix}/no-such-page`, { waitUntil: 'load' });
-    expect(response?.status()).toBe(404);
-    await expect(page.locator('html')).toHaveAttribute('lang', lang);
-    await expect(page.getByRole('navigation')).toBeVisible();
-    expect(refusals).toEqual([]);
-  });
-
-  // The legal pages (shyden-labs/ShyTalk#56 AC4): each language's footer opens the right text.
-  test(`${lang}: each footer legal link opens the right page, with its note if any, passing axe, with no CSP refusal`, async ({ page }) => {
-    const refusals = cspRefusals(page);
     const words = legalLines(legalLocale(locale));
-    await page.goto(`${prefix}/`, { waitUntil: 'load' });
     for (const doc of LEGAL_DOCS) {
       await page
         .getByRole('contentinfo')
@@ -85,8 +73,17 @@ for (const { lang, locale, prefix } of LANGUAGES) {
       }
       const { violations } = await new AxeBuilder({ page }).analyze();
       expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
-      await page.goto(`${prefix}/`, { waitUntil: 'load' });
+      if (doc !== LEGAL_DOCS.at(-1)) await page.goto(`${prefix}/`, { waitUntil: 'load' });
     }
+    expect.soft(refusals).toEqual([]);
+  });
+
+  test(`${lang}: an unknown page answers 404 in ${lang}, with no CSP refusal`, async ({ page }) => {
+    const refusals = cspRefusals(page);
+    const response = await page.goto(`${prefix}/no-such-page`, { waitUntil: 'load' });
+    expect(response?.status()).toBe(404);
+    await expect(page.locator('html')).toHaveAttribute('lang', lang);
+    await expect(page.getByRole('navigation')).toBeVisible();
     expect(refusals).toEqual([]);
   });
 

@@ -54,7 +54,7 @@ const post = (path: string, body: unknown, token?: string): Request =>
   });
 
 describe('app sign-in on D1', () => {
-  it('a Google sign-in makes one user, one session and one audit row; again reuses the user', async () => {
+  it('a Google sign-in makes one user, one session and one audit row; again reuses the user; sign-out deletes the session row on one chain, and the old token then gets 401', async () => {
     const email = 'google-person@example.test';
     const first = await handleSignIn(
       post('sign-in/google', { idToken: await provider.idToken({ email, sub: 'g-1' }) }),
@@ -64,17 +64,30 @@ describe('app sign-in on D1', () => {
     );
     expect(first.status).toBe(200);
     const { token, userId } = (await first.json()) as { token: string; userId: string };
-    expect(await count('user WHERE email = ?', email)).toBe(1);
-    expect(await count('session WHERE token = ? AND userId = ?', token, userId)).toBe(1);
-    expect(await count("audit WHERE action = 'session.start' AND actor = ?", `user:${userId}`)).toBe(1);
+    expect.soft(await count('user WHERE email = ?', email)).toBe(1);
+    expect.soft(await count('session WHERE token = ? AND userId = ?', token, userId)).toBe(1);
+    expect.soft(await count("audit WHERE action = 'session.start' AND actor = ?", `user:${userId}`)).toBe(1);
 
     const again = (await (
       await handleSignIn(post('sign-in/google', { idToken: await provider.idToken({ email, sub: 'g-1' }) }), env, auth, 'google')
     ).json()) as {
       userId: string;
     };
-    expect(again.userId).toBe(userId);
-    expect(await count('user WHERE email = ?', email)).toBe(1);
+    expect.soft(again.userId).toBe(userId);
+    expect.soft(await count('user WHERE email = ?', email)).toBe(1);
+
+    // Signing out the first session (shyden-labs/ShyTalk#180: was its own journey, signing in again first).
+    expect.soft((await handleSignOut(post('sign-out', {}, token), env, auth)).status).toBe(200);
+    expect.soft(await count('session WHERE token = ?', token)).toBe(0);
+    expect.soft(await count("audit WHERE action = 'session.end.attempt' AND actor = ?", `user:${userId}`)).toBe(1);
+    const chains = await local.DB.prepare(
+      "SELECT action, json_extract(detail, '$.chain') AS chain FROM audit WHERE actor = ? AND action LIKE 'session.end.%' ORDER BY id",
+    )
+      .bind(`user:${userId}`)
+      .all<{ action: string; chain: string }>();
+    expect.soft(chains.results.map((row) => row.action)).toEqual(['session.end.attempt', 'session.end.success']);
+    expect.soft(new Set(chains.results.map((row) => row.chain)).size).toBe(1);
+    expect.soft((await handleSignOut(post('sign-out', {}, token), env, auth)).status).toBe(401);
   });
 
   it('an Apple sign-in with a wrong nonce is refused and writes nothing', async () => {
@@ -140,27 +153,6 @@ describe('app sign-in on D1', () => {
     );
     expect(response.status).toBe(500);
     expect(await count('session WHERE userId IN (SELECT id FROM user WHERE email = ?)', email)).toBe(0);
-  });
-
-  it('sign-out deletes the session row and writes its attempt and success on one chain; the old token then gets 401', async () => {
-    const signedIn = await handleSignIn(
-      post('sign-in/google', { idToken: await provider.idToken({ email: 'leaver@example.test', sub: 'g-l' }) }),
-      env,
-      auth,
-      'google',
-    );
-    const { token, userId } = (await signedIn.json()) as { token: string; userId: string };
-    expect((await handleSignOut(post('sign-out', {}, token), env, auth)).status).toBe(200);
-    expect(await count('session WHERE token = ?', token)).toBe(0);
-    expect(await count("audit WHERE action = 'session.end.attempt' AND actor = ?", `user:${userId}`)).toBe(1);
-    const chains = await local.DB.prepare(
-      "SELECT action, json_extract(detail, '$.chain') AS chain FROM audit WHERE actor = ? AND action LIKE 'session.end.%' ORDER BY id",
-    )
-      .bind(`user:${userId}`)
-      .all<{ action: string; chain: string }>();
-    expect(chains.results.map((row) => row.action)).toEqual(['session.end.attempt', 'session.end.success']);
-    expect(new Set(chains.results.map((row) => row.chain)).size).toBe(1);
-    expect((await handleSignOut(post('sign-out', {}, token), env, auth)).status).toBe(401);
   });
 
   it('a sign-out whose end batch fails on D1 keeps the session row and logs the failure on the chain', async () => {

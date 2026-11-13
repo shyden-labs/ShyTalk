@@ -94,7 +94,7 @@ const cookiesFrom = (response: Response): string =>
     .join('; ');
 
 describe('a passkey on D1', () => {
-  it('signs up with #133 token and a passkey, then signs in with it', async () => {
+  it('signs up with #133 token and a passkey, refuses a second registration with the spent token, then signs in with the passkey', async () => {
     await local.DB.prepare("INSERT INTO one_time_token (token_hash, purpose, user_id, email, expires_at) VALUES (?, 'sign-up', NULL, ?, ?)")
       .bind(await tokenHash('d1-sign-up'), 'passkey-person@example.test', Date.now() + 600_000)
       .run();
@@ -107,6 +107,8 @@ describe('a passkey on D1', () => {
     expect(registered.status).toBe(200);
     const made = (await registered.json()) as { userId: string; token: string; recoveryCodes: string[] };
     expect(made.recoveryCodes).toHaveLength(10);
+    // The spent sign-up token starts no second registration (shyden-labs/ShyTalk#180: was its own journey).
+    expect((await call('register/options', { token: 'd1-sign-up' })).status).toBe(401);
     const signedUp = new Request(`${ORIGIN}/x`, { headers: { authorization: `Bearer ${made.token}` } });
     expect((await appSession(signedUp, auth))?.email).toBe('passkey-person@example.test');
     const stored = await local.DB.prepare('SELECT "userId", "publicKey" FROM passkey WHERE "userId" = ?')
@@ -129,16 +131,5 @@ describe('a passkey on D1', () => {
       .bind(`user:${made.userId}`)
       .first<{ n: number }>();
     expect(audited?.n).toBe(3);
-  });
-
-  it('refuses a second registration with a spent sign-up token', async () => {
-    await local.DB.prepare("INSERT INTO one_time_token (token_hash, purpose, user_id, email, expires_at) VALUES (?, 'sign-up', NULL, ?, ?)")
-      .bind(await tokenHash('d1-once'), 'once@example.test', Date.now() + 600_000)
-      .run();
-    const first = await call('register/options', { token: 'd1-once' });
-    const { challenge } = (await first.json()) as { challenge: string };
-    const { response } = await register({ rpId: RP, origin: ORIGIN, challenge });
-    expect((await call('register/verify', { response, token: 'd1-once' }, cookiesFrom(first))).status).toBe(200);
-    expect((await call('register/options', { token: 'd1-once' })).status).toBe(401);
   });
 });

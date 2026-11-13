@@ -86,16 +86,57 @@ beforeEach(async () => {
 });
 
 describe('applying', () => {
-  it('stores one row and sends one mail, holding the hash and never the token', async () => {
-    expect((await apply()).status).toBe(202);
+  // One address's whole life, applied for once, carries every check (shyden-labs/ShyTalk#180: these were six journeys,
+  // each applying first): the first application, an unknown token, a repeat inside 10 minutes, a fresh mail after
+  // 10 minutes, confirming once, and applying again once confirmed.
+  it('applies, refuses an unknown token, sends nothing again within 10 minutes, sends a fresh mail after, confirms once, and sends nothing to a confirmed address', async () => {
+    expect.soft((await apply()).status).toBe(202);
     const [row, ...others] = await rows();
-    expect(others).toEqual([]);
-    expect(row).toMatchObject({ email: ANN, locale: 'en', applied_at: START, confirmed_at: null, confirm_sent_at: START });
-    expect(row?.confirm_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(mails).toHaveLength(1);
-    expect(JSON.stringify(row)).not.toContain(tokenIn(mails[0]));
-    expect(await auditCount('applicant.applied')).toBe(1);
-    expect(await auditCount('applicant.expired')).toBe(0);
+    expect.soft(others).toEqual([]);
+    expect.soft(row).toMatchObject({ email: ANN, locale: 'en', applied_at: START, confirmed_at: null, confirm_sent_at: START });
+    expect.soft(row?.confirm_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect.soft(mails).toHaveLength(1);
+    expect.soft(JSON.stringify(row)).not.toContain(tokenIn(mails[0]));
+    expect.soft(await auditCount('applicant.applied')).toBe(1);
+    expect.soft(await auditCount('applicant.expired')).toBe(0);
+
+    // An unknown token changes nothing.
+    expect.soft((await confirm('no-such-token')).status).toBe(410);
+    expect.soft((await rows())[0]?.confirmed_at).toBeNull();
+    expect.soft(await auditCount('applicant.confirmed')).toBe(0);
+
+    // Within 10 minutes: no second mail, and no change audited.
+    clock += 9 * 60_000;
+    expect.soft((await apply()).status).toBe(202);
+    expect.soft(mails).toHaveLength(1);
+    expect.soft(await auditCount('applicant.applied')).toBe(1);
+
+    // After 10 minutes: a fresh mail, and the old link stops working.
+    const old = tokenIn(mails[0]);
+    clock = START + 10 * 60_000 + 1;
+    await apply();
+    expect.soft(mails).toHaveLength(2);
+    expect.soft((await confirm(old)).status).toBe(410);
+
+    // Confirming sets confirmed_at once and clears the hash; a second use is expired.
+    const token = tokenIn(mails[1]);
+    clock += HOUR;
+    const confirmedAt = clock;
+    expect.soft((await confirm(token)).status).toBe(200);
+    expect.soft((await rows())[0]).toMatchObject({ confirmed_at: confirmedAt, confirm_hash: null });
+    expect.soft((await confirm(token)).status).toBe(410);
+    expect.soft((await rows())[0]?.confirmed_at).toBe(confirmedAt);
+    expect.soft(await auditCount('applicant.confirmed')).toBe(1);
+    const { results } = await dev.DB.prepare('SELECT * FROM audit WHERE id > ?').bind(auditStart).all();
+    expect.soft(results.length).toBeGreaterThan(0);
+    expect.soft(JSON.stringify(results)).not.toContain(ANN);
+
+    // A confirmed address gets nothing, and the same answer.
+    clock += HOUR;
+    const answer = await apply();
+    expect.soft(answer.status).toBe(202);
+    expect.soft(await answer.json()).toEqual({ state: 'sent' });
+    expect.soft(mails).toHaveLength(2);
   });
 
   it('makes one row of spaces and capitals', async () => {
@@ -144,34 +185,6 @@ describe('applying', () => {
     expect(mails).toHaveLength(1);
   });
 
-  it('sends nothing to the same address within 10 minutes, and audits no change', async () => {
-    await apply();
-    clock += 9 * 60_000;
-    expect((await apply()).status).toBe(202);
-    expect(mails).toHaveLength(1);
-    expect(await auditCount('applicant.applied')).toBe(1);
-  });
-
-  it('sends a fresh mail after 10 minutes, and the old link stops working', async () => {
-    await apply();
-    const old = tokenIn(mails[0]);
-    clock += 10 * 60_000 + 1;
-    await apply();
-    expect(mails).toHaveLength(2);
-    expect((await confirm(old)).status).toBe(410);
-    expect((await confirm(tokenIn(mails[1]))).status).toBe(200);
-  });
-
-  it('sends nothing to a confirmed address, and answers the same', async () => {
-    await apply();
-    await confirm(tokenIn(mails[0]));
-    clock += HOUR;
-    const answer = await apply();
-    expect(answer.status).toBe(202);
-    expect(await answer.json()).toEqual({ state: 'sent' });
-    expect(mails).toHaveLength(1);
-  });
-
   it('keeps confirm_sent_at null when the sender fails, and a retry at once sends', async () => {
     sendResult = { ok: false, reason: 'unavailable' };
     expect((await apply()).status).toBe(503);
@@ -194,20 +207,6 @@ describe('applying', () => {
 });
 
 describe('confirming', () => {
-  it('sets confirmed_at once and clears the hash; a second use is expired', async () => {
-    await apply();
-    const token = tokenIn(mails[0]);
-    clock += HOUR;
-    expect((await confirm(token)).status).toBe(200);
-    expect((await rows())[0]).toMatchObject({ confirmed_at: START + HOUR, confirm_hash: null });
-    expect((await confirm(token)).status).toBe(410);
-    expect((await rows())[0]?.confirmed_at).toBe(START + HOUR);
-    expect(await auditCount('applicant.confirmed')).toBe(1);
-    const { results } = await dev.DB.prepare('SELECT * FROM audit WHERE id > ?').bind(auditStart).all();
-    expect(results.length).toBeGreaterThan(0);
-    expect(JSON.stringify(results)).not.toContain(ANN);
-  });
-
   it('refuses a token older than 48 hours, and the row is gone', async () => {
     await apply();
     clock += 48 * HOUR + 1;
@@ -219,13 +218,6 @@ describe('confirming', () => {
     await apply();
     clock += 48 * HOUR;
     expect((await confirm(tokenIn(mails[0]))).status).toBe(200);
-  });
-
-  it('refuses an unknown token, changing nothing', async () => {
-    await apply();
-    expect((await confirm('no-such-token')).status).toBe(410);
-    expect((await rows())[0]?.confirmed_at).toBeNull();
-    expect(await auditCount('applicant.confirmed')).toBe(0);
   });
 
   // Ten rounds: this test once failed inside the test proxy when a statement was held across an await (#55).

@@ -15,6 +15,10 @@ const mailbox = vi.hoisted(() => ({
   waitForMail: vi.fn<(tag: string, deps: { password: string }) => Promise<{ subject: string; text: string; confirmLink: string }>>(() =>
     Promise.resolve({ subject: 'subject', text: 'body', confirmLink: 'https://dev.example/closed-testing/confirm?t=abc' }),
   ),
+  waitForAnyMail: vi.fn<(tag: string, deps: { password: string }) => Promise<{ subject: string; text: string }>>(() =>
+    Promise.resolve({ subject: 'subject', text: 'code 000000' }),
+  ),
+  codeIn: vi.fn((mail: { text: string }) => /\b\d{6}\b/.exec(mail.text)?.[0] ?? ''),
 }));
 vi.mock('../phones/test-mailbox.ts', () => mailbox);
 
@@ -121,15 +125,17 @@ describe('the iPhone cases', () => {
     );
   });
 
-  // One journey, all its assertions (Shyden 2026-11-09, shyden-labs/ShyTalk#151):
-  // the home page is opened once, and every check runs even after one fails.
+  // One journey, all its assertions (Shyden 2026-11-09, shyden-labs/ShyTalk#151, #180): the home page is opened for its
+  // checks, then again only to reach the next footer legal link in this language (a legal page in a language without
+  // its own text has an English footer), never after the last; every check runs even after one fails.
   it.each(cases('the home page answers').map((c) => [c.title, c] as const))(
-    '%s: opens the home page once and names every failing check, not only the first',
+    '%s: opens the home page once for its checks and once before each later legal link, and names every failing check, not only the first',
     async (_, c) => {
       const lang = langOf(c.title);
       const page = safari(lang);
       await c.run(page);
-      expect(page.visited).toEqual([`${PREFIX[lang] ?? '?'}/`]);
+      const home = `${PREFIX[lang] ?? '?'}/`;
+      expect(page.visited).toEqual([home, home, home]);
       const broken = c.run(safari(lang, { goto: () => Promise.resolve(500), axeViolations: () => Promise.resolve(['color-contrast: 1']) }));
       await expect(broken).rejects.toThrow(/500[\s\S]*color-contrast: 1/);
     },
@@ -197,45 +203,60 @@ describe('the iPhone cases', () => {
     await expect(c.run(safari(langOf(c.title), { cspRefusals: () => Promise.resolve(['refused']) }))).rejects.toThrow();
   });
 
-  it('holds a legal-links case in every language', () => {
-    expect(named('each footer legal link')).toHaveLength(5);
-  });
-
-  it.each(named('each footer legal link'))('%s: taps each link, reads its heading in the right language, and checks axe', async (_, c) => {
-    const lang = langOf(c.title);
-    const locale = LOCALE[lang] ?? 'en';
-    const words = legalLines(legalLocale(locale));
-    const tapped: string[] = [];
-    const waited: string[] = [];
-    let axe = 0;
-    await c.run(
-      safari(lang, {
-        attribute: () => Promise.resolve(legalLocale(locale)),
-        tap: (selector) => {
-          tapped.push(selector);
-          return Promise.resolve();
-        },
-        waitForText: (_selector, text) => {
-          waited.push(text);
-          return Promise.resolve();
-        },
-        axeViolations: () => {
-          axe += 1;
-          return Promise.resolve([]);
-        },
-      }),
+  it("holds the legal links in each language's home-page case, and no case of their own", () => {
+    expect(named('the home page answers').filter(([title]) => title.includes('each footer legal link opens the right page'))).toHaveLength(
+      5,
     );
-    expect(tapped).toEqual(['privacy', 'terms', 'guidelines'].map((doc) => `footer a[data-legal="${doc}"]`));
-    expect(waited).toEqual([words.privacy.title, words.terms.title, words.guidelines.title]);
-    expect(axe).toBe(3);
+    expect(named('each footer legal link')).toHaveLength(0);
   });
 
-  it.each(named('each footer legal link'))('%s: fails when a page is in the wrong language', async (_, c) => {
-    await expect(c.run(safari(langOf(c.title), { attribute: () => Promise.resolve('fr') }))).rejects.toThrow();
+  it.each(named('the home page answers'))(
+    '%s: taps each legal link, reads its heading in the right language, and checks axe on home and each',
+    async (_, c) => {
+      const lang = langOf(c.title);
+      const locale = LOCALE[lang] ?? 'en';
+      const words = legalLines(legalLocale(locale));
+      const tapped: string[] = [];
+      const waited: string[] = [];
+      let axe = 0;
+      await c.run(
+        safari(lang, {
+          // The home page is in this language; a legal page, once a link was tapped, in its legal language.
+          attribute: () => Promise.resolve(tapped.length === 0 ? lang : legalLocale(locale)),
+          tap: (selector) => {
+            tapped.push(selector);
+            return Promise.resolve();
+          },
+          waitForText: (_selector, text) => {
+            waited.push(text);
+            return Promise.resolve();
+          },
+          axeViolations: () => {
+            axe += 1;
+            return Promise.resolve([]);
+          },
+        }),
+      );
+      expect(tapped).toEqual(['privacy', 'terms', 'guidelines'].map((doc) => `footer a[data-legal="${doc}"]`));
+      expect(waited).toEqual([words.privacy.title, words.terms.title, words.guidelines.title]);
+      expect(axe).toBe(4);
+    },
+  );
+
+  it.each(named('the home page answers'))('%s: fails when a legal page is in the wrong language', async (_, c) => {
+    const lang = langOf(c.title);
+    let tapped = false;
+    const page = safari(lang, {
+      tap: () => ((tapped = true), Promise.resolve()),
+      attribute: () => Promise.resolve(tapped ? 'fr' : lang),
+    });
+    await expect(c.run(page)).rejects.toThrow(/'fr'/);
   });
 
-  it.each(named('each footer legal link'))('%s: fails on any axe violation', async (_, c) => {
-    await expect(c.run(safari(langOf(c.title), { axeViolations: () => Promise.resolve(['label: 1']) }))).rejects.toThrow();
+  it.each(named('the home page answers'))('%s: fails on an axe violation on a legal page', async (_, c) => {
+    let calls = 0;
+    const onLegal = () => ((calls += 1), Promise.resolve(calls > 1 ? ['label: 1'] : []));
+    await expect(c.run(safari(langOf(c.title), { axeViolations: onLegal }))).rejects.toThrow('label: 1');
   });
 });
 
@@ -318,5 +339,124 @@ describe('the iPhone closed-testing journey', () => {
     vi.stubEnv('TEST_MAILBOX_PASSWORD', undefined);
     await journey().run(safari('en'));
     expect(mailbox.waitForMail).toHaveBeenCalledWith('iphone-air-1700000000000', { password: '' });
+  });
+});
+
+describe('the iPhone joining journey: a recovery shows on the signed-in device (shyden-labs/ShyTalk#180)', () => {
+  const TITLE = 'joining with the mailed code and an authenticator app, then signing back in with it';
+  const journey = () => {
+    const found = IPHONE_CASES.find(({ title }) => title === TITLE);
+    if (found === undefined) throw new Error(`no case titled ${TITLE}`);
+    return found;
+  };
+  const NOTICE = '#recovery-pending';
+
+  /** Safari on the account pages as they should be: the notice shows once a recovery started, until it is cancelled. */
+  function accountPages(overrides: { notice?: (pending: boolean) => boolean; noticeText?: string } = {}) {
+    const steps: string[] = [];
+    let started = false;
+    let pending = false;
+    const page = safari('en', {
+      goto: (path) => {
+        steps.push(`goto ${path}`);
+        if (path === '/account/' && started) pending = true;
+        return Promise.resolve(200);
+      },
+      type: (selector, text) => (steps.push(`type ${selector} ${text}`), Promise.resolve()),
+      tap: (selector) => {
+        steps.push(`tap ${selector}`);
+        if (selector === '#code-submit' && steps.includes('goto /recover')) started = true;
+        if (selector === '#recovery-cancel') pending = false;
+        return Promise.resolve();
+      },
+      waitForText: (selector, text) => (steps.push(`wait ${selector} ${text}`), Promise.resolve()),
+      isVisible: (selector) => Promise.resolve(selector === NOTICE ? (overrides.notice ?? ((shown) => shown))(pending) : false),
+      text: (selector) => {
+        if (selector === '[data-testid="totp-secret"]') return Promise.resolve('JBSWY3DPEHPK3PXP');
+        if (selector === '[data-testid="recovery-codes"]')
+          return Promise.resolve(Array.from({ length: 10 }, () => 'AAAA-AAAA-AAAA-AAAA').join(' '));
+        if (selector === '[data-testid="method-authenticator"]') return Promise.resolve(t('en', 'account.authenticatorOn'));
+        if (selector === '#email-answer')
+          return Promise.resolve(t('en', 'account.recoveryStarted').replace('{completesAt}', '14 Nov 2026, 10:00'));
+        if (selector === '#recovery-pending-text')
+          return Promise.resolve(overrides.noticeText ?? t('en', 'account.recoveryPending').replace('{startedAt}', '13 Nov 2026, 10:00'));
+        return Promise.resolve('');
+      },
+    });
+    return { page, steps };
+  }
+
+  /** Runs the journey, letting its waits pass on fake time. */
+  async function run(page: SafariPage): Promise<void> {
+    const state = { settled: false };
+    const running = journey()
+      .run(page)
+      .finally(() => {
+        state.settled = true;
+      });
+    running.catch(() => undefined);
+    // Each wait sets its next timer only after its look answers, so time moves a second at a time.
+    for (let second = 0; second < 70 && !state.settled; second += 1) await vi.advanceTimersByTimeAsync(1_000);
+    await running;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: 1700000000000 });
+    vi.stubEnv('TEST_MAILBOX_PASSWORD', 'secret');
+    mailbox.waitForAnyMail.mockReset();
+    // The sign-up code; then the same mail while the recovery mail has not yet arrived; then the recovery code.
+    mailbox.waitForAnyMail
+      .mockResolvedValueOnce({ subject: t('en', 'email.codeSubject'), text: 'code 111111' })
+      .mockResolvedValueOnce({ subject: t('en', 'email.codeSubject'), text: 'code 111111' })
+      .mockResolvedValue({ subject: t('en', 'email.codeSubject'), text: 'code 222222' });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it('starts a recovery for its own address, types the new code once it arrives, sees the notice and cancels it there', async () => {
+    const { page, steps } = accountPages();
+    await run(page);
+    const address = 'box+iphone-air-1700000000000@mail.test';
+    expect(steps.slice(steps.indexOf('goto /recover'))).toEqual([
+      'goto /recover',
+      `type #email-address ${address}`,
+      'tap #email-submit',
+      `wait #email-answer ${t('en', 'account.sent')}`,
+      'type #email-code 222222',
+      'tap #code-submit',
+      'goto /account/',
+      'tap #recovery-cancel',
+    ]);
+    expect(mailbox.waitForAnyMail).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails when a notice shows before any recovery started', async () => {
+    const { page } = accountPages({ notice: () => true });
+    await expect(run(page)).rejects.toThrow('a recovery notice before any recovery started');
+  });
+
+  it('fails naming the notice when it never shows', async () => {
+    const { page } = accountPages({ notice: () => false });
+    await expect(run(page)).rejects.toThrow('waited 60 s for the recovery notice');
+  });
+
+  it('fails when the notice says something else', async () => {
+    const { page } = accountPages({ noticeText: 'Something else' });
+    await expect(run(page)).rejects.toThrow('Something else');
+  });
+
+  it('fails naming the notice when it stays after the cancel', async () => {
+    let shown = false;
+    const { page } = accountPages({ notice: (pending) => (shown ||= pending) });
+    await expect(run(page)).rejects.toThrow('waited 60 s for the recovery notice to hide');
+  });
+
+  it('fails naming the recovery mail when it never replaces the sign-up one', async () => {
+    mailbox.waitForAnyMail.mockReset();
+    mailbox.waitForAnyMail.mockResolvedValue({ subject: t('en', 'email.codeSubject'), text: 'code 111111' });
+    const { page } = accountPages();
+    await expect(run(page)).rejects.toThrow('waited 60 s for the recovery code mail');
   });
 });

@@ -28,16 +28,6 @@ const count = async (sql: string): Promise<number> => (await env.DB.prepare(sql)
 const get = (headers: Record<string, string> = {}): Request => new Request('https://site.example.test/api/app/ui', { headers });
 
 describe('the UI document on D1', () => {
-  it('gives each valid publish the next version, with one audit row each', async () => {
-    const audits = await count("SELECT COUNT(*) AS n FROM audit WHERE action = 'ui.publish'");
-    const first = await publishUi(store, valid(), 'everyone', 'ci:integration');
-    const second = await publishUi(store, valid(), 'everyone', 'ci:integration');
-    expect(first.ok && second.ok).toBe(true);
-    if (!first.ok || !second.ok) return;
-    expect(second.version).toBe(first.version + 1);
-    expect(await count("SELECT COUNT(*) AS n FROM audit WHERE action = 'ui.publish'")).toBe(audits + 2);
-  });
-
   it('stores nothing and audits nothing for an invalid document', async () => {
     const rows = await count('SELECT COUNT(*) AS n FROM ui_documents');
     const audits = await count('SELECT COUNT(*) AS n FROM audit');
@@ -58,16 +48,23 @@ describe('the UI document on D1', () => {
     expect(await count('SELECT COUNT(*) AS n FROM audit')).toBe(audits);
   });
 
-  it('serves the newest everyone version with its ETag, then 304 for it, never a newer named one', async () => {
+  // Two publishes, made once, carry the version, audit and serving checks (shyden-labs/ShyTalk#180).
+  it('gives each valid publish the next version with one audit row each, and serves the newest everyone version with its ETag, then 304 for it, never a newer named one', async () => {
+    const audits = await count("SELECT COUNT(*) AS n FROM audit WHERE action = 'ui.publish'");
+    const first = await publishUi(store, valid(), 'everyone', 'ci:integration');
     const published = await publishUi(store, valid(), 'everyone', 'ci:integration');
-    if (!published.ok) throw new Error(published.errors.join('; '));
+    expect(first.ok && published.ok).toBe(true);
+    if (!first.ok || !published.ok) throw new Error('a valid publish was refused');
+    expect.soft(published.version).toBe(first.version + 1);
+    expect.soft(await count("SELECT COUNT(*) AS n FROM audit WHERE action = 'ui.publish'")).toBe(audits + 2);
+
     await publishUi(store, valid(), 'named', 'staff:integration');
     const response = await handleUi(get(), store);
-    expect(response.status).toBe(200);
-    expect(response.headers.get('etag')).toBe(`"${published.version}"`);
-    expect(await response.json()).toEqual(valid());
+    expect.soft(response.status).toBe(200);
+    expect.soft(response.headers.get('etag')).toBe(`"${published.version}"`);
+    expect.soft(await response.json()).toEqual(valid());
     const again = await handleUi(get({ 'if-none-match': `"${published.version}"` }), store);
-    expect(again.status).toBe(304);
-    expect(await again.text()).toBe('');
+    expect.soft(again.status).toBe(304);
+    expect.soft(await again.text()).toBe('');
   });
 });

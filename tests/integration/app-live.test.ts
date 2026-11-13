@@ -121,33 +121,14 @@ afterAll(async () => {
 });
 
 describe('the live announcement, in the real runtime', () => {
-  it('sends a socket the current version as soon as it connects', async () => {
-    const live = await open();
-    expect(await live.next()).toEqual({ type: 'ui', version });
-    live.socket.close();
-  });
-
-  it('sends one message to each connected socket on an announcement', async () => {
+  // Three sockets, opened once, carry every check (shyden-labs/ShyTalk#180).
+  it('sends each socket the current version as soon as it connects, then one message to each connected socket on an announcement, dropping one that closed', async () => {
     const first = await open();
     const second = await open();
-    await first.next();
-    await second.next();
-    const response = await announceCall();
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ announced: version });
-    expect(await first.next()).toEqual({ type: 'ui', version });
-    expect(await second.next()).toEqual({ type: 'ui', version });
-    expect(first.messages).toEqual([]);
-    expect(second.messages).toEqual([]);
-    first.socket.close();
-    second.socket.close();
-  });
-
-  it('drops a socket that closed, and still reaches the others', async () => {
     const gone = await open();
-    const staying = await open();
-    await gone.next();
-    await staying.next();
+    expect.soft(await first.next()).toEqual({ type: 'ui', version });
+    expect.soft(await second.next()).toEqual({ type: 'ui', version });
+    expect.soft(await gone.next()).toEqual({ type: 'ui', version });
     await new Promise<void>((done) => {
       gone.socket.addEventListener('close', () => {
         done();
@@ -155,9 +136,14 @@ describe('the live announcement, in the real runtime', () => {
       gone.socket.close(1000, 'leaving');
     });
     const response = await announceCall();
-    expect(response.status).toBe(200);
-    expect(await staying.next()).toEqual({ type: 'ui', version });
-    staying.socket.close();
+    expect.soft(response.status).toBe(200);
+    expect.soft(await response.json()).toEqual({ announced: version });
+    expect.soft(await first.next()).toEqual({ type: 'ui', version });
+    expect.soft(await second.next()).toEqual({ type: 'ui', version });
+    expect.soft(first.messages).toEqual([]);
+    expect.soft(second.messages).toEqual([]);
+    first.socket.close();
+    second.socket.close();
   });
 
   it('refuses an announcement without the secret', async () => {
