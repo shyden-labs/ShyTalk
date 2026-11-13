@@ -74,16 +74,29 @@ const start = (email: string, purpose: string): Request =>
   });
 
 describe('POST /api/app/email/start on D1', () => {
-  it('keeps one live code per address and purpose, and one send row per start', async () => {
+  // One address, started twice, then verified: these were four journeys, each starting first (shyden-labs/ShyTalk#180).
+  it('keeps one live code per address and purpose and one send row per start, stores no plain address or code, lets one of two verifies through, and answers a sign-up token making no user and no session', async () => {
     const email = 'start-one@example.test';
     const hash = await addressHash(SECRET, email);
     code = '111111';
-    expect((await handleEmailStart(start(email, 'sign-up'), env, deps)).status).toBe(202);
+    expect.soft((await handleEmailStart(start(email, 'sign-up'), env, deps)).status).toBe(202);
     code = '222222';
-    expect((await handleEmailStart(start(email, 'sign-up'), env, deps)).status).toBe(202);
-    expect(await count('email_code WHERE address_hash = ? AND purpose = ?', hash, 'sign-up')).toBe(1);
-    expect(await count('email_send WHERE address_hash = ?', hash)).toBe(2);
-    expect(mails.at(-1)?.text).toContain('222222');
+    expect.soft((await handleEmailStart(start(email, 'sign-up'), env, deps)).status).toBe(202);
+    expect.soft(await count('email_code WHERE address_hash = ? AND purpose = ?', hash, 'sign-up')).toBe(1);
+    expect.soft(await count('email_send WHERE address_hash = ?', hash)).toBe(2);
+    expect.soft(mails.at(-1)?.text).toContain('222222');
+
+    const stored = await local.DB.prepare('SELECT * FROM email_code').all();
+    expect.soft(JSON.stringify(stored.results)).not.toContain(email);
+    expect.soft(JSON.stringify(stored.results)).not.toContain('222222');
+
+    const users = await count('"user"');
+    const sessions = await count('session');
+    const answers = await Promise.all([1, 2].map(() => handleEmailVerify(verify(email, 'sign-up', '222222'), env, deps)));
+    expect.soft(answers.map(({ status }) => status).sort()).toEqual([200, 401]);
+    expect.soft(await count('"user"')).toBe(users);
+    expect.soft(await count('session')).toBe(sessions);
+    expect.soft(await count("one_time_token WHERE purpose = 'sign-up' AND email = ?", email)).toBe(1);
   });
 
   it('refuses the fourth start in 15 minutes with 429, for an address with no account', async () => {
@@ -99,39 +112,9 @@ describe('POST /api/app/email/start on D1', () => {
     const statuses = await Promise.all(Array.from({ length: 6 }, () => handleEmailStart(start(email, 'recovery'), env, deps)));
     expect(statuses.map(({ status }) => status).sort()).toEqual([202, 202, 202, 429, 429, 429]);
   });
-
-  it('stores no plain address and no plain code', async () => {
-    const email = 'start-plain@example.test';
-    code = '987654';
-    await handleEmailStart(start(email, 'sign-up'), env, deps);
-    const rows = await local.DB.prepare('SELECT * FROM email_code').all();
-    expect(JSON.stringify(rows.results)).not.toContain(email);
-    expect(JSON.stringify(rows.results)).not.toContain('987654');
-  });
 });
 
 describe('POST /api/app/email/verify on D1', () => {
-  it('lets one of two verifies with one code through', async () => {
-    const email = 'verify-race@example.test';
-    code = '313131';
-    await handleEmailStart(start(email, 'sign-up'), env, deps);
-    const answers = await Promise.all([1, 2].map(() => handleEmailVerify(verify(email, 'sign-up', '313131'), env, deps)));
-    expect(answers.map(({ status }) => status).sort()).toEqual([200, 401]);
-  });
-
-  it('answers a sign-up token and makes no user and no session', async () => {
-    const email = 'verify-sign-up@example.test';
-    code = '424242';
-    await handleEmailStart(start(email, 'sign-up'), env, deps);
-    const users = await count('"user"');
-    const sessions = await count('session');
-    const answer = await handleEmailVerify(verify(email, 'sign-up', '424242'), env, deps);
-    expect(answer.status).toBe(200);
-    expect(await count('"user"')).toBe(users);
-    expect(await count('session')).toBe(sessions);
-    expect(await count("one_time_token WHERE purpose = 'sign-up' AND email = ?", email)).toBe(1);
-  });
-
   it('spends a code on its fifth wrong try', async () => {
     const email = 'verify-wrong@example.test';
     code = '515151';

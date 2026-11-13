@@ -9,7 +9,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
-import { SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
+import { SMOKE_COUNTS, SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
 import { MAIL_STAND_IN_PORT, SMOKE_TARGETS } from './targets.ts';
 
 const PORT = 8787;
@@ -72,7 +72,11 @@ export default defineConfig({
   retries: 0,
   // scripts/smoke-totals.ts reads the JSON report from the repository root;
   // Playwright resolves a relative outputFile from this config's folder, so it is made absolute.
-  reporter: [['list'], ['json', { outputFile: `${ROOT}${SMOKE_REPORT}` }]],
+  reporter: [
+    ['list'],
+    ['json', { outputFile: `${ROOT}${SMOKE_REPORT}` }],
+    ['./assertion-counts.ts', { outputFile: `${ROOT}${SMOKE_COUNTS}` }],
+  ],
   use: {
     baseURL: SITE,
     ignoreHTTPSErrors: true,

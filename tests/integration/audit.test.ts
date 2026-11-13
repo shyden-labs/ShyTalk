@@ -23,27 +23,23 @@ const count = async (action: string): Promise<number> =>
   (await env.DB.prepare('SELECT COUNT(*) AS n FROM audit WHERE action = ?').bind(action).first<{ n: number }>())?.n ?? -1;
 
 describe('the audit table', () => {
-  it('takes a row written through audit(), marked with the environment', async () => {
+  // One row, written once, carries every check (shyden-labs/ShyTalk#180).
+  it('takes a row written through audit(), marked with the environment, and refuses an UPDATE and a DELETE of it', async () => {
     await env.DB.batch([audit(env, { actor: 'staff:1', action: 'test.written', subject: 'x', detail: { language: 'th' } })]);
-    const row = await env.DB.prepare('SELECT actor, subject, detail, environment FROM audit WHERE action = ?')
-      .bind('test.written')
-      .first<Record<string, string>>();
-    expect(row).toEqual({ actor: 'staff:1', subject: 'x', detail: '{"language":"th"}', environment: 'dev' });
-  });
+    const read = () =>
+      env.DB.prepare('SELECT actor, subject, detail, environment FROM audit WHERE action = ?')
+        .bind('test.written')
+        .first<Record<string, string>>();
+    const written = { actor: 'staff:1', subject: 'x', detail: '{"language":"th"}', environment: 'dev' };
+    expect.soft(await read()).toEqual(written);
 
-  it('refuses an UPDATE, leaving the row as it was', async () => {
-    await env.DB.batch([audit(env, { actor: 'staff:1', action: 'test.update' })]);
-    await expect(env.DB.prepare("UPDATE audit SET actor = 'someone else' WHERE action = 'test.update'").run()).rejects.toThrow(
-      'audit is append-only',
-    );
-    const row = await env.DB.prepare("SELECT actor FROM audit WHERE action = 'test.update'").first<{ actor: string }>();
-    expect(row).toEqual({ actor: 'staff:1' });
-  });
+    await expect
+      .soft(env.DB.prepare("UPDATE audit SET actor = 'someone else' WHERE action = 'test.written'").run())
+      .rejects.toThrow('audit is append-only');
+    expect.soft(await read()).toEqual(written);
 
-  it('refuses a DELETE, leaving the row in place', async () => {
-    await env.DB.batch([audit(env, { actor: 'staff:1', action: 'test.delete' })]);
-    await expect(env.DB.prepare("DELETE FROM audit WHERE action = 'test.delete'").run()).rejects.toThrow('audit is append-only');
-    expect(await count('test.delete')).toBe(1);
+    await expect.soft(env.DB.prepare("DELETE FROM audit WHERE action = 'test.written'").run()).rejects.toThrow('audit is append-only');
+    expect.soft(await count('test.written')).toBe(1);
   });
 });
 

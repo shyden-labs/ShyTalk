@@ -15,6 +15,29 @@ import { SMOKE_TARGETS } from '../tests/smoke/targets.ts';
 /** Where the smoke's JSON reporter writes, relative to the repository root. */
 export const SMOKE_REPORT = 'test-results/smoke-report.json';
 
+/** Where the smoke's assertion counter (tests/smoke/assertion-counts.ts) writes. */
+export const SMOKE_COUNTS = 'test-results/smoke-assertions.json';
+
+type Counts = Record<string, Record<string, number>>;
+
+/**
+ * The assertions each test ran on each target (shyden-labs/ShyTalk#180): one
+ * line per test, in the order tests first appear, and a fault for each test
+ * whose counts differ or that a target did not count.
+ */
+export function assertionTotals(counts: Counts, targets: readonly string[]): { lines: string[]; errors: string[] } {
+  const titles = [...new Set(targets.flatMap((target) => Object.keys(counts[target] ?? {})))];
+  const lines: string[] = [];
+  const errors: string[] = [];
+  for (const title of titles) {
+    const each = targets.map((target) => counts[target]?.[title]);
+    const named = targets.map((target, i) => `${target} ${each[i] === undefined ? 'none' : String(each[i])}`).join(', ');
+    lines.push(`assertions in "${title}": ${named}`);
+    if (new Set(each).size > 1) errors.push(`"${title}" ran different numbers of assertions: ${named}`);
+  }
+  return { lines, errors };
+}
+
 interface Result {
   projectName: string;
   status: string;
@@ -68,9 +91,17 @@ export function main(): number {
     console.error(`smoke-totals: cannot read ${SMOKE_REPORT}: ${(error as Error).message}`);
     return 1;
   }
-  for (const line of totals.lines) console.log(`smoke-totals: ${line}`);
-  for (const line of totals.errors) console.error(`smoke-totals: ${line}`);
-  return totals.errors.length === 0 ? 0 : 1;
+  let assertions: { lines: string[]; errors: string[] };
+  try {
+    assertions = assertionTotals(JSON.parse(readFileSync(SMOKE_COUNTS, 'utf8')) as Counts, SMOKE_TARGETS);
+  } catch (error) {
+    assertions = { lines: [], errors: [`cannot read ${SMOKE_COUNTS}: ${(error as Error).message}`] };
+  }
+  const lines = [...totals.lines, ...assertions.lines];
+  const errors = [...totals.errors, ...assertions.errors];
+  for (const line of lines) console.log(`smoke-totals: ${line}`);
+  for (const line of errors) console.error(`smoke-totals: ${line}`);
+  return errors.length === 0 ? 0 : 1;
 }
 
 await runIfEntry(import.meta.url, main);

@@ -43,25 +43,22 @@ async function liveAuthenticator(id: string, email: string): Promise<Uint8Array>
 }
 
 describe('the authenticator app on D1', () => {
-  it('signs in once with one code, however many times it is sent at one moment', async () => {
+  // One live authenticator, set up once, carries every check (shyden-labs/ShyTalk#180).
+  it('signs in once with one code however many times it is sent, keeps the live authenticator when setup is asked again, and while a recovery sets up a new one', async () => {
     const secret = await liveAuthenticator('u-totp', 'totp@example.test');
-    const code = await createOTP(secret, { digits: 6, period: 30 }).hotp(Math.floor(Date.now() / 30_000));
+    const now = Math.floor(Date.now() / 30_000);
+    const code = await createOTP(secret, { digits: 6, period: 30 }).hotp(now);
     const answers = await Promise.all([1, 2, 3].map(() => signInTotp(env, 'totp@example.test', code, Date.now())));
-    expect(answers.filter((answer) => answer === 'u-totp')).toHaveLength(1);
-    expect(await signInTotp(env, 'totp@example.test', code, Date.now())).toBeNull();
-  });
+    expect.soft(answers.filter((answer) => answer === 'u-totp')).toHaveLength(1);
+    expect.soft(await signInTotp(env, 'totp@example.test', code, Date.now())).toBeNull();
 
-  it('keeps a live authenticator when setup is asked for again', async () => {
-    await liveAuthenticator('u-totp-2', 'totp-2@example.test');
-    expect(await setupTotp(env, 'u-totp-2', 'totp-2@example.test', Date.now(), { flow: 'session' })).toBeNull();
-  });
+    expect.soft(await setupTotp(env, 'u-totp', 'totp@example.test', Date.now(), { flow: 'session' })).toBeNull();
 
-  it('leaves a live authenticator untouched while a recovery sets up a new one', async () => {
-    const old = await liveAuthenticator('u-totp-3', 'totp-3@example.test');
-    expect(
-      await setupTotp(env, 'u-totp-3', 'totp-3@example.test', Date.now(), { flow: 'recovery-hash', replaceLive: true }),
-    ).not.toBeNull();
-    const code = await createOTP(old, { digits: 6, period: 30 }).hotp(Math.floor(Date.now() / 30_000));
-    expect(await signInTotp(env, 'totp-3@example.test', code, Date.now())).toBe('u-totp-3');
+    expect
+      .soft(await setupTotp(env, 'u-totp', 'totp@example.test', Date.now(), { flow: 'recovery-hash', replaceLive: true }))
+      .not.toBeNull();
+    // The live authenticator still signs in: the next step, as the current one is spent above.
+    const next = await createOTP(secret, { digits: 6, period: 30 }).hotp(now + 1);
+    expect.soft(await signInTotp(env, 'totp@example.test', next, Date.now())).toBe('u-totp');
   });
 });

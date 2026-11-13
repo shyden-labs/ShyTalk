@@ -35,19 +35,17 @@ async function memberWithCodes(id: string, email: string): Promise<string[]> {
 }
 
 describe('recovery codes on D1', () => {
-  it('works each code once, and counts down the codes left', async () => {
+  // One member's set, made once, carries every check (shyden-labs/ShyTalk#180).
+  it('works each code once, counts down the codes left, and ends the old set when a new one is made', async () => {
     const codes = await memberWithCodes('u-codes', 'codes@example.test');
-    const [first = '', second = ''] = codes;
-    expect(await useRecoveryCode(env, 'codes@example.test', first, Date.now())).toEqual({ userId: 'u-codes', left: 9 });
-    expect(await useRecoveryCode(env, 'codes@example.test', first, Date.now())).toBeNull();
-    expect(await useRecoveryCode(env, 'codes@example.test', second.toLowerCase(), Date.now())).toEqual({ userId: 'u-codes', left: 8 });
-  });
+    const [first = '', second = '', third = ''] = codes;
+    expect.soft(await useRecoveryCode(env, 'codes@example.test', first, Date.now())).toEqual({ userId: 'u-codes', left: 9 });
+    expect.soft(await useRecoveryCode(env, 'codes@example.test', first, Date.now())).toBeNull();
+    expect.soft(await useRecoveryCode(env, 'codes@example.test', second.toLowerCase(), Date.now())).toEqual({ userId: 'u-codes', left: 8 });
 
-  it('ends the old set when a new one is made', async () => {
-    const old = await memberWithCodes('u-new-set', 'new-set@example.test');
-    const { statements } = await replaceRecoveryCodes(env, 'u-new-set', 'user:u-new-set');
+    const { statements } = await replaceRecoveryCodes(env, 'u-codes', 'user:u-codes');
     await local.DB.batch(statements as Parameters<LocalDevEnv['DB']['batch']>[0]);
-    expect(await useRecoveryCode(env, 'new-set@example.test', old[0], Date.now())).toBeNull();
+    expect.soft(await useRecoveryCode(env, 'codes@example.test', third, Date.now())).toBeNull();
   });
 
   it('locks the address after five wrong tries, even for a right code, however many arrive at once', async () => {
