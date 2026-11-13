@@ -139,7 +139,7 @@ const data = Object.fromEntries(keys.map((key) => [`data-${key.replace(/[A-Z]/g,
     const section = document.querySelector<HTMLElement>('#recovery-pending');
     const words = document.querySelector('#recovery-pending-text');
     if (!section || !words) return;
-    section.hidden = pending === null;
+    section.hidden = true;
     if (pending !== null) words.textContent = text('recoveryPending').replace('{startedAt}', when(pending.startedAt));
   }
 
