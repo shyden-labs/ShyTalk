@@ -46,6 +46,10 @@ function selectorText(locale: Locale, selector: string): string {
   return t(locale, 'home.heading');
 }
 
+/** The viewport tag every page carries: the keyboard resizes the page, never pans over it (shyden-labs/ShyTalk#189). */
+const VIEWPORT_TAG = 'meta[name="viewport"]';
+const VIEWPORT = 'width=device-width, initial-scale=1, interactive-widget=resizes-content';
+
 /** Safari showing the site as it should be, in `lang`; `broken` replaces one answer. */
 function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { visited: string[] } {
   const locale = LOCALE[lang] ?? 'en';
@@ -59,7 +63,15 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     },
     cspRefusals: () => Promise.resolve([]),
     attribute: (selector, name) =>
-      Promise.resolve(selector === 'html' && name === 'lang' ? (onLegalPage ? legalLocale(locale) : lang) : null),
+      Promise.resolve(
+        selector === 'html' && name === 'lang'
+          ? onLegalPage
+            ? legalLocale(locale)
+            : lang
+          : selector === VIEWPORT_TAG && name === 'content'
+            ? VIEWPORT
+            : null,
+      ),
     isVisible: (selector) => Promise.resolve(selector !== '[data-english-only]:not([hidden])'),
     text: (selector) => Promise.resolve(selectorText(locale, selector)),
     tap: () => {
@@ -86,7 +98,7 @@ const cases = (start: string) => IPHONE_CASES.filter(({ title }) => kind(title).
  * The home page runs three more where its legal pages carry the "English only" note.
  */
 const CI_ASSERTIONS: Record<string, Record<string, number>> = {
-  'the home page answers 200': { en: 27, id: 27, th: 30, vi: 30, 'zh-Hans': 30 },
+  'the home page answers 200': { en: 28, id: 28, th: 31, vi: 31, 'zh-Hans': 31 },
   'an unknown page answers 404': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
   'the closed-testing page shows the form and every statement': { en: 17, id: 17, th: 17, vi: 17, 'zh-Hans': 17 },
   'the confirm page passes axe, and its button with a dead link shows link-expired': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
@@ -285,7 +297,7 @@ describe('the iPhone cases', () => {
       await c.run(
         safari(lang, {
           // The home page is in this language; a legal page, once a link was tapped, in its legal language.
-          attribute: () => Promise.resolve(tapped.length === 0 ? lang : legalLocale(locale)),
+          attribute: (selector) => Promise.resolve(selector === VIEWPORT_TAG ? VIEWPORT : tapped.length === 0 ? lang : legalLocale(locale)),
           tap: (selector) => {
             tapped.push(selector);
             return Promise.resolve();
@@ -311,10 +323,21 @@ describe('the iPhone cases', () => {
     let tapped = false;
     const page = safari(lang, {
       tap: () => ((tapped = true), Promise.resolve()),
-      attribute: () => Promise.resolve(tapped ? 'fr' : lang),
+      attribute: (selector) => Promise.resolve(selector === VIEWPORT_TAG ? VIEWPORT : tapped ? 'fr' : lang),
     });
     await expect(c.run(page)).rejects.toThrow(/'fr'/);
   });
+
+  it.each(named('the home page answers'))(
+    '%s: fails when the keyboard may pan the page over it (shyden-labs/ShyTalk#189)',
+    async (_, c) => {
+      const lang = langOf(c.title);
+      const page = safari(lang, {
+        attribute: (selector) => Promise.resolve(selector === VIEWPORT_TAG ? 'width=device-width, initial-scale=1' : lang),
+      });
+      await expect(c.run(page)).rejects.toThrow(/interactive-widget=resizes-content/);
+    },
+  );
 
   it.each(named('the home page answers'))('%s: fails on an axe violation on a legal page', async (_, c) => {
     let calls = 0;

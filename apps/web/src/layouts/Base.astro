@@ -14,7 +14,9 @@ const { locale, title } = Astro.props;
 <html lang={locale === 'zh' ? 'zh-Hans' : locale}>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The on-screen keyboard resizes the page instead of panning over it (Android Chrome), so a form's next control
+         stays reachable (shyden-labs/ShyTalk#189). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
     <title>{title === t(locale, 'site.name') ? title : `${title} · ${t(locale, 'site.name')}`}</title>
     <meta name="description" content={t(locale, 'site.tagline')} />
     <link rel="stylesheet" href="/styles/site.css" />
