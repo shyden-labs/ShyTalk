@@ -32,6 +32,14 @@ a {
   color: var(--accent);
 }
 
+/* Every button sets its own colours: iPhone Safari's default (white on #0091ff) reads at 3.23:1 (shyden-labs/ShyTalk#186). */
+button {
+  color: var(--paper);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 0.25rem;
+}
+
 .site-header,
 .site-footer,
 main {
