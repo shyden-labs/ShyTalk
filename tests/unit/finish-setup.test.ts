@@ -101,6 +101,7 @@ describe('finishSetup: a recovery', () => {
     const completed = made.findIndex(({ sql }) => sql.startsWith("UPDATE account_recovery SET state = 'completed'"));
     expect(made[completed]?.values).toEqual([NOW, 3]);
     expect(made[completed + 1]?.sql).toBe(AUDIT_IF_CHANGED_SQL);
+    expect(made[completed + 1]?.values.slice(1, 4)).toEqual(['user:u-1', 'recovery.complete', 'user:u-1']);
     expect(made.find(({ sql }) => sql === 'DELETE FROM session WHERE "userId" = ?')?.values).toEqual(['u-1']);
     expect(actions(made)).toContain('method.add');
     expect(actions(made)).toContain('recovery_codes.new');
@@ -131,9 +132,20 @@ describe('finishSetup: a recovery removes the old methods', () => {
     const totp = made.findIndex(({ sql }) => sql === "DELETE FROM sign_in_method WHERE user_id = ? AND kind = 'totp'");
     expect(made[passkeys]?.values).toEqual(['u-1']);
     expect(made[passkeys + 1]?.sql).toBe(AUDIT_IF_CHANGED_SQL);
-    expect(made[passkeys + 1]?.values[4]).toBe(JSON.stringify({ kind: 'passkey', reason: 'recovery' }));
+    expect(made[passkeys + 1]?.values.slice(1, 5)).toEqual([
+      'user:u-1',
+      'method.remove',
+      'user:u-1',
+      JSON.stringify({ kind: 'passkey', reason: 'recovery' }),
+    ]);
     expect(made[totp]?.values).toEqual(['u-1']);
-    expect(made[totp + 1]?.values[4]).toBe(JSON.stringify({ kind: 'totp', reason: 'recovery' }));
+    expect(made[totp + 1]?.sql).toBe(AUDIT_IF_CHANGED_SQL);
+    expect(made[totp + 1]?.values.slice(1, 5)).toEqual([
+      'user:u-1',
+      'method.remove',
+      'user:u-1',
+      JSON.stringify({ kind: 'totp', reason: 'recovery' }),
+    ]);
   });
 
   it('keeps the authenticator being set up, removing only the old passkeys', async () => {
