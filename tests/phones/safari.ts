@@ -24,6 +24,8 @@ return [...document.querySelectorAll('a[href], [role="link"]')]
   .filter((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\\s+/g, ' ').trim() === name)
   .filter((el) => !visibleOnly || shown(el)).length;`;
 
+const COUNT = `return document.querySelectorAll(arguments[0]).length;`;
+
 const VISIBLE = `const el = document.querySelector(arguments[0]);
 if (!el) return false;
 const r = el.getBoundingClientRect();
@@ -113,6 +115,9 @@ export function safariPage(
     },
     async visibleLinks(name) {
       return (await run(LINKS, name, true)) as number;
+    },
+    async count(selector) {
+      return (await run(COUNT, selector)) as number;
     },
     async axeViolations() {
       await run(read(AXE_FILE));
