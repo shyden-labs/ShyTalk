@@ -10,13 +10,16 @@
  * (tests/phones/devices.ts gives the real ones), so the order and the
  * clean-up are unit-tested.
  */
-import { smokeTotals } from '../../scripts/smoke-totals.ts';
+import { assertionTotals, smokeTotals } from '../../scripts/smoke-totals.ts';
+import { countingCheck } from './check.ts';
 import type { IphoneCase, SafariPage } from './iphone-cases.ts';
 
 export interface CaseResult {
   title: string;
   status: 'expected' | 'unexpected';
   error?: string;
+  /** The checks the case ran, failed ones too (shyden-labs/ShyTalk#180 AC7). */
+  assertions: number;
 }
 
 interface Report {
@@ -32,6 +35,8 @@ export interface PhoneDeps {
   /** Runs the Playwright suite on the OnePlus; answers its exit code. */
   playwright(address: string, endpoint: string): Promise<number>;
   readOneplusReport(): Promise<Report>;
+  /** The checks each test ran on the OnePlus, from tests/smoke/assertion-counts.ts. */
+  readOneplusCounts(): Promise<Record<string, number>>;
   iphoneUdid(): Promise<string>;
   startAppium(): Promise<void>;
   openSession(udid: string): Promise<string>;
@@ -44,22 +49,31 @@ export interface PhoneDeps {
 
 export const PHONES = ['oneplus', 'iphone-air'] as const;
 
-/** Every case in order, a failure recorded with its reason and the run carried on. */
+/** Every case in order, each counting its own checks, a failure recorded with its reason and the run carried on. */
 export async function runCases(cases: IphoneCase[], page: SafariPage): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const { title, run } of cases) {
+    const check = countingCheck();
     try {
-      await run(page);
-      results.push({ title, status: 'expected' });
+      await run(page, check);
+      results.push({ title, status: 'expected', assertions: check.count });
     } catch (error) {
-      results.push({ title, status: 'unexpected', error: (error as Error).message });
+      results.push({ title, status: 'unexpected', error: (error as Error).message, assertions: check.count });
     }
   }
   return results;
 }
 
-/** Both phones' totals against the CI browsers' `expected`, and every failed test on either, named. */
-export function phoneVerdict(oneplus: Report, iphone: CaseResult[], expected: number): { lines: string[]; errors: string[] } {
+/**
+ * Both phones' totals against the CI browsers' `expected`, every failed test on either, named, and each test's checks
+ * on both phones, which must be equal (shyden-labs/ShyTalk#180 AC7).
+ */
+export function phoneVerdict(
+  oneplus: Report,
+  oneplusCounts: Record<string, number>,
+  iphone: CaseResult[],
+  expected: number,
+): { lines: string[]; errors: string[] } {
   const report: Report = {
     suites: [
       ...oneplus.suites,
@@ -67,6 +81,12 @@ export function phoneVerdict(oneplus: Report, iphone: CaseResult[], expected: nu
     ],
   };
   const { lines, errors } = smokeTotals(report, PHONES, expected);
+  const counts = assertionTotals(
+    { oneplus: oneplusCounts, 'iphone-air': Object.fromEntries(iphone.map(({ title, assertions }) => [title, assertions])) },
+    PHONES,
+  );
+  lines.push(...counts.lines);
+  errors.push(...counts.errors);
   for (const suite of oneplus.suites) {
     for (const { title, tests } of suite.specs) {
       if (tests.some(({ status }) => status === 'unexpected' || status === 'flaky')) errors.push(`oneplus failed "${title}"`);
@@ -114,6 +134,7 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     }
     if (code !== 0) errors.push(`Playwright exited ${String(code)} on the OnePlus`);
     const oneplus = await d.readOneplusReport();
+    const oneplusCounts = await d.readOneplusCounts();
     const udid = await d.iphoneUdid();
     await d.startAppium();
     let iphone: CaseResult[];
@@ -129,7 +150,7 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     }
     for (const { title, status, error } of iphone)
       d.print(status === 'expected' ? `iphone-air: ${title} passed` : `iphone-air: ${title} FAILED: ${error ?? ''}`);
-    const verdict = phoneVerdict(oneplus, iphone, d.cases.length);
+    const verdict = phoneVerdict(oneplus, oneplusCounts, iphone, d.cases.length);
     for (const line of verdict.lines) d.print(line);
     errors.push(...verdict.errors);
   } catch (error) {

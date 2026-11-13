@@ -18,6 +18,16 @@ const APPIUM_PORT = 4733;
 const APPIUM = `http://127.0.0.1:${String(APPIUM_PORT)}`;
 /** tests/smoke/oneplus.config.ts writes the OnePlus report here. */
 export const ONEPLUS_REPORT = 'test-results/phone-oneplus.json';
+/** tests/smoke/oneplus.config.ts's assertion counter writes here (shyden-labs/ShyTalk#180). */
+export const ONEPLUS_COUNTS = 'test-results/phone-oneplus-assertions.json';
+
+/** The OnePlus's checks per test, from the counter's file `text`. */
+export function oneplusCounts(text: string): Record<string, number> {
+  const counts = (JSON.parse(text) as Record<string, Record<string, number> | undefined>).oneplus;
+  if (counts === undefined) throw new Error(`${ONEPLUS_COUNTS} holds no counts for the OnePlus`);
+  return counts;
+}
+
 const DEVICES_FILE = 'test-results/devicectl-devices.json';
 /** How long Appium gets to answer /status, and to exit once asked. */
 const APPIUM_START_MS = 60_000;
@@ -114,6 +124,9 @@ export function realDeps(): PhoneDeps {
     },
     async readOneplusReport() {
       return JSON.parse(await readFile(ONEPLUS_REPORT, 'utf8')) as Awaited<ReturnType<PhoneDeps['readOneplusReport']>>;
+    },
+    async readOneplusCounts() {
+      return oneplusCounts(await readFile(ONEPLUS_COUNTS, 'utf8'));
     },
     async iphoneUdid() {
       await mkdir('test-results', { recursive: true });

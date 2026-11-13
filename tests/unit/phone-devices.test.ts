@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pickIphone } from '../phones/devices.ts';
+import { oneplusCounts, pickIphone } from '../phones/devices.ts';
 
 /**
  * The phone run finds the iPhone on the cable from `xcrun devicectl list
@@ -31,6 +31,18 @@ describe('pickIphone', () => {
   it('fails naming each when more than one iPhone is on the cable', () => {
     expect(() => pickIphone(list(device('A', 'physical', 'iPhone', 'wired'), device('B', 'physical', 'iPhone', 'wired')))).toThrow(
       'more than one iPhone is connected by cable: iPhone A, iPhone B',
+    );
+  });
+});
+
+describe('oneplusCounts', () => {
+  it('answers the OnePlus’s counts from the counter’s file, test by test (shyden-labs/ShyTalk#180 AC7)', () => {
+    expect(oneplusCounts(JSON.stringify({ oneplus: { a: 3, b: 1 } }))).toEqual({ a: 3, b: 1 });
+  });
+
+  it('fails naming the file when it holds no counts for the OnePlus', () => {
+    expect(() => oneplusCounts(JSON.stringify({ chromium: { a: 3 } }))).toThrow(
+      'test-results/phone-oneplus-assertions.json holds no counts for the OnePlus',
     );
   });
 });

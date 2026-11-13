@@ -142,6 +142,13 @@ describe('safariPage: reading the page', () => {
     expect(lastScript(fake).args).toEqual(['Apply', true]);
   });
 
+  it('counts the elements a selector matches, as Playwright’s toHaveCount (shyden-labs/ShyTalk#180)', async () => {
+    const fake = appium({}, [3]);
+    await expect(safariPage(fake.call, 's1', BASE).count('[data-testid="devices"] li')).resolves.toBe(3);
+    expect(lastScript(fake).args).toEqual(['[data-testid="devices"] li']);
+    expect(lastScript(fake).script).toContain('querySelectorAll(arguments[0]).length');
+  });
+
   it('fails naming the selector when nothing matches it', async () => {
     const page = safariPage(appium({}, [null]).call, 's1', BASE);
     await expect(page.text('h1')).rejects.toThrow('nothing matches h1');

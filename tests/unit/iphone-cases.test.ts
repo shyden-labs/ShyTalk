@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
+import { countingCheck } from '../phones/check.ts';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 
@@ -69,6 +70,7 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     waitForText: () => Promise.resolve(),
     visibleLinks: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
+    count: () => Promise.resolve(0),
     axeViolations: () => Promise.resolve([]),
     ...broken,
   };
@@ -78,13 +80,27 @@ const kind = (title: string): string => title.replace(/^[^:]+: /, '').split(' in
 const langOf = (title: string): string => title.split(':')[0] ?? '';
 const cases = (start: string) => IPHONE_CASES.filter(({ title }) => kind(title).startsWith(start));
 
+/**
+ * The checks each test's Playwright twin ran on CI, per test (shyden-labs/ShyTalk#180 AC7):
+ * read from smoke-totals on PR #181's web-smoke job, the same on chromium, firefox and webkit.
+ * The home page runs three more where its legal pages carry the "English only" note.
+ */
+const CI_ASSERTIONS: Record<string, Record<string, number>> = {
+  'the home page answers 200': { en: 27, id: 27, th: 30, vi: 30, 'zh-Hans': 30 },
+  'an unknown page answers 404': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
+  'the closed-testing page shows the form and every statement': { en: 17, id: 17, th: 17, vi: 17, 'zh-Hans': 17 },
+  'the confirm page passes axe, and its button with a dead link shows link-expired': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
+};
+
 describe('the iPhone cases', () => {
   it.each(IPHONE_CASES.filter(({ title }) => langOf(title) in LOCALE).map((c) => [c.title, c] as const))(
-    '%s: passes on the site as it should be',
+    '%s: passes on the site as it should be, running as many checks as its twin on CI',
     async (_, c) => {
       const page = safari(langOf(c.title));
-      await expect(c.run(page)).resolves.toBeUndefined();
+      const check = countingCheck();
+      await expect(c.run(page, check)).resolves.toBeUndefined();
       expect(page.visited[0]?.startsWith(PREFIX[langOf(c.title)] ?? '?')).toBe(true);
+      expect(check.count).toBe(CI_ASSERTIONS[kind(c.title)]?.[langOf(c.title)]);
     },
   );
 
@@ -148,6 +164,28 @@ describe('the iPhone cases', () => {
     },
   );
 
+  it.each(cases('the home page answers').map((c) => [c.title, c] as const))(
+    '%s: fails on a CSP refusal on any page it opened, though each goto starts the console afresh',
+    async (_, c) => {
+      // Safari's console as Appium reads it: a goto starts it afresh. The refusal comes on the first legal page only.
+      let logged: string[] = [];
+      let taps = 0;
+      const site = safari(langOf(c.title));
+      const page = safari(langOf(c.title), {
+        goto: () => ((logged = []), Promise.resolve(200)),
+        // The site's own tap, which opens the legal page, then the refusal on the first.
+        tap: async (selector) => {
+          await site.tap(selector);
+          taps += 1;
+          if (taps === 1) logged = ['Refused to load x'];
+        },
+        attribute: (selector, name) => site.attribute(selector, name),
+        cspRefusals: () => Promise.resolve(logged),
+      });
+      await expect(c.run(page)).rejects.toThrow('Refused to load x');
+    },
+  );
+
   const named = (start: string) => cases(start).map((c) => [c.title, c] as const);
 
   it('holds both closed-testing cases in every language', () => {
@@ -162,6 +200,24 @@ describe('the iPhone cases', () => {
   it.each(named('the closed-testing page shows'))('%s: fails when a statement is hidden', async (_, c) => {
     const hidden = (selector: string): Promise<boolean> => Promise.resolve(!selector.includes('retention'));
     await expect(c.run(safari(langOf(c.title), { isVisible: hidden }))).rejects.toThrow('retention');
+  });
+
+  it.each(named('the closed-testing page shows'))('%s: fails naming the box when its label holds other words', async (_, c) => {
+    const locale = LOCALE[langOf(c.title)] ?? 'en';
+    const text = (selector: string) =>
+      Promise.resolve(selector === 'label[for="apply-adult"]' ? 'other words' : selectorText(locale, selector));
+    await expect(c.run(safari(langOf(c.title), { text }))).rejects.toThrow('no visible #apply-adult');
+  });
+
+  it.each(named('the confirm page'))('%s: fails naming the button when it holds another name, before tapping it', async (_, c) => {
+    const locale = LOCALE[langOf(c.title)] ?? 'en';
+    const taps: string[] = [];
+    const page = safari(langOf(c.title), {
+      text: (selector) => Promise.resolve(selector === '#confirm-button' ? 'Other' : selectorText(locale, selector)),
+      tap: (selector) => (taps.push(selector), Promise.resolve()),
+    });
+    await expect(c.run(page)).rejects.toThrow('#confirm-button is named "Other"');
+    expect(taps).toEqual([]);
   });
 
   it.each(named('the closed-testing page shows'))('%s: fails when a statement holds other words', async (_, c) => {
@@ -312,7 +368,10 @@ describe('the iPhone closed-testing journey', () => {
       tap: (selector) => (steps.push(`tap ${selector}`), Promise.resolve()),
       waitForText: (selector, text) => (steps.push(`wait ${selector} ${text}`), Promise.resolve()),
     });
-    await journey().run(page);
+    const check = countingCheck();
+    await journey().run(page, check);
+    // Its twin on CI ran 5 (shyden-labs/ShyTalk#180 AC7).
+    expect(check.count).toBe(5);
     expect(mailbox.plusAddress).toHaveBeenCalledWith('iphone-air-1700000000000');
     expect(steps).toEqual([
       'goto /closed-testing',
@@ -325,6 +384,12 @@ describe('the iPhone closed-testing journey', () => {
       'tap #confirm-button',
       `wait h1, [role="heading"][aria-level="1"] ${t('en', 'closedTesting.confirmedHeading')}`,
     ]);
+  });
+
+  it('fails naming what is hidden when the sent answer or the confirmed heading is not shown', async () => {
+    const hidden = (gone: string) => safari('en', { isVisible: (selector) => Promise.resolve(selector !== gone) });
+    await expect(journey().run(hidden('#apply-answer'))).rejects.toThrow('no visible answer');
+    await expect(journey().run(hidden('h1, [role="heading"][aria-level="1"]'))).rejects.toThrow('no visible top heading');
   });
 
   it('fails when the mail has another subject', async () => {
@@ -357,9 +422,20 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     return found;
   };
   const NOTICE = '#recovery-pending';
+  const H1 = 'h1, [role="heading"][aria-level="1"]';
+  const CODES = '[data-testid="recovery-codes"] li, [data-testid="recovery-codes"] [role="listitem"]';
+  const DEVICES = '[data-testid="devices"] li, [data-testid="devices"] [role="listitem"]';
 
   /** Safari on the account pages as they should be: the notice shows once a recovery started, until it is cancelled. */
-  function accountPages(overrides: { notice?: (pending: boolean) => boolean; noticeText?: string } = {}) {
+  function accountPages(
+    overrides: {
+      notice?: (pending: boolean) => boolean;
+      noticeText?: string;
+      shown?: (selector: string) => boolean;
+      count?: (selector: string) => number | undefined;
+      firstCode?: string;
+    } = {},
+  ) {
     const steps: string[] = [];
     let started = false;
     let pending = false;
@@ -377,11 +453,16 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
         return Promise.resolve();
       },
       waitForText: (selector, text) => (steps.push(`wait ${selector} ${text}`), Promise.resolve()),
-      isVisible: (selector) => Promise.resolve(selector === NOTICE ? (overrides.notice ?? ((shown) => shown))(pending) : false),
+      isVisible: (selector) => {
+        if (selector === NOTICE) return Promise.resolve((overrides.notice ?? ((shown) => shown))(pending));
+        return Promise.resolve(
+          ['#email-answer', '[data-testid="totp-secret"]', H1].includes(selector) && overrides.shown?.(selector) !== false,
+        );
+      },
+      count: (selector) => Promise.resolve(overrides.count?.(selector) ?? (selector === CODES ? 10 : selector === DEVICES ? 1 : 0)),
       text: (selector) => {
         if (selector === '[data-testid="totp-secret"]') return Promise.resolve('JBSWY3DPEHPK3PXP');
-        if (selector === '[data-testid="recovery-codes"]')
-          return Promise.resolve(Array.from({ length: 10 }, () => 'AAAA-AAAA-AAAA-AAAA').join(' '));
+        if (selector === CODES) return Promise.resolve(overrides.firstCode ?? 'AB12-CD34-EF56-GH78');
         if (selector === '[data-testid="method-authenticator"]') return Promise.resolve(t('en', 'account.authenticatorOn'));
         if (selector === '#email-answer')
           return Promise.resolve(t('en', 'account.recoveryStarted').replace('{completesAt}', '14 Nov 2026, 10:00'));
@@ -394,10 +475,10 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
   }
 
   /** Runs the journey, letting its waits pass on fake time. */
-  async function run(page: SafariPage): Promise<void> {
+  async function run(page: SafariPage, check = countingCheck()): Promise<void> {
     const state = { settled: false };
     const running = journey()
-      .run(page)
+      .run(page, check)
       .finally(() => {
         state.settled = true;
       });
@@ -424,7 +505,10 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
 
   it('starts a recovery for its own address, types the new code once it arrives, sees the notice and cancels it there', async () => {
     const { page, steps } = accountPages();
-    await run(page);
+    const check = countingCheck();
+    await run(page, check);
+    // Its twin on CI ran 19 (shyden-labs/ShyTalk#180 AC7).
+    expect(check.count).toBe(19);
     const address = 'box+iphone-air-1700000000000@mail.test';
     expect(steps.slice(steps.indexOf('goto /recover'))).toEqual([
       'goto /recover',
@@ -437,6 +521,31 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
       'tap #recovery-cancel',
     ]);
     expect(mailbox.waitForAnyMail).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails naming the key when the authenticator key is not shown', async () => {
+    const { page } = accountPages({ shown: (selector) => selector !== '[data-testid="totp-secret"]' });
+    await expect(run(page)).rejects.toThrow('no visible authenticator key');
+  });
+
+  it('fails naming the count when there are not ten recovery codes', async () => {
+    const { page } = accountPages({ count: (selector) => (selector === CODES ? 9 : undefined) });
+    await expect(run(page)).rejects.toThrow('ten recovery codes, not 9');
+  });
+
+  it('fails when the first recovery code is not four groups of four Crockford letters', async () => {
+    const { page } = accountPages({ firstCode: 'AB12-CD34-EF56-GH7U' });
+    await expect(run(page)).rejects.toThrow('AB12-CD34-EF56-GH7U');
+  });
+
+  it('fails naming the count when the account page lists another number of devices than this one', async () => {
+    const { page } = accountPages({ count: (selector) => (selector === DEVICES ? 2 : undefined) });
+    await expect(run(page)).rejects.toThrow('one signed-in device, not 2');
+  });
+
+  it('fails naming the answer when the sent answer is not shown', async () => {
+    const { page } = accountPages({ shown: (selector) => selector !== '#email-answer' });
+    await expect(run(page)).rejects.toThrow('no visible answer');
   });
 
   it('fails when a notice shows before any recovery started', async () => {
@@ -465,5 +574,66 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     mailbox.waitForAnyMail.mockResolvedValue({ subject: t('en', 'email.codeSubject'), text: 'code 111111' });
     const { page } = accountPages();
     await expect(run(page)).rejects.toThrow('waited 60 s for the recovery code mail');
+  });
+});
+
+describe('the iPhone recovery pages', () => {
+  const TITLE = 'asking to recover shows the code step, and a cancel link answers on its press';
+  const recovery = () => {
+    const found = IPHONE_CASES.find(({ title }) => title === TITLE);
+    if (found === undefined) throw new Error(`no case titled ${TITLE}`);
+    return found;
+  };
+
+  /** Safari on the recovery pages as they should be: the code field after a start, the cancel answer after its tap. */
+  function recoveryPages(overrides: Partial<SafariPage> = {}) {
+    const steps: string[] = [];
+    let tapped = '';
+    const page = safari('en', {
+      goto: (path) => (steps.push(`goto ${path}`), Promise.resolve(200)),
+      type: (selector, text) => (steps.push(`type ${selector} ${text}`), Promise.resolve()),
+      tap: (selector) => ((tapped = selector), steps.push(`tap ${selector}`), Promise.resolve()),
+      waitForText: (selector, text) => (steps.push(`wait ${selector} ${text}`), Promise.resolve()),
+      isVisible: (selector) =>
+        Promise.resolve(
+          selector === '#email-code' ? tapped === '#email-submit' : selector === '#cancel-answer' && tapped === '#cancel-button',
+        ),
+      ...overrides,
+    });
+    return { page, steps };
+  }
+
+  beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('starts a recovery, sees the code step, and sees the cancel page answer only once its button is tapped, as many checks as its twin on CI', async () => {
+    const { page, steps } = recoveryPages();
+    const check = countingCheck();
+    await recovery().run(page, check);
+    expect(steps).toEqual([
+      'goto /recover',
+      'type #email-address box+iphone-air-recover-1700000000000@mail.test',
+      'tap #email-submit',
+      `wait #email-answer ${t('en', 'account.sent')}`,
+      'goto /recover/cancel/#not-a-real-token',
+      'tap #cancel-button',
+      `wait #cancel-answer ${t('en', 'account.cancelled')}`,
+    ]);
+    // Its twin on CI ran 4 (shyden-labs/ShyTalk#180 AC7).
+    expect(check.count).toBe(4);
+  });
+
+  it('fails naming the code field when it never shows', async () => {
+    const { page } = recoveryPages({ isVisible: () => Promise.resolve(false) });
+    await expect(recovery().run(page)).rejects.toThrow('no code field after the start');
+  });
+
+  it('fails when the cancel page answers before its button is tapped', async () => {
+    const { page } = recoveryPages({ isVisible: () => Promise.resolve(true) });
+    await expect(recovery().run(page)).rejects.toThrow('the cancel page answered before its button was tapped');
   });
 });
