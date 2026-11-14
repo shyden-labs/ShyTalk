@@ -577,6 +577,16 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     expect(check.count).toBe(19);
   });
 
+  it('waits for the authenticator to read On, which the account page fills in after its heading shows (#190 run 8)', async () => {
+    const { page, steps } = accountPages();
+    const text = page.text.bind(page);
+    page.text = (selector) => (selector === '[data-testid="method-authenticator"]' ? Promise.resolve('') : text(selector));
+    const check = countingCheck();
+    await run(page, check);
+    expect(check.count).toBe(19);
+    expect(steps).toContain(`wait [data-testid="method-authenticator"] ${t('en', 'account.authenticatorOn')}`);
+  });
+
   it('fails naming the count when no recovery codes show within 15 s', async () => {
     let confirmedAt: number | undefined;
     const { page } = accountPages({

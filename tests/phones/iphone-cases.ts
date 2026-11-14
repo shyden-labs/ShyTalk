@@ -272,7 +272,8 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     await page.tap('#codes-saved');
 
     await check.waitForText(page, H1, t('en', 'account.accountTitle'));
-    check.equal(await page.text('[data-testid="method-authenticator"]'), t('en', 'account.authenticatorOn'));
+    // The account page fills in its methods after its heading shows: read '' on the iPhone Air (#190 run 8).
+    await check.waitForText(page, '[data-testid="method-authenticator"]', t('en', 'account.authenticatorOn'));
     const devices = await page.count(DEVICES);
     check.equal(devices, 1, `one signed-in device, not ${String(devices)}`);
     await page.tap('#sign-out');
