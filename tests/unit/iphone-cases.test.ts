@@ -562,6 +562,34 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     expect(check.count).toBe(19);
   });
 
+  it('waits for the recovery codes, which show once the confirm answers: their hidden heading already holds its text', async () => {
+    let confirmedAt: number | undefined;
+    const { page } = accountPages({
+      count: (selector) => (selector === CODES ? (confirmedAt !== undefined && Date.now() - confirmedAt >= 1_000 ? 10 : 0) : undefined),
+    });
+    const tap = page.tap.bind(page);
+    page.tap = (selector) => {
+      if (selector === '#totp-confirm') confirmedAt = Date.now();
+      return tap(selector);
+    };
+    const check = countingCheck();
+    await run(page, check);
+    expect(check.count).toBe(19);
+  });
+
+  it('fails naming the count when no recovery codes show within 15 s', async () => {
+    let confirmedAt: number | undefined;
+    const { page } = accountPages({
+      count: (selector) => (selector === CODES ? (confirmedAt !== undefined && Date.now() - confirmedAt > 15_000 ? 10 : 0) : undefined),
+    });
+    const tap = page.tap.bind(page);
+    page.tap = (selector) => {
+      if (selector === '#totp-confirm') confirmedAt = Date.now();
+      return tap(selector);
+    };
+    await expect(run(page)).rejects.toThrow('ten recovery codes, not 0');
+  });
+
   it('fails naming the key when the authenticator key is not shown within 15 s', async () => {
     let tappedAt: number | undefined;
     const KEY = '[data-testid="totp-secret"]';
@@ -699,5 +727,61 @@ describe('the iPhone recovery pages', () => {
   it('fails when the cancel page answers before its button is tapped', async () => {
     const { page } = recoveryPages({ isVisible: () => Promise.resolve(true) });
     await expect(recovery().run(page)).rejects.toThrow('the cancel page answered before its button was tapped');
+  });
+});
+
+describe('the English-only note on a legal page (shyden-labs/ShyTalk#190)', () => {
+  const NOTE = '[data-english-only="th"]';
+  const home = () => {
+    const found = IPHONE_CASES.find(({ title }) => title.startsWith('th: the home page answers'));
+    if (found === undefined) throw new Error('no th home case');
+    return found;
+  };
+  /** Safari on th's pages, the note shown `afterMs` after each legal-link tap, as the page's own script reveals it. */
+  function delayedNote(afterMs: number): SafariPage {
+    let tappedAt: number | undefined;
+    const page = safari('th', {
+      isVisible: (selector) =>
+        Promise.resolve(
+          selector === NOTE ? tappedAt !== undefined && Date.now() - tappedAt >= afterMs : selector !== '[data-english-only]:not([hidden])',
+        ),
+    });
+    const tap = page.tap.bind(page);
+    page.tap = (selector) => {
+      tappedAt = Date.now();
+      return tap(selector);
+    };
+    page.goto = (path) => {
+      tappedAt = undefined;
+      return Promise.resolve(path.endsWith('/no-such-page') ? 404 : 200);
+    };
+    return page;
+  }
+  async function run(page: SafariPage, check = countingCheck()): Promise<void> {
+    const state = { settled: false };
+    const running = home()
+      .run(page, check)
+      .finally(() => {
+        state.settled = true;
+      });
+    running.catch(() => undefined);
+    for (let step = 0; step < 400 && !state.settled; step += 1) await vi.advanceTimersByTimeAsync(250);
+    await running;
+  }
+  beforeEach(() => {
+    vi.useFakeTimers({ now: 1700000000000 });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('waits for the note the page reveals after it loads, as Playwright’s toBeVisible() waits', async () => {
+    const check = countingCheck();
+    await run(delayedNote(1_000), check);
+    expect(check.count).toBe(31);
+  });
+
+  it('fails naming the note when it is not shown within 15 s', async () => {
+    await expect(run(delayedNote(15_001))).rejects.toThrow('no visible note');
   });
 });
