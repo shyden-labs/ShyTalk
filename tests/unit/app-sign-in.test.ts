@@ -119,6 +119,17 @@ const google = async (w: World, token: string): Promise<Response> =>
 const apple = async (w: World, token: string, nonce?: string): Promise<Response> =>
   handleSignIn(post('sign-in/apple', { idToken: token, nonce }), w.env, w.auth, 'apple');
 
+/**
+ * Each account row as provider, account id and the provider tokens it keeps (shyden-labs/ShyTalk#196): ShyTalk verifies the
+ * id token once, at sign-in, and never reads it again, so no row keeps one.
+ */
+const accountsOf = (w: World) =>
+  rows(w, 'account').map((row) => ({
+    providerId: row['providerId'],
+    accountId: row['accountId'],
+    kept: [row['idToken'], row['accessToken'], row['refreshToken']].filter((token) => token !== undefined && token !== null),
+  }));
+
 describe('verifyIdToken', () => {
   const check = (): Parameters<typeof verifyIdToken>[1] => ({ keys: jwks, issuer: [GOOGLE_ISSUER], audience: GOOGLE_IDS });
 
@@ -189,6 +200,8 @@ describe('POST /api/app/sign-in/google', () => {
     expect(second.userId).toBe(first.userId);
     expect(w.store['user']).toHaveLength(1);
     expect(w.store['session']).toHaveLength(2);
+    // Neither the first sign-in's account nor the second's refresh of it keeps the id token (shyden-labs/ShyTalk#196).
+    expect(accountsOf(w)).toEqual([{ providerId: 'google', accountId: 'google-sub-1', kept: [] }]);
   });
 
   it.each([
@@ -236,6 +249,7 @@ describe('POST /api/app/sign-in/google', () => {
     expect(body.userId).toBe('email-user');
     expect(w.store['user']).toHaveLength(1);
     expect(rows(w, 'account').filter((row) => row['providerId'] === 'google')).toHaveLength(1);
+    expect(accountsOf(w).filter(({ kept }) => kept.length > 0)).toEqual([]);
   });
 
   it('does not link to an account whose email was never verified', async () => {
@@ -373,6 +387,7 @@ describe('linking Google and Apple by a verified email (shyden-labs/ShyTalk#133)
         .map((row) => row['providerId'])
         .sort(),
     ).toEqual(['apple', 'google']);
+    expect(accountsOf(w).filter(({ kept }) => kept.length > 0)).toEqual([]);
   });
 
   it('does not link a Google sign-in whose email is not verified: 401, still one account', async () => {

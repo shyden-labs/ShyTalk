@@ -42,6 +42,14 @@ const count = async (sql: string, ...values: unknown[]): Promise<number> =>
       .first<{ n: number }>()
   )?.n ?? -1;
 
+/** The provider tokens an account row keeps: none (shyden-labs/ShyTalk#196). */
+const tokensKept = async (providerId: string, accountId: string) =>
+  local.DB.prepare('SELECT idToken, accessToken, refreshToken FROM account WHERE providerId = ? AND accountId = ?')
+    .bind(providerId, accountId)
+    .first<Record<string, string | null>>();
+
+const NO_TOKENS = { idToken: null, accessToken: null, refreshToken: null };
+
 const post = (path: string, body: unknown, token?: string): Request =>
   new Request(`https://site.example.test/api/app/${path}`, {
     method: 'POST',
@@ -75,6 +83,8 @@ describe('app sign-in on D1', () => {
     };
     expect.soft(again.userId).toBe(userId);
     expect.soft(await count('user WHERE email = ?', email)).toBe(1);
+    // Neither the sign-in that made the account row nor the one that refreshed it left a provider token there.
+    expect.soft(await tokensKept('google', 'g-1')).toEqual(NO_TOKENS);
 
     // Signing out the first session (shyden-labs/ShyTalk#180: was its own journey, signing in again first).
     expect.soft((await handleSignOut(post('sign-out', {}, token), env, auth)).status).toBe(200);
@@ -88,6 +98,19 @@ describe('app sign-in on D1', () => {
     expect.soft(chains.results.map((row) => row.action)).toEqual(['session.end.attempt', 'session.end.success']);
     expect.soft(new Set(chains.results.map((row) => row.chain)).size).toBe(1);
     expect.soft((await handleSignOut(post('sign-out', {}, token), env, auth)).status).toBe(401);
+  });
+
+  it('an Apple sign-in signs in and keeps no provider token on its account row', async () => {
+    const email = 'apple-person@example.test';
+    const response = await handleSignIn(
+      post('sign-in/apple', { idToken: await provider.appleToken('n-a', { email, sub: 'a-1' }), nonce: 'n-a' }),
+      env,
+      auth,
+      'apple',
+    );
+    expect.soft(response.status).toBe(200);
+    expect.soft(await count("account WHERE providerId = 'apple' AND accountId = 'a-1'")).toBe(1);
+    expect.soft(await tokensKept('apple', 'a-1')).toEqual(NO_TOKENS);
   });
 
   it('an Apple sign-in with a wrong nonce is refused and writes nothing', async () => {
