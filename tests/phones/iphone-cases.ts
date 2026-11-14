@@ -17,6 +17,8 @@ import { countingCheck, type Check } from './check.ts';
 export interface SafariPage {
   /** Opens a path on the target and answers the document's HTTP status. */
   goto(path: string): Promise<number>;
+  /** Leaves no cookie or stored value from an earlier case, as each Playwright test starts with a fresh context. */
+  freshStart(): Promise<void>;
   /** Every Content Security Policy refusal the console logged since the last `goto`. */
   cspRefusals(): Promise<string[]>;
   attribute(selector: string, name: string): Promise<string | null>;
@@ -274,7 +276,8 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     await check.waitForText(page, H1, t('en', 'account.accountTitle'));
     // The account page fills in its methods after its heading shows: read '' on the iPhone Air (#190 run 8).
     await check.waitForText(page, '[data-testid="method-authenticator"]', t('en', 'account.authenticatorOn'));
-    const devices = await page.count(DEVICES);
+    // The device list fills in after the methods: read 0 straight after On (#190 run 11); toHaveCount waits too.
+    const devices = await countWithin(page, DEVICES);
     check.equal(devices, 1, `one signed-in device, not ${String(devices)}`);
     await page.tap('#sign-out');
     await page.waitForText(H1, t('en', 'account.signInTitle'));

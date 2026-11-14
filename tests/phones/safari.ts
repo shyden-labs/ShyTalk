@@ -167,6 +167,13 @@ export function safariPage(
         await wait(TEXT_LOOK_MS);
       }
     },
+    // Safari kept the session cookie and stored tokens across cases and runs: run 8's join, failing before its
+    // sign-out, left every later sign-up's setup acting for that account (iPhone Air, 2026-11-14, #190).
+    async freshStart() {
+      await this.goto('/');
+      await call('DELETE', `${at}/cookie`);
+      await run('localStorage.clear(); sessionStorage.clear(); return true;');
+    },
     async cspRefusals() {
       const texts = (await log('safariConsole')).map((entry) => String(entry.text));
       refusals.push(...texts.filter((text) => /Content Security Policy/i.test(text)));
