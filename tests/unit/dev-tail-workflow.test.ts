@@ -45,8 +45,14 @@ describe('dev-tail', () => {
   it('prints only the time, outcome, method, path and exceptions of a request that did not end ok', () => {
     const text = source();
     expect(text).toContain(
-      'jq -c --unbuffered \'select(.outcome != "ok" or (.exceptions | length) > 0) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), exceptions}\'',
+      'jq -c --unbuffered \'select(.outcome != "ok" or (.exceptions | length) > 0) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), ',
     );
     expect(text).not.toMatch(/headers|\.logs/);
+  });
+
+  it('blanks every email address and long token-like string in an exception before printing it', () => {
+    expect(source()).toContain(
+      'exceptions: [.exceptions[] | {name, message: (.message | gsub("[^\\\\s@]+@[^\\\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>"))}]',
+    );
   });
 });

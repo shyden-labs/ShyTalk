@@ -4,7 +4,8 @@
 # dev's own key, while someone repeats what fails. This repository is public,
 # so its job log is too: only each failing request's time, outcome, method,
 # path and exceptions are printed, never a header, query, body or console
-# line. Third-party actions are pinned to full SHAs with a `# vX.Y.Z` comment,
+# line, with every email address and long token-like string in an exception
+# blanked. Third-party actions are pinned to full SHAs with a `# vX.Y.Z` comment,
 # as in ci.yml.
 name: dev-tail
 on:
@@ -49,7 +50,7 @@ jobs:
           fi
           status=0
           timeout "$((MINUTES * 60))" npx wrangler tail --env dev --format json \
-            | jq -c --unbuffered 'select(.outcome != "ok" or (.exceptions | length) > 0) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), exceptions}' \
+            | jq -c --unbuffered 'select(.outcome != "ok" or (.exceptions | length) > 0) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), exceptions: [.exceptions[] | {name, message: (.message | gsub("[^\\s@]+@[^\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>"))}]}' \
             || status=$?
           # The watch ends by its timeout (124), which is the plan, not a failure.
           if [ "$status" -eq 0 ] || [ "$status" -eq 124 ]; then
