@@ -83,9 +83,28 @@ describe('safariPage: goto', () => {
     await expect(safariPage(fake.call, 's1', BASE).goto('/')).resolves.toBe(200);
   });
 
-  it('fails naming the address when Safari logged no document', async () => {
+  it('waits for the document when Safari logs it after the address call returns (measured 2 in 5 on the iPhone Air, 2026-11-14)', async () => {
+    const fake = appium({ safariNetwork: [[], [network(`${BASE}/s.css`, 200, 'StyleSheet')], [], [network(`${BASE}/zh/`, 200)]] });
+    const waits: number[] = [];
+    const wait = (ms: number) => {
+      waits.push(ms);
+      return Promise.resolve();
+    };
+    await expect(safariPage(fake.call, 's1', BASE, undefined, undefined, wait).goto('/zh/')).resolves.toBe(200);
+    expect(waits).toEqual([250, 250]);
+  });
+
+  it('fails naming the address and the ceiling when Safari logs no document within 15 s', async () => {
     const fake = appium({ safariNetwork: [[], [network(`${BASE}/s.css`, 200, 'StyleSheet')]] });
-    await expect(safariPage(fake.call, 's1', BASE).goto('/th/')).rejects.toThrow(`Safari logged no document for ${BASE}/th/?phone-smoke=`);
+    const waits: number[] = [];
+    const wait = (ms: number) => {
+      waits.push(ms);
+      return Promise.resolve();
+    };
+    await expect(safariPage(fake.call, 's1', BASE, undefined, undefined, wait).goto('/th/')).rejects.toThrow(
+      new RegExp(`^Safari logged no document for ${BASE}/th/\\?phone-smoke=\\w+ within 15000 ms$`),
+    );
+    expect(waits.reduce((sum, ms) => sum + ms, 0)).toBe(15_000);
   });
 });
 
