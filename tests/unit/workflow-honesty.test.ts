@@ -24,6 +24,7 @@ describe('every workflow', () => {
       'deploy-dev.yml',
       'deploy-doors.yml',
       'deploy-release.yml',
+      'dev-tail.yml',
       'door-count-trigger.yml',
       'door-count.yml',
       'sonarcloud.yml',

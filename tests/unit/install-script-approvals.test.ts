@@ -109,6 +109,7 @@ describe('no workflow approves an install script past allowScripts', () => {
       'workflows/deploy-dev.yml',
       'workflows/deploy-doors.yml',
       'workflows/deploy-release.yml',
+      'workflows/dev-tail.yml',
       'workflows/door-count-trigger.yml',
       'workflows/door-count.yml',
       'workflows/sonarcloud.yml',
