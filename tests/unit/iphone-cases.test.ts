@@ -548,6 +548,32 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     expect(mailbox.waitForAnyMail).toHaveBeenCalledTimes(3);
   });
 
+  it('waits for the authenticator key, which the page shows once its setup fetch answers (1.1 s on the iPhone Air, 2026-11-14)', async () => {
+    let tappedAt: number | undefined;
+    const KEY = '[data-testid="totp-secret"]';
+    const { page } = accountPages({ shown: (selector) => selector !== KEY || (tappedAt !== undefined && Date.now() - tappedAt >= 1_000) });
+    const tap = page.tap.bind(page);
+    page.tap = (selector) => {
+      if (selector === '#setup-authenticator') tappedAt = Date.now();
+      return tap(selector);
+    };
+    const check = countingCheck();
+    await run(page, check);
+    expect(check.count).toBe(19);
+  });
+
+  it('fails naming the key when the authenticator key is not shown within 15 s', async () => {
+    let tappedAt: number | undefined;
+    const KEY = '[data-testid="totp-secret"]';
+    const { page } = accountPages({ shown: (selector) => selector !== KEY || (tappedAt !== undefined && Date.now() - tappedAt > 15_000) });
+    const tap = page.tap.bind(page);
+    page.tap = (selector) => {
+      if (selector === '#setup-authenticator') tappedAt = Date.now();
+      return tap(selector);
+    };
+    await expect(run(page)).rejects.toThrow('no visible authenticator key');
+  });
+
   it('fails naming the key when the authenticator key is not shown', async () => {
     const { page } = accountPages({ shown: (selector) => selector !== '[data-testid="totp-secret"]' });
     await expect(run(page)).rejects.toThrow('no visible authenticator key');

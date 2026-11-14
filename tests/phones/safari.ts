@@ -85,7 +85,7 @@ interface Point {
   y: number;
 }
 
-/** How long a page may take to show what a tap leads to, and how often it is looked at meanwhile. */
+/** How long a page may take to load or to show what a tap leads to, and how often it is looked at meanwhile. */
 const TEXT_CEILING_MS = 15_000;
 const TEXT_LOOK_MS = 250;
 
@@ -149,13 +149,18 @@ export function safariPage(
       refusals = [];
       const url = `${base}${path}${path.includes('?') ? '&' : '?'}phone-smoke=${token()}`;
       await call('POST', `${at}/url`, { url });
-      const documents = (await log('safariNetwork'))
-        .filter((entry) => entry.method === 'Network.responseReceived')
-        .map((entry) => entry.event as { type: string; response: { status: number } })
-        .filter((event) => event.type === 'Document');
-      const last = documents.at(-1);
-      if (last === undefined) throw new Error(`Safari logged no document for ${url}`);
-      return last.response.status;
+      // Safari's address call returned before the page loaded 2 times in 5 (iPhone Air, 2026-11-14,
+      // shyden-labs/ShyTalk#190): the document is waited for, as Playwright's goto waits for the load.
+      for (let waited = 0; ; waited += TEXT_LOOK_MS) {
+        const documents = (await log('safariNetwork'))
+          .filter((entry) => entry.method === 'Network.responseReceived')
+          .map((entry) => entry.event as { type: string; response: { status: number } })
+          .filter((event) => event.type === 'Document');
+        const last = documents.at(-1);
+        if (last !== undefined) return last.response.status;
+        if (waited >= TEXT_CEILING_MS) throw new Error(`Safari logged no document for ${url} within ${String(TEXT_CEILING_MS)} ms`);
+        await wait(TEXT_LOOK_MS);
+      }
     },
     async cspRefusals() {
       const texts = (await log('safariConsole')).map((entry) => String(entry.text));
