@@ -153,7 +153,8 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
             check.equal(await page.isVisible('[data-english-only]:not([hidden])'), false);
           } else {
             const note = `[data-english-only="${locale}"]`;
-            check.ok(await page.isVisible(note), 'no visible note');
+            // The page's own script reveals the note once it loads: waited for, as Playwright's toBeVisible() waits.
+            check.ok(await visibleWithin(page, note), 'no visible note');
             check.equal(await page.text(note), t(locale, 'footer.englishOnly'));
           }
           check.deepEqual(await page.axeViolations(), []);
@@ -263,9 +264,9 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     const secret = base32(await page.text('[data-testid="totp-secret"]'));
     await page.type('#totp-code', await totpAt(secret, 0));
     await page.tap('#totp-confirm');
-    // A wait for the next page, as Playwright's waits on a locator or address: not a check, so not counted.
-    await page.waitForText('#codes-title', t('en', 'account.codesTitle'));
-    const codes = await page.count(CODES);
+    // The codes show once the confirm answers; their hidden heading already holds its text, so the wait is on the
+    // codes themselves, as Playwright's count on a locator waits (shyden-labs/ShyTalk#190). Not a check, so not counted.
+    const codes = await countWithin(page, CODES);
     check.equal(codes, 10, `ten recovery codes, not ${String(codes)}`);
     check.match(await page.text(CODES), /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
     await page.tap('#codes-saved');
@@ -350,6 +351,16 @@ async function visibleWithin(page: SafariPage, selector: string): Promise<boolea
   for (;;) {
     if (await page.isVisible(selector)) return true;
     if (Date.now() - started >= SHOWN_CEILING_MS) return false;
+    await new Promise<void>((done) => setTimeout(done, SHOWN_EVERY_MS));
+  }
+}
+
+/** How many elements match `selector` once any do, looked at every quarter second up to the ceiling; 0 if none. */
+async function countWithin(page: SafariPage, selector: string): Promise<number> {
+  const started = Date.now();
+  for (;;) {
+    const found = await page.count(selector);
+    if (found > 0 || Date.now() - started >= SHOWN_CEILING_MS) return found;
     await new Promise<void>((done) => setTimeout(done, SHOWN_EVERY_MS));
   }
 }
