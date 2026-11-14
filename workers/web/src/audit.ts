@@ -3,7 +3,8 @@
  * bound INSERT for the caller to batch with its own write,
  * `env.DB.batch([write, audit(env, …)])`, so both land or neither. The table
  * refuses UPDATE and DELETE (migrations/0002_audit.sql), so a row once written
- * stays.
+ * stays for one year; each new row deletes those older than that
+ * (migrations/0008_audit_kept_one_year.sql, shyden-labs/ShyTalk#197).
  */
 import type { WebEnv } from './web.ts';
 
