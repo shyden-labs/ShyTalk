@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm';
 import { describe, it, expect, vi } from 'vitest';
 import { safariPage, type WebDriverCall } from '../phones/safari.ts';
 
@@ -246,6 +247,49 @@ describe('safariPage: tap and waitForText', () => {
       TOUCH_AT(26, 583),
       TOUCH_AT(100, 268),
     ]);
+  });
+
+  /**
+   * On the iPhone Air (measured 2026-11-14, shyden-labs/ShyTalk#190, `.superpowers/sdd/190/run5/`), a native
+   * touch reached Safari as `mousedown` and `click` only, never `pointerdown` or `touchstart`, and only on a
+   * clickable element: four touches on plain text delivered nothing, one on the checkbox delivered both. So
+   * the calibration lays a clickable layer over the whole screen and reads the touch from its `mousedown`.
+   */
+  it('calibrates on a clickable layer over the screen, read from its mousedown, swallowing the click and removing the layer', async () => {
+    const fake = phone([
+      { x: 210, y: 373 },
+      { x: 210, y: 305 },
+      { x: 26, y: 515 },
+    ]);
+    await safariPage(fake.call, 's1', BASE).tap('#apply-adult');
+    const [arm, received] = fake.scripts() as { script: string }[];
+
+    type Listener = (event: Record<string, unknown>) => void;
+    const listeners: Record<string, Listener[]> = {};
+    const appended: unknown[] = [];
+    const layer = {
+      style: {} as Record<string, string>,
+      addEventListener: (type: string, listener: Listener) => (listeners[type] ??= []).push(listener),
+      remove: vi.fn(),
+    };
+    const document = { createElement: vi.fn(() => layer), body: { append: (el: unknown) => appended.push(el) } };
+    const window: Record<string, unknown> = {};
+    const page = (script: string): unknown =>
+      runInNewContext(`(() => {${script}})()`, { window, document, innerWidth: 420, innerHeight: 746, addEventListener: () => undefined });
+
+    expect(page(String(arm?.script))).toEqual({ x: 210, y: 373 });
+    expect(document.createElement).toHaveBeenCalledWith('div');
+    expect(appended).toEqual([layer]);
+    expect(layer.style).toMatchObject({ position: 'fixed', inset: '0px', zIndex: '2147483647', cursor: 'pointer' });
+
+    for (const listener of listeners.mousedown ?? []) listener({ clientX: 210, clientY: 305 });
+    const click = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    for (const listener of listeners.click ?? []) listener(click);
+    expect(click.preventDefault).toHaveBeenCalled();
+    expect(click.stopPropagation).toHaveBeenCalled();
+
+    expect(page(String(received?.script))).toEqual({ x: 210, y: 305 });
+    expect(layer.remove).toHaveBeenCalled();
   });
 
   it('fails, naming why, when the calibration touch never reaches the page', async () => {
