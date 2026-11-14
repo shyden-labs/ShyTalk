@@ -55,4 +55,12 @@ describe('dev-tail', () => {
       'exceptions: [.exceptions[] | {name, message: (.message | gsub("[^\\\\s@]+@[^\\\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>"))}]',
     );
   });
+
+  it('prints how many events it saw in all, so an empty watch is told apart from a broken stream', () => {
+    const text = source();
+    expect(text).toContain('| tee "$RUNNER_TEMP/events" \\');
+    expect(text).toContain('seen=$(wc -l < "$RUNNER_TEMP/events")');
+    expect(text).toContain('if [ "$seen" -eq 0 ]; then');
+    expect(text).toContain('echo "Watched dev for $MINUTES minutes: $seen events."');
+  });
 });
