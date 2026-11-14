@@ -24,12 +24,24 @@ interface Fake {
   calls: [string, string, unknown][];
 }
 
-/** Appium with queued log answers: each log read takes the next answer for its type, else nothing. */
+/** Stands for the token of the visit opened last, in a faked log entry: Safari's documents carry it. */
+const VISIT = '{visit}';
+
+/** Appium with queued log answers: each log read takes the next answer for its type, else nothing; `VISIT` in an entry reads as the last opened visit's token. */
 function appium(logs: Record<string, unknown[][]> = {}, executes: unknown[] = []): Fake {
   const calls: [string, string, unknown][] = [];
+  let visit = '';
   const call: WebDriverCall = (method, path, body) => {
     calls.push([method, path, body]);
-    if (path.endsWith('/se/log')) return Promise.resolve(logs[(body as { type: string }).type]?.shift() ?? []);
+    if (path.endsWith('/url')) visit = new URL((body as { url: string }).url).searchParams.get('phone-smoke') ?? '';
+    if (path.endsWith('/se/log'))
+      return Promise.resolve(
+        (logs[(body as { type: string }).type]?.shift() ?? []).map((entry) =>
+          typeof entry === 'object' && entry !== null && 'message' in entry
+            ? { message: String(entry.message).replaceAll(VISIT, visit) }
+            : entry,
+        ),
+      );
     if (path.includes('/execute/')) return Promise.resolve(executes.shift() ?? null);
     return Promise.resolve(null);
   };
@@ -39,7 +51,10 @@ function appium(logs: Record<string, unknown[][]> = {}, executes: unknown[] = []
 describe('safariPage: goto', () => {
   it('drains both logs, opens the address on the target, and answers the document’s status', async () => {
     const fake = appium({
-      safariNetwork: [[network('old', 200)], [network(`${BASE}/id/`, 404), network(`${BASE}/s.css`, 200, 'StyleSheet')]],
+      safariNetwork: [
+        [network('old', 200)],
+        [network(`${BASE}/id/?phone-smoke=${VISIT}`, 404), network(`${BASE}/s.css`, 200, 'StyleSheet')],
+      ],
     });
     const page = safariPage(fake.call, 's1', BASE, undefined, () => 'v1');
     await expect(page.goto('/id/')).resolves.toBe(404);
@@ -51,14 +66,16 @@ describe('safariPage: goto', () => {
   });
 
   it('adds its token after a query the path already has, so a confirm link keeps its own', async () => {
-    const fake = appium({ safariNetwork: [[], [network(`${BASE}/closed-testing/confirm`, 200)]] });
+    const fake = appium({ safariNetwork: [[], [network(`${BASE}/closed-testing/confirm?t=abc&phone-smoke=${VISIT}`, 200)]] });
     const page = safariPage(fake.call, 's1', BASE, undefined, () => 'v1');
     await page.goto('/closed-testing/confirm?t=abc');
     expect(fake.calls[2]).toEqual(['POST', '/session/s1/url', { url: `${BASE}/closed-testing/confirm?t=abc&phone-smoke=v1` }]);
   });
 
   it('asks for each page fresh, with a token no earlier visit used: Safari answered 304 from its cache across sessions (2026-11-07)', async () => {
-    const fake = appium({ safariNetwork: [[], [network(`${BASE}/`, 200)], [], [network(`${BASE}/`, 200)]] });
+    const fake = appium({
+      safariNetwork: [[], [network(`${BASE}/?phone-smoke=${VISIT}`, 200)], [], [network(`${BASE}/?phone-smoke=${VISIT}`, 200)]],
+    });
     const page = safariPage(fake.call, 's1', BASE);
     await page.goto('/');
     await page.goto('/');
@@ -70,7 +87,14 @@ describe('safariPage: goto', () => {
 
   it('answers the last document when the page loads more than one, and ignores other kinds', async () => {
     const fake = appium({
-      safariNetwork: [[], [network(`${BASE}/`, 301), network(`${BASE}/en/`, 200), network(`${BASE}/x.js`, 500, 'Script')]],
+      safariNetwork: [
+        [],
+        [
+          network(`${BASE}/?phone-smoke=${VISIT}`, 301),
+          network(`${BASE}/en/?phone-smoke=${VISIT}`, 200),
+          network(`${BASE}/x.js`, 500, 'Script'),
+        ],
+      ],
     });
     await expect(safariPage(fake.call, 's1', BASE).goto('/')).resolves.toBe(200);
   });
@@ -79,12 +103,14 @@ describe('safariPage: goto', () => {
     const request = {
       message: JSON.stringify({ method: 'Network.requestWillBeSent', event: { type: 'Document', request: { url: `${BASE}/` } } }),
     };
-    const fake = appium({ safariNetwork: [[], [network(`${BASE}/`, 200), request]] });
+    const fake = appium({ safariNetwork: [[], [network(`${BASE}/?phone-smoke=${VISIT}`, 200), request]] });
     await expect(safariPage(fake.call, 's1', BASE).goto('/')).resolves.toBe(200);
   });
 
   it('waits for the document when Safari logs it after the address call returns (measured 2 in 5 on the iPhone Air, 2026-11-14)', async () => {
-    const fake = appium({ safariNetwork: [[], [network(`${BASE}/s.css`, 200, 'StyleSheet')], [], [network(`${BASE}/zh/`, 200)]] });
+    const fake = appium({
+      safariNetwork: [[], [network(`${BASE}/s.css`, 200, 'StyleSheet')], [], [network(`${BASE}/zh/?phone-smoke=${VISIT}`, 200)]],
+    });
     const waits: number[] = [];
     const wait = (ms: number) => {
       waits.push(ms);
@@ -92,6 +118,23 @@ describe('safariPage: goto', () => {
     };
     await expect(safariPage(fake.call, 's1', BASE, undefined, undefined, wait).goto('/zh/')).resolves.toBe(200);
     expect(waits).toEqual([250, 250]);
+  });
+
+  it('takes only a document carrying this visit’s token: Safari logged an earlier page’s documents late (iPhone Air, 2026-11-14, #190)', async () => {
+    const fake = appium({
+      safariNetwork: [
+        [],
+        [network(`${BASE}/vi/closed-testing/link-expired`, 200), network(`${BASE}/vi/closed-testing/confirm?t=x&phone-smoke=v0`, 200)],
+        [network(`${BASE}/zh/?phone-smoke=v1`, 404)],
+      ],
+    });
+    const waits: number[] = [];
+    const wait = (ms: number) => {
+      waits.push(ms);
+      return Promise.resolve();
+    };
+    await expect(safariPage(fake.call, 's1', BASE, undefined, () => 'v1', wait).goto('/zh/')).resolves.toBe(404);
+    expect(waits).toEqual([250]);
   });
 
   it('fails naming the address and the ceiling when Safari logs no document within 15 s', async () => {
@@ -113,7 +156,7 @@ describe('safariPage: cspRefusals', () => {
     const refusal =
       'Refused to load https://x/beacon.js because it appears in neither the script-src directive nor the default-src directive of the Content Security Policy.';
     const fake = appium({
-      safariNetwork: [[], [network(`${BASE}/`, 200)]],
+      safariNetwork: [[], [network(`${BASE}/?phone-smoke=${VISIT}`, 200)]],
       safariConsole: [
         [consoleLine('security', 'from before')],
         [consoleLine('network', 'Failed to load resource: 404'), consoleLine('security', refusal)],
@@ -128,7 +171,7 @@ describe('safariPage: cspRefusals', () => {
 
   it('starts again at each goto', async () => {
     const fake = appium({
-      safariNetwork: [[], [network(`${BASE}/`, 200)], [], [network(`${BASE}/`, 200)]],
+      safariNetwork: [[], [network(`${BASE}/?phone-smoke=${VISIT}`, 200)], [], [network(`${BASE}/?phone-smoke=${VISIT}`, 200)]],
       safariConsole: [[], [consoleLine('security', 'Refused by the Content Security Policy')], []],
     });
     const page = safariPage(fake.call, 's1', BASE);

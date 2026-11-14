@@ -147,15 +147,18 @@ export function safariPage(
       await log('safariNetwork');
       await log('safariConsole');
       refusals = [];
-      const url = `${base}${path}${path.includes('?') ? '&' : '?'}phone-smoke=${token()}`;
+      const visit = token();
+      const url = `${base}${path}${path.includes('?') ? '&' : '?'}phone-smoke=${visit}`;
       await call('POST', `${at}/url`, { url });
       // Safari's address call returned before the page loaded 2 times in 5 (iPhone Air, 2026-11-14,
       // shyden-labs/ShyTalk#190): the document is waited for, as Playwright's goto waits for the load.
       for (let waited = 0; ; waited += TEXT_LOOK_MS) {
         const documents = (await log('safariNetwork'))
           .filter((entry) => entry.method === 'Network.responseReceived')
-          .map((entry) => entry.event as { type: string; response: { status: number } })
-          .filter((event) => event.type === 'Document');
+          .map((entry) => entry.event as { type: string; response: { status: number; url: string } })
+          // Safari logged an earlier page's documents after that page showed (iPhone Air, 2026-11-14,
+          // shyden-labs/ShyTalk#190): only a document carrying this visit's token is this visit's.
+          .filter((event) => event.type === 'Document' && URL.parse(event.response.url)?.searchParams.get('phone-smoke') === visit);
         const last = documents.at(-1);
         if (last !== undefined) return last.response.status;
         if (waited >= TEXT_CEILING_MS) throw new Error(`Safari logged no document for ${url} within ${String(TEXT_CEILING_MS)} ms`);
