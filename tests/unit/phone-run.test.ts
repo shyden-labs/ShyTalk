@@ -10,7 +10,7 @@ import { countingCheck } from '../phones/check.ts';
  * or failed. Every process and request is stood in here.
  */
 
-const page = {} as SafariPage;
+const page = { freshStart: () => Promise.resolve() } as unknown as SafariPage;
 const passing = (title: string): IphoneCase => ({ title, run: () => Promise.resolve() });
 const failing = (title: string, message: string): IphoneCase => ({ title, run: () => Promise.reject(new Error(message)) });
 /** A case running `n` passing checks, then failing with `message` if one is given. */
@@ -43,6 +43,25 @@ describe('runCases', () => {
       ['a', 3],
       ['b', 2],
       ['c', 1],
+    ]);
+  });
+});
+
+describe('runCases: each case starts fresh', () => {
+  it('starts each case from a fresh page, as each Playwright test gets a fresh context: run 8 left Safari signed in (#190)', async () => {
+    const steps: string[] = [];
+    const fresh = { freshStart: () => (steps.push('fresh'), Promise.resolve()) } as unknown as SafariPage;
+    const stepping = (title: string): IphoneCase => ({ title, run: () => (steps.push(title), Promise.resolve()) });
+    await runCases([stepping('a'), stepping('b')], fresh);
+    expect(steps).toEqual(['fresh', 'a', 'fresh', 'b']);
+  });
+
+  it('records a case whose fresh start fails as failed, naming why, and runs the next', async () => {
+    const fresh = { freshStart: () => Promise.reject(new Error('cookies not cleared')) } as unknown as SafariPage;
+    const results = await runCases([passing('a'), passing('b')], fresh);
+    expect(results).toEqual([
+      { title: 'a', status: 'unexpected', error: 'cookies not cleared', assertions: 0 },
+      { title: 'b', status: 'unexpected', error: 'cookies not cleared', assertions: 0 },
     ]);
   });
 });

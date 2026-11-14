@@ -55,6 +55,7 @@ export async function runCases(cases: IphoneCase[], page: SafariPage): Promise<C
   for (const { title, run } of cases) {
     const check = countingCheck();
     try {
+      await page.freshStart();
       await run(page, check);
       results.push({ title, status: 'expected', assertions: check.count });
     } catch (error) {

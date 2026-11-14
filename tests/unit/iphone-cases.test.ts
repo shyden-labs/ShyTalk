@@ -63,6 +63,7 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
       visited.push(path);
       return Promise.resolve(path.endsWith('/no-such-page') ? 404 : 200);
     },
+    freshStart: () => Promise.resolve(),
     cspRefusals: () => Promise.resolve([]),
     attribute: (selector, name) =>
       Promise.resolve(
@@ -585,6 +586,21 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     await run(page, check);
     expect(check.count).toBe(19);
     expect(steps).toContain(`wait [data-testid="method-authenticator"] ${t('en', 'account.authenticatorOn')}`);
+  });
+
+  it('waits for the signed-in device, which the account page lists after its methods (#190 run 11: read 0)', async () => {
+    let onAt: number | undefined;
+    const { page } = accountPages({
+      count: (selector) => (selector === DEVICES ? (onAt !== undefined && Date.now() - onAt >= 1_000 ? 1 : 0) : undefined),
+    });
+    const wait = page.waitForText.bind(page);
+    page.waitForText = (selector, text) => {
+      if (selector === '[data-testid="method-authenticator"]') onAt = Date.now();
+      return wait(selector, text);
+    };
+    const check = countingCheck();
+    await run(page, check);
+    expect(check.count).toBe(19);
   });
 
   it('fails naming the count when no recovery codes show within 15 s', async () => {
