@@ -102,6 +102,12 @@ export function createAuth(env: AuthEnv, deps: AuthDeps) {
     // expiry is within expiresIn of now, so these rows are never rewritten by use.
     session: { expiresIn: SESSION_COOKIE_SECONDS, updateAge: 86_400 },
     databaseHooks: {
+      // No copy of the provider's id token (shyden-labs/ShyTalk#196): it is verified once, at sign-in, and never read again.
+      // Sign-in passes Better Auth the id token alone (app/sign-in.ts), so no access or refresh token reaches the row either.
+      account: {
+        create: { before: (account) => Promise.resolve({ data: withoutIdToken(account) }) },
+        update: { before: (account) => Promise.resolve({ data: withoutIdToken(account) }) },
+      },
       session: {
         create: {
           before: (session) => Promise.resolve({ data: { ...session, expiresAt: new Date(Date.now() + SESSION_ROW_MS) } }),
@@ -121,6 +127,14 @@ export function createAuth(env: AuthEnv, deps: AuthDeps) {
       }),
     ],
   });
+}
+
+/**
+ * `account` with the provider's id token emptied. Better Auth merges a hook's answer over the data it was given, so a
+ * token left out would still be written: it is set to null.
+ */
+function withoutIdToken<Account extends object>(account: Account): Account & { idToken: null } {
+  return { ...account, idToken: null };
 }
 
 export type ShyTalkAuth = ReturnType<typeof createAuth>;
