@@ -56,8 +56,9 @@ describe('the audit table', () => {
 describe('a row kept one year', () => {
   // One write, every check (shyden-labs/ShyTalk#180): the old row goes, the young one stays and still refuses a DELETE.
   it('is deleted by the next audit write once older than a year, and refused a DELETE until then', async () => {
-    await rowAged('test.aged.old', 366);
+    // The young row first: each insert prunes before it lands, so the old row survives only its own insert.
     await rowAged('test.aged.young', 364);
+    await rowAged('test.aged.old', 366);
     expect.soft([await count('test.aged.old'), await count('test.aged.young')]).toEqual([1, 1]);
 
     await env.DB.batch([audit(env, { actor: 'staff:1', action: 'test.aged.next' })]);
