@@ -48,6 +48,19 @@ function appium(logs: Record<string, unknown[][]> = {}, executes: unknown[] = []
   return { call, calls };
 }
 
+describe('safariPage: freshStart', () => {
+  it('opens the site, deletes its cookies and clears both storages: the sign-in, sign-up and recovery state a run left (#190)', async () => {
+    const fake = appium({ safariNetwork: [[], [network(`${BASE}/?phone-smoke=${VISIT}`, 200)]] });
+    await safariPage(fake.call, 's1', BASE, undefined, () => 'v1').freshStart();
+    const after = fake.calls.slice(2).map(([method, path, body]) => [method, path, body]);
+    expect(after[0]).toEqual(['POST', '/session/s1/url', { url: `${BASE}/?phone-smoke=v1` }]);
+    expect(after.slice(-2)).toEqual([
+      ['DELETE', '/session/s1/cookie', undefined],
+      ['POST', '/session/s1/execute/sync', { script: 'localStorage.clear(); sessionStorage.clear(); return true;', args: [] }],
+    ]);
+  });
+});
+
 describe('safariPage: goto', () => {
   it('drains both logs, opens the address on the target, and answers the document’s status', async () => {
     const fake = appium({
