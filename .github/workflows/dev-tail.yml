@@ -1,0 +1,60 @@
+# Watching dev's live log stream (shyden-labs/ShyTalk#204; Shyden 2026-11-14:
+# a hand-started job, nothing stored, production untouched). It runs
+# Cloudflare's `wrangler tail` on the dev Worker for the asked minutes, with
+# dev's own key, while someone repeats what fails. This repository is public,
+# so its job log is too: only each failing request's time, outcome, method,
+# path and exceptions are printed, never a header, query, body or console
+# line. Third-party actions are pinned to full SHAs with a `# vX.Y.Z` comment,
+# as in ci.yml.
+name: dev-tail
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: How long to watch, 1 to 30
+        required: true
+        default: 10
+        type: number
+
+permissions:
+  contents: read
+
+jobs:
+  dev-tail:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 40
+    environment: dev
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143), as in ci.yml.
+      - id: node
+        run: |
+          version=$(sed -nE 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' .github/node/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: 'npm'
+      - run: node scripts/npm-ci.ts
+      - name: Watch dev's failing requests
+        working-directory: workers/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MINUTES: ${{ inputs.minutes }}
+        run: |
+          if [ "$MINUTES" -lt 1 ] || [ "$MINUTES" -gt 30 ]; then
+            echo "::error title=dev-tail::minutes must be 1 to 30, not $MINUTES"
+            exit 1
+          fi
+          status=0
+          timeout "$((MINUTES * 60))" npx wrangler tail --env dev --format json \
+            | jq -c --unbuffered 'select(.outcome != "ok" or (.exceptions | length) > 0) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), exceptions}' \
+            || status=$?
+          # The watch ends by its timeout (124), which is the plan, not a failure.
+          if [ "$status" -eq 0 ] || [ "$status" -eq 124 ]; then
+            echo "Watched dev for $MINUTES minutes."
+            exit 0
+          fi
+          echo "::error title=dev-tail::the watch stopped with status $status"
+          exit "$status"
