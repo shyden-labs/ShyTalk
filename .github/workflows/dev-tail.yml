@@ -50,11 +50,19 @@ jobs:
           fi
           status=0
           timeout "$((MINUTES * 60))" npx wrangler tail --env dev --format json \
+            | tee "$RUNNER_TEMP/events" \
             | jq -c --unbuffered 'select(.outcome != "ok" or (.exceptions | length) > 0) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), exceptions: [.exceptions[] | {name, message: (.message | gsub("[^\\s@]+@[^\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>"))}]}' \
             || status=$?
-          # The watch ends by its timeout (124), which is the plan, not a failure.
+          # The watch ends by its timeout (124), which is the plan, not a failure. It runs while someone repeats
+          # requests, so no event at all means the stream never connected: that fails, saying so. The events file
+          # lives on the runner alone and goes with it.
           if [ "$status" -eq 0 ] || [ "$status" -eq 124 ]; then
-            echo "Watched dev for $MINUTES minutes."
+            seen=$(wc -l < "$RUNNER_TEMP/events")
+            if [ "$seen" -eq 0 ]; then
+              echo "::error title=dev-tail::no event reached the watch in $MINUTES minutes: the stream did not connect, or nothing was asked of dev"
+              exit 1
+            fi
+            echo "Watched dev for $MINUTES minutes: $seen events."
             exit 0
           fi
           echo "::error title=dev-tail::the watch stopped with status $status"
