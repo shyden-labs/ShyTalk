@@ -38,19 +38,23 @@ const AXE = `const done = arguments[arguments.length - 1];
 axe.run(document).then((r) => done(r.violations.map((v) => ({ id: v.id, nodes: v.nodes.length }))));`;
 
 /**
- * Arms one inert calibration touch and answers the middle of the screen to aim it at: the next touch is recorded
- * where the page received it, and its default action and click are cancelled, so it changes nothing on the page.
+ * Arms one inert calibration touch and answers the middle of the screen to aim it at. A native touch reaches Safari
+ * as `mousedown` and `click` only, and only on a clickable element (measured on the iPhone Air 2026-11-14,
+ * shyden-labs/ShyTalk#190), so a clickable layer covers the screen: it records where its `mousedown` arrived and
+ * cancels the click, so the touch changes nothing on the page.
  */
-const ARM = `window.__calibration = null;
-const record = (e) => { window.__calibration = { x: e.clientX, y: e.clientY }; };
-const swallow = (e) => { e.preventDefault(); e.stopImmediatePropagation(); };
-addEventListener('pointerdown', record, { capture: true, once: true });
-addEventListener('touchstart', swallow, { capture: true, once: true, passive: false });
-addEventListener('click', swallow, { capture: true, once: true });
+const ARM = `const layer = document.createElement('div');
+Object.assign(layer.style, { position: 'fixed', inset: '0px', zIndex: '2147483647', cursor: 'pointer' });
+window.__calibration = null;
+window.__calibrationLayer = layer;
+layer.addEventListener('mousedown', (e) => { window.__calibration = { x: e.clientX, y: e.clientY }; });
+layer.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
+document.body.append(layer);
 return { x: Math.round(innerWidth / 2), y: Math.round(innerHeight / 2) };`;
 
-/** Where the calibration touch arrived, in page coordinates, or null if it never did. */
-const RECEIVED = `return window.__calibration;`;
+/** Where the calibration touch arrived, in page coordinates, or null if it never did; the layer goes either way. */
+const RECEIVED = `window.__calibrationLayer.remove();
+return window.__calibration;`;
 
 /** Scrolls the element to the middle of the screen and answers its centre in page coordinates, or null. */
 const CENTRE = `const el = document.querySelector(arguments[0]);
