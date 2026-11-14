@@ -30,7 +30,7 @@
     "imapflow": "2.11.0",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.72.1",
+    "typescript-eslint": "8.72.2",
     "vitest": "5.1.0",
     "wrangler": "4.157.0"
   },
@@ -43,12 +43,12 @@
     "minimatch": "11.0.3"
   },
   "dependencies": {
-    "@better-auth/passkey": "1.7.17",
+    "@better-auth/passkey": "1.7.20",
     "@better-auth/utils": "0.5.1",
     "@simplewebauthn/browser": "13.3.0",
-    "better-auth": "1.7.17",
+    "better-auth": "1.7.20",
     "better-call": "1.4.5",
-    "jose": "6.2.15",
+    "jose": "6.2.17",
     "valibot": "1.5.0"
   }
 }
