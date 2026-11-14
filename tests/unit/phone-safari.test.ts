@@ -72,6 +72,13 @@ describe('safariPage: goto', () => {
     expect(fake.calls[2]).toEqual(['POST', '/session/s1/url', { url: `${BASE}/closed-testing/confirm?t=abc&phone-smoke=v1` }]);
   });
 
+  it('puts its token before a fragment the path has, where the server sees it: after it, the document carried none (iPhone Air run 9)', async () => {
+    const fake = appium({ safariNetwork: [[], [network(`${BASE}/recover/cancel/?phone-smoke=v1`, 200)]] });
+    const page = safariPage(fake.call, 's1', BASE, undefined, () => 'v1');
+    await expect(page.goto('/recover/cancel/#not-a-real-token')).resolves.toBe(200);
+    expect(fake.calls[2]).toEqual(['POST', '/session/s1/url', { url: `${BASE}/recover/cancel/?phone-smoke=v1#not-a-real-token` }]);
+  });
+
   it('asks for each page fresh, with a token no earlier visit used: Safari answered 304 from its cache across sessions (2026-11-07)', async () => {
     const fake = appium({
       safariNetwork: [[], [network(`${BASE}/?phone-smoke=${VISIT}`, 200)], [], [network(`${BASE}/?phone-smoke=${VISIT}`, 200)]],

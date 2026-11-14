@@ -148,7 +148,9 @@ export function safariPage(
       await log('safariConsole');
       refusals = [];
       const visit = token();
-      const url = `${base}${path}${path.includes('?') ? '&' : '?'}phone-smoke=${visit}`;
+      // The token goes before any fragment: a fragment never reaches the server, so its document would carry none.
+      const [address = '', fragment] = path.split('#', 2);
+      const url = `${base}${address}${address.includes('?') ? '&' : '?'}phone-smoke=${visit}${fragment === undefined ? '' : `#${fragment}`}`;
       await call('POST', `${at}/url`, { url });
       // Safari's address call returned before the page loaded 2 times in 5 (iPhone Air, 2026-11-14,
       // shyden-labs/ShyTalk#190): the document is waited for, as Playwright's goto waits for the load.
