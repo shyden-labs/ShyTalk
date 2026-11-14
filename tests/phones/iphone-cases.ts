@@ -257,7 +257,9 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     check.equal(await page.isVisible('#email-address'), false, 'the address form stays after the code was accepted');
 
     await page.tap('#setup-authenticator');
-    check.ok(await page.isVisible('[data-testid="totp-secret"]'), 'no visible authenticator key');
+    // As Playwright's toBeVisible() waits: the key shows once the page's setup fetch answers (1.1 s on the iPhone Air,
+    // 2026-11-14, shyden-labs/ShyTalk#190).
+    check.ok(await visibleWithin(page, '[data-testid="totp-secret"]'), 'no visible authenticator key');
     const secret = base32(await page.text('[data-testid="totp-secret"]'));
     await page.type('#totp-code', await totpAt(secret, 0));
     await page.tap('#totp-confirm');
@@ -336,6 +338,19 @@ async function waitFor<T>(what: string, look: () => Promise<T | null>, ceilingMs
     if (found !== null) return found;
     if (Date.now() - started >= ceilingMs) throw new Error(`waited ${String(ceilingMs / 1000)} s for ${what}`);
     await new Promise<void>((done) => setTimeout(done, WAIT_EVERY_MS));
+  }
+}
+
+const SHOWN_CEILING_MS = 15_000;
+const SHOWN_EVERY_MS = 250;
+
+/** Whether `selector` is shown within the ceiling, looked at every quarter second. */
+async function visibleWithin(page: SafariPage, selector: string): Promise<boolean> {
+  const started = Date.now();
+  for (;;) {
+    if (await page.isVisible(selector)) return true;
+    if (Date.now() - started >= SHOWN_CEILING_MS) return false;
+    await new Promise<void>((done) => setTimeout(done, SHOWN_EVERY_MS));
   }
 }
 
