@@ -449,6 +449,20 @@ describe('safariPage: tap and waitForText', () => {
     expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(210, 292, 590), TOUCH_AT(26, 368), SWIPE(210, 590, 292), TOUCH_AT(26, 368)]);
   });
 
+  it('touches an element exactly on the band’s edges: on a 750 pt screen, 150 and 600', async () => {
+    const fake = phone([...CALIBRATED, { x: 26, y: 150, width: 420, height: 750 }, { x: 26, y: 600, width: 420, height: 750 }]);
+    const page = safariPage(fake.call, 's1', BASE);
+    await page.tap('#top');
+    await page.tap('#bottom');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), TOUCH_AT(26, 218), TOUCH_AT(26, 668)]);
+  });
+
+  it('swipes at the middle of the screen, shifted by Safari’s offset both ways', async () => {
+    const fake = phone([{ x: 210, y: 373 }, { x: 200, y: 305 }, at(1400), at(500)]);
+    await safariPage(fake.call, 's1', BASE).tap('#apply-submit');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(220, 590, 292), TOUCH_AT(36, 568)]);
+  });
+
   it('fails naming the element when 10 swipes leave it off the screen, touching nothing', async () => {
     const fake = phone([...CALIBRATED, ...Array.from({ length: 11 }, () => at(5000))]);
     await expect(safariPage(fake.call, 's1', BASE).tap('#far')).rejects.toThrow('#far is still off the screen after 10 swipes');
