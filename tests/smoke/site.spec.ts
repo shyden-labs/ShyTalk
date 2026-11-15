@@ -245,6 +245,12 @@ test('joining with the mailed code and an authenticator app, then signing back i
   await emailField.pressSequentially(mailbox.address);
   await page.getByLabel(t('en', 'account.recoveryCodeLabel')).pressSequentially(savedCode);
   await page.getByRole('button', { name: t('en', 'account.signInWithRecoveryCode'), exact: true }).click();
+  // A recovery code's sign-in says how many are left before going on: ten were made, one is now used.
+  await expect(answer).toHaveText(t('en', 'account.codesLeftAfterSignIn').replace('{count}', '9'));
+  await page
+    .locator('#signin-continue')
+    .getByRole('link', { name: t('en', 'account.accountTitle'), exact: true })
+    .click();
   await page.waitForURL('**/account/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(t('en', 'account.accountTitle'));
   await expect(pending).toBeVisible();

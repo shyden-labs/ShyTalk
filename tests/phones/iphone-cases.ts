@@ -334,6 +334,9 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     await page.type('#signin-email', address);
     await page.type('#signin-recovery-code', savedCode);
     await page.tap('#signin-recovery-submit');
+    // A recovery code's sign-in says how many are left before going on: ten were made, one is now used.
+    await check.waitForText(page, '#signin-answer', t('en', 'account.codesLeftAfterSignIn').replace('{count}', '9'));
+    await page.tap('#signin-continue a');
     await check.waitForText(page, H1, t('en', 'account.accountTitle'));
     await check.poll(() => waitFor('the recovery notice', async () => ((await page.isVisible(NOTICE)) ? true : null)));
     check.match(await page.text('#recovery-pending-text'), matching(t('en', 'account.recoveryPending'), '{startedAt}'));
