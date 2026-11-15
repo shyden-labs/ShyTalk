@@ -293,13 +293,15 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
 
     // Signed in, the sign-up and recovery pages say so and offer Sign out before anything else
     // (as tests/smoke/site.spec.ts does; shyden-labs/ShyTalk#213).
+    // The line is in the page from the start, hidden: it shows once the page has asked whether it is signed in
+    // (run 4, 2026-11-16: its text was there while it was still hidden on the recovery page).
     await page.goto('/sign-up');
     await check.waitForText(page, SIGNED_IN, t('en', 'account.signedInFirst'));
-    check.ok(await page.isVisible(SIGNED_IN), 'no visible signed-in line on the sign-up page');
+    check.ok(await visibleWithin(page, SIGNED_IN), 'no visible signed-in line on the sign-up page');
     check.equal(await page.isVisible('#email-address'), false, 'the sign-up form shows while signed in');
     await page.goto('/recover');
     await check.waitForText(page, SIGNED_IN, t('en', 'account.signedInFirst'));
-    check.ok(await page.isVisible(SIGNED_IN), 'no visible signed-in line on the recovery page');
+    check.ok(await visibleWithin(page, SIGNED_IN), 'no visible signed-in line on the recovery page');
     check.equal(await page.isVisible('#email-address'), false, 'the recovery form shows while signed in');
     await page.tap('#signed-in-sign-out');
     check.ok(await visibleWithin(page, '#email-address'), 'no visible recovery form after signing out');

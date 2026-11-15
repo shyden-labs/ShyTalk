@@ -717,6 +717,24 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     expect(check.count).toBe(30);
   });
 
+  it('waits for the signed-in line, which shows once the page has asked whether it is signed in (#213 run 4: read hidden on the recovery page)', async () => {
+    let visitedAt = 0;
+    const { page } = accountPages({ shown: (selector) => selector !== SIGNED_IN || Date.now() - visitedAt >= 1_000 });
+    const goto = page.goto.bind(page);
+    page.goto = (path) => {
+      visitedAt = Date.now();
+      return goto(path);
+    };
+    const check = countingCheck();
+    await run(page, check);
+    expect(check.count).toBe(30);
+  });
+
+  it('fails naming the page when its signed-in line never shows', async () => {
+    const { page } = accountPages({ shown: (selector) => selector !== SIGNED_IN });
+    await expect(run(page)).rejects.toThrow('no visible signed-in line on the sign-up page');
+  });
+
   it('fails naming the sign-up form when it never shows', async () => {
     const { page } = accountPages({ shown: (selector) => selector !== '#email-address' });
     await expect(run(page)).rejects.toThrow('no visible sign-up form');
