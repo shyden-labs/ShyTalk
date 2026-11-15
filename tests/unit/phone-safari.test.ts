@@ -464,9 +464,35 @@ describe('safariPage: tap and waitForText', () => {
   });
 
   it('fails naming the element when 10 swipes leave it off the screen, touching nothing', async () => {
-    const fake = phone([...CALIBRATED, ...Array.from({ length: 11 }, () => at(5000))]);
+    // Each swipe moves it a little, so the page has not reached its end.
+    const fake = phone([...CALIBRATED, ...Array.from({ length: 11 }, (_, n) => at(5000 - n * 10))]);
     await expect(safariPage(fake.call, 's1', BASE).tap('#far')).rejects.toThrow('#far is still off the screen after 10 swipes');
     expect(actions(fake)).toEqual([TOUCH_AT(210, 373), ...Array.from({ length: 10 }, () => SWIPE(210, 590, 292))]);
+  });
+
+  /**
+   * A control at a page's end can never reach the band: fully scrolled, the footer's links and the codes step's
+   * "saved" button still sit in the bottom fifth (both phones' run, 2026-11-16, shyden-labs/ShyTalk#209). A swipe that
+   * leaves it where it was shows the page can move no further: it is touched where it is, if it is on the screen.
+   */
+  it('touches a control the page’s end keeps below the band, once a swipe leaves it where it was', async () => {
+    const fake = phone([...CALIBRATED, at(700), at(700)]);
+    await safariPage(fake.call, 's1', BASE).tap('#codes-saved');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(210, 590, 292), TOUCH_AT(26, 768)]);
+  });
+
+  it('touches a control the page’s top keeps above the band, once a swipe leaves it where it was', async () => {
+    const fake = phone([...CALIBRATED, at(100), at(100)]);
+    await safariPage(fake.call, 's1', BASE).tap('#menu');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(210, 292, 590), TOUCH_AT(26, 168)]);
+  });
+
+  it('fails naming the control when it is off the screen and a swipe moves the page no further, touching nothing', async () => {
+    const fake = phone([...CALIBRATED, at(900), at(900)]);
+    await expect(safariPage(fake.call, 's1', BASE).tap('#hidden')).rejects.toThrow(
+      '#hidden is off the screen and a swipe moves the page no further',
+    );
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(210, 590, 292)]);
   });
 
   it('fails naming the selector when the element goes away between swipes', async () => {

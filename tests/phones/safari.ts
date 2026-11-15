@@ -114,6 +114,7 @@ interface Place extends Point {
 /**
  * A control is touched once its centre is in the middle 3/5 of the screen; a swipe travels 2/5 of it, less than that
  * band, so one swipe cannot carry a control past the band. Ten swipes cover several screens before the tap gives up.
+ * At a page's end the band may be out of reach: a control a swipe leaves in place is touched where it is, if on screen.
  */
 const BAND = { top: 0.2, bottom: 0.8 };
 const SWIPE = { from: 0.7, to: 0.3 };
@@ -250,12 +251,19 @@ export function safariPage(
     // A control off the screen is reached by real swipes, as a member reaches it, never a script scroll (#209).
     async tap(selector) {
       const shift = (offset ??= await calibrate());
+      let before: number | undefined;
       for (let swipes = 0; ; swipes++) {
         const place = (await run(PLACE, selector)) as Place | null;
         if (place === null) throw new Error(`no element matches ${selector} to tap`);
         const below = place.y > place.height * BAND.bottom;
         if (!below && place.y >= place.height * BAND.top) return touch(place.x + shift.x, place.y + shift.y);
+        // A swipe that left it where it was: the page is at its end, so the band cannot be reached (2026-11-16).
+        if (place.y === before) {
+          if (place.y >= 0 && place.y < place.height) return touch(place.x + shift.x, place.y + shift.y);
+          throw new Error(`${selector} is off the screen and a swipe moves the page no further`);
+        }
         if (swipes === MAX_SWIPES) throw new Error(`${selector} is still off the screen after ${String(MAX_SWIPES)} swipes`);
+        before = place.y;
         const from = Math.round(place.height * SWIPE.from) + shift.y;
         const to = Math.round(place.height * SWIPE.to) + shift.y;
         await native(swipe(Math.round(place.width / 2) + shift.x, below ? from : to, below ? to : from));
