@@ -37,3 +37,9 @@ export function setupKey(uri: string): string {
   const secret = new URL(uri).searchParams.get('secret') ?? '';
   return (secret.match(/.{1,4}/g) ?? []).join(' ');
 }
+
+/** Whether someone is signed in, from the account's methods answer (#213): only a 401 lets the sign-up and recovery forms show. */
+export function sessionState(status: number): 'signedIn' | 'signedOut' | 'failed' {
+  if (status === 200) return 'signedIn';
+  return status === 401 ? 'signedOut' : 'failed';
+}

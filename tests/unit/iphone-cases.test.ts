@@ -448,6 +448,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     return found;
   };
   const NOTICE = '#recovery-pending';
+  const SIGNED_IN = '[data-testid="signed-in"]';
   const H1 = 'h1, [role="heading"][aria-level="1"]';
   const CODES = '[data-testid="recovery-codes"] li, [data-testid="recovery-codes"] [role="listitem"]';
   const DEVICES = '[data-testid="devices"] li, [data-testid="devices"] [role="listitem"]';
@@ -465,22 +466,27 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     const steps: string[] = [];
     let started = false;
     let pending = false;
+    let signedOut = false;
     const page = safari('en', {
       goto: (path) => {
         steps.push(`goto ${path}`);
-        if (path === '/account/' && started) pending = true;
         return Promise.resolve(200);
       },
       type: (selector, text) => (steps.push(`type ${selector} ${text}`), Promise.resolve()),
       tap: (selector) => {
         steps.push(`tap ${selector}`);
         if (selector === '#code-submit' && steps.includes('goto /recover')) started = true;
+        if (selector === '#signed-in-sign-out') signedOut = true;
+        if (selector === '#signin-recovery-submit' && started) pending = true;
         if (selector === '#recovery-cancel') pending = false;
         return Promise.resolve();
       },
       waitForText: (selector, text) => (steps.push(`wait ${selector} ${text}`), Promise.resolve()),
       isVisible: (selector) => {
         if (selector === NOTICE) return Promise.resolve((overrides.notice ?? ((shown) => shown))(pending));
+        // Signed in, the sign-up and recovery pages show only the signed-in line, until its Sign out (#213).
+        if (selector === SIGNED_IN) return Promise.resolve(!signedOut && overrides.shown?.(selector) !== false);
+        if (selector === '#email-address') return Promise.resolve(signedOut && overrides.shown?.(selector) !== false);
         return Promise.resolve(
           ['#email-answer', '[data-testid="totp-secret"]', H1].includes(selector) && overrides.shown?.(selector) !== false,
         );
@@ -533,17 +539,26 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     const { page, steps } = accountPages();
     const check = countingCheck();
     await run(page, check);
-    // Its twin on CI ran 19 (shyden-labs/ShyTalk#180 AC7).
-    expect(check.count).toBe(19);
+    // Its twin on CI runs 28: 19 (shyden-labs/ShyTalk#180 AC7) and 9 for the signed-in pages and the sign-in (#213).
+    expect(check.count).toBe(28);
     const address = 'box+iphone-air-1700000000000@mail.test';
-    expect(steps.slice(steps.indexOf('goto /recover'))).toEqual([
+    expect(steps.slice(steps.indexOf('goto /sign-up', 1))).toEqual([
+      'goto /sign-up',
+      `wait ${SIGNED_IN} ${t('en', 'account.signedInFirst')}`,
       'goto /recover',
+      `wait ${SIGNED_IN} ${t('en', 'account.signedInFirst')}`,
+      'tap #signed-in-sign-out',
       `type #email-address ${address}`,
       'tap #email-submit',
       `wait #email-answer ${t('en', 'account.sent')}`,
       'type #email-code 222222',
       'tap #code-submit',
-      'goto /account/',
+      'goto /sign-in',
+      'tap #use-recovery-code',
+      `type #signin-email ${address}`,
+      'type #signin-recovery-code AB12-CD34-EF56-GH78',
+      'tap #signin-recovery-submit',
+      `wait ${H1} ${t('en', 'account.accountTitle')}`,
       'tap #recovery-cancel',
     ]);
     expect(mailbox.waitForAnyMail).toHaveBeenCalledTimes(3);
@@ -560,7 +575,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     };
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(19);
+    expect(check.count).toBe(28);
   });
 
   it('waits for the recovery codes, which show once the confirm answers: their hidden heading already holds its text', async () => {
@@ -575,7 +590,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     };
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(19);
+    expect(check.count).toBe(28);
   });
 
   it('waits for the authenticator to read On, which the account page fills in after its heading shows (#190 run 8)', async () => {
@@ -584,7 +599,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     page.text = (selector) => (selector === '[data-testid="method-authenticator"]' ? Promise.resolve('') : text(selector));
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(19);
+    expect(check.count).toBe(28);
     expect(steps).toContain(`wait [data-testid="method-authenticator"] ${t('en', 'account.authenticatorOn')}`);
   });
 
@@ -600,7 +615,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     };
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(19);
+    expect(check.count).toBe(28);
   });
 
   it('fails naming the count when no recovery codes show within 15 s', async () => {

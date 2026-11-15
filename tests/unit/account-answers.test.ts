@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cancelMessage, removeMessage, setupKey, signInMessage, verifyMessage } from '../../apps/web/src/account/answers.ts';
+import { cancelMessage, removeMessage, sessionState, setupKey, signInMessage, verifyMessage } from '../../apps/web/src/account/answers.ts';
 
 /**
  * What the sign-up and recovery pages say for each API answer (plan 6 Task 6,
@@ -71,5 +71,18 @@ describe('setupKey', () => {
 
   it('answers nothing for a link without a secret', () => {
     expect(setupKey('otpauth://totp/ShyTalk:a?issuer=ShyTalk')).toBe('');
+  });
+});
+
+/** The sign-up and recovery pages ask first whether someone is signed in (shyden-labs/ShyTalk#213). */
+describe('sessionState', () => {
+  it.each([
+    [200, 'signedIn'],
+    [401, 'signedOut'],
+    [403, 'failed'],
+    [500, 'failed'],
+    [0, 'failed'],
+  ] as const)('answers %i with %s', (status, state) => {
+    expect(sessionState(status)).toBe(state);
   });
 });

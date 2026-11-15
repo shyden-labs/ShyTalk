@@ -25,7 +25,11 @@ const data = Object.fromEntries(messages.map((key) => [`data-${key.replace(/[A-Z
   <p>{line(purpose === 'sign-up' ? 'signUpIntro' : 'recoverIntro')}</p>
   <noscript><p>{line('noScript')}</p></noscript>
   <div id="email-flow" data-locale={locale} data-purpose={purpose} data-account={localePath(locale, '/account/')} {...data}>
-    <form id="email-form">
+    <section id="signed-in-first" hidden>
+      <p data-testid="signed-in">{line('signedInFirst')}</p>
+      <p><button id="signed-in-sign-out" type="button">{line('signOut')}</button></p>
+    </section>
+    <form id="email-form" hidden>
       <p>
         <label for="email-address">{line('emailLabel')}</label>
         <input id="email-address" name="email" type="email" autocomplete="email" required />
@@ -73,7 +77,7 @@ const data = Object.fromEntries(messages.map((key) => [`data-${key.replace(/[A-Z
 <script>
   import { startRegistration, type PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
   import { applyMessage } from '../closed-testing/answers.ts';
-  import { setupKey, verifyMessage } from '../account/answers.ts';
+  import { sessionState, setupKey, verifyMessage } from '../account/answers.ts';
   import { call } from '../account/api.ts';
 
   const SIGN_UP_KEY = 'shytalk.signUpToken';
@@ -141,13 +145,34 @@ const data = Object.fromEntries(messages.map((key) => [`data-${key.replace(/[A-Z
     codes.hidden = false;
   }
 
-  if (root && emailForm && codeForm && answer && choose && authenticator && totpForm && codes) {
+  const signedInFirst = document.querySelector<HTMLElement>('#signed-in-first');
+
+  if (root && emailForm && codeForm && answer && choose && authenticator && totpForm && codes && signedInFirst) {
     const purpose = root.dataset['purpose'];
-    const recovery = purpose === 'recovery' ? storedRecovery() : null;
-    if (recovery !== null) {
-      say('recoveryStarted', recovery.completesAt);
-      if (Date.now() >= Date.parse(recovery.completesAt)) showChoice();
-    }
+
+    /** Signed in, the page says so and offers Sign out before anything else (#213); the form shows only once signed out. */
+    void call('sign-in-methods', undefined, 'GET').then(({ status }) => {
+      const state = sessionState(status);
+      if (state === 'signedIn') {
+        signedInFirst.hidden = false;
+        return;
+      }
+      if (state === 'failed') return say('failed');
+      emailForm.hidden = false;
+      const recovery = purpose === 'recovery' ? storedRecovery() : null;
+      if (recovery !== null) {
+        say('recoveryStarted', recovery.completesAt);
+        if (Date.now() >= Date.parse(recovery.completesAt)) showChoice();
+      }
+    });
+
+    document.querySelector('#signed-in-sign-out')?.addEventListener('click', () => {
+      void call('sign-out', {}).then(({ status }) => {
+        if (status !== 200) return say('failed');
+        signedInFirst.hidden = true;
+        emailForm.hidden = false;
+      });
+    });
 
     emailForm.addEventListener('submit', (event) => {
       event.preventDefault();

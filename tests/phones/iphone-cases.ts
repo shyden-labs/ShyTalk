@@ -240,7 +240,8 @@ const JOURNEY: IphoneCase = counted('applying and following the mailed link conf
  * #134): the code goes out for real to this run's plus-address and is read
  * over IMAP; the authenticator's code is computed from the key the page shows,
  * as the member's app would; then the account page, sign-out, and signing back
- * in with the app's next code.
+ * in with the app's next code; the sign-up and recovery pages saying signed in
+ * (#213); and a recovery, seen after signing in with a saved recovery code.
  */
 const SIGN_UP_JOURNEY: IphoneCase = counted(
   'joining with the mailed code and an authenticator app, then signing back in with it',
@@ -270,7 +271,8 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     // codes themselves, as Playwright's count on a locator waits (shyden-labs/ShyTalk#190). Not a check, so not counted.
     const codes = await countWithin(page, CODES);
     check.equal(codes, 10, `ten recovery codes, not ${String(codes)}`);
-    check.match(await page.text(CODES), /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    const savedCode = await page.text(CODES);
+    check.match(savedCode, /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
     await page.tap('#codes-saved');
 
     await check.waitForText(page, H1, t('en', 'account.accountTitle'));
@@ -287,10 +289,23 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     await check.waitForText(page, H1, t('en', 'account.accountTitle'));
     check.equal(await page.isVisible(NOTICE), false, 'a recovery notice before any recovery started');
 
-    // A recovery started for this address shows on this signed-in device, which cancels it there
+    // Signed in, the sign-up and recovery pages say so and offer Sign out before anything else
+    // (as tests/smoke/site.spec.ts does; shyden-labs/ShyTalk#213).
+    await page.goto('/sign-up');
+    await check.waitForText(page, SIGNED_IN, t('en', 'account.signedInFirst'));
+    check.ok(await page.isVisible(SIGNED_IN), 'no visible signed-in line on the sign-up page');
+    check.equal(await page.isVisible('#email-address'), false, 'the sign-up form shows while signed in');
+    await page.goto('/recover');
+    await check.waitForText(page, SIGNED_IN, t('en', 'account.signedInFirst'));
+    check.ok(await page.isVisible(SIGNED_IN), 'no visible signed-in line on the recovery page');
+    check.equal(await page.isVisible('#email-address'), false, 'the recovery form shows while signed in');
+    await page.tap('#signed-in-sign-out');
+    check.ok(await visibleWithin(page, '#email-address'), 'no visible recovery form after signing out');
+    check.equal(await page.isVisible(SIGNED_IN), false, 'the signed-in line stays after signing out');
+
+    // A recovery started for this address shows on a signed-in device, which cancels it there
     // (as tests/smoke/site.spec.ts does; shyden-labs/ShyTalk#133 AC3, #180).
     const signUpCode = codeIn(codeMail);
-    await page.goto('/recover');
     await page.type('#email-address', address);
     await page.tap('#email-submit');
     await check.waitForText(page, '#email-answer', t('en', 'account.sent'));
@@ -313,7 +328,13 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
       waitFor('the recovery-started answer', async () => (started.test(await page.text('#email-answer')) ? true : null)),
     );
 
-    await page.goto('/account/');
+    // Signing back in with a recovery code: the authenticator's next steps may not have come round yet.
+    await page.goto('/sign-in');
+    await page.tap('#use-recovery-code');
+    await page.type('#signin-email', address);
+    await page.type('#signin-recovery-code', savedCode);
+    await page.tap('#signin-recovery-submit');
+    await check.waitForText(page, H1, t('en', 'account.accountTitle'));
     await check.poll(() => waitFor('the recovery notice', async () => ((await page.isVisible(NOTICE)) ? true : null)));
     check.match(await page.text('#recovery-pending-text'), matching(t('en', 'account.recoveryPending'), '{startedAt}'));
     await page.tap('#recovery-cancel');
@@ -322,6 +343,7 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
 );
 
 const NOTICE = '#recovery-pending';
+const SIGNED_IN = '[data-testid="signed-in"]';
 /** Playwright's `getByTestId(…).getByRole('listitem')`, as CSS. */
 const CODES = '[data-testid="recovery-codes"] li, [data-testid="recovery-codes"] [role="listitem"]';
 const DEVICES = '[data-testid="devices"] li, [data-testid="devices"] [role="listitem"]';
