@@ -304,7 +304,7 @@ describe('safariPage: tap and waitForText', () => {
     const fake = phone([
       { x: 210, y: 373 },
       { x: 210, y: 305 },
-      { x: 26, y: 515 },
+      { x: 26, y: 515, width: 420, height: 746 },
     ]);
     await safariPage(fake.call, 's1', BASE).tap('#apply-adult');
     const [arm, received, centre] = fake.scripts() as { script: string; args: unknown[] }[];
@@ -318,8 +318,8 @@ describe('safariPage: tap and waitForText', () => {
     const fake = phone([
       { x: 210, y: 373 },
       { x: 210, y: 305 },
-      { x: 26, y: 515 },
-      { x: 100, y: 200 },
+      { x: 26, y: 515, width: 420, height: 746 },
+      { x: 100, y: 200, width: 420, height: 746 },
     ]);
     const page = safariPage(fake.call, 's1', BASE);
     await page.tap('#apply-adult');
@@ -341,7 +341,7 @@ describe('safariPage: tap and waitForText', () => {
     const fake = phone([
       { x: 210, y: 373 },
       { x: 210, y: 305 },
-      { x: 26, y: 515 },
+      { x: 26, y: 515, width: 420, height: 746 },
     ]);
     await safariPage(fake.call, 's1', BASE).tap('#apply-adult');
     const [arm, received] = fake.scripts() as { script: string }[];
@@ -389,6 +389,141 @@ describe('safariPage: tap and waitForText', () => {
     const fake = phone([{ x: 210, y: 373 }], true);
     await expect(safariPage(fake.call, 's1', BASE).tap('#apply-adult')).rejects.toThrow(/touch refused/);
     expect(fake.calls.at(-1)).toEqual(['POST', '/session/s1/context', { name: 'WEBVIEW_7' }]);
+  });
+
+  /**
+   * A member reaches a control off the screen by swiping, so the tests do too: a script scroll is not real input
+   * (shyden-labs/ShyTalk#209). The finger moves slowly and stays down a moment before lifting, so the page moves by
+   * the finger's travel and no flick carries it further. Its travel (2/5 of the screen) is shorter than the band a
+   * control is touched in (the middle 3/5), so one swipe cannot carry a control from one side of the band past the other.
+   */
+  const SWIPE = (x: number, fromY: number, toY: number) => ({
+    actions: [
+      {
+        type: 'pointer',
+        id: 'finger',
+        parameters: { pointerType: 'touch' },
+        actions: [
+          { type: 'pointerMove', duration: 0, x, y: fromY },
+          { type: 'pointerDown', button: 0 },
+          { type: 'pointerMove', duration: 500, x, y: toY },
+          { type: 'pause', duration: 200 },
+          { type: 'pointerUp', button: 0 },
+        ],
+      },
+    ],
+  });
+  /** The calibration of the tests above: aimed at (210, 373), received at (210, 305), so the page sits 68 pt down. */
+  const CALIBRATED = [
+    { x: 210, y: 373 },
+    { x: 210, y: 305 },
+  ];
+  const at = (y: number) => ({ x: 26, y, width: 420, height: 746 });
+  const actions = (fake: ReturnType<typeof phone>) => fake.calls.filter(([, path]) => path.endsWith('/actions')).map(([, , body]) => body);
+
+  it('swipes up with a real finger while the element is below the screen, then touches it', async () => {
+    const fake = phone([...CALIBRATED, at(1400), at(1100), at(500)]);
+    await safariPage(fake.call, 's1', BASE).tap('#apply-submit');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(210, 590, 292), SWIPE(210, 590, 292), TOUCH_AT(26, 568)]);
+  });
+
+  it('swipes down while the element is above the screen, then touches it', async () => {
+    const fake = phone([...CALIBRATED, at(-300), at(400)]);
+    await safariPage(fake.call, 's1', BASE).tap('#back');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(210, 292, 590), TOUCH_AT(26, 468)]);
+  });
+
+  it('touches an element on the edges of the middle 3/5 of the screen without swiping', async () => {
+    const fake = phone([...CALIBRATED, at(150), at(596)]);
+    const page = safariPage(fake.call, 's1', BASE);
+    await page.tap('#top');
+    await page.tap('#bottom');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), TOUCH_AT(26, 218), TOUCH_AT(26, 664)]);
+  });
+
+  it('swipes when the element is just outside the middle 3/5, above or below', async () => {
+    const fake = phone([...CALIBRATED, at(149), at(300), at(597), at(300)]);
+    const page = safariPage(fake.call, 's1', BASE);
+    await page.tap('#above');
+    await page.tap('#below');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(210, 292, 590), TOUCH_AT(26, 368), SWIPE(210, 590, 292), TOUCH_AT(26, 368)]);
+  });
+
+  it('touches an element exactly on the band’s edges: on a 750 pt screen, 150 and 600', async () => {
+    const fake = phone([...CALIBRATED, { x: 26, y: 150, width: 420, height: 750 }, { x: 26, y: 600, width: 420, height: 750 }]);
+    const page = safariPage(fake.call, 's1', BASE);
+    await page.tap('#top');
+    await page.tap('#bottom');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), TOUCH_AT(26, 218), TOUCH_AT(26, 668)]);
+  });
+
+  it('swipes at the middle of the screen, shifted by Safari’s offset both ways', async () => {
+    const fake = phone([{ x: 210, y: 373 }, { x: 200, y: 305 }, at(1400), at(500)]);
+    await safariPage(fake.call, 's1', BASE).tap('#apply-submit');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(220, 590, 292), TOUCH_AT(36, 568)]);
+  });
+
+  it('fails naming the element when 10 swipes leave it off the screen, touching nothing', async () => {
+    // Each swipe moves it a little, so the page has not reached its end.
+    const fake = phone([...CALIBRATED, ...Array.from({ length: 11 }, (_, n) => at(5000 - n * 10))]);
+    await expect(safariPage(fake.call, 's1', BASE).tap('#far')).rejects.toThrow('#far is still off the screen after 10 swipes');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), ...Array.from({ length: 10 }, () => SWIPE(210, 590, 292))]);
+  });
+
+  /**
+   * A control at a page's end can never reach the band: fully scrolled, the footer's links and the codes step's
+   * "saved" button still sit in the bottom fifth (both phones' run, 2026-11-16, shyden-labs/ShyTalk#209). A swipe that
+   * leaves it where it was shows the page can move no further: it is touched where it is, if it is on the screen.
+   */
+  it('touches a control the page’s end keeps below the band, once a swipe leaves it where it was', async () => {
+    const fake = phone([...CALIBRATED, at(700), at(700)]);
+    await safariPage(fake.call, 's1', BASE).tap('#codes-saved');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(210, 590, 292), TOUCH_AT(26, 768)]);
+  });
+
+  it('touches a control the page’s top keeps above the band, once a swipe leaves it where it was', async () => {
+    const fake = phone([...CALIBRATED, at(100), at(100)]);
+    await safariPage(fake.call, 's1', BASE).tap('#menu');
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(210, 292, 590), TOUCH_AT(26, 168)]);
+  });
+
+  it('fails naming the control when it is off the screen and a swipe moves the page no further, touching nothing', async () => {
+    const fake = phone([...CALIBRATED, at(900), at(900)]);
+    await expect(safariPage(fake.call, 's1', BASE).tap('#hidden')).rejects.toThrow(
+      '#hidden is off the screen and a swipe moves the page no further',
+    );
+    expect(actions(fake)).toEqual([TOUCH_AT(210, 373), SWIPE(210, 590, 292)]);
+  });
+
+  it('fails naming the selector when the element goes away between swipes', async () => {
+    const fake = phone([...CALIBRATED, at(1400), null]);
+    await expect(safariPage(fake.call, 's1', BASE).tap('#gone')).rejects.toThrow(/no element matches #gone/);
+    expect(actions(fake)).toHaveLength(2);
+  });
+
+  it('reads the element’s centre and the screen’s size from the page, scrolling nothing itself', async () => {
+    const fake = phone([...CALIBRATED, at(500)]);
+    await safariPage(fake.call, 's1', BASE).tap('#apply-adult');
+    const place = (fake.scripts() as { script: string }[])[2];
+    const el = { getBoundingClientRect: () => ({ left: 10, top: 1200, width: 30, height: 20 }), scrollIntoView: vi.fn() };
+    const window = { scrollTo: vi.fn(), scrollBy: vi.fn(), scroll: vi.fn() };
+    const run = (found: unknown): unknown =>
+      runInNewContext(`(() => {${String(place?.script)}})()`, {
+        arguments: ['#apply-adult'],
+        document: { querySelector: () => found },
+        window,
+        scrollTo: window.scrollTo,
+        scrollBy: window.scrollBy,
+        scroll: window.scroll,
+        innerWidth: 420,
+        innerHeight: 746,
+      });
+    expect(run(el)).toEqual({ x: 25, y: 1210, width: 420, height: 746 });
+    expect(run(null)).toBeNull();
+    expect(el.scrollIntoView).not.toHaveBeenCalled();
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    expect(window.scrollBy).not.toHaveBeenCalled();
+    expect(window.scroll).not.toHaveBeenCalled();
   });
 
   it('types into the element key by key through WebDriver, as the iPhone’s keyboard does', async () => {
