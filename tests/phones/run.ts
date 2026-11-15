@@ -100,6 +100,12 @@ export function phoneVerdict(
   return { lines, errors };
 }
 
+/**
+ * The real iPhone's local WebDriverAgent port: a simulator's WebDriverAgent takes the Mac's 8100, which
+ * refused the iPhone's session on 2026-11-16 (shyden-labs/ShyTalk#224).
+ */
+export const WDA_LOCAL_PORT = 8199;
+
 /** Safari on that iPhone, WebDriverAgent signed by this Mac's Apple Development identity (measured 2026-11-06). */
 export function capabilities(udid: string): Record<string, unknown> {
   return {
@@ -115,6 +121,7 @@ export function capabilities(udid: string): Record<string, unknown> {
     // A press is a real tap on the screen, never a script's click (global rule 2026-10-31).
     'appium:nativeWebTap': true,
     'appium:wdaLaunchTimeout': 240_000,
+    'appium:wdaLocalPort': WDA_LOCAL_PORT,
     'appium:newCommandTimeout': 120,
   };
 }
