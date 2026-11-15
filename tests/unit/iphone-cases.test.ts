@@ -486,7 +486,10 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
         if (selector === NOTICE) return Promise.resolve((overrides.notice ?? ((shown) => shown))(pending));
         // Signed in, the sign-up and recovery pages show only the signed-in line, until its Sign out (#213).
         if (selector === SIGNED_IN) return Promise.resolve(!signedOut && overrides.shown?.(selector) !== false);
-        if (selector === '#email-address') return Promise.resolve(signedOut && overrides.shown?.(selector) !== false);
+        // The address form shows once the page has asked whether it is signed in, until its code is accepted;
+        // signed in, it shows only after Sign out (#213).
+        if (selector === '#email-address')
+          return Promise.resolve((signedOut || !steps.includes('tap #code-submit')) && overrides.shown?.(selector) !== false);
         return Promise.resolve(
           ['#email-answer', '[data-testid="totp-secret"]', H1].includes(selector) && overrides.shown?.(selector) !== false,
         );
@@ -539,8 +542,9 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     const { page, steps } = accountPages();
     const check = countingCheck();
     await run(page, check);
-    // Its twin on CI runs 28: 19 (shyden-labs/ShyTalk#180 AC7) and 9 for the signed-in pages and the sign-in (#213).
-    expect(check.count).toBe(29);
+    // Its twin on CI runs 30: 19 (shyden-labs/ShyTalk#180 AC7), 9 for the signed-in pages and the sign-in, 1 for the
+    // codes left and 1 for the sign-up form showing before it is typed in (#213).
+    expect(check.count).toBe(30);
     const address = 'box+iphone-air-1700000000000@mail.test';
     expect(steps.slice(steps.indexOf('goto /sign-up', 1))).toEqual([
       'goto /sign-up',
@@ -577,7 +581,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     };
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(29);
+    expect(check.count).toBe(30);
   });
 
   it('waits for the recovery codes, which show once the confirm answers: their hidden heading already holds its text', async () => {
@@ -592,7 +596,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     };
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(29);
+    expect(check.count).toBe(30);
   });
 
   it('waits for the authenticator to read On, which the account page fills in after its heading shows (#190 run 8)', async () => {
@@ -601,7 +605,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     page.text = (selector) => (selector === '[data-testid="method-authenticator"]' ? Promise.resolve('') : text(selector));
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(29);
+    expect(check.count).toBe(30);
     expect(steps).toContain(`wait [data-testid="method-authenticator"] ${t('en', 'account.authenticatorOn')}`);
   });
 
@@ -617,7 +621,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     };
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(29);
+    expect(check.count).toBe(30);
   });
 
   it('fails naming the count when no recovery codes show within 15 s', async () => {
@@ -691,6 +695,33 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     await expect(run(page)).rejects.toThrow('waited 60 s for the recovery notice to hide');
   });
 
+  it('waits for the sign-up form, which shows once the page has asked whether it is signed in (#213: 0 typed on both phones, 2026-11-16)', async () => {
+    let visitedAt: number | undefined;
+    const ready = () => visitedAt !== undefined && Date.now() - visitedAt >= 1_000;
+    const { page, steps } = accountPages({ shown: (selector) => selector !== '#email-address' || ready() });
+    const goto = page.goto.bind(page);
+    page.goto = (path) => {
+      if (path === '/sign-up' && visitedAt === undefined) visitedAt = Date.now();
+      return goto(path);
+    };
+    const type = page.type.bind(page);
+    let typedWhileHidden = false;
+    page.type = (selector, text) => {
+      if (selector === '#email-address' && visitedAt !== undefined && !ready()) typedWhileHidden = true;
+      return type(selector, text);
+    };
+    const check = countingCheck();
+    await run(page, check);
+    expect(typedWhileHidden).toBe(false);
+    expect(steps).toContain('type #email-address box+iphone-air-1700000000000@mail.test');
+    expect(check.count).toBe(30);
+  });
+
+  it('fails naming the sign-up form when it never shows', async () => {
+    const { page } = accountPages({ shown: (selector) => selector !== '#email-address' });
+    await expect(run(page)).rejects.toThrow('no visible sign-up form');
+  });
+
   it('fails naming the recovery mail when it never replaces the sign-up one', async () => {
     mailbox.waitForAnyMail.mockReset();
     mailbox.waitForAnyMail.mockResolvedValue({ subject: t('en', 'email.codeSubject'), text: 'code 111111' });
@@ -731,7 +762,8 @@ describe('the iPhone recovery pages', () => {
       waitForText: (selector, text) => (steps.push(`wait ${selector} ${text}`), Promise.resolve()),
       isVisible: (selector) =>
         Promise.resolve(
-          selector === '#email-code' ? tapped === '#email-submit' : selector === '#cancel-answer' && tapped === '#cancel-button',
+          selector === '#email-address' ||
+            (selector === '#email-code' ? tapped === '#email-submit' : selector === '#cancel-answer' && tapped === '#cancel-button'),
         ),
       ...overrides,
     });
@@ -758,12 +790,34 @@ describe('the iPhone recovery pages', () => {
       'tap #cancel-button',
       `wait #cancel-answer ${t('en', 'account.cancelled')}`,
     ]);
-    // Its twin on CI ran 4 (shyden-labs/ShyTalk#180 AC7).
-    expect(check.count).toBe(4);
+    // Its twin on CI runs 5: 4 (shyden-labs/ShyTalk#180 AC7) and the form showing before it is typed in (#213).
+    expect(check.count).toBe(5);
+  });
+
+  it('waits for the recovery form, which shows once the page has asked whether it is signed in (#213)', async () => {
+    let looks = 0;
+    let typedWhileHidden = false;
+    const { page } = recoveryPages();
+    const isVisible = page.isVisible.bind(page);
+    page.isVisible = (selector) => (selector === '#email-address' ? Promise.resolve(++looks > 2) : isVisible(selector));
+    const type = page.type.bind(page);
+    page.type = (selector, text) => {
+      if (selector === '#email-address' && looks <= 2) typedWhileHidden = true;
+      return type(selector, text);
+    };
+    await recovery().run(page, countingCheck());
+    expect(typedWhileHidden).toBe(false);
+  });
+
+  it('fails naming the recovery form when it never shows', async () => {
+    let now = 1700000000000;
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 16_000));
+    const { page } = recoveryPages({ isVisible: () => Promise.resolve(false) });
+    await expect(recovery().run(page)).rejects.toThrow('no visible recovery form');
   });
 
   it('fails naming the code field when it never shows', async () => {
-    const { page } = recoveryPages({ isVisible: () => Promise.resolve(false) });
+    const { page } = recoveryPages({ isVisible: (selector) => Promise.resolve(selector === '#email-address') });
     await expect(recovery().run(page)).rejects.toThrow('no code field after the start');
   });
 

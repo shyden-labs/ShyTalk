@@ -249,6 +249,8 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     const tag = `iphone-air-${String(Date.now())}`;
     const address = plusAddress(tag);
     await page.goto('/sign-up');
+    // The form shows once the page has asked whether it is signed in (#213): 0 typed on both phones before this wait.
+    check.ok(await visibleWithin(page, '#email-address'), 'no visible sign-up form');
     await page.type('#email-address', address);
     await page.tap('#email-submit');
     await check.waitForText(page, '#email-answer', t('en', 'account.sent'));
@@ -403,6 +405,8 @@ const RECOVERY_PAGES: IphoneCase = counted(
   'asking to recover shows the code step, and a cancel link answers on its press',
   async (page, check) => {
     await page.goto('/recover');
+    // The form shows once the page has asked whether it is signed in (#213).
+    check.ok(await visibleWithin(page, '#email-address'), 'no visible recovery form');
     await page.type('#email-address', plusAddress(`iphone-air-recover-${String(Date.now())}`));
     await page.tap('#email-submit');
     await check.waitForText(page, '#email-answer', t('en', 'account.sent'));

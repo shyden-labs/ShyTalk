@@ -171,6 +171,8 @@ test('applying and following the mailed link confirms the address', async ({ pag
  */
 test('joining with the mailed code and an authenticator app, then signing back in with it', async ({ page, mailbox }) => {
   await page.goto('/sign-up', { waitUntil: 'load' });
+  // The form shows once the page has asked whether it is signed in (#213): typing waits for it, as a person does.
+  await expect(page.getByLabel(t('en', 'account.emailLabel'))).toBeVisible();
   await page.getByLabel(t('en', 'account.emailLabel')).pressSequentially(mailbox.address);
   await page.getByRole('button', { name: t('en', 'account.sendCode') }).click();
   const answer = page.getByRole('status');
@@ -272,6 +274,8 @@ function filled(line: string, placeholder: string): RegExp {
  */
 test('asking to recover shows the code step, and a cancel link answers on its press', async ({ page, mailbox }) => {
   await page.goto('/recover', { waitUntil: 'load' });
+  // The form shows once the page has asked whether it is signed in (#213).
+  await expect(page.getByLabel(t('en', 'account.emailLabel'))).toBeVisible();
   await page.getByLabel(t('en', 'account.emailLabel')).pressSequentially(mailbox.address);
   await page.getByRole('button', { name: t('en', 'account.sendCode') }).click();
   const answer = page.getByRole('status');
