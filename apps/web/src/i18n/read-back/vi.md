@@ -116,6 +116,7 @@
 | account.thisDevice | This device | Thiết bị này | This device |
 | account.signOutDevice | Sign this device out | Đăng xuất thiết bị này | Log out of this device. |
 | account.signOut | Sign out | Đăng xuất | Log out |
+| account.signedInFirst | You are already signed in. Sign out to continue here. | Bạn đã đăng nhập rồi. Hãy đăng xuất để tiếp tục tại đây. | You are already logged in. Please log out to continue here. |
 | account.recoveryPending | A recovery of this account started on {startedAt}. If this was not you, cancel it now. | Quá trình khôi phục tài khoản này đã bắt đầu vào {startedAt}. Nếu đây không phải là bạn, hãy hủy ngay. | The account recovery process started at {startedAt} . If this is not you, please cancel immediately. |
 | account.signInTitle | Sign in | Đăng nhập | Log in |
 | account.signInWithPasskey | Sign in with a passkey | Đăng nhập bằng khóa truy cập | Log in using your access key. |

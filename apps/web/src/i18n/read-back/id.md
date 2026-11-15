@@ -116,6 +116,7 @@
 | account.thisDevice | This device | Perangkat ini | This device |
 | account.signOutDevice | Sign this device out | Keluarkan akun dari perangkat ini | Sign out account from this device |
 | account.signOut | Sign out | Keluar | Go out |
+| account.signedInFirst | You are already signed in. Sign out to continue here. | Kamu sudah masuk. Keluar dulu untuk melanjutkan di sini. | You are already logged in. Please log out to continue here. |
 | account.recoveryPending | A recovery of this account started on {startedAt}. If this was not you, cancel it now. | Pemulihan akun ini dimulai pada {startedAt}. Jika ini bukan kamu, batalkan sekarang. | This account recovery started at {startedAt} . If this isn't you, cancel now. |
 | account.signInTitle | Sign in | Masuk | Enter |
 | account.signInWithPasskey | Sign in with a passkey | Masuk dengan passkey | Login with passkey |

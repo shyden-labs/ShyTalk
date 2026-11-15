@@ -116,6 +116,7 @@
 | account.thisDevice | This device | อุปกรณ์นี้ | This device |
 | account.signOutDevice | Sign this device out | ออกจากระบบอุปกรณ์นี้ | Log out of this device. |
 | account.signOut | Sign out | ออกจากระบบ | Log out |
+| account.signedInFirst | You are already signed in. Sign out to continue here. | คุณเข้าสู่ระบบอยู่แล้ว ออกจากระบบก่อนเพื่อดำเนินการต่อที่นี่ | You are already logged in. Please log out to continue here. |
 | account.recoveryPending | A recovery of this account started on {startedAt}. If this was not you, cancel it now. | การกู้คืนบัญชีนี้เริ่มเมื่อ {startedAt} หากไม่ใช่คุณ ให้ยกเลิกทันที | This account recovery started at {startedAt} If it wasn't you, cancel immediately. |
 | account.signInTitle | Sign in | เข้าสู่ระบบ | Log in |
 | account.signInWithPasskey | Sign in with a passkey | เข้าสู่ระบบด้วยพาสคีย์ | Log in with your password. |

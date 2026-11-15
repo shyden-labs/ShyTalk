@@ -4,10 +4,11 @@
  * is unit-tested; the rest is proven by the phone run itself.
  */
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, rm } from 'node:fs/promises';
+import { connect } from 'node:net';
 import { promisify } from 'node:util';
 import { IPHONE_CASES } from './iphone-cases.ts';
-import { capabilities, type PhoneDeps } from './run.ts';
+import { APPIUM_LOG, capabilities, WDA_LOCAL_PORT, type PhoneDeps } from './run.ts';
 import { safariPage, type WebDriverCall } from './safari.ts';
 
 const exec = promisify(execFile);
@@ -32,6 +33,8 @@ const DEVICES_FILE = 'test-results/devicectl-devices.json';
 /** How long Appium gets to answer /status, and to exit once asked. */
 const APPIUM_START_MS = 60_000;
 const APPIUM_STOP_MS = 30_000;
+const PORT_CEILING_MS = 30_000;
+const PORT_EVERY_MS = 500;
 
 interface DeviceList {
   result: {
@@ -91,6 +94,69 @@ const call: WebDriverCall = async (method, path, body) => {
   return value;
 };
 
+/** How a held port is looked at, while it is waited for. */
+export interface PortWait {
+  free(port: number): Promise<boolean>;
+  /** Who holds the port, as lsof shows it; '' when it shows none. */
+  holder(port: number): Promise<string>;
+  now(): number;
+  pause(ms: number): Promise<void>;
+}
+
+/**
+ * Waits for a port to come free, looking every 500 ms, and fails after 30 s
+ * naming it and its holder: a held port is waited for, never retried round
+ * (shyden-labs/ShyTalk#224: run 5 found WebDriverAgent's still held).
+ */
+export async function waitForFreePort(port: number, d: PortWait): Promise<void> {
+  const started = d.now();
+  for (;;) {
+    if (await d.free(port)) return;
+    if (d.now() - started >= PORT_CEILING_MS) {
+      const holder = (await d.holder(port)) || "a process lsof does not show to this user (root's, perhaps)";
+      throw new Error(`port ${String(port)} is still held after ${String(PORT_CEILING_MS / 1000)} s, by ${holder}`);
+    }
+    await d.pause(PORT_EVERY_MS);
+  }
+}
+
+/** Each listening command and pid in lsof's answer, once each. */
+export function listenersIn(lsof: string): string {
+  const seen = new Set<string>();
+  for (const line of lsof.split('\n').slice(1)) {
+    const [command, pid] = line.trim().split(/\s+/);
+    if (command !== undefined && pid !== undefined) seen.add(`${command} (pid ${pid})`);
+  }
+  return [...seen].join(', ');
+}
+
+const realPortWait: PortWait = {
+  // Held means something answers there, as Appium judges it; binding is no test, since a listener on
+  // every address leaves 127.0.0.1 bindable on macOS (measured 2026-11-16).
+  free: (port) =>
+    new Promise((answer) => {
+      const probe = connect(port, '127.0.0.1');
+      probe.once('connect', () => {
+        probe.destroy();
+        answer(false);
+      });
+      probe.once('error', () => {
+        answer(true);
+      });
+    }),
+  holder: async (port) => {
+    const { stdout } = await exec('lsof', ['-nP', `-iTCP:${String(port)}`, '-sTCP:LISTEN']).catch(() => ({ stdout: '' }));
+    return listenersIn(stdout);
+  },
+  now: () => Date.now(),
+  pause: (ms) => new Promise((done) => setTimeout(done, ms)),
+};
+
+/** Appium's arguments: warnings on the console, the full debug log in its file (shyden-labs/ShyTalk#221). */
+export function appiumArgs(port: number): string[] {
+  return ['--port', String(port), '--log-level', 'warn:debug', '--log', APPIUM_LOG];
+}
+
 export function realDeps(): PhoneDeps {
   let appium: ChildProcess | undefined;
   return {
@@ -134,7 +200,11 @@ export function realDeps(): PhoneDeps {
       return pickIphone(JSON.parse(await readFile(DEVICES_FILE, 'utf8')) as DeviceList);
     },
     async startAppium() {
-      const child = spawn('appium', ['--port', String(APPIUM_PORT), '--log-level', 'warn'], { stdio: 'inherit' });
+      // The last run's WebDriverAgent listener may still hold the iPhone's port (#224).
+      await waitForFreePort(WDA_LOCAL_PORT, realPortWait);
+      // Each run's log starts empty, so it holds this run alone.
+      await rm(APPIUM_LOG, { force: true });
+      const child = spawn('appium', appiumArgs(APPIUM_PORT), { stdio: 'inherit' });
       appium = child;
       let gone: Error | undefined;
       exited(child, 'Appium').then(

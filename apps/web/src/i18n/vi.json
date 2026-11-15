@@ -128,6 +128,7 @@
     "thisDevice": "Thiết bị này",
     "signOutDevice": "Đăng xuất thiết bị này",
     "signOut": "Đăng xuất",
+    "signedInFirst": "Bạn đã đăng nhập rồi. Hãy đăng xuất để tiếp tục tại đây.",
     "recoveryPending": "Quá trình khôi phục tài khoản này đã bắt đầu vào {startedAt}. Nếu đây không phải là bạn, hãy hủy ngay.",
     "signInTitle": "Đăng nhập",
     "signInWithPasskey": "Đăng nhập bằng khóa truy cập",
