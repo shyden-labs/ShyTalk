@@ -73,6 +73,34 @@ describe('waitForMail', () => {
     expect(box.closed).toBe(1);
   });
 
+  /** A reset from the mail server read as a phone's fault (2026-11-16, both phones, shyden-labs/ShyTalk#223). */
+  it('names the server and folder when the connection drops while reading, keeping the reason, and still closes', async () => {
+    const box = reader([null]);
+    box.latest = vi.fn(() => Promise.reject(new Error('read ECONNRESET')));
+    const { now, pause } = clock();
+    await expect(waitForMail('t3', { password: 'pw', open: () => Promise.resolve(box), now, pause })).rejects.toThrow(
+      'the test mailbox at mail.shyden.co.uk dropped while reading INBOX.t3: read ECONNRESET',
+    );
+    expect(box.closed).toBe(1);
+  });
+
+  it('keeps the drop as the reason when closing the dropped connection fails too', async () => {
+    const box = reader([null]);
+    box.latest = vi.fn(() => Promise.reject(new Error('read ECONNRESET')));
+    box.close = vi.fn(() => Promise.reject(new Error('Connection not available')));
+    const { now, pause } = clock();
+    await expect(waitForMail('t4', { password: 'pw', open: () => Promise.resolve(box), now, pause })).rejects.toThrow(
+      'the test mailbox at mail.shyden.co.uk dropped while reading INBOX.t4: read ECONNRESET',
+    );
+  });
+
+  it('names the server when the connection cannot be opened, keeping the reason', async () => {
+    const { now, pause } = clock();
+    await expect(
+      waitForMail('t5', { password: 'pw', open: () => Promise.reject(new Error('connect ETIMEDOUT')), now, pause }),
+    ).rejects.toThrow('the test mailbox at mail.shyden.co.uk could not be opened: connect ETIMEDOUT');
+  });
+
   it('fails naming the subject when the mail holds no confirm link', async () => {
     const box = reader([{ subject: 'Something else', text: 'no link here' }]);
     const { now, pause } = clock();

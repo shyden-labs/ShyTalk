@@ -48,18 +48,27 @@ export async function waitForAnyMail(tag: string, deps: WaitDeps): Promise<Mail>
   const now = deps.now ?? Date.now;
   const pause = deps.pause ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
   const folder = `INBOX.${tag}`;
-  const box = await (deps.open ?? openImap)(deps.password);
+  const box = await (deps.open ?? openImap)(deps.password).catch((error: unknown) => {
+    throw new Error(`the test mailbox at ${HOST} could not be opened: ${(error as Error).message}`, { cause: error });
+  });
+  // A drop names the server, so a reset read as a phone's fault is told apart (shyden-labs/ShyTalk#223).
+  const read = { dropped: false };
   try {
     const started = now();
     for (;;) {
-      const mail = await box.latest(folder);
+      const mail = await box.latest(folder).catch((error: unknown) => {
+        read.dropped = true;
+        throw new Error(`the test mailbox at ${HOST} dropped while reading ${folder}: ${(error as Error).message}`, { cause: error });
+      });
       if (mail !== null) return mail;
       if (now() - started + LOOK_EVERY_MS > MAIL_CEILING_MS)
         throw new Error(`no mail reached ${folder} within ${String(MAIL_CEILING_MS / 1000)} s`);
       await pause(LOOK_EVERY_MS);
     }
   } finally {
-    await box.close();
+    // After a drop, closing the dead connection can fail too; the drop stays the reason given.
+    if (read.dropped) await box.close().catch(() => undefined);
+    else await box.close();
   }
 }
 
