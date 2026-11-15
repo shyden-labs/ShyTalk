@@ -49,6 +49,9 @@ export interface PhoneDeps {
 
 export const PHONES = ['oneplus', 'iphone-air'] as const;
 
+/** Appium's full log, at debug level, for each run: the console keeps only its warnings (shyden-labs/ShyTalk#221). */
+export const APPIUM_LOG = 'test-results/appium.log';
+
 /** Every case in order, each counting its own checks, a failure recorded with its reason and the run carried on. */
 export async function runCases(cases: IphoneCase[], page: SafariPage): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
@@ -122,6 +125,7 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     return 1;
   }
   const errors: string[] = [];
+  let appiumStarted = false;
   try {
     // Both phones' closed-testing journey reads its mail from the real test mailbox (shyden-labs/ShyTalk#150):
     // the OnePlus's Playwright inherits this environment, and the iPhone's cases run in this process.
@@ -138,6 +142,8 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     const oneplusCounts = await d.readOneplusCounts();
     const udid = await d.iphoneUdid();
     await d.startAppium();
+    appiumStarted = true;
+    d.print(`phone-smoke: Appium's full log: ${APPIUM_LOG}`);
     let iphone: CaseResult[];
     try {
       const session = await d.openSession(udid);
@@ -154,8 +160,10 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     const verdict = phoneVerdict(oneplus, oneplusCounts, iphone, d.cases.length);
     for (const line of verdict.lines) d.print(line);
     errors.push(...verdict.errors);
+    // The iPhone's reason is Appium's last word; its full log holds what led there.
+    if (iphone.some(({ status }) => status !== 'expected')) errors.push(`the iPhone's failures in Appium's full log: ${APPIUM_LOG}`);
   } catch (error) {
-    d.print(`phone-smoke: ${(error as Error).message}`);
+    d.print(`phone-smoke: ${(error as Error).message}${appiumStarted ? ` (Appium's full log: ${APPIUM_LOG})` : ''}`);
     return 1;
   }
   for (const error of errors) d.print(`phone-smoke: ${error}`);

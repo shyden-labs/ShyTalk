@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { oneplusCounts, pickIphone } from '../phones/devices.ts';
+import { appiumArgs, oneplusCounts, pickIphone } from '../phones/devices.ts';
 
 /**
  * The phone run finds the iPhone on the cable from `xcrun devicectl list
@@ -44,5 +44,11 @@ describe('oneplusCounts', () => {
     expect(() => oneplusCounts(JSON.stringify({ chromium: { a: 3 } }))).toThrow(
       'test-results/phone-oneplus-assertions.json holds no counts for the OnePlus',
     );
+  });
+});
+
+describe('appiumArgs', () => {
+  it('keeps the console at warnings and writes the full debug log to its file, so a failed iPhone start shows its cause (shyden-labs/ShyTalk#221)', () => {
+    expect(appiumArgs(4733)).toEqual(['--port', '4733', '--log-level', 'warn:debug', '--log', 'test-results/appium.log']);
   });
 });

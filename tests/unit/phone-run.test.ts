@@ -214,6 +214,7 @@ describe('runPhones', () => {
       'read counts',
       'udid',
       'start appium',
+      "print phone-smoke: Appium's full log: test-results/appium.log",
       'open session UDID-1',
       'page',
       'close session s1',
@@ -236,6 +237,14 @@ describe('runPhones', () => {
     await expect(runPhones('https://site.example', d)).resolves.toBe(1);
     expect(d.steps).toContain('print iphone-air: a FAILED: no visible navigation');
     expect(d.steps).toContain('print phone-smoke: iphone-air failed "a": no visible navigation');
+    // The iPhone's reason is Appium's last word; its full log holds what led there (shyden-labs/ShyTalk#221).
+    expect(d.steps.at(-1)).toBe("print phone-smoke: the iPhone's failures in Appium's full log: test-results/appium.log");
+  });
+
+  it('names no Appium log when only the OnePlus failed (shyden-labs/ShyTalk#221)', async () => {
+    const d = deps({ readOneplusReport: () => Promise.resolve(oneplusReport(['a'], 'unexpected')) });
+    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    expect(d.steps.some((s) => s.includes("the iPhone's failures"))).toBe(false);
   });
 
   it('removes the adb forward when Playwright cannot run, and fails naming why', async () => {
@@ -251,13 +260,20 @@ describe('runPhones', () => {
       },
     });
     await expect(runPhones('https://site.example', d)).resolves.toBe(1);
-    expect(d.steps.slice(-3)).toEqual(['close session s1', 'stop appium', 'print phone-smoke: Safari went away']);
+    expect(d.steps.slice(-3)).toEqual([
+      'close session s1',
+      'stop appium',
+      "print phone-smoke: Safari went away (Appium's full log: test-results/appium.log)",
+    ]);
   });
 
   it('stops Appium when no session opens', async () => {
     const d = deps({ openSession: () => Promise.reject(new Error('WebDriverAgent did not start')) });
     await expect(runPhones('https://site.example', d)).resolves.toBe(1);
-    expect(d.steps.slice(-2)).toEqual(['stop appium', 'print phone-smoke: WebDriverAgent did not start']);
+    expect(d.steps.slice(-2)).toEqual([
+      'stop appium',
+      "print phone-smoke: WebDriverAgent did not start (Appium's full log: test-results/appium.log)",
+    ]);
     expect(d.steps.some((s) => s.startsWith('close session'))).toBe(false);
   });
 
