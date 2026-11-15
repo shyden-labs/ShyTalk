@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { runCases, phoneVerdict, capabilities, runPhones, type PhoneDeps } from '../phones/run.ts';
+import { runCases, phoneVerdict, capabilities, runPhones, type PhoneDeps, WDA_LOCAL_PORT } from '../phones/run.ts';
 import type { IphoneCase, SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
 
@@ -147,6 +147,12 @@ describe('capabilities', () => {
     });
     // Measured 2026-11-06: the performance log crashes appium-xcuitest-driver 11.11.2.
     expect(caps).not.toHaveProperty('appium:enablePerformanceLogging');
+  });
+
+  it('gives the real iPhone its own local WebDriverAgent port, never the simulators’ 8100 (shyden-labs/ShyTalk#224)', () => {
+    // 2026-11-16: a simulator's WebDriverAgent held the Mac's port 8100 and the iPhone's session was refused.
+    expect(capabilities('00008150-ABC')).toMatchObject({ 'appium:wdaLocalPort': WDA_LOCAL_PORT });
+    expect(WDA_LOCAL_PORT).toBe(8199);
   });
 });
 
