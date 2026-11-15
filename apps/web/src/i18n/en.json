@@ -128,6 +128,7 @@
     "thisDevice": "This device",
     "signOutDevice": "Sign this device out",
     "signOut": "Sign out",
+    "signedInFirst": "You are already signed in. Sign out to continue here.",
     "recoveryPending": "A recovery of this account started on {startedAt}. If this was not you, cancel it now.",
     "signInTitle": "Sign in",
     "signInWithPasskey": "Sign in with a passkey",

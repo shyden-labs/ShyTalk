@@ -116,6 +116,7 @@
 | account.thisDevice | This device | 此设备 | This device |
 | account.signOutDevice | Sign this device out | 将此设备退出登录 | Log out of this device |
 | account.signOut | Sign out | 退出登录 | Log out |
+| account.signedInFirst | You are already signed in. Sign out to continue here. | 你已经登录了。请先退出登录，再在这里继续。 | You are already logged in. Please log out first, and then continue here. |
 | account.recoveryPending | A recovery of this account started on {startedAt}. If this was not you, cancel it now. | 此账户的恢复已于 {startedAt} 开始。如果这不是您本人操作，请立即取消。 | The recovery of this account began at {startedAt} . If this was not your action, please cancel immediately. |
 | account.signInTitle | Sign in | 登录 | Log in |
 | account.signInWithPasskey | Sign in with a passkey | 使用通行密钥登录 | Log in using access key |

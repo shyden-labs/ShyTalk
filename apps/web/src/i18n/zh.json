@@ -128,6 +128,7 @@
     "thisDevice": "此设备",
     "signOutDevice": "将此设备退出登录",
     "signOut": "退出登录",
+    "signedInFirst": "你已经登录了。请先退出登录，再在这里继续。",
     "recoveryPending": "此账户的恢复已于 {startedAt} 开始。如果这不是您本人操作，请立即取消。",
     "signInTitle": "登录",
     "signInWithPasskey": "使用通行密钥登录",
