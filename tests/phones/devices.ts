@@ -4,10 +4,10 @@
  * is unit-tested; the rest is proven by the phone run itself.
  */
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { IPHONE_CASES } from './iphone-cases.ts';
-import { capabilities, type PhoneDeps } from './run.ts';
+import { APPIUM_LOG, capabilities, type PhoneDeps } from './run.ts';
 import { safariPage, type WebDriverCall } from './safari.ts';
 
 const exec = promisify(execFile);
@@ -91,6 +91,11 @@ const call: WebDriverCall = async (method, path, body) => {
   return value;
 };
 
+/** Appium's arguments: warnings on the console, the full debug log in its file (shyden-labs/ShyTalk#221). */
+export function appiumArgs(port: number): string[] {
+  return ['--port', String(port), '--log-level', 'warn:debug', '--log', APPIUM_LOG];
+}
+
 export function realDeps(): PhoneDeps {
   let appium: ChildProcess | undefined;
   return {
@@ -134,7 +139,9 @@ export function realDeps(): PhoneDeps {
       return pickIphone(JSON.parse(await readFile(DEVICES_FILE, 'utf8')) as DeviceList);
     },
     async startAppium() {
-      const child = spawn('appium', ['--port', String(APPIUM_PORT), '--log-level', 'warn'], { stdio: 'inherit' });
+      // Each run's log starts empty, so it holds this run alone.
+      await rm(APPIUM_LOG, { force: true });
+      const child = spawn('appium', appiumArgs(APPIUM_PORT), { stdio: 'inherit' });
       appium = child;
       let gone: Error | undefined;
       exited(child, 'Appium').then(
