@@ -56,12 +56,11 @@ return { x: Math.round(innerWidth / 2), y: Math.round(innerHeight / 2) };`;
 const RECEIVED = `window.__calibrationLayer.remove();
 return window.__calibration;`;
 
-/** Scrolls the element to the middle of the screen and answers its centre in page coordinates, or null. */
-const CENTRE = `const el = document.querySelector(arguments[0]);
+/** The element's centre in page coordinates and the screen's size, or null; it scrolls nothing (shyden-labs/ShyTalk#209). */
+const PLACE = `const el = document.querySelector(arguments[0]);
 if (!el) return null;
-el.scrollIntoView({ block: 'center', inline: 'center' });
 const r = el.getBoundingClientRect();
-return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };`;
+return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), width: innerWidth, height: innerHeight };`;
 
 /** A real finger: one touch at a point on the screen, through WebDriverAgent. */
 const touchAt = (x: number, y: number) => ({
@@ -80,10 +79,45 @@ const touchAt = (x: number, y: number) => ({
   ],
 });
 
+/**
+ * A real finger swipe from one screen point to another, moving slowly and resting before it lifts, so the page moves by
+ * the finger's travel and no flick carries it further (shyden-labs/ShyTalk#209).
+ */
+const swipe = (x: number, fromY: number, toY: number) => ({
+  actions: [
+    {
+      type: 'pointer',
+      id: 'finger',
+      parameters: { pointerType: 'touch' },
+      actions: [
+        { type: 'pointerMove', duration: 0, x, y: fromY },
+        { type: 'pointerDown', button: 0 },
+        { type: 'pointerMove', duration: 500, x, y: toY },
+        { type: 'pause', duration: 200 },
+        { type: 'pointerUp', button: 0 },
+      ],
+    },
+  ],
+});
+
 interface Point {
   x: number;
   y: number;
 }
+
+/** Where an element sits, and the screen it sits on. */
+interface Place extends Point {
+  width: number;
+  height: number;
+}
+
+/**
+ * A control is touched once its centre is in the middle 3/5 of the screen; a swipe travels 2/5 of it, less than that
+ * band, so one swipe cannot carry a control past the band. Ten swipes cover several screens before the tap gives up.
+ */
+const BAND = { top: 0.2, bottom: 0.8 };
+const SWIPE = { from: 0.7, to: 0.3 };
+const MAX_SWIPES = 10;
 
 /** How long a page may take to load or to show what a tap leads to, and how often it is looked at meanwhile. */
 const TEXT_CEILING_MS = 15_000;
@@ -123,16 +157,17 @@ export function safariPage(
     String(((await call('POST', `${at}/element`, { using: 'css selector', value: selector })) as Record<string, string>)[ELEMENT]);
   let refusals: string[] = [];
   let offset: Point | undefined;
-  /** One native touch at a screen point, returning to the web page however it ends. */
-  const touch = async (x: number, y: number) => {
+  /** One native gesture, returning to the web page however it ends. */
+  const native = async (gesture: unknown) => {
     const web = (await call('GET', `${at}/context`)) as string;
     await call('POST', `${at}/context`, { name: 'NATIVE_APP' });
     try {
-      await call('POST', `${at}/actions`, touchAt(x, y));
+      await call('POST', `${at}/actions`, gesture);
     } finally {
       await call('POST', `${at}/context`, { name: web });
     }
   };
+  const touch = (x: number, y: number) => native(touchAt(x, y));
   /** Safari's offset between the screen and the page: aim one inert touch, read where the page received it. */
   const calibrate = async (): Promise<Point> => {
     const aim = (await run(ARM)) as Point;
@@ -212,11 +247,19 @@ export function safariPage(
     },
     // Appium's web click stalled in Safari's remote debugger and never reached the page; a native touch arrives as a
     // real touch, offset by Safari's content inset (measured on the iPhone Air 2026-11-14, shyden-labs/ShyTalk#190).
+    // A control off the screen is reached by real swipes, as a member reaches it, never a script scroll (#209).
     async tap(selector) {
-      offset ??= await calibrate();
-      const centre = (await run(CENTRE, selector)) as Point | null;
-      if (centre === null) throw new Error(`no element matches ${selector} to tap`);
-      await touch(centre.x + offset.x, centre.y + offset.y);
+      const shift = (offset ??= await calibrate());
+      for (let swipes = 0; ; swipes++) {
+        const place = (await run(PLACE, selector)) as Place | null;
+        if (place === null) throw new Error(`no element matches ${selector} to tap`);
+        const below = place.y > place.height * BAND.bottom;
+        if (!below && place.y >= place.height * BAND.top) return touch(place.x + shift.x, place.y + shift.y);
+        if (swipes === MAX_SWIPES) throw new Error(`${selector} is still off the screen after ${String(MAX_SWIPES)} swipes`);
+        const from = Math.round(place.height * SWIPE.from) + shift.y;
+        const to = Math.round(place.height * SWIPE.to) + shift.y;
+        await native(swipe(Math.round(place.width / 2) + shift.x, below ? from : to, below ? to : from));
+      }
     },
     async type(selector, text) {
       await call('POST', `${at}/element/${await find(selector)}/value`, { text });
