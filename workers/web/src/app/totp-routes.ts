@@ -41,7 +41,28 @@ async function open(request: Request, deps: TotpRouteDeps): Promise<Opened | Res
   return { body, identity };
 }
 
-export async function handleTotpSetup(request: Request, deps: TotpRouteDeps): Promise<Response> {
+/**
+ * A throw answers JSON the page maps to its message, never Cloudflare's HTML error page, and its stack
+ * goes to the log the dev watch prints (shyden-labs/ShyTalk#204 AC3, Shyden's choice 2026-11-16).
+ */
+async function answering(route: string, answer: () => Promise<Response>): Promise<Response> {
+  try {
+    return await answer();
+  } catch (error) {
+    console.error(`${route} threw: ${String((error as Error).stack ?? error)}`);
+    return json(500, { error: 'setup_failed' });
+  }
+}
+
+export function handleTotpSetup(request: Request, deps: TotpRouteDeps): Promise<Response> {
+  return answering('totp/setup', () => setupAnswer(request, deps));
+}
+
+export function handleTotpConfirm(request: Request, deps: TotpRouteDeps): Promise<Response> {
+  return answering('totp/confirm', () => confirmAnswer(request, deps));
+}
+
+async function setupAnswer(request: Request, deps: TotpRouteDeps): Promise<Response> {
   const opened = await open(request, deps);
   if (opened instanceof Response) return opened;
   const { identity } = opened;
@@ -51,7 +72,7 @@ export async function handleTotpSetup(request: Request, deps: TotpRouteDeps): Pr
   return json(200, pending);
 }
 
-export async function handleTotpConfirm(request: Request, deps: TotpRouteDeps): Promise<Response> {
+async function confirmAnswer(request: Request, deps: TotpRouteDeps): Promise<Response> {
   const opened = await open(request, deps);
   if (opened instanceof Response) return opened;
   const confirmed = await deps.confirm(opened.identity.userId, opened.body['code']);
