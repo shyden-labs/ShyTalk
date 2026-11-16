@@ -57,9 +57,16 @@ async function refusal(answer: unknown): Promise<{ status: number; body: unknown
 }
 
 describe('setupIdentity', () => {
-  it('takes a signed-in member, ignoring any token', async () => {
+  it('takes a signed-in member who sends no token', async () => {
     const { env, all } = setting({ token: LIVE_SIGN_UP });
-    expect(await setupIdentity(env, SESSION, 'some-token', deps)).toEqual({ kind: 'session', userId: 'u-session' });
+    expect(await setupIdentity(env, SESSION, null, deps)).toEqual({ kind: 'session', userId: 'u-session' });
+    expect(await setupIdentity(env, SESSION, '', deps)).toEqual({ kind: 'session', userId: 'u-session' });
+    expect(all()).toEqual([]);
+  });
+
+  it('refuses a signed-in setup carrying a sign-up or recovery token with 409 signed_in, reading nothing (#213)', async () => {
+    const { env, all } = setting({ token: LIVE_SIGN_UP });
+    expect(await refusal(await setupIdentity(env, SESSION, 'some-token', deps))).toEqual({ status: 409, body: { error: 'signed_in' } });
     expect(all()).toEqual([]);
   });
 

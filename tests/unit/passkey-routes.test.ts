@@ -208,6 +208,39 @@ describe('registering a passkey', () => {
     expect(w.events).toEqual(['prepare:session']);
   });
 
+  it('refuses a signed-in verify carrying a token with 409 signed_in, writing no passkey (#213)', async () => {
+    const w = world();
+    w.store['user']?.push({
+      id: 'u-1',
+      name: 'Member',
+      email: 'm@example.test',
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const made = await (await w.auth.$context).internalAdapter.createSession('u-1');
+    w.signIn({ sessionId: made.id, userId: 'u-1', email: 'm@example.test', createdAt: Date.now() });
+    const signedIn = (operation: PasskeyOperation, body: unknown, cookie = ''): Promise<Response> =>
+      handlePasskey(
+        new Request(`${ORIGIN}/api/app/passkey/${operation}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', origin: ORIGIN, authorization: `Bearer ${made.token}`, cookie },
+          body: JSON.stringify(body),
+        }),
+        operation,
+        w.deps,
+      );
+    const options = await signedIn('register/options', {});
+    expect(options.status).toBe(200);
+    const { challenge } = (await options.json()) as { challenge: string };
+    const { response } = await register({ rpId: RP, origin: ORIGIN, challenge });
+    const answer = await signedIn('register/verify', { response, token: 'sign-up-token' }, cookiesFrom(options));
+    expect(answer.status).toBe(409);
+    expect(await answer.json()).toEqual({ error: 'signed_in' });
+    expect(w.store['passkey']).toHaveLength(0);
+    expect(w.events).toEqual([]);
+  });
+
   it('passes a refusal of who is setting up straight through, asking the plugin nothing', async () => {
     const w = world({ identity: new Response(JSON.stringify({ error: 'recovery_waiting' }), { status: 403 }) });
     const answer = await call(w.deps, 'register/options', { token: 'waiting' });

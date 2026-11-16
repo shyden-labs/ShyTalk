@@ -46,6 +46,12 @@ const RECOVERY_SQL = "SELECT id, completes_at FROM account_recovery WHERE user_i
 
 const refused = (): Response => json(401, { error: 'sign_in_refused' });
 
+/**
+ * A signed-in setup carrying a sign-up or recovery token is refused: acting for the session would change the
+ * wrong account, and the pages offer Sign out first (shyden-labs/ShyTalk#213, Shyden's ruling 2026-11-16).
+ */
+export const signedInRefusal = (): Response => json(409, { error: 'signed_in' });
+
 const firstRow = (answer: D1Answer | undefined): unknown => answer?.results?.[0];
 
 /** The identity setting up a method, or the refusal to answer. */
@@ -55,8 +61,9 @@ export async function setupIdentity(
   token: string | null,
   deps: SetupDeps,
 ): Promise<SetupIdentity | Response> {
-  if (session !== null) return { kind: 'session', userId: session.userId };
-  if (token === null || token === '') return refused();
+  const hasToken = token !== null && token !== '';
+  if (session !== null) return hasToken ? signedInRefusal() : { kind: 'session', userId: session.userId };
+  if (!hasToken) return refused();
   return setupIdentityByHash(env, await tokenHash(token), deps);
 }
 
