@@ -17,7 +17,7 @@ import { tokenHash } from './email-code.ts';
 import { objectBody } from './email-routes.ts';
 import { preparedKey, type PreparedPasskeys } from './passkey-hooks.ts';
 import type { AppSession } from './session.ts';
-import type { SetupIdentity } from './setup-identity.ts';
+import { signedInRefusal, type SetupIdentity } from './setup-identity.ts';
 import type { SignInEnv } from './sign-in.ts';
 
 export type PasskeyOperation = 'register/options' | 'register/verify' | 'sign-in/options' | 'sign-in/verify';
@@ -102,6 +102,7 @@ async function registerVerify(
 ): Promise<Response> {
   // The hook files its setup under the token's hash, or under a signed-in member's id; with neither, the plugin refuses.
   const session = await deps.session();
+  if (session !== null && token !== null) return signedInRefusal();
   const key = session === null ? (token === null ? null : preparedKey(await tokenHash(token), '')) : preparedKey(null, session.userId);
   let failed = false;
   let failure: unknown;
