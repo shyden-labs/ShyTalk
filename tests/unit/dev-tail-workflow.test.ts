@@ -42,12 +42,19 @@ describe('dev-tail', () => {
     expect(text).toContain('[ "$status" -eq 124 ]');
   });
 
-  it('prints only the time, outcome, method, path and exceptions of a request that did not end ok', () => {
+  it('prints only the time, outcome, method, path, exceptions and error logs of a request that did not end ok or logged an error', () => {
     const text = source();
     expect(text).toContain(
-      'jq -c --unbuffered \'select(.outcome != "ok" or (.exceptions | length) > 0) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), ',
+      'jq -c --unbuffered \'select(.outcome != "ok" or (.exceptions | length) > 0 or any(.logs[]; .level == "error")) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), ',
     );
-    expect(text).not.toMatch(/headers|\.logs/);
+    expect(text).not.toMatch(/headers/);
+  });
+
+  /** A caught error is logged rather than thrown (shyden-labs/ShyTalk#204 AC3), so the watch reads error logs too (Shyden, 2026-11-16). */
+  it('prints only error-level logs, blanking every email address and long token-like string in them', () => {
+    expect(source()).toContain(
+      'errors: [.logs[] | select(.level == "error") | .message | map(tostring) | join(" ") | gsub("[^\\\\s@]+@[^\\\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>")]',
+    );
   });
 
   it('blanks every email address and long token-like string in an exception before printing it', () => {

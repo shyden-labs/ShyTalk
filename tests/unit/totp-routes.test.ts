@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleTotpConfirm, handleTotpSetup, type TotpRouteDeps } from '../../workers/web/src/app/totp-routes.ts';
 import type { SetupIdentity } from '../../workers/web/src/app/setup-identity.ts';
 
@@ -119,5 +119,35 @@ describe('POST /api/app/totp/confirm', () => {
     const request = new Request('https://site.example.test/api/app/totp/confirm', { method: 'GET' });
     expect((await handleTotpConfirm(request, deps())).status).toBe(405);
     expect((await handleTotpSetup(request, deps())).status).toBe(405);
+  });
+});
+
+/**
+ * A throw inside setup or confirm answered Cloudflare's HTML error page, and the page could not tell why
+ * (2026-11-14, dev, shyden-labs/ShyTalk#204 AC3). Each route now answers JSON the page maps to its message,
+ * and writes the error to the log, which the dev watch prints (Shyden's choice, 2026-11-16).
+ */
+describe('a throw inside setup or confirm', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('answers 500 setup_failed from setup and logs the route with the error and where it was thrown', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const d = deps({ setup: () => Promise.reject(new Error('D1_ERROR: database is locked')) });
+    expect(await answerOf(await handleTotpSetup(post({ token: 'su' }), d))).toEqual({ status: 500, body: { error: 'setup_failed' } });
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(String(logged.mock.calls[0]?.[0])).toMatch(/^totp\/setup threw: Error: D1_ERROR: database is locked\n\s+at /);
+  });
+
+  it('answers 500 setup_failed from confirm and logs a thrown value that is not an Error as it is', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the point: a library rejecting with a bare value
+    const d = deps({ finish: () => Promise.reject('network connection lost') });
+    expect(await answerOf(await handleTotpConfirm(post({ code: '123456', token: 'su' }), d))).toEqual({
+      status: 500,
+      body: { error: 'setup_failed' },
+    });
+    expect(logged.mock.calls).toEqual([['totp/confirm threw: network connection lost']]);
   });
 });
