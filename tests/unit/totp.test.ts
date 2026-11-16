@@ -203,7 +203,7 @@ describe('signInTotp', () => {
   it('reserves a try on the address, then takes the step only if it is still above the last', async () => {
     const { env, batches, all } = setting({ userId: 'u-1', method: await live() });
     expect(await signInTotp(env, 'm@example.test', await codeAt(RFC_SECRET, STEP), NOW)).toBe('u-1');
-    expect(batches[0]?.[1]?.values).toEqual([await addressHash(SECRET, 'm@example.test'), NOW, MAX_WRONG_SIGN_INS]);
+    expect(batches[0]?.[2]?.values).toEqual([NOW, await addressHash(SECRET, 'm@example.test'), NOW, MAX_WRONG_SIGN_INS]);
     const taken = all().find(({ sql }) => sql.startsWith('UPDATE sign_in_method SET last_step'));
     expect(taken?.sql).toBe('UPDATE sign_in_method SET last_step = ? WHERE id = ? AND last_step < ?');
     expect(taken?.values).toEqual([STEP, 4, STEP]);
