@@ -29,6 +29,8 @@ export const MAX_WRONG_SIGN_INS = 5;
 export const LOCK_MS = 15 * 60_000;
 /** Each spent window doubles the next lock, up to 2^6 = 64 windows (16 hours), so guessing stays slow over months. */
 export const MAX_LOCK_DOUBLINGS = 6;
+/** An address's wrong tries are forgotten this long after the last one, pruned on write (Shyden 2026-11-16, shyden-labs/ShyTalk#230). */
+export const FORGET_TRIES_MS = 30 * 86_400_000;
 export const RECOVERY_CODES_PER_SET = 10;
 
 /** Crockford's base32: no I, L, O or U. */
@@ -100,14 +102,15 @@ export async function reserveTry(
   const address = email.trim().toLowerCase();
   const hash = await addressHash(env.BETTER_AUTH_SECRET, address);
   const answers = await DB.batch([
-    DB.prepare(`INSERT OR IGNORE INTO sign_in_lock (address_hash, kind) VALUES (?, '${kind}')`).bind(hash),
+    DB.prepare('DELETE FROM sign_in_lock WHERE last_at < ?').bind(now - FORGET_TRIES_MS),
+    DB.prepare(`INSERT OR IGNORE INTO sign_in_lock (address_hash, kind, last_at) VALUES (?, '${kind}', ?)`).bind(hash, now),
     DB.prepare(
-      `UPDATE sign_in_lock SET wrong_tries = wrong_tries + 1 WHERE address_hash = ? AND kind = '${kind}' AND locked_until <= ? AND wrong_tries < ?`,
-    ).bind(hash, now, MAX_WRONG_SIGN_INS),
+      `UPDATE sign_in_lock SET wrong_tries = wrong_tries + 1, last_at = ? WHERE address_hash = ? AND kind = '${kind}' AND locked_until <= ? AND wrong_tries < ?`,
+    ).bind(now, hash, now, MAX_WRONG_SIGN_INS),
     DB.prepare('SELECT id FROM "user" WHERE email = ?').bind(address),
   ]);
-  if (answers[1]?.meta.changes !== 1) return null;
-  const user = (answers[2] as D1Answer).results[0] as { id: string } | undefined;
+  if (answers[2]?.meta.changes !== 1) return null;
+  const user = (answers[3] as D1Answer).results[0] as { id: string } | undefined;
   return { hash, userId: user?.id ?? null };
 }
 
@@ -116,15 +119,15 @@ export async function lockIfSpent(env: CodeSignInEnv, hash: string, kind: LockKi
   const { DB } = env;
   await DB.batch([
     DB.prepare(
-      `UPDATE sign_in_lock SET locked_until = ? + ? * (1 << MIN(locks, ?)), locks = locks + 1, wrong_tries = 0 WHERE address_hash = ? AND kind = '${kind}' AND wrong_tries >= ?`,
-    ).bind(now, LOCK_MS, MAX_LOCK_DOUBLINGS, hash, MAX_WRONG_SIGN_INS),
+      `UPDATE sign_in_lock SET locked_until = ? + ? * (1 << MIN(locks, ?)), locks = locks + 1, wrong_tries = 0, last_at = ? WHERE address_hash = ? AND kind = '${kind}' AND wrong_tries >= ?`,
+    ).bind(now, LOCK_MS, MAX_LOCK_DOUBLINGS, now, hash, MAX_WRONG_SIGN_INS),
   ]);
 }
 
-/** After a right try: the address's tries and lock doubling start again. */
+/** After a right try: the address is forgotten, so its tries and lock doubling start again. */
 export async function clearTries(env: CodeSignInEnv, hash: string, kind: LockKind): Promise<void> {
   const { DB } = env;
-  await DB.batch([DB.prepare(`UPDATE sign_in_lock SET wrong_tries = 0, locks = 0 WHERE address_hash = ? AND kind = '${kind}'`).bind(hash)]);
+  await DB.batch([DB.prepare(`DELETE FROM sign_in_lock WHERE address_hash = ? AND kind = '${kind}'`).bind(hash)]);
 }
 
 /** Spends `code` for the address's member: the member and the codes left, or null for any refusal. */

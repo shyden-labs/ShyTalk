@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { replaceRecoveryCodes, useRecoveryCode, type CodeSignInEnv } from '../../workers/web/src/app/recovery-codes.ts';
+import { addressHash } from '../../workers/web/src/app/email-code.ts';
+import { FORGET_TRIES_MS, replaceRecoveryCodes, useRecoveryCode, type CodeSignInEnv } from '../../workers/web/src/app/recovery-codes.ts';
 import { localDev, type LocalDevEnv } from './d1.ts';
 
 /**
@@ -70,5 +71,30 @@ describe('recovery codes on D1', () => {
     // The second lock, from minute 16, lasts 30 minutes: still locked at 45, open at 47.
     expect(await useRecoveryCode(env, 'doubling@example.test', good, minutes(45))).toBeNull();
     expect(await useRecoveryCode(env, 'doubling@example.test', good, minutes(47))).toEqual({ userId: 'u-doubling', left: 9 });
+  });
+
+  // shyden-labs/ShyTalk#230: wrong tries are forgotten 30 days after the last one, pruned on write; a right code forgets at once.
+  it('forgets an address 30 days after its last wrong try, keeps one inside 30 days, and forgets at once after a right code', async () => {
+    const wrong = '0000-0000-0000-0000';
+    const row = async (email: string) =>
+      local.DB.prepare('SELECT wrong_tries, last_at FROM sign_in_lock WHERE address_hash = ? AND kind = ?')
+        .bind(await addressHash(env.BETTER_AUTH_SECRET, email), 'recovery-code')
+        .first<{ wrong_tries: number; last_at: number }>();
+    const now = Date.now();
+    await useRecoveryCode(env, 'forget-old@example.test', wrong, now - FORGET_TRIES_MS - 1);
+    await useRecoveryCode(env, 'forget-edge@example.test', wrong, now - FORGET_TRIES_MS);
+    await useRecoveryCode(env, 'forget-recent@example.test', wrong, now - 1_000);
+    expect.soft(await row('forget-old@example.test')).toEqual({ wrong_tries: 1, last_at: now - FORGET_TRIES_MS - 1 });
+
+    await useRecoveryCode(env, 'forget-trigger@example.test', wrong, now);
+    expect.soft(await row('forget-old@example.test')).toBeNull();
+    expect.soft(await row('forget-edge@example.test')).toEqual({ wrong_tries: 1, last_at: now - FORGET_TRIES_MS });
+    expect.soft(await row('forget-recent@example.test')).toEqual({ wrong_tries: 1, last_at: now - 1_000 });
+
+    const [good = ''] = await memberWithCodes('u-forget', 'forget-right@example.test');
+    await useRecoveryCode(env, 'forget-right@example.test', wrong, now);
+    expect.soft(await row('forget-right@example.test')).toEqual({ wrong_tries: 1, last_at: now });
+    expect.soft(await useRecoveryCode(env, 'forget-right@example.test', good, now)).toEqual({ userId: 'u-forget', left: 9 });
+    expect.soft(await row('forget-right@example.test')).toBeNull();
   });
 });

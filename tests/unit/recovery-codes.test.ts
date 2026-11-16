@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addressHash } from '../../workers/web/src/app/email-code.ts';
 import {
+  FORGET_TRIES_MS,
   LOCK_MS,
   MAX_LOCK_DOUBLINGS,
   MAX_WRONG_SIGN_INS,
@@ -105,11 +106,21 @@ describe('useRecoveryCode', () => {
     await useRecoveryCode(env, 'Member@Example.test', 'ABCD-EFGH-JKMN-PQRS', NOW);
     const first = batches[0] ?? [];
     const hash = await addressHash(SECRET, 'member@example.test');
-    expect(first[0]).toEqual({
-      sql: "INSERT OR IGNORE INTO sign_in_lock (address_hash, kind) VALUES (?, 'recovery-code')",
-      values: [hash],
+    expect(first[1]).toEqual({
+      sql: "INSERT OR IGNORE INTO sign_in_lock (address_hash, kind, last_at) VALUES (?, 'recovery-code', ?)",
+      values: [hash, NOW],
     });
-    expect(first[1]?.values).toEqual([hash, NOW, MAX_WRONG_SIGN_INS]);
+    expect(first[2]).toEqual({
+      sql: "UPDATE sign_in_lock SET wrong_tries = wrong_tries + 1, last_at = ? WHERE address_hash = ? AND kind = 'recovery-code' AND locked_until <= ? AND wrong_tries < ?",
+      values: [NOW, hash, NOW, MAX_WRONG_SIGN_INS],
+    });
+  });
+
+  it('forgets, in the same batch as the reservation, every address whose last wrong try is more than 30 days old (#230)', async () => {
+    const { env, batches } = setting({ userId: 'u-1' });
+    await useRecoveryCode(env, 'member@example.test', 'ABCD-EFGH-JKMN-PQRS', NOW);
+    expect(FORGET_TRIES_MS).toBe(2_592_000_000);
+    expect(batches[0]?.[0]).toEqual({ sql: 'DELETE FROM sign_in_lock WHERE last_at < ?', values: [NOW - FORGET_TRIES_MS] });
   });
 
   it('spends a matching unused code and answers the member and the codes left', async () => {
@@ -120,7 +131,7 @@ describe('useRecoveryCode', () => {
       'u-1',
       await recoveryCodeHash('ABCDEFGHJKMNPQRS'),
     ]);
-    expect(all().some(({ sql }) => sql.startsWith('UPDATE sign_in_lock SET wrong_tries = 0'))).toBe(true);
+    expect(all().some(({ sql }) => sql.startsWith('DELETE FROM sign_in_lock WHERE address_hash'))).toBe(true);
   });
 
   it('refuses a code that matched nothing, and locks the address once its tries are used', async () => {
@@ -129,17 +140,26 @@ describe('useRecoveryCode', () => {
     const lock = all().find(({ sql }) => sql.startsWith('UPDATE sign_in_lock SET locked_until'));
     // Each spent window doubles the next lock, up to 64 windows (16 hours): guessing stays slow over months.
     expect(lock?.sql).toBe(
-      "UPDATE sign_in_lock SET locked_until = ? + ? * (1 << MIN(locks, ?)), locks = locks + 1, wrong_tries = 0 WHERE address_hash = ? AND kind = 'recovery-code' AND wrong_tries >= ?",
+      "UPDATE sign_in_lock SET locked_until = ? + ? * (1 << MIN(locks, ?)), locks = locks + 1, wrong_tries = 0, last_at = ? WHERE address_hash = ? AND kind = 'recovery-code' AND wrong_tries >= ?",
     );
-    expect(lock?.values).toEqual([NOW, LOCK_MS, MAX_LOCK_DOUBLINGS, await addressHash(SECRET, 'member@example.test'), MAX_WRONG_SIGN_INS]);
+    expect(lock?.values).toEqual([
+      NOW,
+      LOCK_MS,
+      MAX_LOCK_DOUBLINGS,
+      NOW,
+      await addressHash(SECRET, 'member@example.test'),
+      MAX_WRONG_SIGN_INS,
+    ]);
   });
 
-  it('starts the lock doubling again after a right code', async () => {
+  it('forgets the address after a right code, so its tries and lock doubling start again (#230)', async () => {
     const { env, all } = setting({ userId: 'u-1', left: 7 });
     await useRecoveryCode(env, 'member@example.test', 'ABCD-EFGH-JKMN-PQRS', NOW);
-    expect(all().find(({ sql }) => sql.startsWith('UPDATE sign_in_lock SET wrong_tries = 0'))?.sql).toBe(
-      "UPDATE sign_in_lock SET wrong_tries = 0, locks = 0 WHERE address_hash = ? AND kind = 'recovery-code'",
-    );
+    expect(all().find(({ sql }) => sql.startsWith('DELETE FROM sign_in_lock WHERE address_hash'))).toEqual({
+      sql: "DELETE FROM sign_in_lock WHERE address_hash = ? AND kind = 'recovery-code'",
+      values: [await addressHash(SECRET, 'member@example.test')],
+    });
+    expect(all().some(({ sql }) => sql.startsWith('UPDATE sign_in_lock SET wrong_tries = 0'))).toBe(false);
   });
 
   it('refuses without looking further when no try is left', async () => {
