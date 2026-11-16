@@ -5,7 +5,9 @@
 # so its job log is too: only each failing request's time, outcome, method,
 # path, exceptions and error-level console lines (a caught error, #204 AC3,
 # Shyden 2026-11-16) are printed, never a header, query, body or other
-# console line, with every email address and long token-like string blanked. Third-party actions are pinned to full SHAs with a `# vX.Y.Z` comment,
+# console line, with every email address (plain or %40), long token-like
+# string and 6-digit-or-longer number blanked. Third-party actions are
+# pinned to full SHAs with a `# vX.Y.Z` comment,
 # as in ci.yml.
 name: dev-tail
 on:
@@ -51,7 +53,7 @@ jobs:
           status=0
           timeout "$((MINUTES * 60))" npx wrangler tail --env dev --format json \
             | tee "$RUNNER_TEMP/events" \
-            | jq -c --unbuffered 'select(.outcome != "ok" or (.exceptions | length) > 0 or any(.logs[]; .level == "error")) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), exceptions: [.exceptions[] | {name, message: (.message | gsub("[^\\s@]+@[^\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>"))}], errors: [.logs[] | select(.level == "error") | .message | map(tostring) | join(" ") | gsub("[^\\s@]+@[^\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>")]}' \
+            | jq -c --unbuffered 'select(.outcome != "ok" or (.exceptions | length) > 0 or any(.logs[]; .level == "error")) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), exceptions: [.exceptions[] | {name, message: (.message | gsub("[^\\s@%]+(@|%40)[^\\s@%]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>"))}], errors: [.logs[] | select(.level == "error") | .message | map(tostring) | join(" ") | gsub("[^\\s@%]+(@|%40)[^\\s@%]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>")]}' \
             || status=$?
           # The watch ends by its timeout (124), which is the plan, not a failure. It runs while someone repeats
           # requests, so no event at all means the stream never connected: that fails, saying so. The events file

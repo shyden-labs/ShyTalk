@@ -51,15 +51,15 @@ describe('dev-tail', () => {
   });
 
   /** A caught error is logged rather than thrown (shyden-labs/ShyTalk#204 AC3), so the watch reads error logs too (Shyden, 2026-11-16). */
-  it('prints only error-level logs, blanking every email address and long token-like string in them', () => {
+  it('prints only error-level logs, blanking every email address (plain or %40), long token-like string and 6-digit-or-longer number in them', () => {
     expect(source()).toContain(
-      'errors: [.logs[] | select(.level == "error") | .message | map(tostring) | join(" ") | gsub("[^\\\\s@]+@[^\\\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>")]',
+      'errors: [.logs[] | select(.level == "error") | .message | map(tostring) | join(" ") | gsub("[^\\\\s@%]+(@|%40)[^\\\\s@%]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>")]',
     );
   });
 
-  it('blanks every email address and long token-like string in an exception before printing it', () => {
+  it('blanks every email address (plain or %40), long token-like string and 6-digit-or-longer number in an exception before printing it', () => {
     expect(source()).toContain(
-      'exceptions: [.exceptions[] | {name, message: (.message | gsub("[^\\\\s@]+@[^\\\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>"))}]',
+      'exceptions: [.exceptions[] | {name, message: (.message | gsub("[^\\\\s@%]+(@|%40)[^\\\\s@%]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>"))}]',
     );
   });
 
