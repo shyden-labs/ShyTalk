@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
+import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
+import { PAGE_FILES, wantedPreview } from '../support/link-preview.ts';
 
 /**
  * Each case of the iPhone copy checks what its Playwright twin checks
@@ -59,6 +62,10 @@ function selectorText(locale: Locale, selector: string): string {
 const VIEWPORT_TAG = 'meta[name="viewport"]';
 const VIEWPORT = 'width=device-width, initial-scale=1, interactive-widget=resizes-content';
 
+/** The origin the site is built for in these tests, from the Worker's settings: SITE_ENVIRONMENT is dev (set below). */
+const DEV = (JSON.parse(readFileSync('workers/web/wrangler.json', 'utf8')) as { env: { dev: { vars: { SITE_ORIGIN: string } } } }).env.dev
+  .vars.SITE_ORIGIN;
+
 /** Safari showing the site as it should be, in `lang`; `broken` replaces one answer. */
 function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { visited: string[] } {
   const locale = LOCALE[lang] ?? 'en';
@@ -96,6 +103,7 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     count: () => Promise.resolve(0),
     axeViolations: () => Promise.resolve([]),
+    previewFacts: (path) => Promise.resolve(wantedPreview(DEV, locale, lang, path, `${path} · ShyTalk`)),
     ...broken,
   };
 }
@@ -123,9 +131,18 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
     vi: 13,
     'zh-Hans': 13,
   },
+  // Two per page: its title is not empty, and its preview is as wanted (shyden-labs/ShyTalk#198).
+  'every page carries its link preview': { en: 30, id: 30, th: 24, vi: 24, 'zh-Hans': 24 },
 };
 
 describe('the iPhone cases', () => {
+  beforeEach(() => {
+    vi.stubEnv('SITE_ENVIRONMENT', 'dev');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it.each(IPHONE_CASES.filter(({ title }) => langOf(title) in LOCALE).map((c) => [c.title, c] as const))(
     '%s: passes on the site as it should be, running as many checks as its twin on CI',
     async (_, c) => {
@@ -968,5 +985,69 @@ describe('the iPhone holding-page cases (shyden-labs/ShyTalk#261)', () => {
   it.each(holding)('%s: fails on an axe violation or a CSP refusal', async (title, c) => {
     await expect(c.run(safari(langOf(title), { axeViolations: () => Promise.resolve(['region: 1']) }))).rejects.toThrow();
     await expect(c.run(safari(langOf(title), { cspRefusals: () => Promise.resolve(['refused']) }))).rejects.toThrow();
+  });
+});
+
+describe('the iPhone link-preview cases (shyden-labs/ShyTalk#198)', () => {
+  beforeEach(() => {
+    vi.stubEnv('SITE_ENVIRONMENT', 'dev');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const previews = IPHONE_CASES.filter(({ title }) => kind(title).startsWith('every page carries its link preview')).map(
+    (c) => [c.title, c] as const,
+  );
+
+  it('holds one in every language', () => {
+    expect(previews.map(([title]) => langOf(title))).toEqual(Object.keys(LOCALE));
+  });
+
+  it.each(previews)('%s: opens the home page once and reads every page this language builds from it', async (title, c) => {
+    const lang = langOf(title);
+    const asked: string[] = [];
+    const page = safari(lang, {
+      previewFacts: (path) => {
+        asked.push(path);
+        return Promise.resolve(wantedPreview(DEV, LOCALE[lang] ?? 'en', lang, path, 'A title'));
+      },
+    });
+    await c.run(page);
+    expect(page.visited).toEqual([`${PREFIX[lang] ?? '?'}/`]);
+    expect(asked).toEqual(sitePages(PAGE_FILES, LOCALE[lang] ?? 'en').map((file) => pageUrl('', pagePath(file))));
+  });
+
+  it.each(previews)('%s: fails naming each page whose preview is wrong, after checking every page', async (title, c) => {
+    const lang = langOf(title);
+    const locale = LOCALE[lang] ?? 'en';
+    const [first, , third] = sitePages(PAGE_FILES, locale).map((file) => pageUrl('', pagePath(file)));
+    const asked: string[] = [];
+    const page = safari(lang, {
+      previewFacts: (path) => {
+        asked.push(path);
+        const facts = wantedPreview(DEV, locale, lang, path, 'A title');
+        if (path === first) facts.tags['og:image:alt'] = null;
+        if (path === third) facts.picture.manyColours = false;
+        return Promise.resolve(facts);
+      },
+    });
+    const failure = await c.run(page).catch((error: unknown) => (error as Error).message);
+    expect(failure).toContain(`${String(first)}: the link preview`);
+    expect(failure).toContain(`${String(third)}: the link preview`);
+    expect(asked).toHaveLength(sitePages(PAGE_FILES, locale).length);
+  });
+
+  it.each(previews)('%s: fails naming a page with no title', async (title, c) => {
+    const lang = langOf(title);
+    const page = safari(lang, {
+      previewFacts: (path) => Promise.resolve(wantedPreview(DEV, LOCALE[lang] ?? 'en', lang, path, '')),
+    });
+    await expect(c.run(page)).rejects.toThrow(`${PREFIX[lang] ?? '?'}/: no title`);
+  });
+
+  it.each(previews)('%s: fails naming why when the run names no environment', async (title, c) => {
+    vi.stubEnv('SITE_ENVIRONMENT', '');
+    await expect(c.run(safari(langOf(title)))).rejects.toThrow('SITE_ENVIRONMENT is unset');
   });
 });

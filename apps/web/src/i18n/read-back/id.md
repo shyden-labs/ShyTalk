@@ -4,6 +4,7 @@
 | --- | --- | --- | --- |
 | site.name | ShyTalk | ShyTalk | ShyTalk |
 | site.tagline | Learn languages and cultures by talking. | Belajar bahasa dan budaya dengan bercakap-cakap. | Learn language and culture by having conversations. |
+| site.previewAlt | A screenshot of the top of this ShyTalk page. | Tangkapan layar bagian atas halaman ShyTalk ini. | This screenshot of the top of the ShyTalk page. |
 | menu.label | Main menu | Navigasi utama | Main navigation |
 | menu.home | Home | Beranda | Home page |
 | menu.closedTesting | Closed testing | Uji coba tertutup | Closed trial |

@@ -75,6 +75,12 @@ describe('deploy-release', () => {
     expect(deployStep()).toContain('          TARGET: ${{ github.ref == refs/heads/main && prod || test }}');
   });
 
+  it('builds the website for the environment it deploys, so each page’s preview names its origin (shyden-labs/ShyTalk#198)', () => {
+    expect(deployStep()).toContain(
+      '          SITE_ENVIRONMENT=$TARGET npm run build:web || { echo ::error title=deploy-release failed::the website did not build; exit 1; }',
+    );
+  });
+
   it('builds the website, and a rehearsal only bundles both environments, holding no credential', () => {
     const step = deployStep();
     const build = step.indexOf('npm run build:web ||');

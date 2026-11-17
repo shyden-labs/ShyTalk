@@ -4,6 +4,7 @@
 | --- | --- | --- | --- |
 | site.name | ShyTalk | ShyTalk | SyTalk |
 | site.tagline | Learn languages and cultures by talking. | Học ngôn ngữ và văn hóa qua trò chuyện. | Learn language and culture through conversation. |
+| site.previewAlt | A screenshot of the top of this ShyTalk page. | Ảnh chụp màn hình phần đầu của trang ShyTalk này. | This is a screenshot of the top of the ShyTalk page. |
 | menu.label | Main menu | Menu chính | Main Menu |
 | menu.home | Home | Trang chủ | Homepage |
 | menu.closedTesting | Closed testing | Thử nghiệm kín | Closed testing |

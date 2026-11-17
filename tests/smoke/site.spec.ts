@@ -15,6 +15,8 @@ import { t } from '../../apps/web/src/i18n/t.ts';
 import { LEGAL_DOCS, legalLines, legalLocale, legalPath } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
+import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
+import { PAGE_FILES, PREVIEW_FACTS, PREVIEW_TAGS, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 
 const LANGUAGES = [
   { lang: 'en', locale: 'en', prefix: '' },
@@ -160,6 +162,25 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     await expect.soft(heading).toBeVisible();
     await expect.soft(heading).toHaveText(t(locale, 'closedTesting.expiredHeading'));
     expect(refusals).toEqual([]);
+  });
+
+  // Link previews (shyden-labs/ShyTalk#198 AC1, AC3): every page the site builds in this language, read as a preview
+  // fetcher reads it (its HTML as served, no scripts run, so a page that sends a signed-out visitor on still counts),
+  // its tags in this language with addresses on the built environment's origin, and its picture 1200 by 630 and more
+  // than one colour. The home page opens once; each page is fetched from it.
+  test(`${lang}: every page carries its link preview in ${lang}, and each preview picture is 1200 by 630 and not one flat colour`, async ({
+    page,
+  }) => {
+    const origin = builtSiteOrigin();
+    await page.goto(`${prefix}/`, { waitUntil: 'load' });
+    for (const file of sitePages(PAGE_FILES, locale)) {
+      const path = pagePath(file);
+      const facts = await page.evaluate<PreviewFacts>(
+        `(${PREVIEW_FACTS})(${JSON.stringify(pageUrl('', path))}, ${JSON.stringify(PREVIEW_TAGS)})`,
+      );
+      expect.soft(facts.title, file).not.toBe('');
+      expect.soft(facts, file).toEqual(wantedPreview(origin, locale, lang, path, facts.title));
+    }
   });
 }
 

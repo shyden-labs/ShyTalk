@@ -10,9 +10,15 @@
  * (tests/phones/devices.ts gives the real ones), so the order and the
  * clean-up are unit-tested.
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { assertionTotals, smokeTotals } from '../../scripts/smoke-totals.ts';
 import { countingCheck } from './check.ts';
+import { environmentAt, type WranglerOrigins } from '../../apps/web/src/preview.ts';
 import type { IphoneCase, SafariPage } from './iphone-cases.ts';
+
+/** The Worker's settings, whose `SITE_ORIGIN` names each environment's address. */
+const WRANGLER = fileURLToPath(new URL('../../workers/web/wrangler.json', import.meta.url));
 
 export interface CaseResult {
   title: string;
@@ -129,6 +135,14 @@ export function capabilities(udid: string): Record<string, unknown> {
 export async function runPhones(address: string, d: PhoneDeps): Promise<number> {
   if (!address.startsWith('https://')) {
     d.print(`phone-smoke: the address must start with https://, not ${address}`);
+    return 1;
+  }
+  // The iPhone's cases and the OnePlus's Playwright check each preview's addresses on the origin the deployed site
+  // was built for (shyden-labs/ShyTalk#198).
+  try {
+    process.env.SITE_ENVIRONMENT = environmentAt(address, JSON.parse(readFileSync(WRANGLER, 'utf8')) as WranglerOrigins);
+  } catch (error) {
+    d.print(`phone-smoke: ${(error as Error).message}`);
     return 1;
   }
   const errors: string[] = [];

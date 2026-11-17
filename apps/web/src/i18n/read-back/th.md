@@ -4,6 +4,7 @@
 | --- | --- | --- | --- |
 | site.name | ShyTalk | ShyTalk | ShyTalk |
 | site.tagline | Learn languages and cultures by talking. | เรียนภาษาและวัฒนธรรมด้วยการพูดคุย | Learn language and culture through conversation. |
+| site.previewAlt | A screenshot of the top of this ShyTalk page. | ภาพหน้าจอส่วนบนของหน้า ShyTalk นี้ | This is a screenshot of the top section of the ShyTalk page. |
 | menu.label | Main menu | เมนูหลัก | Main Menu |
 | menu.home | Home | หน้าแรก | Homepage |
 | menu.closedTesting | Closed testing | การทดสอบแบบปิด | Closed-loop testing |

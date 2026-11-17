@@ -14,6 +14,8 @@ import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
 import { codeIn, MAIL_CEILING_MS, plusAddress, waitForAnyMail, waitForMail } from './test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import { countingCheck, type Check } from './check.ts';
+import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
+import { PAGE_FILES, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 
 /** What a case can ask of Safari; tests/phones/safari.ts drives it through Appium. */
 export interface SafariPage {
@@ -40,6 +42,8 @@ export interface SafariPage {
   type(selector: string, text: string): Promise<void>;
   /** Waits for `selector` to hold exactly `text`, failing at a ceiling and naming what it found. */
   waitForText(selector: string, text: string): Promise<void>;
+  /** The page at `path` as a link preview reads it, by the smoke's own in-page check (shyden-labs/ShyTalk#198). */
+  previewFacts(path: string): Promise<PreviewFacts>;
 }
 
 export interface IphoneCase {
@@ -243,6 +247,29 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
         await check.waitForText(page, H1, t(locale, 'closedTesting.expiredHeading'));
         check.ok(await page.isVisible(H1), 'no visible top heading');
         check.deepEqual(await page.cspRefusals(), []);
+      },
+    ),
+    counted(
+      `${lang}: every page carries its link preview in ${lang}, and each preview picture is 1200 by 630 and not one flat colour`,
+      async (page, check) => {
+        const origin = builtSiteOrigin();
+        await page.goto(`${prefix}/`);
+        const checks: (() => Promise<void>)[] = [];
+        for (const file of sitePages(PAGE_FILES, locale)) {
+          const path = pageUrl('', pagePath(file));
+          const facts = await page.previewFacts(path);
+          checks.push(
+            () => {
+              check.ok(facts.title !== '', `${path}: no title`);
+              return Promise.resolve();
+            },
+            () => {
+              check.deepEqual(facts, wantedPreview(origin, locale, lang, path, facts.title), `${path}: the link preview`);
+              return Promise.resolve();
+            },
+          );
+        }
+        await softly(checks);
       },
     ),
   ];

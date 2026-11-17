@@ -1,7 +1,8 @@
 {
   "site": {
     "name": "ShyTalk",
-    "tagline": "Học ngôn ngữ và văn hóa qua trò chuyện."
+    "tagline": "Học ngôn ngữ và văn hóa qua trò chuyện.",
+    "previewAlt": "Ảnh chụp màn hình phần đầu của trang ShyTalk này."
   },
   "menu": {
     "label": "Menu chính",
