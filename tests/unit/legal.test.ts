@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { LEGAL_DOCS, englishOnlyNoteLocale, legalBlocks, legalLines, legalPath } from '../../apps/web/src/legal/legal.ts';
 import { LOCALES, t } from '../../apps/web/src/i18n/t.ts';
+import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 
 /**
  * The legal pages (plan 3 Task 6, shyden-labs/ShyTalk#56): English and
@@ -102,6 +103,27 @@ describe('the legal text', () => {
     const table = readFileSync('apps/web/src/legal/read-back-id.md', 'utf8');
     const walk = (node: unknown): string[] => (typeof node === 'string' ? [node] : Object.values(node as Lines).flatMap(walk));
     for (const line of walk(legalLines('id'))) expect(table, line).toContain(line);
+  });
+});
+
+// #171: the privacy policy says what an account keeps, why and for how long, in both languages,
+// placed after what the form collects and before why it is used.
+describe('the privacy policy on accounts', () => {
+  it.each(['en', 'id'] as const)('has every account line in %s', (locale) => {
+    const privacy = legalLines(locale).privacy as Record<string, string | undefined>;
+    expect(ACCOUNT_PRIVACY_KEYS.filter((key) => !privacy[key]?.trim())).toEqual([]);
+  });
+
+  it('puts what an account keeps, and what is kept briefly, after what the form collects', () => {
+    const keys = Object.keys(legalLines('en').privacy);
+    expect(keys.slice(keys.indexOf('whatAddress') + 1, keys.indexOf('whyH'))).toEqual(ACCOUNT_PRIVACY_KEYS.slice(0, 19));
+    expect(keys[keys.indexOf('kept3') + 1]).toBe('keptAccount');
+    expect(keys[keys.indexOf('others') + 1]).toBe('othersSignIn');
+    expect(keys[keys.indexOf('staff') + 1]).toBe('staffAccount');
+  });
+
+  it('says that an account, not only the form, has the rights', () => {
+    expect(legalLines('en').privacy.rights).toBe('Anyone who has used the form, or has an account, can, free of charge:');
   });
 });
 

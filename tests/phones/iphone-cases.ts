@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
+import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 import { codeIn, MAIL_CEILING_MS, plusAddress, waitForAnyMail, waitForMail } from './test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import { countingCheck, type Check } from './check.ts';
@@ -158,6 +159,13 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
             // The page's own script reveals the note once it loads: waited for, as Playwright's toBeVisible() waits.
             check.ok(await visibleWithin(page, note), 'no visible note');
             check.equal(await page.text(note), t(locale, 'footer.englishOnly'));
+          }
+          // #171 AC4: the privacy page shows what an account keeps, in English and in Indonesian.
+          if (doc === 'privacy') {
+            const privacy = words.privacy as Record<string, string | undefined>;
+            const shown = await page.text('main');
+            for (const key of ACCOUNT_PRIVACY_KEYS)
+              check.ok(privacy[key] !== undefined && shown.includes(privacy[key]), `no privacy.${key}`);
           }
           check.deepEqual(await page.axeViolations(), []);
           if (doc !== LEGAL_DOCS.at(-1)) {

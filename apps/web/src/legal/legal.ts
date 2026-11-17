@@ -16,7 +16,7 @@ export const ENGLISH_ONLY_LOCALES = ['th', 'vi', 'zh'] as const;
 type EnglishOnlyLocale = (typeof ENGLISH_ONLY_LOCALES)[number];
 
 /** The date each page names; a release that changes the text moves it. */
-export const LEGAL_VERSION = '2026-11-09';
+export const LEGAL_VERSION = '2026-11-17';
 
 export type LegalLocale = 'en' | 'id';
 
