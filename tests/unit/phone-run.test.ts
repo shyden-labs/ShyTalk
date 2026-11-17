@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { runCases, phoneVerdict, capabilities, runPhones, type PhoneDeps, WDA_LOCAL_PORT } from '../phones/run.ts';
 import type { IphoneCase, SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
+
+/** Each environment's address, as the Worker's own settings give it: tests never name a door host. */
+const WORKER = JSON.parse(readFileSync('workers/web/wrangler.json', 'utf8')) as {
+  env: Record<'dev' | 'test', { vars: { SITE_ORIGIN: string } }>;
+};
+const DEV_ORIGIN = WORKER.env.dev.vars.SITE_ORIGIN;
+const TEST_ORIGIN = WORKER.env.test.vars.SITE_ORIGIN;
 
 /**
  * The phone run (shyden-labs/ShyTalk#112 AC4, AC6): one command runs the smoke
@@ -198,23 +206,47 @@ describe('runPhones', () => {
       readOneplusCounts: () => Promise.resolve({ a: 0 }),
       cases: [{ title: 'a', run: () => (seen.push(process.env.TEST_MAILBOX_PASSWORD), Promise.resolve()) }],
     });
-    await expect(runPhones('https://site.example', d)).resolves.toBe(0);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(0);
     expect(seen).toEqual(['secret', 'secret']);
+  });
+
+  it.each([
+    [DEV_ORIGIN, 'dev'],
+    [TEST_ORIGIN, 'test'],
+  ])(
+    'tells both phones’ runs that %s was built for %s, so a preview’s addresses are checked on it (shyden-labs/ShyTalk#198)',
+    async (address, environment) => {
+      vi.stubEnv('SITE_ENVIRONMENT', undefined);
+      const seen: (string | undefined)[] = [];
+      const d = deps({
+        playwright: () => (seen.push(process.env.SITE_ENVIRONMENT), Promise.resolve(0)),
+        readOneplusCounts: () => Promise.resolve({ a: 0 }),
+        cases: [{ title: 'a', run: () => (seen.push(process.env.SITE_ENVIRONMENT), Promise.resolve()) }],
+      });
+      await expect(runPhones(address, d)).resolves.toBe(0);
+      expect(seen).toEqual([environment, environment]);
+    },
+  );
+
+  it('refuses an address that no environment serves, naming it, before touching a phone', async () => {
+    const d = deps();
+    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    expect(d.steps).toEqual(['print phone-smoke: https://site.example is the SITE_ORIGIN of no environment in workers/web/wrangler.json']);
   });
 
   it('fails naming why, before touching a phone, when the Keychain gives no password', async () => {
     const d = deps({ mailboxPassword: () => Promise.reject(new Error('security: item not found')) });
-    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
     expect(d.steps).toEqual(['print phone-smoke: security: item not found']);
   });
 
   it('runs the OnePlus, then the iPhone, then prints the verdict, and passes', async () => {
     const d = deps();
-    await expect(runPhones('https://site.example', d)).resolves.toBe(0);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(0);
     expect(d.steps).toEqual([
       'mailbox password',
       'forward',
-      'playwright https://site.example http://127.0.0.1:9333',
+      `playwright ${DEV_ORIGIN} http://127.0.0.1:9333`,
       'unforward',
       'read report',
       'read counts',
@@ -240,7 +272,7 @@ describe('runPhones', () => {
 
   it('fails, printing why, when a phone fails a test', async () => {
     const d = deps({ cases: [failing('a', 'no visible navigation')] });
-    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
     expect(d.steps).toContain('print iphone-air: a FAILED: no visible navigation');
     expect(d.steps).toContain('print phone-smoke: iphone-air failed "a": no visible navigation');
     // The iPhone's reason is Appium's last word; its full log holds what led there (shyden-labs/ShyTalk#221).
@@ -249,13 +281,13 @@ describe('runPhones', () => {
 
   it('names no Appium log when only the OnePlus failed (shyden-labs/ShyTalk#221)', async () => {
     const d = deps({ readOneplusReport: () => Promise.resolve(oneplusReport(['a'], 'unexpected')) });
-    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
     expect(d.steps.some((s) => s.includes("the iPhone's failures"))).toBe(false);
   });
 
   it('removes the adb forward when Playwright cannot run, and fails naming why', async () => {
     const d = deps({ playwright: () => Promise.reject(new Error('npx not found')) });
-    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
     expect(d.steps).toEqual(['mailbox password', 'forward', 'unforward', 'print phone-smoke: npx not found']);
   });
 
@@ -265,7 +297,7 @@ describe('runPhones', () => {
         throw new Error('Safari went away');
       },
     });
-    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
     expect(d.steps.slice(-3)).toEqual([
       'close session s1',
       'stop appium',
@@ -275,7 +307,7 @@ describe('runPhones', () => {
 
   it('stops Appium when no session opens', async () => {
     const d = deps({ openSession: () => Promise.reject(new Error('WebDriverAgent did not start')) });
-    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
     expect(d.steps.slice(-2)).toEqual([
       'stop appium',
       "print phone-smoke: WebDriverAgent did not start (Appium's full log: test-results/appium.log)",
@@ -285,25 +317,25 @@ describe('runPhones', () => {
 
   it('fails when the OnePlus run itself failed, even if its report reads clean', async () => {
     const d = deps({ playwright: () => Promise.resolve(1) });
-    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
     expect(d.steps).toContain('print phone-smoke: Playwright exited 1 on the OnePlus');
   });
 
   it('fails naming the test when the iPhone ran a different number of checks than the OnePlus (shyden-labs/ShyTalk#180)', async () => {
     const d = deps({ cases: [checking('a', 1)] });
-    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
     expect(d.steps).toContain('print phone-smoke: "a" ran different numbers of assertions: oneplus 2, iphone-air 1');
   });
 
   it('fails naming why when the OnePlus counts cannot be read', async () => {
     const d = deps({ readOneplusCounts: () => Promise.reject(new Error('ENOENT: phone-oneplus-assertions.json')) });
-    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
     expect(d.steps.at(-1)).toBe('print phone-smoke: ENOENT: phone-oneplus-assertions.json');
   });
 
   it('runs the iPhone cases against the address it was given', async () => {
     const pageFor = vi.fn(() => page);
-    await runPhones('https://other.example', deps({ page: pageFor }));
-    expect(pageFor).toHaveBeenCalledWith('s1', 'https://other.example');
+    await runPhones(TEST_ORIGIN, deps({ page: pageFor }));
+    expect(pageFor).toHaveBeenCalledWith('s1', TEST_ORIGIN);
   });
 });

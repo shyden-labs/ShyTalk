@@ -1,6 +1,7 @@
 import { runInNewContext } from 'node:vm';
 import { describe, it, expect, vi } from 'vitest';
 import { safariPage, type WebDriverCall } from '../phones/safari.ts';
+import { PREVIEW_FACTS, PREVIEW_TAGS } from '../support/link-preview.ts';
 
 /**
  * Safari on the iPhone Air, driven through Appium's WebDriver API
@@ -206,6 +207,8 @@ describe('safariPage: reading the page', () => {
   /** The script and arguments of the last execute call. */
   const lastScript = (fake: Fake) =>
     fake.calls.filter(([, path]) => path.endsWith('/execute/sync')).at(-1)?.[2] as { script: string; args: unknown[] };
+  const lastAsyncScript = (fake: Fake) =>
+    fake.calls.filter(([, path]) => path.endsWith('/execute/async')).at(-1)?.[2] as { script: string; args: unknown[] };
 
   it('reads an attribute of the first match, passing the selector and name as arguments', async () => {
     const fake = appium({}, ['en']);
@@ -253,6 +256,40 @@ describe('safariPage: reading the page', () => {
     const steps = fake.calls.map(([, path]) => path);
     expect(fake.calls).toContainEqual(['POST', '/session/s1/timeouts', { script: 60_000 }]);
     expect(steps.indexOf('/session/s1/timeouts')).toBeLessThan(steps.indexOf('/session/s1/execute/async'));
+  });
+
+  it('reads a page’s link preview with the smoke’s own in-page check, given a minute, and answers what it found (shyden-labs/ShyTalk#198)', async () => {
+    const facts = { lang: 'id', title: 'Masuk · ShyTalk', tags: { 'og:type': 'website' }, picture: { loaded: true } };
+    const fake = appium({}, [facts]);
+    await expect(safariPage(fake.call, 's1', BASE).previewFacts('/id/sign-in/')).resolves.toEqual(facts);
+    const { script, args } = lastAsyncScript(fake);
+    expect(script).toContain(PREVIEW_FACTS);
+    expect(args).toEqual(['/id/sign-in/', [...PREVIEW_TAGS]]);
+    const steps = fake.calls.map(([, path]) => path);
+    expect(fake.calls).toContainEqual(['POST', '/session/s1/timeouts', { script: 60_000 }]);
+    expect(steps.indexOf('/session/s1/timeouts')).toBeLessThan(steps.indexOf('/session/s1/execute/async'));
+  });
+
+  it('hands the in-page check its answer, or its failure, through WebDriver’s callback', async () => {
+    const { script } = await (async () => {
+      const fake = appium({}, [{}]);
+      await safariPage(fake.call, 's1', BASE).previewFacts('/');
+      return lastAsyncScript(fake);
+    })();
+    const answers: unknown[] = [];
+    const run = (check: string) =>
+      runInNewContext(`(function () { ${script.replace(PREVIEW_FACTS, check)} }).apply(null, args)`, {
+        args: ['/', [], (answer: unknown) => answers.push(answer)],
+      }) as unknown;
+    run('async (path, keys) => ({ path, keys })');
+    run('async () => { throw new Error("fetch refused"); }');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(answers).toEqual([{ path: '/', keys: [] }, { failed: 'Error: fetch refused' }]);
+  });
+
+  it('fails naming the in-page check’s failure', async () => {
+    const page = safariPage(appium({}, [{ failed: 'TypeError: Load failed' }]).call, 's1', BASE);
+    await expect(page.previewFacts('/sign-up/')).rejects.toThrow('the link-preview check on /sign-up/ failed: TypeError: Load failed');
   });
 });
 

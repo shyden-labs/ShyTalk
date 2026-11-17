@@ -89,6 +89,12 @@ describe('deploy-dev', () => {
     );
   });
 
+  it('builds the website for dev, so each page’s preview names the dev origin (shyden-labs/ShyTalk#198)', () => {
+    expect(deployStep()).toContain(
+      '          SITE_ENVIRONMENT=dev npm run build:web || { echo ::error title=deploy-dev failed::the website did not build; exit 1; }',
+    );
+  });
+
   it('builds the website before the Worker bundles it', () => {
     const step = deployStep().join('\n');
     const build = step.indexOf('npm run build:web ||');

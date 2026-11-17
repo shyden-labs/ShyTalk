@@ -100,7 +100,7 @@ jobs:
             echo "Nothing deployable changed, so dev deploys nothing."
             exit 0
           fi
-          npm run build:web || { echo "::error title=deploy-dev failed::the website did not build"; exit 1; }
+          SITE_ENVIRONMENT=dev npm run build:web || { echo "::error title=deploy-dev failed::the website did not build"; exit 1; }
           cd workers/web
           if [ "$DEPLOY_REHEARSAL" = true ]; then
             "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --dry-run --env dev --outdir "$RUNNER_TEMP/web" || { echo "::error title=deploy-dev failed::workers/web did not bundle"; exit 1; }

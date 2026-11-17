@@ -9,7 +9,7 @@
   "scripts": {
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "test:coverage": "vitest run --config vitest.unit.config.ts --coverage.enabled",
-    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tests/smoke",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tests/smoke && tsc --noEmit -p apps/web/scripts",
     "build:web": "astro build --root apps/web",
     "test:smoke": "playwright test -c tests/smoke",
     "test:phones": "node tests/phones/phone-smoke.ts",
