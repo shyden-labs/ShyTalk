@@ -224,9 +224,8 @@ export function main(args: string[]): number {
   if (id === undefined || title === undefined) {
     throw new Error('usage: node scripts/board-next.ts <board-node-id> "<board title>"');
   }
-  const out = execFileSync('gh', ['api', 'graphql', '--paginate', '--slurp', '-f', `query=${QUERY}`, '-f', `id=${id}`], {
-    encoding: 'utf8',
-  });
+  const query = ['api', 'graphql', '--paginate', '--slurp', '-f', `query=${QUERY}`, '-f', `id=${id}`];
+  const out = execFileSync('gh', query, { encoding: 'utf8' }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
   const pages = JSON.parse(out) as RawPage[];
   if (assertWholeRead(pages, title) === 0) {
     process.stdout.write(`Next: nothing to pick; ${emptyBoardNote(title)}.\n`);
