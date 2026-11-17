@@ -43,7 +43,7 @@ async function sealingKey(key: string): Promise<CryptoKey> {
   return crypto.subtle.importKey('raw', digest, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
 
-const toBase64 = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes));
+const toBase64 = (bytes: Uint8Array): string => btoa(String.fromCodePoint(...bytes));
 
 /** `secret` sealed under `key`: base64 of a fresh 12-byte nonce and the AES-GCM ciphertext. */
 export async function encryptSecret(key: string, secret: Uint8Array<ArrayBuffer>): Promise<string> {
@@ -55,7 +55,7 @@ export async function encryptSecret(key: string, secret: Uint8Array<ArrayBuffer>
 /** The secret `sealed` holds, or null when it is not one sealed under `key`. */
 export async function decryptSecret(key: string, sealed: string): Promise<Uint8Array | null> {
   try {
-    const bytes = Uint8Array.from(atob(sealed), (char) => char.charCodeAt(0));
+    const bytes = Uint8Array.from(atob(sealed), (char) => char.codePointAt(0) as number);
     const opened = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: bytes.slice(0, NONCE_BYTES) },
       await sealingKey(key),
@@ -122,7 +122,7 @@ export async function setupTotp(
 export async function confirmTotp(env: TotpEnv, userId: string, code: unknown, now: number, flow: string): Promise<ConfirmedTotp | null> {
   const [found] = await env.DB.batch([env.DB.prepare(PENDING_SQL).bind(userId)]);
   const pending = (found as { results: unknown[] }).results[0] as { secret_enc: string; flow: string; created_at: number } | undefined;
-  if (pending === undefined || pending.flow !== flow || pending.created_at < now - PENDING_LIFE_MS) return null;
+  if (pending?.flow !== flow || pending.created_at < now - PENDING_LIFE_MS) return null;
   const secret = await decryptSecret(env.TOTP_KEY, pending.secret_enc);
   // A secret that will not open (sealed under an earlier TOTP_KEY) confirms nothing.
   const step = secret === null ? null : await matchStep(secret, code, now, 0);

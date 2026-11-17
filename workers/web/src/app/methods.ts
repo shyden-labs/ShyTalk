@@ -114,29 +114,44 @@ export async function handleMethods(
   sessionOf: (request: Request) => Promise<AppSession | null>,
 ): Promise<Response> {
   const parts = new URL(request.url).pathname.split('/').slice(3);
-  const [area, kind, id] = parts;
-  const allowed = area === 'recovery-codes' ? 'POST' : parts.length === 1 ? 'GET' : 'DELETE';
+  const [area] = parts;
+  const allowed = allowedMethod(area, parts.length);
   if (request.method !== allowed) return new Response(null, { status: 405, headers: { allow: allowed } });
   const session = await sessionOf(request);
   if (session === null) return signedOut();
+  if (area === 'recovery-codes') return newRecoveryCodes(request, env, session, parts.length);
+  if (area === 'sign-in-methods') return signInMethods(env, session, parts);
+  return sessions(env, session, parts);
+}
 
-  if (area === 'recovery-codes') {
-    if (parts.length > 1) return notFound();
-    // JSON only: a form on another site can send none, so it cannot make new codes with the member's cookie.
-    if ((await objectBody(request)) === null) return json(400, { error: 'bad_request' });
-    // A new set ends the old one (AC3); the codes are shown once, here.
-    const actor = `user:${session.userId}`;
-    const { statements, codes } = await replaceRecoveryCodes(env as unknown as CodeSignInEnv, session.userId, actor);
-    await env.DB.batch(statements);
-    return json(200, { recoveryCodes: codes });
-  }
-  if (area === 'sign-in-methods') {
-    if (parts.length === 1) return listMethods(env, session.userId);
-    if (kind === 'passkey' && parts.length === 3 && id !== undefined && id !== '')
-      return removeMethod(env, session.userId, 'passkey', decodeURIComponent(id));
-    if (kind === 'totp' && parts.length === 2) return removeMethod(env, session.userId, 'totp', null);
-    return notFound();
-  }
+/** The one HTTP method each route answers. */
+function allowedMethod(area: string | undefined, depth: number): string {
+  if (area === 'recovery-codes') return 'POST';
+  return depth === 1 ? 'GET' : 'DELETE';
+}
+
+async function newRecoveryCodes(request: Request, env: MethodsEnv, session: AppSession, depth: number): Promise<Response> {
+  if (depth > 1) return notFound();
+  // JSON only: a form on another site can send none, so it cannot make new codes with the member's cookie.
+  if ((await objectBody(request)) === null) return json(400, { error: 'bad_request' });
+  // A new set ends the old one (AC3); the codes are shown once, here.
+  const actor = `user:${session.userId}`;
+  const { statements, codes } = await replaceRecoveryCodes(env as unknown as CodeSignInEnv, session.userId, actor);
+  await env.DB.batch(statements);
+  return json(200, { recoveryCodes: codes });
+}
+
+function signInMethods(env: MethodsEnv, session: AppSession, parts: string[]): Promise<Response> | Response {
+  const [, kind, id] = parts;
+  if (parts.length === 1) return listMethods(env, session.userId);
+  if (kind === 'passkey' && parts.length === 3 && id !== undefined && id !== '')
+    return removeMethod(env, session.userId, 'passkey', decodeURIComponent(id));
+  if (kind === 'totp' && parts.length === 2) return removeMethod(env, session.userId, 'totp', null);
+  return notFound();
+}
+
+function sessions(env: MethodsEnv, session: AppSession, parts: string[]): Promise<Response> | Response {
+  const [, kind] = parts;
   if (parts.length === 1) return listSessions(env, session);
   if (parts.length !== 2 || kind === undefined || kind === '') return notFound();
   return endSession(env, session.userId, decodeURIComponent(kind));

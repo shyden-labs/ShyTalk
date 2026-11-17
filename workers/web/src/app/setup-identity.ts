@@ -73,7 +73,7 @@ export async function setupIdentityByHash(env: SetupEnv, hash: string, deps: Set
   const { DB } = env;
   const [found] = await DB.batch([DB.prepare(TOKEN_SQL).bind(hash)]);
   const row = firstRow(found) as TokenRow | undefined;
-  if (row === undefined || row.used_at !== null || row.expires_at < now) return refused();
+  if (row?.used_at !== null || row.expires_at < now) return refused();
 
   if (row.purpose === 'sign-up') {
     const [existing] = await DB.batch([DB.prepare(USER_SQL).bind(row.email)]);

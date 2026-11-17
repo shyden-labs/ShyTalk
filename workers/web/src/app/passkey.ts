@@ -20,6 +20,8 @@ import type { AppSession } from './session.ts';
 import { signedInRefusal, type SetupIdentity } from './setup-identity.ts';
 import type { SignInEnv } from './sign-in.ts';
 
+type PreparedEntry = NonNullable<ReturnType<PreparedPasskeys['get']>>;
+
 export type PasskeyOperation = 'register/options' | 'register/verify' | 'sign-in/options' | 'sign-in/verify';
 
 export interface PasskeyRouteDeps {
@@ -103,7 +105,7 @@ async function registerVerify(
   // The hook files its setup under the token's hash, or under a signed-in member's id; with neither, the plugin refuses.
   const session = await deps.session();
   if (session !== null && token !== null) return signedInRefusal();
-  const key = session === null ? (token === null ? null : preparedKey(await tokenHash(token), '')) : preparedKey(null, session.userId);
+  const key = await setupKey(session, token);
   let failed = false;
   let failure: unknown;
   try {
@@ -114,8 +116,18 @@ async function registerVerify(
   }
   const entry = key === null ? undefined : deps.prepared.get(key);
   if (key !== null) deps.prepared.delete(key);
-
   if (entry === undefined) return failed ? fromPlugin(failure) : json(500, { error: 'setup_failed' });
+  return finishSetup(entry, failed, deps);
+}
+
+/** Where the hook files this registration's setup: under a signed-in member's id, or under the token's hash. */
+async function setupKey(session: AppSession | null, token: string | null): Promise<string | null> {
+  if (session !== null) return preparedKey(null, session.userId);
+  return token === null ? null : preparedKey(await tokenHash(token), '');
+}
+
+/** The answer once the hook has filed `entry`: its member's session, or the setup undone when the plugin failed. */
+async function finishSetup(entry: PreparedEntry, failed: boolean, deps: PasskeyRouteDeps): Promise<Response> {
   if (failed) {
     // The hook wrote the setup's database part, but the passkey was not written: a sign-up's new member goes again.
     if (entry.identity.kind === 'sign-up') await deps.undoSignUp(entry.identity.userId);

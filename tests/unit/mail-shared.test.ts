@@ -123,6 +123,15 @@ describe('checkMessage', () => {
     ['a semicolon list', { ...MESSAGE, to: 'a@b.test;c@d.test' }],
     ['a bracketed address', { ...MESSAGE, to: '<a@b.test>' }],
     ['no at sign', { ...MESSAGE, to: 'no-at-sign' }],
+    ['no at sign, with a dot', { ...MESSAGE, to: 'a.b.test' }],
+    ['two at signs', { ...MESSAGE, to: 'a@@b.test' }],
+    ['a second address part', { ...MESSAGE, to: 'a@b@c.test' }],
+    ['nothing before the at sign', { ...MESSAGE, to: '@b.test' }],
+    ['nothing after the at sign', { ...MESSAGE, to: 'a@' }],
+    ['a domain with no dot', { ...MESSAGE, to: 'a@test' }],
+    ['a domain ending in its only dot', { ...MESSAGE, to: 'a@test.' }],
+    ['a domain starting with its only dot', { ...MESSAGE, to: 'a@.test' }],
+    ['a quoted local part', { ...MESSAGE, to: '"a"@b.test' }],
     ['a 255-character address', { ...MESSAGE, to: `${'a'.repeat(243)}@example.test` }],
     ['a non-ASCII address', { ...MESSAGE, to: 'josé@example.test' }],
     ['an empty subject', { ...MESSAGE, subject: '' }],
@@ -134,6 +143,10 @@ describe('checkMessage', () => {
     ['an oversized message', { ...MESSAGE, text: 'x'.repeat(MAIL_MAX_BYTES) }],
   ])('refuses %s', (_name, value) => {
     expect(checkMessage(value)).toBeNull();
+  });
+
+  it.each(['a@b.c', 'a.b@c.d.e', 'a@b..c', 'a@.b.c', 'a+tag@b-c.test'])('accepts the address %s', (to) => {
+    expect(checkMessage({ ...MESSAGE, to })).toEqual({ ...MESSAGE, to });
   });
 
   it('accepts a 254-character address', () => {

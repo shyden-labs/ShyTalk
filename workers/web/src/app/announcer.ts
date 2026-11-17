@@ -107,7 +107,9 @@ export class Announcer {
   }
 
   /** The hibernation API's message event: apps only listen, so a message changes nothing. */
-  webSocketMessage(): void {}
+  webSocketMessage(): void {
+    // Nothing to do: apps only listen.
+  }
 }
 
 /** The part of a Durable Object namespace the Worker uses. */

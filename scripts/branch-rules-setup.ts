@@ -149,27 +149,37 @@ export function auditBranchRules(branch: Branch, rules: Rule[]): string[] {
       problems.push(`${branch}: required check "${status.context}" is not pinned to GitHub Actions (app ${GITHUB_ACTIONS_APP_ID})`);
     }
   }
-  if (checks.length === 0) {
-    problems.push(`${branch}: no rule requires status checks`);
-  } else if (branch === 'develop') {
-    if (checks.some((c) => c.strict_required_status_checks_policy !== true)) {
-      problems.push(`${branch}: a required-checks rule is not strict`);
-    }
-    if (requiresReleaseCut) {
-      problems.push(`${branch}: a rule requires ${RELEASE_CUT}, which runs only on pull requests into main`);
-    }
-  } else {
-    if (checks.some((c) => c.strict_required_status_checks_policy !== false)) {
-      problems.push(`${branch}: a required-checks rule is strict, so a second release cut could never merge`);
-    }
-    if (!requiresReleaseCut) {
-      problems.push(`${branch}: no rule requires ${RELEASE_CUT}`);
-    }
-    if (checks.some((c) => c.do_not_enforce_on_create !== true)) {
-      problems.push(
-        `${branch}: its required checks are enforced when it is created, so it can never be created (${RELEASE_CUT} needs a pull request into main)`,
-      );
-    }
+  if (checks.length === 0) problems.push(`${branch}: no rule requires status checks`);
+  else if (branch === 'develop') problems.push(...developCheckProblems(checks, requiresReleaseCut));
+  else problems.push(...mainCheckProblems(branch, checks, requiresReleaseCut));
+  return problems;
+}
+
+/** `develop`'s required checks: strict, and never the release cut, which runs only into main. */
+function developCheckProblems(checks: ChecksParameters[], requiresReleaseCut: boolean): string[] {
+  const problems: string[] = [];
+  if (checks.some((c) => c.strict_required_status_checks_policy !== true)) {
+    problems.push('develop: a required-checks rule is not strict');
+  }
+  if (requiresReleaseCut) {
+    problems.push(`develop: a rule requires ${RELEASE_CUT}, which runs only on pull requests into main`);
+  }
+  return problems;
+}
+
+/** `main`'s required checks: not strict, the release cut required, and not enforced when the branch is created. */
+function mainCheckProblems(branch: Branch, checks: ChecksParameters[], requiresReleaseCut: boolean): string[] {
+  const problems: string[] = [];
+  if (checks.some((c) => c.strict_required_status_checks_policy !== false)) {
+    problems.push(`${branch}: a required-checks rule is strict, so a second release cut could never merge`);
+  }
+  if (!requiresReleaseCut) {
+    problems.push(`${branch}: no rule requires ${RELEASE_CUT}`);
+  }
+  if (checks.some((c) => c.do_not_enforce_on_create !== true)) {
+    problems.push(
+      `${branch}: its required checks are enforced when it is created, so it can never be created (${RELEASE_CUT} needs a pull request into main)`,
+    );
   }
   return problems;
 }

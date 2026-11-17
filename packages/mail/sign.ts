@@ -17,14 +17,14 @@ export const SIGNED_HEADERS = ['(request-target)', 'host', 'date', 'x-content-sh
 const ALGORITHM = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } as const;
 const PKCS8 = /^-----BEGIN PRIVATE KEY-----([A-Za-z0-9+/=\s]+)-----END PRIVATE KEY-----\s*$/;
 
-const base64 = (bytes: ArrayBuffer): string => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+const base64 = (bytes: ArrayBuffer): string => btoa(String.fromCodePoint(...new Uint8Array(bytes)));
 
 /** The PKCS#8 PEM's key for signing, or `null` for anything else (a PKCS#1 key included); never throws. */
 export async function importKey(pem: string): Promise<CryptoKey | null> {
   const match = PKCS8.exec(pem.trim());
   if (match === null) return null;
   try {
-    const der = Uint8Array.from(atob((match[1] as string).replace(/\s/g, '')), (char) => char.charCodeAt(0));
+    const der = Uint8Array.from(atob((match[1] as string).replaceAll(/\s/g, '')), (char) => char.codePointAt(0) as number);
     return await crypto.subtle.importKey('pkcs8', der, ALGORITHM, false, ['sign']);
   } catch {
     return null;

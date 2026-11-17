@@ -121,7 +121,7 @@ export async function takeLock(files: LedgerFiles, path: string, me: Holder, clo
       clock.say(`waiting for the read-back held by ${holderText(holder)} (up to ${LOCK_CEILING_MS / 60_000} minutes)`);
       announced = true;
     }
-    await clock.wait(LOCK_POLL_MS);
+    await clock.wait(LOCK_POLL_MS); // NOSONAR: a poll, each look waits for the one before, and a stated ceiling fails naming the cause (#245)
   }
 }
 
@@ -221,16 +221,16 @@ const SLOT = /\{[^{}]*\}/g;
 /** A line as Google is sent it: HTML-escaped, each slot marked not to translate, so it comes back where it was. */
 export const toGoogleHtml = (line: string): string =>
   line
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
     .replace(SLOT, (slot) => `<span translate="no">${slot}</span>`);
 
 const NAMED_ENTITIES: Readonly<Record<string, string>> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
 /** Google's HTML answer as text: the slot marks taken off and every entity decoded once. */
 export const fromGoogleHtml = (reading: string): string =>
-  reading.replace(/<\/?span\b[^>]*>/g, '').replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (entity, name: string) => {
+  reading.replace(/<\/?span\b[^>]*>/g, '').replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
     if (name.startsWith('#')) {
       return String.fromCodePoint(/^#x/i.test(name) ? Number.parseInt(name.slice(2), 16) : Number.parseInt(name.slice(1), 10));
     }
@@ -318,7 +318,7 @@ export interface ReadRow {
   google: string;
 }
 
-const cell = (text: string): string => text.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+const cell = (text: string): string => text.replaceAll('|', String.raw`\|`).replaceAll('\n', ' ');
 
 /** The per-line writer/reader table Shyden reads. */
 export function readBackTable(locale: string, rows: readonly ReadRow[]): string {

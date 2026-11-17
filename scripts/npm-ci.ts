@@ -24,7 +24,7 @@ export function main(): number {
   if (run.error) throw new Error(`npm ci did not run: ${run.error.message}`);
   process.stdout.write(run.stdout);
   process.stderr.write(run.stderr);
-  if (run.status !== 0) throw new Error(`npm ci exited ${run.status ?? `on ${String(run.signal)}`}`);
+  if (run.status !== 0) throw new Error(`npm ci exited ${run.status ?? 'on ' + String(run.signal)}`);
   const found = warnings(`${run.stdout}\n${run.stderr}`);
   if (found.length > 0) throw new Error(`npm ci printed ${found.length} warning(s):\n${found.join('\n')}`);
   return 0;

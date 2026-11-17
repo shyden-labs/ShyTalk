@@ -57,8 +57,16 @@ export function resultFor(status: number, body: unknown, to: string): MailResult
   return named ? { ok: false, reason: 'suppressed', status } : { ok: true, messageId };
 }
 
-/** One bare ASCII address: no list, no display name, no spaces (Oracle: `email` is ASCII only). */
-const ADDRESS = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
+/** An address part: no list, no display name, no spaces, no second at sign. */
+const PART = /^[^\s@,;<>"]+$/;
+
+/** One bare address: a part, an at sign, and a part with a dot that is neither its first nor its last character. */
+function isAddress(to: string): boolean {
+  const at = to.indexOf('@');
+  const local = to.slice(0, at);
+  const domain = to.slice(at + 1);
+  return at > 0 && PART.test(local) && PART.test(domain) && domain.slice(1, -1).includes('.');
+}
 const ASCII = /^[\x21-\x7e]+$/;
 const MAX_ADDRESS = 254;
 const MAX_SUBJECT = 200;
@@ -69,7 +77,7 @@ const isText = (value: unknown): value is string => typeof value === 'string' &&
 export function checkMessage(value: unknown): MailMessage | null {
   if (typeof value !== 'object' || value === null) return null;
   const { to, subject, text, html } = value as Record<string, unknown>;
-  if (!isText(to) || to.length > MAX_ADDRESS || !ASCII.test(to) || !ADDRESS.test(to)) return null;
+  if (!isText(to) || to.length > MAX_ADDRESS || !ASCII.test(to) || !isAddress(to)) return null;
   if (!isText(subject) || subject.length > MAX_SUBJECT || /[\r\n]/.test(subject)) return null;
   if (!isText(text)) return null;
   if (html !== undefined && typeof html !== 'string') return null;
