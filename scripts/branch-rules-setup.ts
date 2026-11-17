@@ -223,7 +223,7 @@ export function auditDevEnvironment(env: DevEnvironment | undefined, policies: B
 
 /** gh's JSON answer; an empty one (a DELETE's 204) reads as nothing. */
 function gh(args: string[], input?: string): unknown {
-  const answer = execFileSync('gh', args, { encoding: 'utf8', input });
+  const answer = execFileSync('gh', args, { encoding: 'utf8', input }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
   return answer.trim() === '' ? undefined : JSON.parse(answer);
 }
 

@@ -127,7 +127,7 @@ export function parseRemoteHead(lsRemote: string, ref: string, question: string)
 }
 
 function git(args: string[]): string {
-  return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
 }
 
 /** Whether `sha` is on develop. git answers 0 (yes) or 1 (no); anything else is an error, never a no. */
