@@ -1,0 +1,8 @@
+[
+  {
+    "advisory": "GHSA-fc5q-39xc-vjpf",
+    "package": "picomatch",
+    "reason": "Every picomatch release (<= 4.0.7) is affected and none is fixed; it reaches only build and test tools, matching the project's own patterns, never a visitor's.",
+    "ruled": "Shyden 2026-11-18, shyden-labs/ShyTalk#260"
+  }
+]

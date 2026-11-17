@@ -52,7 +52,7 @@ describe('ci.yml', () => {
       { name: '', run: '', if: '' },
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
-      { name: 'Audit', run: 'npm audit --audit-level=low', if: '' },
+      { name: 'Audit', run: 'node scripts/audit.ts', if: '' },
       { name: 'Typecheck', run: 'npm run typecheck', if: CODE },
       { name: 'Lint', run: 'npm run lint', if: CODE },
       { name: 'Format', run: 'npm run format:check', if: '' },
