@@ -1,0 +1,7 @@
+{
+  "//": "The site's browser-driven scripts, such as the link-preview pictures (shyden-labs/ShyTalk#198): the root options plus the DOM, which Playwright's types need.",
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": { "lib": ["es2024", "dom"] },
+  "include": ["**/*.ts"],
+  "exclude": []
+}

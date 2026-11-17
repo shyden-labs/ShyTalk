@@ -29,7 +29,7 @@ const CODE = 'steps.classify.outputs.scope != docs-only';
 
 describe('package.json', () => {
   it.each([
-    ['typecheck', 'tsc --noEmit -p . && tsc --noEmit -p tests/smoke'],
+    ['typecheck', 'tsc --noEmit -p . && tsc --noEmit -p tests/smoke && tsc --noEmit -p apps/web/scripts'],
     ['build:web', 'astro build --root apps/web'],
     ['test:smoke', 'playwright test -c tests/smoke'],
     ['lint', 'eslint --max-warnings 0 .'],
@@ -74,6 +74,16 @@ describe('ci.yml', () => {
   });
 
   // shyden-labs/ShyTalk#109: every target the site supports runs the same suite, and their totals are compared.
+  it('builds the site for dev and runs the smoke against that build, so a preview’s addresses are checked (shyden-labs/ShyTalk#198)', () => {
+    expect(yamlBlock(ci, 'web-smoke', '  ').split('\n').slice(0, 5)).toEqual([
+      '  web-smoke:',
+      '    runs-on: ubuntu-26.04',
+      '    timeout-minutes: 20',
+      '    env:',
+      '      SITE_ENVIRONMENT: dev',
+    ]);
+  });
+
   it('builds the site, installs every browser, runs the smoke and compares the totals in web-smoke, skipping them for docs', () => {
     expect(steps(yamlBlock(ci, 'web-smoke', '  '))).toEqual([
       { name: '', run: '', if: '' },

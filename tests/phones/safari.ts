@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import type { SafariPage } from './iphone-cases.ts';
+import { PREVIEW_FACTS, PREVIEW_TAGS, type PreviewFacts } from '../support/link-preview.ts';
 
 /** One WebDriver request to Appium, answering the response's `value`. */
 export type WebDriverCall = (method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown) => Promise<unknown>;
@@ -128,6 +129,9 @@ const TEXT_LOOK_MS = 250;
 const ELEMENT = 'element-6066-11e4-a52e-4f735466cecf';
 
 /** How long axe may take on a page before WebDriver gives up on it. */
+/** Runs the smoke's link-preview check with the page's path and tags, handing back its answer or its failure. */
+const PREVIEW = `const done = arguments[arguments.length - 1];
+(${PREVIEW_FACTS})(arguments[0], arguments[1]).then(done, (error) => done({ failed: String(error) }));`;
 const AXE_TIMEOUT_MS = 60_000;
 const AXE_FILE = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 
@@ -245,6 +249,17 @@ export function safariPage(
       await call('POST', `${at}/timeouts`, { script: AXE_TIMEOUT_MS });
       const violations = (await call('POST', `${at}/execute/async`, { script: AXE, args: [] })) as { id: string; nodes: number }[];
       return violations.map(({ id, nodes }) => `${id}: ${String(nodes)}`);
+    },
+    // The smoke's own in-page check (shyden-labs/ShyTalk#198): it fetches each page and decodes its picture, so it gets
+    // axe's minute too; a failure inside it comes back as `failed`, as WebDriver hands only the callback's value back.
+    async previewFacts(path) {
+      await call('POST', `${at}/timeouts`, { script: AXE_TIMEOUT_MS });
+      const answer = (await call('POST', `${at}/execute/async`, {
+        script: PREVIEW,
+        args: [path, [...PREVIEW_TAGS]],
+      })) as PreviewFacts | { failed: string };
+      if ('failed' in answer) throw new Error(`the link-preview check on ${path} failed: ${answer.failed}`);
+      return answer;
     },
     // Appium's web click stalled in Safari's remote debugger and never reached the page; a native touch arrives as a
     // real touch, offset by Safari's content inset (measured on the iPhone Air 2026-11-14, shyden-labs/ShyTalk#190).
