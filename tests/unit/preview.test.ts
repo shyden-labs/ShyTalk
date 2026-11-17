@@ -7,6 +7,7 @@ import {
   pageUrl,
   previewImageUrl,
   previewKey,
+  sharedUrl,
   siteOrigin,
   sitePages,
 } from '../../apps/web/src/preview.ts';
@@ -57,6 +58,25 @@ describe('pageUrl', () => {
 
   it('gives a path alone on an empty origin', () => {
     expect(pageUrl('', '/vi/terms.html')).toBe('/vi/terms');
+  });
+});
+
+describe('sharedUrl', () => {
+  it.each([
+    ['/', 'https://dev.site.example/'],
+    ['/id/sign-in/', 'https://dev.site.example/id/sign-in/'],
+    ['/closed-testing.html', 'https://dev.site.example/closed-testing'],
+  ])('shares %s at its own address', (path, url) => {
+    expect(sharedUrl('https://dev.site.example', path)).toBe(url);
+  });
+
+  // While production holds, only its home answers 200 (shyden-labs/ShyTalk#261).
+  it.each(['/holding', '/holding.html', '/th/holding', '/zh/holding.html'])('shares the holding page %s at the bare address', (path) => {
+    expect(sharedUrl('https://dev.site.example', path)).toBe('https://dev.site.example/');
+  });
+
+  it('shares a page merely ending in holding at its own address', () => {
+    expect(sharedUrl('https://dev.site.example', '/id/withholding')).toBe('https://dev.site.example/id/withholding');
   });
 });
 

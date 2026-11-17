@@ -140,5 +140,8 @@
     "signInWithRecoveryCode": "使用恢复码登录",
     "signInRefused": "未成功。请检查地址和验证码，然后重试。",
     "codesLeftAfterSignIn": "已登录。剩余恢复码：{count}。"
+  },
+  "holding": {
+    "building": "ShyTalk 应用正在开发中。"
   }
 }

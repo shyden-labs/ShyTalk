@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
-import { PREVIEW_HEIGHT, PREVIEW_WIDTH, pageUrl, previewImageUrl, siteOrigin, type WranglerOrigins } from '../../apps/web/src/preview.ts';
+import { PREVIEW_HEIGHT, PREVIEW_WIDTH, previewImageUrl, sharedUrl, siteOrigin, type WranglerOrigins } from '../../apps/web/src/preview.ts';
 
 /** Every page file the site is built from, as `readdirSync(…, { recursive: true })` lists them. */
 export const PAGE_FILES: string[] = readdirSync(fileURLToPath(new URL('../../apps/web/src/pages', import.meta.url)), {
@@ -99,7 +99,7 @@ export function wantedPreview(origin: string, locale: Locale, lang: string, path
       'og:image:width': String(PREVIEW_WIDTH),
       'og:image:height': String(PREVIEW_HEIGHT),
       'og:image:alt': t(locale, 'site.previewAlt'),
-      'og:url': pageUrl(origin, path),
+      'og:url': sharedUrl(origin, path),
       'og:type': 'website',
       'twitter:card': 'summary_large_image',
     },

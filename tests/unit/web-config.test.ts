@@ -46,7 +46,11 @@ describe('web config', () => {
     expect(block['name']).toBe('shytalk-web');
     expect(block['account_id']).toBe(PROD);
     expect(block['workers_dev']).toBe(false);
-    expect(block['routes']).toEqual([{ pattern: 'shytalk.app', custom_domain: true }]);
+    // The bare address and www, which the holding Worker sends to the bare one (shyden-labs/ShyTalk#261).
+    expect(block['routes']).toEqual([
+      { pattern: 'shytalk.app', custom_domain: true },
+      { pattern: 'www.shytalk.app', custom_domain: true },
+    ]);
     expect((block['vars'] as Config)['ENVIRONMENT_NAME']).toBe('prod');
   });
 
@@ -91,6 +95,8 @@ describe('app sign-in config', () => {
         APPLE_AUDIENCES: 'com.shyden.shytalk',
         MAIL_REGION: MAIL[name as keyof typeof MAIL].region,
         MAIL_FROM: MAIL[name as keyof typeof MAIL].from,
+        // Production holds until the full release; dev and test never do (shyden-labs/ShyTalk#261).
+        ...(name === 'prod' ? { HOLDING: 'true' } : {}),
       });
     },
   );
