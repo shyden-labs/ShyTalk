@@ -1,7 +1,8 @@
 {
   "site": {
     "name": "ShyTalk",
-    "tagline": "Learn languages and cultures by talking."
+    "tagline": "Learn languages and cultures by talking.",
+    "previewAlt": "A screenshot of the top of this ShyTalk page."
   },
   "menu": {
     "label": "Main menu",

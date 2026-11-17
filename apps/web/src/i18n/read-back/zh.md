@@ -4,6 +4,7 @@
 | --- | --- | --- | --- |
 | site.name | ShyTalk | ShyTalk | ShyTalk |
 | site.tagline | Learn languages and cultures by talking. | 在交谈中学习语言和文化。 | Learn language and culture through conversation. |
+| site.previewAlt | A screenshot of the top of this ShyTalk page. | 这个 ShyTalk 页面顶部的截图。 | This is a screenshot of the top of the ShyTalk page. |
 | menu.label | Main menu | 主菜单 | Main Menu |
 | menu.home | Home | 首页 | front page |
 | menu.closedTesting | Closed testing | 封闭测试 | Closed testing |
