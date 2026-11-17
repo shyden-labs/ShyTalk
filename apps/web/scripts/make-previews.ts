@@ -4,7 +4,7 @@
  * 1200 by 630, into `apps/web/public/previews/`, to be committed. Shyden's
  * ruling 2026-11-14 (shyden-labs/shyden.co.uk#1158).
  *
- *   SITE_ENVIRONMENT=dev npm run build:web && node apps/web/make-previews.ts
+ *   SITE_ENVIRONMENT=dev npm run build:web && node apps/web/scripts/make-previews.ts
  *
  * The built pages are served from `apps/web/dist` by a plain file server in
  * this process, as Workers' assets serve them (`/x` is `x.html`, `/x/` is
@@ -17,10 +17,10 @@ import { mkdir, readFile, stat } from 'node:fs/promises';
 import { dirname, extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
-import { makePreviews, PREVIEW_HEIGHT, PREVIEW_WIDTH } from './src/preview.ts';
+import { makePreviews, PREVIEW_HEIGHT, PREVIEW_WIDTH } from '../src/preview.ts';
 
-const DIST = fileURLToPath(new URL('dist', import.meta.url));
-const OUT = fileURLToPath(new URL('public/previews', import.meta.url));
+const DIST = fileURLToPath(new URL('../dist', import.meta.url));
+const OUT = fileURLToPath(new URL('../public/previews', import.meta.url));
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',

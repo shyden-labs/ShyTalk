@@ -1,5 +1,5 @@
 {
-  "//": "Checks every .ts and .js file but the Astro config, whose import pulls in Astro's browser-typed declarations (it is checked by the build) and the browser-driven code, the smoke and the preview-picture script (tests/smoke/tsconfig.json adds the DOM); Node runs them by stripping types, so nothing is emitted and only erasable syntax is allowed (issue shyden-labs/repo-template#61).",
+  "//": "Checks every .ts and .js file but the Astro config, whose import pulls in Astro's browser-typed declarations (it is checked by the build) and the browser-driven code, the smoke and the site's scripts (tests/smoke/tsconfig.json and apps/web/scripts/tsconfig.json add the DOM); Node runs them by stripping types, so nothing is emitted and only erasable syntax is allowed (issue shyden-labs/repo-template#61).",
   "compilerOptions": {
     "target": "es2024",
     "module": "nodenext",
@@ -32,7 +32,7 @@
     "apps/web/dist",
     "apps/web/.astro",
     "apps/web/astro.config.mjs",
-    "apps/web/make-previews.ts",
+    "apps/web/scripts",
     "tests/smoke"
   ]
 }

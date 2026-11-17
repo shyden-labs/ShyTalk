@@ -29,7 +29,7 @@ const CODE = 'steps.classify.outputs.scope != docs-only';
 
 describe('package.json', () => {
   it.each([
-    ['typecheck', 'tsc --noEmit -p . && tsc --noEmit -p tests/smoke'],
+    ['typecheck', 'tsc --noEmit -p . && tsc --noEmit -p tests/smoke && tsc --noEmit -p apps/web/scripts'],
     ['build:web', 'astro build --root apps/web'],
     ['test:smoke', 'playwright test -c tests/smoke'],
     ['lint', 'eslint --max-warnings 0 .'],
