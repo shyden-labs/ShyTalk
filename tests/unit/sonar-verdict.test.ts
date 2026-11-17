@@ -3,7 +3,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { main, parseReportTask, verdict } from '../../scripts/sonar-verdict.ts';
+import { changedCode, main, parseReportTask, verdict } from '../../scripts/sonar-verdict.ts';
 
 /**
  * SonarCloud's quality gate, read for the analysis this run's scan made
@@ -26,13 +26,14 @@ const REPORT = [
 describe('parseReportTask', () => {
   it("reads the scan's task id, server and dashboard", () => {
     expect(parseReportTask(REPORT)).toEqual({
+      projectKey: 'shyden-labs_app',
       serverUrl: 'https://sonarcloud.io',
       ceTaskId: 'AX1',
       dashboardUrl: 'https://sonarcloud.io/dashboard?id=x&pullRequest=7',
     });
   });
 
-  it.each([['ceTaskId'], ['serverUrl'], ['dashboardUrl']])('refuses a report with no %s', (key) => {
+  it.each([['projectKey'], ['ceTaskId'], ['serverUrl'], ['dashboardUrl']])('refuses a report with no %s', (key) => {
     const text = REPORT.split('\n')
       .filter((l) => !l.startsWith(`${key}=`))
       .join('\n');
@@ -82,6 +83,7 @@ describe('main', () => {
     waited.mockClear();
     dir = mkdtempSync(join(tmpdir(), 'sonar-verdict-'));
     writeFileSync(join(dir, 'report-task.txt'), REPORT);
+    writeFileSync(join(dir, 'changed-files.txt'), 'scripts/a.ts\n');
     out = [];
     err = [];
     fetched = [];
@@ -91,6 +93,7 @@ describe('main', () => {
     // and a test that inherits it judges (and writes to) the runner's own summary.
     vi.stubEnv('SONAR_TOKEN', 'tok');
     vi.stubEnv('SONAR_PULL_REQUEST', '7');
+    vi.stubEnv('SONAR_CHANGED_FILES', join(dir, 'changed-files.txt'));
     vi.stubEnv('SONAR_CEILING_SECONDS', '');
     vi.stubEnv('GITHUB_STEP_SUMMARY', '');
   });
@@ -115,6 +118,9 @@ describe('main', () => {
   const task = (status: string, over: object = {}) =>
     [200, { task: { id: 'AX1', status, analysisId: 'AN1', pullRequest: '7', ...over } }] as [number, unknown];
   const gate = (status: string, conditions: object[] = []) => [200, { projectStatus: { status, conditions } }] as [number, unknown];
+  /** The analysis's measured source lines (ncloc); no value means SonarCloud measured none. */
+  const lines = (ncloc?: string) =>
+    [200, { component: { measures: ncloc === undefined ? [] : [{ metric: 'ncloc', value: ncloc }] } }] as [number, unknown];
   const run = () => main([join(dir, 'report-task.txt')]);
 
   it.each([[[]], [['a', 'b']]])('refuses the arguments %j', async (args) => {
@@ -129,11 +135,12 @@ describe('main', () => {
   });
 
   it("reads this scan's task, then the gate of the analysis it made, and passes OK", async () => {
-    answer(task('SUCCESS'), gate('OK'));
+    answer(task('SUCCESS'), gate('OK'), lines('1200'));
     expect(await run()).toBe(0);
     expect(fetched).toEqual([
       'https://sonarcloud.io/api/ce/task?id=AX1 Bearer tok',
       'https://sonarcloud.io/api/qualitygates/project_status?analysisId=AN1 Bearer tok',
+      'https://sonarcloud.io/api/measures/component?component=shyden-labs_app&metricKeys=ncloc&pullRequest=7 Bearer tok',
     ]);
     expect(out).toEqual(['sonar-verdict: quality gate: OK\n', 'sonar-verdict: https://sonarcloud.io/dashboard?id=x&pullRequest=7\n']);
   });
@@ -146,7 +153,7 @@ describe('main', () => {
 
   it("writes the verdict and the link to the job's summary", async () => {
     vi.stubEnv('GITHUB_STEP_SUMMARY', join(dir, 'summary.md'));
-    answer(task('SUCCESS'), gate('OK'));
+    answer(task('SUCCESS'), gate('OK'), lines('1200'));
     await run();
     expect(readFileSync(join(dir, 'summary.md'), 'utf8')).toBe(
       '### SonarCloud\n\nThe scan ran. quality gate: OK\n\nhttps://sonarcloud.io/dashboard?id=x&pullRequest=7\n',
@@ -163,7 +170,7 @@ describe('main', () => {
   });
 
   it('waits for a pending task within the ceiling, five seconds at a time', async () => {
-    answer(task('PENDING'), task('IN_PROGRESS'), task('SUCCESS'), gate('OK'));
+    answer(task('PENDING'), task('IN_PROGRESS'), task('SUCCESS'), gate('OK'), lines('1200'));
     expect(await run()).toBe(0);
     expect(waited.mock.calls).toEqual([[5000], [5000]]);
   });
@@ -178,6 +185,7 @@ describe('main', () => {
     answer(
       task('SUCCESS'),
       gate('ERROR', [{ status: 'ERROR', metricKey: 'new_coverage', comparator: 'LT', errorThreshold: '85', actualValue: '82.5' }]),
+      lines('1200'),
     );
     expect(await run()).toBe(1);
     expect(err).toEqual(['sonar-verdict: quality gate: ERROR\n', 'sonar-verdict: new_coverage is 82.5, which fails LT 85\n']);
@@ -205,7 +213,7 @@ describe('main', () => {
 
   it('accepts a task that names no pull request when none is expected', async () => {
     vi.stubEnv('SONAR_PULL_REQUEST', '');
-    answer(task('SUCCESS', { pullRequest: undefined }), gate('OK'));
+    answer(task('SUCCESS', { pullRequest: undefined, branch: 'develop' }), gate('OK'), lines('1200'));
     expect(await run()).toBe(0);
   });
 
@@ -216,8 +224,96 @@ describe('main', () => {
       [task('SUCCESS'), [404, {}]],
       'sonar-verdict: GET https://sonarcloud.io/api/qualitygates/project_status?analysisId=AN1 answered 404; no verdict to read',
     ],
+    [
+      'the measured lines',
+      [task('SUCCESS'), gate('OK'), [500, {}]],
+      'sonar-verdict: GET https://sonarcloud.io/api/measures/component?component=shyden-labs_app&metricKeys=ncloc&pullRequest=7 answered 500; no verdict to read',
+    ],
   ])('fails closed on an API error reading %s', async (_what, replies, message) => {
     answer(...(replies as [number, unknown][]));
     await expect(run()).rejects.toThrow(message);
+  });
+
+  // Issue #240: the gate passed for weeks on an analysis of tests alone. A branch analysis
+  // measures the whole branch, so no source lines there means the scan read no source code.
+  describe('on a branch analysis', () => {
+    beforeEach(() => vi.stubEnv('SONAR_PULL_REQUEST', ''));
+    const branchTask = () => task('SUCCESS', { pullRequest: undefined, branch: 'develop' });
+
+    it('reads the source lines of that branch, and passes when there are some', async () => {
+      answer(branchTask(), gate('OK'), lines('1200'));
+      expect(await run()).toBe(0);
+      expect(fetched[2]).toBe(
+        'https://sonarcloud.io/api/measures/component?component=shyden-labs_app&metricKeys=ncloc&branch=develop Bearer tok',
+      );
+    });
+
+    it.each([
+      ['measured no source lines', undefined, 'missing'],
+      ['measured 0 source lines', '0', '0'],
+    ])('fails, naming why, when it %s', async (_what, ncloc, shown) => {
+      answer(branchTask(), gate('OK'), lines(ncloc));
+      await expect(run()).rejects.toThrow(
+        `sonar-verdict: the analysis of branch develop measured no source lines (ncloc ${shown}): the scan read no source code, so the gate judged nothing`,
+      );
+    });
+  });
+
+  // Issue #240: a pull request's analysis counts only the files it changed (measured 2026-11-17,
+  // shyden-labs/repo-template PR 189: 2 files changed, 1 counted), so no source lines is wrong only
+  // when it changed code outside tests/ (Shyden 2026-11-17: "Develop full, PR by diff").
+  describe('on a pull request analysis', () => {
+    it.each([
+      ['measured no source lines', undefined, 'missing'],
+      ['measured 0 source lines', '0', '0'],
+    ])('fails, naming the code it changed, when it %s', async (_what, ncloc, shown) => {
+      writeFileSync(join(dir, 'changed-files.txt'), 'docs/a.md\nscripts/a.ts\napps/web/src/b.tsx\n');
+      answer(task('SUCCESS'), gate('OK'), lines(ncloc));
+      await expect(run()).rejects.toThrow(
+        `sonar-verdict: pull request 7 changed code outside tests/ (scripts/a.ts, apps/web/src/b.tsx), but its analysis measured no source lines (ncloc ${shown}): the scan read no source code, so the gate judged nothing`,
+      );
+    });
+
+    it('passes with no source lines when it changed no code outside tests/', async () => {
+      writeFileSync(join(dir, 'changed-files.txt'), 'docs/a.md\ntests/unit/a.test.ts\n');
+      answer(task('SUCCESS'), gate('OK'), lines(undefined));
+      expect(await run()).toBe(0);
+    });
+
+    it.each([
+      ['was given no list of the changed files', ''],
+      ['was given a list that does not exist', 'missing.txt'],
+    ])('fails closed when it %s', async (_what, list) => {
+      vi.stubEnv('SONAR_CHANGED_FILES', list && join(dir, list));
+      answer(task('SUCCESS'), gate('OK'), lines(undefined));
+      await expect(run()).rejects.toThrow(
+        "sonar-verdict: SONAR_CHANGED_FILES names no file of the pull request's changed files; cannot judge whether no source lines means no scan",
+      );
+    });
+  });
+});
+
+describe('changedCode', () => {
+  it('keeps the code files outside tests/, in order', () => {
+    expect(
+      changedCode([
+        'scripts/a.ts',
+        'tests/unit/a.test.ts',
+        'docs/a.md',
+        '.github/workflows/ci.yml',
+        'apps/web/src/b.tsx',
+        'workers/c.js',
+        'eslint.config.mjs',
+        'x.cjs',
+        'y.mts',
+        'z.cts',
+        'w.jsx',
+        '',
+      ]),
+    ).toEqual(['scripts/a.ts', 'apps/web/src/b.tsx', 'workers/c.js', 'eslint.config.mjs', 'x.cjs', 'y.mts', 'z.cts', 'w.jsx']);
+  });
+
+  it('keeps nothing from tests/ alone, nor a file whose name only starts with tests', () => {
+    expect(changedCode(['tests/a.ts', 'tests-helper.ts', 'apps/tests/b.ts'])).toEqual(['tests-helper.ts', 'apps/tests/b.ts']);
   });
 });

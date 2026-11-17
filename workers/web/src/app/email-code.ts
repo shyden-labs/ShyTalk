@@ -58,10 +58,10 @@ export function newCode(random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array =
 /** 32 random bytes as base64url, without padding. */
 export function newToken(): string {
   const bytes = fill(new Uint8Array(32));
-  return btoa(String.fromCharCode(...bytes))
+  return btoa(String.fromCodePoint(...bytes))
     .replaceAll('+', '-')
     .replaceAll('/', '_')
-    .replace(/=+$/, '');
+    .replaceAll('=', '');
 }
 
 /** A token as stored: hex SHA-256. */

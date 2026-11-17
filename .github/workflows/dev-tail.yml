@@ -51,7 +51,7 @@ jobs:
             exit 1
           fi
           status=0
-          timeout "$((MINUTES * 60))" npx wrangler tail --env dev --format json \
+          timeout "$((MINUTES * 60))" "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" tail --env dev --format json \
             | tee "$RUNNER_TEMP/events" \
             | jq -c --unbuffered 'select(.outcome != "ok" or (.exceptions | length) > 0 or any(.logs[]; .level == "error")) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), exceptions: [.exceptions[] | {name, message: (.message | gsub("[^\\s@]+(@|%40|%2540)[^\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>"))}], errors: [.logs[] | select(.level == "error") | .message | map(tostring) | join(" ") | gsub("[^\\s@]+(@|%40|%2540)[^\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>")]}' \
             || status=$?

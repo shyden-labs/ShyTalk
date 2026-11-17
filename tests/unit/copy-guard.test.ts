@@ -89,7 +89,7 @@ describe('the copy guard', () => {
 
   it.each(['id', 'th', 'vi', 'zh'])('finds none of the refused words in the %s read-back, which covers every line', (locale) => {
     const read = googleColumn(locale);
-    expect(read.length).toBe(englishLines().length);
+    expect(read).toHaveLength(englishLines().length);
     for (const line of read) expect(line, line).not.toMatch(REFUSED);
   });
 

@@ -79,7 +79,7 @@ export const QUERY = `query($id: ID!, $endCursor: String) {
 const PR_LIMIT = 500;
 
 function gh(args: string[]): unknown {
-  return JSON.parse(execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64e6 }));
+  return JSON.parse(execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64e6 })); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
 }
 
 export function main(args: string[]): number {

@@ -45,15 +45,26 @@ export function validateUiDocument(input: unknown): { ok: true; doc: UiDocument 
   const parsed = v.safeParse(Schema, input);
   if (!parsed.success) return { ok: false, errors: parsed.issues.map((issue) => `${v.getDotPath(issue) ?? '(root)'}: ${issue.message}`) };
   const doc = parsed.output;
+  const errors = [...copyErrors(doc), ...navigationErrors(doc)];
+  return errors.length ? { ok: false, errors } : { ok: true, doc };
+}
+
+/** Each language's copy lists exactly English's keys. */
+function copyErrors(doc: UiDocument): string[] {
   const errors: string[] = [];
   const english = Object.keys(doc.copy.en);
-
   for (const locale of LOCALES) {
     for (const key of english) if (!Object.hasOwn(doc.copy[locale], key)) errors.push(`copy.${locale} is missing ${key}`);
     for (const key of Object.keys(doc.copy[locale]))
       if (!english.includes(key)) errors.push(`copy.${locale} has ${key}, which English lacks`);
   }
+  return errors;
+}
 
+/** Each menu item is listed once, names a menu route that is not sealed, and labels itself with a copy key. */
+function navigationErrors(doc: UiDocument): string[] {
+  const errors: string[] = [];
+  const english = Object.keys(doc.copy.en);
   const ids = new Set<string>();
   for (const item of doc.navigation) {
     if (ids.has(item.id)) errors.push(`navigation ${item.id} is listed twice`);
@@ -62,6 +73,5 @@ export function validateUiDocument(input: unknown): { ok: true; doc: UiDocument 
     else if (!MENU_ROUTES.includes(item.route)) errors.push(`navigation ${item.id} names route ${item.route}, which is not a menu route`);
     if (!english.includes(item.label)) errors.push(`navigation ${item.id} label ${item.label} is not a copy key`);
   }
-
-  return errors.length ? { ok: false, errors } : { ok: true, doc };
+  return errors;
 }

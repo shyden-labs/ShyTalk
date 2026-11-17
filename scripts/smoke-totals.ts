@@ -72,7 +72,7 @@ export function smokeTotals(report: Report, targets: readonly string[], expected
   const unlisted = new Set(results.map((result) => result.projectName).filter((name) => !targets.includes(name)));
   for (const name of unlisted) errors.push(`${name} ran but is not a listed target`);
   if (new Set(perTarget.map(({ total }) => total)).size > 1) {
-    errors.push(`the totals differ: ${perTarget.map(({ target, total }) => `${target} ${String(total)}`).join(', ')}`);
+    errors.push(`the totals differ: ${perTarget.map(({ target, total }) => target + ' ' + String(total)).join(', ')}`);
   }
   if (expected !== undefined) {
     for (const { target, total } of perTarget) {

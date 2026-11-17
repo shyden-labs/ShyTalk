@@ -8,8 +8,8 @@
  * Reads `apps/web/src/i18n/<locale>.json` against `en.json` (or `$I18N_DIR`),
  * sends the lines to Google under the machine-wide lock and the shared
  * character ledger (~/.config/shyden/, the same files every project uses),
- * and writes `.superpowers/sdd/plan-03/read-back-<locale>.md`: key, English
- * source, my line, Google's English. Nothing that would cross the day's
+ * and writes a new `.superpowers/sdd/plan-03/read-back-<locale>-<UTC time>.md`
+ * each run, printing its path: key, English source, my line, Google's English. Nothing that would cross the day's
  * 16,000 characters is sent; any refusal writes no table and exits 1.
  */
 import { closeSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync, writeSync } from 'node:fs';
@@ -40,7 +40,7 @@ import {
 } from './read-back.ts';
 
 const ENDPOINT = 'https://translation.googleapis.com/language/translate/v2';
-const LOCALES = ['id', 'th', 'vi', 'zh'];
+const LOCALES = new Set(['id', 'th', 'vi', 'zh']);
 const USAGE = 'usage: node scripts/i18n/google-read-back.ts <id|th|vi|zh> [keys…]';
 // Google v2 takes up to 128 texts a request and advises at most 5,000 characters.
 const MAX_TEXTS = 100;
@@ -96,7 +96,7 @@ async function ask(deps: Deps, key: string, locale: string, batch: readonly Plan
 
 export async function run(args: string[], deps: Deps): Promise<number> {
   const [locale, ...keys] = args;
-  if (locale === undefined || !LOCALES.includes(locale)) throw new Error(USAGE);
+  if (locale === undefined || !LOCALES.has(locale)) throw new Error(USAGE);
 
   const dir = deps.env['I18N_DIR'] ?? `${deps.cwd}/apps/web/src/i18n`;
   const english = catalogue(deps.files, `${dir}/en.json`);
@@ -151,7 +151,14 @@ export async function run(args: string[], deps: Deps): Promise<number> {
       locale,
       rows.map((row) => ({ ...row, google: readings.get(row.key) as string })),
     );
-    deps.files.write(`${deps.cwd}/.superpowers/sdd/plan-03/read-back-${locale}.md`, table);
+    // One table per run, named by its UTC time, so a later run never replaces an earlier one (#247).
+    const stamp = deps.now().toISOString().replaceAll(':', '-');
+    const tablePath = `${deps.cwd}/.superpowers/sdd/plan-03/read-back-${locale}-${stamp}.md`;
+    if (!deps.files.create(tablePath, table)) {
+      deps.say(`${tablePath} is already there; this run's table was not written over it`);
+      return 1;
+    }
+    deps.say(`table: ${tablePath}`);
     const total = readLedger(deps.files, ledgerPath)[day] as number;
     deps.say(
       `read ${String(rows.length)} lines of ${locale}, ${String(spent)} characters; Google's ${day} now shows ${String(total)} of ${String(DAILY_CHARACTERS)} spent`,

@@ -71,10 +71,10 @@ export const isClosedTesting = (pathname: string): boolean => pathname === APPLY
 /** 32 random bytes as base64url. */
 export function newToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  return btoa(String.fromCodePoint(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
 }
 
 /** SHA-256 as hex: only this is ever stored. */
@@ -104,7 +104,7 @@ interface Application {
 
 /** The application with its address normalised, or null when it must be refused. */
 function applicationFrom(body: Record<string, unknown> | null): Application | null {
-  if (body === null || body['adult'] !== true) return null;
+  if (body?.['adult'] !== true) return null;
   const { email, locale } = body;
   if (typeof email !== 'string' || !LOCALES.includes(locale as Locale)) return null;
   const normalised = email.trim().toLowerCase();

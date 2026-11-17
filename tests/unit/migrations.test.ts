@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { migrationProblems } from './migrations.ts';
 
 /**
@@ -42,5 +42,21 @@ describe('the real tree', () => {
   it('names every migration NNNN_words.sql, each number once', () => {
     expect(existsSync('migrations')).toBe(true);
     expect(migrationProblems(readdirSync('migrations'))).toEqual([]);
+  });
+
+  // #244: SonarCloud's reliability gate refuses an UPDATE or DELETE with no WHERE, and a
+  // whole-table write is never what a migration means by accident.
+  it('names the rows of every UPDATE and DELETE', () => {
+    const unscoped = readdirSync('migrations')
+      .filter((name) => name.endsWith('.sql'))
+      .flatMap((name) =>
+        readFileSync(`migrations/${name}`, 'utf8')
+          .replace(/--.*$/gm, '')
+          .split(';')
+          .map((statement) => statement.replace(/\s+/g, ' ').trim())
+          .filter((statement) => /^(UPDATE|DELETE)\b/i.test(statement) && !/\bWHERE\b/i.test(statement))
+          .map((statement) => `${name}: ${statement}`),
+      );
+    expect(unscoped).toEqual([]);
   });
 });
