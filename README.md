@@ -2,6 +2,8 @@
 
 Learn languages and cultures by talking.
 
+Progress to launch: [ShyTalk: the road to launch](https://claude.ai/artifact/K58mvus5Tnn6e1D25KvLYT).
+
 # Shyden Labs repo template
 
 A starter kit: a new Shyden Labs repository starts with CI and repository
