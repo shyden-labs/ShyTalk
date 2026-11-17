@@ -72,28 +72,26 @@ export function unexcused(report: AuditReport, exceptions: AuditException[]): st
 }
 
 /** One line per excused advisory: a fixed release to take now, still none, or why it could not be checked. */
-export async function fixCheck(exceptions: AuditException[], fetcher: typeof fetch): Promise<string[]> {
-  const lines: string[] = [];
-  for (const { advisory, package: name, ruled } of exceptions) {
-    try {
-      const answer = await fetcher(`https://api.github.com/advisories/${advisory}`, {
-        headers: { accept: 'application/vnd.github+json' },
-      });
-      if (!answer.ok) throw new Error(`GitHub answered ${String(answer.status)}`);
-      const { vulnerabilities } = (await answer.json()) as {
-        vulnerabilities: { package: { name: string }; first_patched_version: string | null }[];
-      };
-      const fixed = vulnerabilities.find((entry) => entry.package.name === name)?.first_patched_version ?? null;
-      lines.push(
-        fixed === null
+export function fixCheck(exceptions: AuditException[], fetcher: typeof fetch): Promise<string[]> {
+  return Promise.all(
+    exceptions.map(async ({ advisory, package: name, ruled }) => {
+      try {
+        const answer = await fetcher(`https://api.github.com/advisories/${advisory}`, {
+          headers: { accept: 'application/vnd.github+json' },
+        });
+        if (!answer.ok) throw new Error(`GitHub answered ${String(answer.status)}`);
+        const { vulnerabilities } = (await answer.json()) as {
+          vulnerabilities: { package: { name: string }; first_patched_version: string | null }[];
+        };
+        const fixed = vulnerabilities.find((entry) => entry.package.name === name)?.first_patched_version ?? null;
+        return fixed === null
           ? `audit: ${advisory} (${name}) still names no fixed release`
-          : `audit: FIX AVAILABLE: ${name} ${fixed} fixes ${advisory}. Take it now and delete the exception from audit-exceptions.json (${ruled})`,
-      );
-    } catch (error) {
-      lines.push(`audit: could not check ${advisory} for a fix: ${(error as Error).message}`);
-    }
-  }
-  return lines;
+          : `audit: FIX AVAILABLE: ${name} ${fixed} fixes ${advisory}. Take it now and delete the exception from audit-exceptions.json (${ruled})`;
+      } catch (error) {
+        return `audit: could not check ${advisory} for a fix: ${(error as Error).message}`;
+      }
+    }),
+  );
 }
 
 const exceptions = (): AuditException[] => JSON.parse(readFileSync('audit-exceptions.json', 'utf8')) as AuditException[];
@@ -105,7 +103,7 @@ export function main(args: string[]): number | Promise<number> {
       return 0;
     });
   }
-  const run = spawnSync('npm', ['audit', '--json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const run = spawnSync('npm', ['audit', '--json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
   let report: AuditReport;
   try {
     report = JSON.parse(run.stdout) as AuditReport;
