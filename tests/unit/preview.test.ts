@@ -3,6 +3,7 @@ import {
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
   makePreviews,
+  pagePath,
   pageUrl,
   previewImageUrl,
   previewKey,
@@ -40,6 +41,22 @@ describe('previewKey', () => {
   it('names a built file path the same as its page path', () => {
     expect(previewKey('zh/404.html')).toBe(previewKey('/zh/404.html'));
     expect(previewKey('sign-up/index.html')).toBe(previewKey('/sign-up/'));
+  });
+});
+
+describe('pagePath', () => {
+  it('serves a folder page at its folder', () => {
+    expect(pagePath('index.html')).toBe('/');
+    expect(pagePath('id/index.html')).toBe('/id/');
+    expect(pagePath('th/sign-up/index.html')).toBe('/th/sign-up/');
+  });
+
+  it('keeps a page file as Astro names it', () => {
+    expect(pagePath('id/closed-testing.html')).toBe('/id/closed-testing.html');
+  });
+
+  it('leaves a page merely ending in index alone', () => {
+    expect(pagePath('reindex.html')).toBe('/reindex.html');
   });
 });
 

@@ -20,6 +20,9 @@ export function previewKey(path: string): string {
   return relative.replace(/\.html$/, '');
 }
 
+/** A built page's path as Astro names it while building (`id/index.html` is `/id/`, `id/privacy.html` stays). */
+export const pagePath = (builtFile: string): string => `/${builtFile.replace(/(^|\/)index\.html$/, '$1')}`;
+
 /** The address the site serves the page at: Workers' assets answer without `.html`. */
 export const pageUrl = (origin: string, path: string): string => `${origin}${path.replace(/\.html$/, '')}`;
 
@@ -60,9 +63,8 @@ export async function makePreviews(server: string, out: string, deps: PreviewDep
   const pages = deps.pages();
   if (pages.length === 0) throw new Error('no built pages: run npm run build:web first');
   for (const page of pages) {
-    const path = `/${page.replace(/(^|\/)index\.html$/, '$1')}`;
     try {
-      await deps.shoot(pageUrl(server, path), `${out}/${previewKey(page)}.png`);
+      await deps.shoot(pageUrl(server, pagePath(page)), `${out}/${previewKey(page)}.png`);
     } catch (error) {
       throw new Error(`${page}: ${(error as Error).message}`, { cause: error });
     }
