@@ -23,7 +23,8 @@ const REPO = '/repo';
 const I18N = `${REPO}/apps/web/src/i18n`;
 const LEDGER = `${HOME}/.config/shyden/google-translate-ledger.json`;
 const LOCK = `${HOME}/.config/shyden/google-translate.lock`;
-const TABLE = `${REPO}/.superpowers/sdd/plan-03/read-back-th.md`;
+// Named by locale and the run's UTC time, so no run replaces another's table (shyden-labs/ShyTalk#247).
+const TABLE = `${REPO}/.superpowers/sdd/plan-03/read-back-th-2026-11-02T01-00-00.000Z.md`;
 
 function memoryFiles(initial: Record<string, string>): LedgerFiles & { all: Map<string, string> } {
   const all = new Map(Object.entries(initial));
@@ -114,6 +115,27 @@ describe('google-read-back', () => {
       "# Read-back: th\n\n| Key | English source | My line | Google's English |\n| --- | --- | --- | --- |\n" +
         '| home.title | Talk to learn | คุยเพื่อเรียน | Chat to learn |\n| home.hi | Hi {name} | สวัสดี {name} | Hello {name} |\n',
     );
+  });
+
+  it('prints the path of the table it wrote', async () => {
+    const d = deps();
+    expect(await run(['th'], d)).toBe(0);
+    expect(d.out).toContain(`table: ${TABLE}`);
+  });
+
+  it("keeps an earlier run's table and writes this run's beside it", async () => {
+    const earlier = `${REPO}/.superpowers/sdd/plan-03/read-back-th-2026-11-02T00-30-00.000Z.md`;
+    const d = deps({ files: { [earlier]: 'the earlier table' } });
+    expect(await run(['th'], d)).toBe(0);
+    expect(d.files.all.get(earlier)).toBe('the earlier table');
+    expect(d.files.all.get(TABLE)).toContain('# Read-back: th');
+  });
+
+  it('never replaces a table already at its path, and says which', async () => {
+    const d = deps({ files: { [TABLE]: 'a table from the same millisecond' } });
+    expect(await run(['th'], d)).toBe(1);
+    expect(d.files.all.get(TABLE)).toBe('a table from the same millisecond');
+    expect(d.out).toContain(`${TABLE} is already there; this run's table was not written over it`);
   });
 
   it('moves the ledger by the characters sent, and says so', async () => {
