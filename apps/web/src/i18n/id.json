@@ -140,5 +140,8 @@
     "signInWithRecoveryCode": "Masuk dengan kode",
     "signInRefused": "Tidak berhasil. Periksa alamat dan kodenya, lalu coba lagi.",
     "codesLeftAfterSignIn": "Berhasil masuk. Sisa kode pemulihan: {count}."
+  },
+  "holding": {
+    "building": "Aplikasi ShyTalk sedang dibangun saat ini."
   }
 }

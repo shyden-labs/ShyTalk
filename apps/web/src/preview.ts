@@ -21,6 +21,13 @@ export function previewKey(path: string): string {
   return relative === '' || relative.endsWith('/') ? `${relative}index` : relative.replace(/\.html$/, '');
 }
 
+/**
+ * The address a page is shared at: its own, except the holding page, shared at the bare address, the only one that
+ * answers 200 while production holds (shyden-labs/ShyTalk#261).
+ */
+export const sharedUrl = (origin: string, path: string): string =>
+  /(^|\/)holding(\.html)?$/.test(path) ? `${origin}/` : pageUrl(origin, path);
+
 export const previewImageUrl = (origin: string, path: string): string => `${origin}/previews/${previewKey(path)}.png`;
 
 const EACH_LANGUAGE = '[locale]/';

@@ -4,6 +4,7 @@ import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
+import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, wantedPreview } from '../support/link-preview.ts';
 
@@ -38,8 +39,13 @@ vi.mock('../support/totp.ts', async (importOriginal) => ({
 const LOCALE: Record<string, Locale> = { en: 'en', id: 'id', th: 'th', vi: 'vi', 'zh-Hans': 'zh' };
 const PREFIX: Record<string, string> = { en: '', id: '/id', th: '/th', vi: '/vi', 'zh-Hans': '/zh' };
 
+/** The holding page's lines, by their data-holding name (shyden-labs/ShyTalk#261). */
+const HOLDING_KEYS: Record<string, string> = { intro: 'home.intro', way: 'home.wayTitle', building: 'holding.building' };
+
 /** What each selector holds on the site as it should be. */
 function selectorText(locale: Locale, selector: string): string {
+  const holding = /data-holding="(\w+)"/.exec(selector)?.[1];
+  if (holding !== undefined) return t(locale, HOLDING_KEYS[holding] ?? 'missing');
   const line = /data-line="(\w+)"/.exec(selector)?.[1];
   if (line !== undefined) return t(locale, `closedTesting.${line}`);
   if (selector === 'label[for="apply-email"]') return t(locale, 'closedTesting.emailLabel');
@@ -81,7 +87,9 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
             : lang
           : selector === VIEWPORT_TAG && name === 'content'
             ? VIEWPORT
-            : null,
+            : selector === 'a[href^="mailto:"]' && name === 'href'
+              ? `mailto:${SUPPORT_EMAIL}`
+              : null,
       ),
     isVisible: (selector) => Promise.resolve(selector !== '[data-english-only]:not([hidden])'),
     text: (selector) => Promise.resolve(selectorText(locale, selector)),
@@ -91,7 +99,7 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     },
     type: () => Promise.resolve(),
     waitForText: () => Promise.resolve(),
-    visibleLinks: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
+    visibleLinks: (name) => Promise.resolve(name === t(locale, 'home.apply') || name === SUPPORT_EMAIL ? 1 : 0),
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     count: () => Promise.resolve(0),
     axeViolations: () => Promise.resolve([]),
@@ -115,8 +123,16 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
   'an unknown page answers 404': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
   'the closed-testing page shows the form and every statement': { en: 17, id: 17, th: 17, vi: 17, 'zh-Hans': 17 },
   'the confirm page passes axe, and its button with a dead link shows link-expired': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
+  // Counted from its Playwright twin's 13 checks (shyden-labs/ShyTalk#261); confirmed against CI's smoke-totals.
+  'the holding page shows what ShyTalk is, that the app is being built, and the contact,': {
+    en: 13,
+    id: 13,
+    th: 13,
+    vi: 13,
+    'zh-Hans': 13,
+  },
   // Two per page: its title is not empty, and its preview is as wanted (shyden-labs/ShyTalk#198).
-  'every page carries its link preview': { en: 28, id: 28, th: 22, vi: 22, 'zh-Hans': 22 },
+  'every page carries its link preview': { en: 30, id: 30, th: 24, vi: 24, 'zh-Hans': 24 },
 };
 
 describe('the iPhone cases', () => {
@@ -923,6 +939,52 @@ describe('the English-only note on a legal page (shyden-labs/ShyTalk#190)', () =
 
   it('fails naming the note when it is not shown within 15 s', async () => {
     await expect(run(delayedNote(15_001))).rejects.toThrow('no visible note');
+  });
+});
+
+describe('the iPhone holding-page cases (shyden-labs/ShyTalk#261)', () => {
+  const holding = IPHONE_CASES.filter(({ title }) => kind(title).startsWith('the holding page')).map((c) => [c.title, c] as const);
+
+  it('holds one in every language', () => {
+    expect(holding.map(([title]) => langOf(title))).toEqual(Object.keys(LOCALE));
+  });
+
+  it.each(holding)('%s: opens the holding page', async (title, c) => {
+    const page = safari(langOf(title));
+    await c.run(page);
+    expect(page.visited).toEqual([`${PREFIX[langOf(title)] ?? '?'}/holding`]);
+  });
+
+  it.each(holding)('%s: fails on anything but 200', async (title, c) => {
+    await expect(c.run(safari(langOf(title), { goto: () => Promise.resolve(404) }))).rejects.toThrow();
+  });
+
+  it.each(holding)('%s: fails naming a line that is hidden or holds other words', async (title, c) => {
+    await expect(
+      c.run(safari(langOf(title), { isVisible: (selector) => Promise.resolve(selector !== '[data-holding="building"]') })),
+    ).rejects.toThrow('[data-holding="building"]');
+    await expect(
+      c.run(
+        safari(langOf(title), {
+          text: (selector) =>
+            Promise.resolve(selector === '[data-holding="intro"]' ? 'other words' : selectorText(LOCALE[langOf(title)] ?? 'en', selector)),
+        }),
+      ),
+    ).rejects.toThrow('[data-holding="intro"]');
+  });
+
+  it.each(holding)('%s: fails when the contact link is missing or points elsewhere', async (title, c) => {
+    await expect(c.run(safari(langOf(title), { visibleLinks: () => Promise.resolve(0) }))).rejects.toThrow();
+    await expect(c.run(safari(langOf(title), { attribute: () => Promise.resolve('mailto:someone@else.example') }))).rejects.toThrow();
+  });
+
+  it.each(holding)('%s: fails when the page shows a menu or a footer', async (title, c) => {
+    await expect(c.run(safari(langOf(title), { count: () => Promise.resolve(1) }))).rejects.toThrow();
+  });
+
+  it.each(holding)('%s: fails on an axe violation or a CSP refusal', async (title, c) => {
+    await expect(c.run(safari(langOf(title), { axeViolations: () => Promise.resolve(['region: 1']) }))).rejects.toThrow();
+    await expect(c.run(safari(langOf(title), { cspRefusals: () => Promise.resolve(['refused']) }))).rejects.toThrow();
   });
 });
 
