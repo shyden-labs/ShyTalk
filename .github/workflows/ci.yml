@@ -46,7 +46,7 @@ jobs:
       - run: node scripts/npm-ci.ts
       # Any known vulnerability, of any severity and dev dependencies included, fails the build (shyden-labs/repo-template#156).
       - name: Audit
-        run: npm audit --audit-level=low
+        run: node scripts/audit.ts
       # The static checks (issue shyden-labs/repo-template#61); .githooks/pre-push runs the same three before every push.
       - name: Typecheck
         if: steps.classify.outputs.scope != 'docs-only'
