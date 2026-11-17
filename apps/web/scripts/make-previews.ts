@@ -62,11 +62,18 @@ export async function main(): Promise<number> {
   try {
     const page = await browser.newPage({ viewport: { width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT }, deviceScaleFactor: 1 });
     await page.route(`${SHOT_ORIGIN}/**`, async (route) => {
-      const file = await builtFileFor(DIST, new URL(route.request().url()).pathname, isFile);
+      const { pathname } = new URL(route.request().url());
+      // The site's API answers as it does a signed-out visitor, so each picture shows what opening the link shows.
+      if (pathname.startsWith('/api/')) {
+        await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
+        return;
+      }
+      const file = await builtFileFor(DIST, pathname, isFile);
       await route.fulfill(file === undefined ? { status: 404 } : { path: file });
     });
     const count = await makePreviews(pages, OUT, async (url, file) => {
-      const answer = await page.goto(url, { waitUntil: 'load' });
+      // Quiet network: the page has asked whether it is signed in, and gone where the answer sends it.
+      const answer = await page.goto(url, { waitUntil: 'networkidle' });
       if (answer === null) throw new Error('no answer');
       if (answer.status() !== 200) throw new Error(`answered ${String(answer.status())}, not 200`);
       await mkdir(dirname(file), { recursive: true });

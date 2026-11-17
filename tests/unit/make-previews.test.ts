@@ -100,7 +100,7 @@ describe('makePreviews', () => {
 /** What the route handler is handed: the request's address, and the answer it gives. */
 interface Route {
   request(): { url(): string };
-  fulfill(answer: { path?: string; status?: number }): Promise<void>;
+  fulfill(answer: { path?: string; status?: number; contentType?: string; body?: string }): Promise<void>;
 }
 
 const BUILT = fileURLToPath(new URL('../../apps/web/dist', import.meta.url));
@@ -120,7 +120,7 @@ function fakes(options: { status?: number | null; files?: string[] } = {}) {
     return Promise.reject(new Error(`ENOENT: ${String(path)}`));
   });
   vi.mocked(mkdir).mockResolvedValue(undefined);
-  const served: { url: string; answer: { path?: string; status?: number } }[] = [];
+  const served: { url: string; answer: { path?: string; status?: number; contentType?: string; body?: string } }[] = [];
   let handler: ((route: Route) => Promise<void>) | undefined;
   const page = {
     route: vi.fn((_: string, h: (route: Route) => Promise<void>) => {
@@ -128,7 +128,7 @@ function fakes(options: { status?: number | null; files?: string[] } = {}) {
       return Promise.resolve();
     }),
     goto: vi.fn(async (url: string) => {
-      for (const asked of [url, `${SHOT_ORIGIN}/styles/site.css`, `${SHOT_ORIGIN}/styles`]) {
+      for (const asked of [url, `${SHOT_ORIGIN}/styles/site.css`, `${SHOT_ORIGIN}/styles`, `${SHOT_ORIGIN}/api/app/sign-in-methods`]) {
         await handler?.({
           request: () => ({ url: () => asked }),
           fulfill: (answer) => {
@@ -159,13 +159,19 @@ describe('main', () => {
     expect(browser.newPage).toHaveBeenCalledWith({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
     expect(page.route).toHaveBeenCalledWith(`${SHOT_ORIGIN}/**`, expect.any(Function));
     expect(page.goto.mock.calls).toEqual([
-      [`${SHOT_ORIGIN}/id/sign-in/`, { waitUntil: 'load' }],
-      [`${SHOT_ORIGIN}/`, { waitUntil: 'load' }],
+      [`${SHOT_ORIGIN}/id/sign-in/`, { waitUntil: 'networkidle' }],
+      [`${SHOT_ORIGIN}/`, { waitUntil: 'networkidle' }],
     ]);
     expect(served).toContainEqual({ url: `${SHOT_ORIGIN}/id/sign-in/`, answer: { path: `${BUILT}/id/sign-in/index.html` } });
     expect(served).toContainEqual({ url: `${SHOT_ORIGIN}/styles/site.css`, answer: { path: `${BUILT}/styles/site.css` } });
     // A folder is not a file: /styles is neither styles nor styles.html.
     expect(served).toContainEqual({ url: `${SHOT_ORIGIN}/styles`, answer: { status: 404 } });
+    // The site's API answers as it does a signed-out visitor, so each picture shows what opening the link shows, and
+    // never an error line from an API that is not there.
+    expect(served).toContainEqual({
+      url: `${SHOT_ORIGIN}/api/app/sign-in-methods`,
+      answer: { status: 401, contentType: 'application/json', body: '{}' },
+    });
     expect(mkdir).toHaveBeenCalledWith(`${OUT}/id/sign-in`, { recursive: true });
     expect(page.screenshot.mock.calls).toEqual([[{ path: `${OUT}/id/sign-in/index.png` }], [{ path: `${OUT}/index.png` }]]);
     expect(log).toHaveBeenCalledWith(`make-previews: 2 pictures in ${OUT}`);
