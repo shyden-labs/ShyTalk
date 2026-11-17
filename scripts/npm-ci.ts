@@ -20,7 +20,7 @@ export function warnings(output: string): string[] {
 }
 
 export function main(): number {
-  const run = spawnSync('npm', ['ci'], { encoding: 'utf8', stdio: ['inherit', 'pipe', 'pipe'] });
+  const run = spawnSync('npm', ['ci'], { encoding: 'utf8', stdio: ['inherit', 'pipe', 'pipe'] }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
   if (run.error) throw new Error(`npm ci did not run: ${run.error.message}`);
   process.stdout.write(run.stdout);
   process.stderr.write(run.stderr);
