@@ -75,9 +75,9 @@ describe('deploy-release', () => {
     expect(deployStep()).toContain('          TARGET: ${{ github.ref == refs/heads/main && prod || test }}');
   });
 
-  it('builds the website, and a rehearsal only bundles both environments, holding no credential', () => {
+  it('builds the website for TARGET, whose addresses its link previews name (shyden-labs/ShyTalk#198), and a rehearsal only bundles both environments, holding no credential', () => {
     const step = deployStep();
-    const build = step.indexOf('npm run build:web ||');
+    const build = step.indexOf('SITE_ENVIRONMENT=$TARGET npm run build:web ||');
     const rehearsal = step.indexOf('if [ $DEPLOY_REHEARSAL = true ]; then');
     const test = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --dry-run --env test --outdir $RUNNER_TEMP/test ||');
     const prod = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --dry-run --env prod --outdir $RUNNER_TEMP/prod ||');

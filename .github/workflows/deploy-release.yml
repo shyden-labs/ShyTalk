@@ -62,7 +62,7 @@ jobs:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
         run: |
-          npm run build:web || { echo "::error title=deploy-release failed::the website did not build"; exit 1; }
+          SITE_ENVIRONMENT="$TARGET" npm run build:web || { echo "::error title=deploy-release failed::the website did not build"; exit 1; }
           cd workers/web
           if [ "$DEPLOY_REHEARSAL" = true ]; then
             "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --dry-run --env test --outdir "$RUNNER_TEMP/test" || { echo "::error title=deploy-release failed::workers/web did not bundle for test"; exit 1; }

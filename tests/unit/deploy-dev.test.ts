@@ -89,9 +89,9 @@ describe('deploy-dev', () => {
     );
   });
 
-  it('builds the website before the Worker bundles it', () => {
+  it('builds the website for dev, whose addresses its link previews name (shyden-labs/ShyTalk#198), before the Worker bundles it', () => {
     const step = deployStep().join('\n');
-    const build = step.indexOf('npm run build:web ||');
+    const build = step.indexOf('SITE_ENVIRONMENT=dev npm run build:web ||');
     const enter = step.indexOf('cd workers/web');
     expect(build).toBeGreaterThan(-1);
     expect(enter).toBeGreaterThan(build);
