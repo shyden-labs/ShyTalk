@@ -69,7 +69,7 @@ describe('waitForMail', () => {
     await expect(waitForMail('t2', { password: 'pw', open: () => Promise.resolve(box), now, pause })).rejects.toThrow(
       'no mail reached INBOX.t2 within 120 s',
     );
-    expect(box.folders.length).toBe(25);
+    expect(box.folders).toHaveLength(25);
     expect(box.closed).toBe(1);
   });
 

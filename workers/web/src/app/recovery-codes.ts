@@ -64,7 +64,7 @@ export function newRecoveryCodes(random: (bytes: Uint8Array<ArrayBuffer>) => Uin
 /** A code as typed, made comparable: no dashes or spaces, upper case, I and L read as 1, O as 0; null if it cannot be one. */
 export function normaliseRecoveryCode(input: unknown): string | null {
   if (typeof input !== 'string') return null;
-  const code = input.replace(/[\s-]/g, '').toUpperCase().replace(/[IL]/g, '1').replace(/O/g, '0');
+  const code = input.replace(/[\s-]/g, '').toUpperCase().replaceAll(/[IL]/g, '1').replaceAll('O', '0');
   return /^[0-9A-HJKMNP-TV-Z]{16}$/.test(code) ? code : null;
 }
 

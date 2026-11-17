@@ -40,7 +40,7 @@ import {
 } from './read-back.ts';
 
 const ENDPOINT = 'https://translation.googleapis.com/language/translate/v2';
-const LOCALES = ['id', 'th', 'vi', 'zh'];
+const LOCALES = new Set(['id', 'th', 'vi', 'zh']);
 const USAGE = 'usage: node scripts/i18n/google-read-back.ts <id|th|vi|zh> [keys…]';
 // Google v2 takes up to 128 texts a request and advises at most 5,000 characters.
 const MAX_TEXTS = 100;
@@ -96,7 +96,7 @@ async function ask(deps: Deps, key: string, locale: string, batch: readonly Plan
 
 export async function run(args: string[], deps: Deps): Promise<number> {
   const [locale, ...keys] = args;
-  if (locale === undefined || !LOCALES.includes(locale)) throw new Error(USAGE);
+  if (locale === undefined || !LOCALES.has(locale)) throw new Error(USAGE);
 
   const dir = deps.env['I18N_DIR'] ?? `${deps.cwd}/apps/web/src/i18n`;
   const english = catalogue(deps.files, `${dir}/en.json`);

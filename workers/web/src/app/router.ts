@@ -67,59 +67,80 @@ function readyForSignIn(env: WebEnv): ReadyEnv | null {
   return { ENVIRONMENT_NAME, DB, SITE_ORIGIN, BETTER_AUTH_SECRET, GOOGLE_CLIENT_IDS, APPLE_AUDIENCES, SIGN_IN_LIMIT };
 }
 
+type Route = (request: Request, env: WebEnv) => Promise<Response>;
+
+const signInUnavailable = (): Promise<Response> => Promise.resolve(json(503, { error: 'sign_in_unavailable' }));
+
+/** `route` with the sign-in settings, or 503 when this environment lacks them. */
+const withSignIn =
+  (route: (request: Request, ready: ReadyEnv, env: WebEnv) => Promise<Response>): Route =>
+  (request, env) => {
+    const ready = readyForSignIn(env);
+    return ready === null ? signInUnavailable() : route(request, ready, env);
+  };
+
+/** An email-code route, given one environment holding the sign-in settings and its deps. */
+function emailRoute(handler: typeof handleEmailStart | typeof handleEmailVerify): Route {
+  return withSignIn((request, ready, env) => {
+    const emailEnv = { ...env, ...ready };
+    return handler(request, emailEnv, emailDeps(emailEnv));
+  });
+}
+
+/** The routes found by their exact path. */
+const EXACT = new Map<string, Route>([
+  [
+    `${APP_API_PREFIX}health`,
+    (request, env) =>
+      Promise.resolve(
+        request.method === 'GET'
+          ? json(200, { ok: true, environment: env.ENVIRONMENT_NAME })
+          : new Response(null, { status: 405, headers: { allow: 'GET' } }),
+      ),
+  ],
+  [
+    UI,
+    (request, env) => {
+      const { ENVIRONMENT_NAME, DB } = env;
+      if (DB === undefined || !isD1(DB)) return Promise.resolve(json(503, { error: 'ui_unavailable' }));
+      return handleUi(request, d1UiStore({ ENVIRONMENT_NAME, DB }));
+    },
+  ],
+  [LIVE, (request, env) => live(request, env)],
+  [LIVE_ANNOUNCE, (request, env) => liveAnnounce(request, env)],
+  [EMAIL_START, emailRoute(handleEmailStart)],
+  [EMAIL_VERIFY, emailRoute(handleEmailVerify)],
+  [RECOVERY, withSignIn((request, ready) => handleRecoveryPending(request, ready, sessionReader(authFor(ready))))],
+  [RECOVERY_CANCEL, withSignIn((request, ready) => handleRecoveryCancel(request, ready, sessionReader(authFor(ready))))],
+  [TOTP_SETUP, (request, env) => totpSetupRoute(request, env, true)],
+  [TOTP_CONFIRM, (request, env) => totpSetupRoute(request, env, false)],
+  [SIGN_OUT, withSignIn((request, ready) => handleSignOut(request, ready, authFor(ready)))],
+]);
+
+const methods = withSignIn((request, ready) => handleMethods(request, ready, sessionReader(authFor(ready))));
+
 export function handleAppApi(request: Request, env: WebEnv): Promise<Response> {
   const { pathname } = new URL(request.url);
-  if (pathname === `${APP_API_PREFIX}health`) {
-    if (request.method !== 'GET') return Promise.resolve(new Response(null, { status: 405, headers: { allow: 'GET' } }));
-    return Promise.resolve(json(200, { ok: true, environment: env.ENVIRONMENT_NAME }));
-  }
-  if (pathname === UI) {
-    const { ENVIRONMENT_NAME, DB } = env;
-    if (DB === undefined || !isD1(DB)) return Promise.resolve(json(503, { error: 'ui_unavailable' }));
-    return handleUi(request, d1UiStore({ ENVIRONMENT_NAME, DB }));
-  }
-  if (pathname === LIVE) return live(request, env);
-  if (pathname === LIVE_ANNOUNCE) return liveAnnounce(request, env);
-  if (pathname === EMAIL_START || pathname === EMAIL_VERIFY) {
-    const ready = readyForSignIn(env);
-    if (ready === null) return Promise.resolve(json(503, { error: 'sign_in_unavailable' }));
-    const emailEnv = { ...env, ...ready };
-    return pathname === EMAIL_START
-      ? handleEmailStart(request, emailEnv, emailDeps(emailEnv))
-      : handleEmailVerify(request, emailEnv, emailDeps(emailEnv));
-  }
-  if (pathname === RECOVERY || pathname === RECOVERY_CANCEL) {
-    const ready = readyForSignIn(env);
-    if (ready === null) return Promise.resolve(json(503, { error: 'sign_in_unavailable' }));
-    const auth = authFor(ready);
-    const sessionOf = sessionReader(auth);
-    return pathname === RECOVERY ? handleRecoveryPending(request, ready, sessionOf) : handleRecoveryCancel(request, ready, sessionOf);
-  }
-  if (pathname === TOTP_SETUP || pathname === TOTP_CONFIRM) return totpSetupRoute(request, env, pathname === TOTP_SETUP);
+  const exact = EXACT.get(pathname);
+  if (exact !== undefined) return exact(request, env);
   if (isUnder(pathname, 'sign-in-methods') || isUnder(pathname, 'sessions') || isUnder(pathname, 'recovery-codes')) {
-    const ready = readyForSignIn(env);
-    if (ready === null) return Promise.resolve(json(503, { error: 'sign_in_unavailable' }));
-    const auth = authFor(ready);
-    return handleMethods(request, ready, sessionReader(auth));
+    return methods(request, env);
   }
   const passkeyOperation = PASSKEY[pathname];
   if (passkeyOperation !== undefined) return passkeyRoute(request, env, passkeyOperation);
   const codeKind = CODE_SIGN_IN[pathname];
-  if (codeKind !== undefined) {
-    const ready = readyForSignIn(env);
-    const { TOTP_KEY } = env;
-    if (ready === null || (codeKind === 'totp' && TOTP_KEY === undefined))
-      return Promise.resolve(json(503, { error: 'sign_in_unavailable' }));
-    return handleCodeSignIn(request, ready, authFor(ready), codeKind, codeVerifier(codeKind, ready, TOTP_KEY));
-  }
+  if (codeKind !== undefined) return codeSignIn(request, env, codeKind);
   const provider = SIGN_IN[pathname];
-  if (provider !== undefined || pathname === SIGN_OUT) {
-    const ready = readyForSignIn(env);
-    if (ready === null) return Promise.resolve(json(503, { error: 'sign_in_unavailable' }));
-    const auth = authFor(ready);
-    return provider === undefined ? handleSignOut(request, ready, auth) : handleSignIn(request, ready, auth, provider);
-  }
+  if (provider !== undefined) return withSignIn((req, ready) => handleSignIn(req, ready, authFor(ready), provider))(request, env);
   return Promise.resolve(json(404, { error: 'not_found' }));
+}
+
+/** A code sign-in: an authenticator code needs the TOTP key as well as the sign-in settings. */
+function codeSignIn(request: Request, env: WebEnv, codeKind: CodeKind): Promise<Response> {
+  const ready = readyForSignIn(env);
+  const { TOTP_KEY } = env;
+  if (ready === null || (codeKind === 'totp' && TOTP_KEY === undefined)) return signInUnavailable();
+  return handleCodeSignIn(request, ready, authFor(ready), codeKind, codeVerifier(codeKind, ready, TOTP_KEY));
 }
 
 /** `GET /api/app/live` (plan 4 Task 8): the WebSocket that tells the app a new UI is published. */

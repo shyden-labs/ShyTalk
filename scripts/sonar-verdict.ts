@@ -133,10 +133,11 @@ async function judge(path: string): Promise<{ ok: boolean; lines: string[]; dash
     task = ((await get(`${report.serverUrl}/api/ce/task?id=${report.ceTaskId}`, token)) as { task: typeof task }).task;
     if (task.status !== 'PENDING' && task.status !== 'IN_PROGRESS') break;
     if (waited >= ceiling) fail(`task ${report.ceTaskId} is still ${task.status} after ${ceiling} s; no verdict to read`);
-    await sleep(STEP_MS);
+    await sleep(STEP_MS); // NOSONAR: a poll, each look waits for the one before, and a stated ceiling fails naming the cause (#245)
   }
   if (task.status !== 'SUCCESS') {
-    fail(`task ${report.ceTaskId} ended ${task.status}${task.errorMessage ? ` (${task.errorMessage})` : ''}; no verdict to read`);
+    const why = task.errorMessage ? ' (' + task.errorMessage + ')' : '';
+    fail(`task ${report.ceTaskId} ended ${task.status}${why}; no verdict to read`);
   }
   if (task.analysisId === undefined) fail(`task ${report.ceTaskId} made no analysis; no verdict to read`);
   const pullRequest = process.env.SONAR_PULL_REQUEST || '';
