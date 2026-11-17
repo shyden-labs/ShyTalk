@@ -72,11 +72,20 @@ jobs:
             -Dsonar.organization=${{ inputs.organization }}
             -Dsonar.projectKey=${{ inputs.project-key }}
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.sources=.
             -Dsonar.tests=tests
             -Dsonar.exclusions=tests/**
             -Dsonar.coverage.exclusions=eslint.config.js,vitest.unit.config.ts
+      # A pull request's analysis counts only the files it changed, so the verdict is given
+      # that list to judge whether no source lines means the scan read none (issue #240).
       - name: Read the quality gate of this scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
-        run: node scripts/sonar-verdict.ts .scannerwork/report-task.txt
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ -n "$SONAR_PULL_REQUEST" ]; then
+            git diff --name-only "origin/$BASE_REF...HEAD" > "$RUNNER_TEMP/changed-files.txt"
+            export SONAR_CHANGED_FILES="$RUNNER_TEMP/changed-files.txt"
+          fi
+          node scripts/sonar-verdict.ts .scannerwork/report-task.txt
