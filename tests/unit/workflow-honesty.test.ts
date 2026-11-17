@@ -31,6 +31,16 @@ describe('every workflow', () => {
     ]);
   });
 
+  // #242 (SonarCloud githubactions:S8543, S6505): `npx <tool>` fetches a release from the registry when the
+  // installed one is missing; a workflow runs the lockfile's installed binary or fails.
+  it.each(files)('%s runs no tool through npx', (file) => {
+    expect(
+      read(file)
+        .split('\n')
+        .filter((line) => /\bnpx\b/.test(line) && !/^\s*#/.test(line)),
+    ).toEqual([]);
+  });
+
   it.each(files)('%s swallows no failure and gates no step on the token', (file) => {
     expect([...swallowed(file, read(file)), ...tokenGated(file, read(file))]).toEqual([]);
   });

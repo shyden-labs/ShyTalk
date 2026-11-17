@@ -103,7 +103,7 @@ jobs:
           npm run build:web || { echo "::error title=deploy-dev failed::the website did not build"; exit 1; }
           cd workers/web
           if [ "$DEPLOY_REHEARSAL" = true ]; then
-            npx wrangler deploy --dry-run --env dev --outdir "$RUNNER_TEMP/web" || { echo "::error title=deploy-dev failed::workers/web did not bundle"; exit 1; }
+            "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --dry-run --env dev --outdir "$RUNNER_TEMP/web" || { echo "::error title=deploy-dev failed::workers/web did not bundle"; exit 1; }
             exit 0
           fi
           # Plan 4 Task 2 (shyden-labs/ShyTalk#75, decisions 219, 220): the
@@ -111,16 +111,16 @@ jobs:
           # deploys, or the site answers 503 to everyone. Only Wrangler's
           # not-found message (the same in 4.157.0 and 4.161.0, #232) creates
           # it; any other error stops the job, with no retry.
-          info=$(npx wrangler d1 info shytalk-dev --env dev 2>&1) || {
+          info=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 info shytalk-dev --env dev 2>&1) || {
             printf '%s\n' "$info"
             case "$info" in
-              *"Couldn't find a D1 DB named 'shytalk-dev'"*) npx wrangler d1 create shytalk-dev --location apac || { echo "::error title=deploy-dev failed::shytalk-dev was not created"; exit 1; } ;;
+              *"Couldn't find a D1 DB named 'shytalk-dev'"*) "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 create shytalk-dev --location apac || { echo "::error title=deploy-dev failed::shytalk-dev was not created"; exit 1; } ;;
               *) echo "::error title=deploy-dev failed::d1 info shytalk-dev failed"; exit 1 ;;
             esac
           }
-          npx wrangler d1 migrations apply DB --remote --env dev || { echo "::error title=deploy-dev failed::the shytalk-dev migrations did not apply"; exit 1; }
-          npx wrangler d1 execute DB --remote --env dev --command "CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT 'dev' WHERE NOT EXISTS (SELECT 1 FROM environment_marker);" || { echo "::error title=deploy-dev failed::the shytalk-dev marker was not written"; exit 1; }
-          marker=$(npx wrangler d1 execute DB --remote --env dev --json --command "SELECT name FROM environment_marker") || { echo "::error title=deploy-dev failed::the shytalk-dev marker could not be read back"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 migrations apply DB --remote --env dev || { echo "::error title=deploy-dev failed::the shytalk-dev migrations did not apply"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 execute DB --remote --env dev --command "CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT 'dev' WHERE NOT EXISTS (SELECT 1 FROM environment_marker);" || { echo "::error title=deploy-dev failed::the shytalk-dev marker was not written"; exit 1; }
+          marker=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 execute DB --remote --env dev --json --command "SELECT name FROM environment_marker") || { echo "::error title=deploy-dev failed::the shytalk-dev marker could not be read back"; exit 1; }
           if [ "$(printf '%s' "$marker" | jq -c '[.[0].results[].name]')" != '["dev"]' ]; then
             printf '%s\n' "$marker"
             echo "::error title=deploy-dev failed::shytalk-dev must hold exactly one marker row, dev"
@@ -132,21 +132,21 @@ jobs:
           # Worker that serves it deploys, through a Wrangler remote binding to
           # the database by id (Shyden, 2026-11-06). It publishes nothing when
           # dev already serves that document.
-          ui_db=$(npx wrangler d1 info shytalk-dev --env dev --json | jq -er '.uuid') || { echo "::error title=deploy-dev failed::the shytalk-dev id could not be read"; exit 1; }
+          ui_db=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 info shytalk-dev --env dev --json | jq -er '.uuid') || { echo "::error title=deploy-dev failed::the shytalk-dev id could not be read"; exit 1; }
           (cd "$GITHUB_WORKSPACE" && UI_ENVIRONMENT=dev UI_DATABASE_NAME=shytalk-dev UI_DATABASE_ID="$ui_db" UI_PUBLISHED_BY=ci:deploy-dev node scripts/publish-ui.ts) || { echo "::error title=deploy-dev failed::the UI document was not published"; exit 1; }
-          npx wrangler deploy --env dev || { echo "::error title=deploy-dev failed::workers/web did not deploy"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --env dev || { echo "::error title=deploy-dev failed::workers/web did not deploy"; exit 1; }
           if [ -z "$DOOR_SECRET" ]; then
             echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the dev environment (decision 216); until then the dev origin refuses every request."
             exit 1
           fi
-          printf '%s' "$DOOR_SECRET" | npx wrangler secret put DOOR_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev door secret was not set"; exit 1; }
+          printf '%s' "$DOOR_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put DOOR_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev door secret was not set"; exit 1; }
           # shyden-labs/ShyTalk#76: dev app sign-in answers 503 until the
           # Worker holds Better Auth's secret.
           if [ -z "$BETTER_AUTH_SECRET" ]; then
             echo "::error title=BETTER_AUTH_SECRET missing::Set BETTER_AUTH_SECRET in the dev environment (shyden-labs/ShyTalk#76); until then dev app sign-in answers 503."
             exit 1
           fi
-          printf '%s' "$BETTER_AUTH_SECRET" | npx wrangler secret put BETTER_AUTH_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev Better Auth secret was not set"; exit 1; }
+          printf '%s' "$BETTER_AUTH_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put BETTER_AUTH_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev Better Auth secret was not set"; exit 1; }
           # shyden-labs/ShyTalk#134: authenticator-app sign-in answers 503 until
           # the Worker holds TOTP_KEY. It seals stored secrets, so it is kept in
           # the dev environment, never made fresh here.
@@ -154,14 +154,14 @@ jobs:
             echo "::error title=TOTP_KEY missing::Set TOTP_KEY in the dev environment (shyden-labs/ShyTalk#134); until then dev authenticator-app sign-in answers 503."
             exit 1
           fi
-          printf '%s' "$TOTP_KEY" | npx wrangler secret put TOTP_KEY --env dev || { echo "::error title=deploy-dev failed::the dev authenticator key was not set"; exit 1; }
+          printf '%s' "$TOTP_KEY" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put TOTP_KEY --env dev || { echo "::error title=deploy-dev failed::the dev authenticator key was not set"; exit 1; }
           # Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07): last,
           # every open app hears the newest UI version. Each deploy makes a
           # fresh announce secret, puts it in the Worker and calls the Worker
           # with it, so nothing is stored.
           announce_secret=$(openssl rand -hex 32) || { echo "::error title=deploy-dev failed::no announce secret was made"; exit 1; }
           echo "::add-mask::$announce_secret"
-          printf '%s' "$announce_secret" | npx wrangler secret put ANNOUNCE_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev announce secret was not set"; exit 1; }
+          printf '%s' "$announce_secret" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put ANNOUNCE_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev announce secret was not set"; exit 1; }
           (cd "$GITHUB_WORKSPACE" && ANNOUNCE_ENVIRONMENT=dev ANNOUNCE_SECRET="$announce_secret" node scripts/announce-ui.ts) || { echo "::error title=deploy-dev failed::open apps were not told the UI version"; exit 1; }
           echo "deployed=true" >> "$GITHUB_OUTPUT"
       # shyden-labs/ShyTalk#88: the Oracle mail secrets are in no other step's
@@ -186,5 +186,5 @@ jobs:
               echo "::error title=$name missing::Set $name in the dev environment (shyden-labs/ShyTalk#88); until then dev sends no mail."
               exit 1
             fi
-            printf '%s' "${!name}" | npx wrangler secret put "$name" --env dev || { echo "::error title=deploy-dev failed::the dev $name was not set"; exit 1; }
+            printf '%s' "${!name}" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put "$name" --env dev || { echo "::error title=deploy-dev failed::the dev $name was not set"; exit 1; }
           done

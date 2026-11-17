@@ -82,7 +82,11 @@ describe('ci.yml', () => {
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
       { name: 'Build the site', run: 'npm run build:web', if: CODE },
-      { name: 'Install the browsers', run: 'npx playwright install --with-deps chromium firefox webkit', if: CODE },
+      {
+        name: 'Install the browsers',
+        run: '$GITHUB_WORKSPACE/node_modules/.bin/playwright install --with-deps chromium firefox webkit',
+        if: CODE,
+      },
       { name: 'Smoke', run: '|', if: CODE },
       { name: 'Compare the totals', run: 'node scripts/smoke-totals.ts', if: `\${{ !cancelled() && ${CODE} }}` },
     ]);
