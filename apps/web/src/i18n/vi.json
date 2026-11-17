@@ -139,5 +139,8 @@
     "signInWithRecoveryCode": "Đăng nhập bằng mã",
     "signInRefused": "Không thành công. Hãy kiểm tra địa chỉ và mã, rồi thử lại.",
     "codesLeftAfterSignIn": "Đã đăng nhập. Số mã khôi phục còn lại: {count}."
+  },
+  "holding": {
+    "building": "Ứng dụng ShyTalk đang được xây dựng."
   }
 }

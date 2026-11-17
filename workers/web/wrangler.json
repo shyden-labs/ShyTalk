@@ -17,6 +17,10 @@
         {
           "pattern": "shytalk.app",
           "custom_domain": true
+        },
+        {
+          "pattern": "www.shytalk.app",
+          "custom_domain": true
         }
       ],
       "vars": {
@@ -25,7 +29,8 @@
         "GOOGLE_CLIENT_IDS": "415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com,415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com",
         "APPLE_AUDIENCES": "com.shyden.shytalk",
         "MAIL_REGION": "ap-singapore-1",
-        "MAIL_FROM": "no-reply@shytalk.app"
+        "MAIL_FROM": "no-reply@shytalk.app",
+        "HOLDING": "true"
       },
       "d1_databases": [
         {

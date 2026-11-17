@@ -6,8 +6,10 @@ import { t, type Locale } from '../i18n/t.ts';
 interface Props {
   locale: Locale;
   title: string;
+  /** No menu or footer: the holding page, whose links lead nowhere yet (shyden-labs/ShyTalk#261). */
+  bare?: boolean;
 }
-const { locale, title } = Astro.props;
+const { locale, title, bare = false } = Astro.props;
 ---
 
 <!doctype html>
@@ -22,10 +24,10 @@ const { locale, title } = Astro.props;
     <link rel="stylesheet" href="/styles/site.css" />
   </head>
   <body>
-    <Menu locale={locale} />
+    {!bare && <Menu locale={locale} />}
     <main id="main">
       <slot />
     </main>
-    <Footer locale={locale} />
+    {!bare && <Footer locale={locale} />}
   </body>
 </html>

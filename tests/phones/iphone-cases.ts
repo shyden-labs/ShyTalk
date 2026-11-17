@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
+import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
 import { codeIn, MAIL_CEILING_MS, plusAddress, waitForAnyMail, waitForMail } from './test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import { countingCheck, type Check } from './check.ts';
@@ -53,6 +54,13 @@ const LANGUAGES = [
   { lang: 'th', locale: 'th', prefix: '/th' },
   { lang: 'vi', locale: 'vi', prefix: '/vi' },
   { lang: 'zh-Hans', locale: 'zh', prefix: '/zh' },
+] as const;
+
+/** The holding page's lines after its heading, by their `data-holding` name (shyden-labs/ShyTalk#261). */
+const HOLDING_LINES = [
+  ['intro', 'home.intro'],
+  ['way', 'home.wayTitle'],
+  ['building', 'holding.building'],
 ] as const;
 
 /** Playwright's `getByRole('navigation')` and `getByRole('heading', { level: 1 })`, as CSS. */
@@ -181,6 +189,28 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       check.equal(await page.goto(`${prefix}/no-such-page`), 404);
       await inLanguageWithoutRefusal(page, check, lang);
     }),
+    counted(
+      `${lang}: the holding page shows what ShyTalk is, that the app is being built, and the contact, in ${lang}, passing axe, with no menu and no CSP refusal`,
+      async (page, check) => {
+        check.equal(await page.goto(`${prefix}/holding`), 200);
+        check.equal(await page.attribute('html', 'lang'), lang);
+        check.ok(await page.isVisible(H1), 'no visible top heading');
+        check.equal(await page.text(H1), t(locale, 'home.heading'));
+        // Playwright's getByText(…, { exact: true }) seen: the line shown, holding exactly its words.
+        for (const [name, key] of HOLDING_LINES) {
+          const selector = `[data-holding="${name}"]`;
+          const words = await page.text(selector);
+          const wanted = t(locale, key);
+          check.ok((await page.isVisible(selector)) && words === wanted, `no visible ${selector} holding "${wanted}": "${words}"`);
+        }
+        check.equal(await page.visibleLinks(SUPPORT_EMAIL), 1, 'no visible contact link');
+        check.equal(await page.attribute('a[href^="mailto:"]', 'href'), `mailto:${SUPPORT_EMAIL}`);
+        check.equal(await page.count(NAV), 0, 'a menu shows');
+        check.equal(await page.count('footer, [role="contentinfo"]'), 0, 'a footer shows');
+        check.deepEqual(await page.axeViolations(), []);
+        check.deepEqual(await page.cspRefusals(), []);
+      },
+    ),
     counted(
       `${lang}: the closed-testing page shows the form and every statement in ${lang}, passes axe, with no CSP refusal`,
       async (page, check) => {

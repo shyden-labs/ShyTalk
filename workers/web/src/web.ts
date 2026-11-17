@@ -32,6 +32,8 @@ export interface WebEnv {
   /** The secret a deploy puts in the Worker and calls `/api/app/live/announce` with; absent, that route answers 503. */
   ANNOUNCE_SECRET?: string;
   SITE_ORIGIN?: string;
+  /** "true" while production holds (a var, prod only): every address answers the holding page (shyden-labs/ShyTalk#261). */
+  HOLDING?: string;
   BETTER_AUTH_SECRET?: string;
   GOOGLE_CLIENT_IDS?: string;
   APPLE_AUDIENCES?: string;
@@ -71,6 +73,46 @@ export function handleApi(request: Request, env: WebEnv): Promise<Response> {
   return handleClosedTesting(request, env);
 }
 
+/** The site's languages other than English, each with its own holding page under its own folder. */
+const HOLDING_LANGUAGES = ['id', 'th', 'vi', 'zh'];
+
+/**
+ * The holding page for a visitor's `Accept-Language`: the most wanted of the site's languages (a `zh-*` tag is
+ * Chinese, written simplified on this site), English when none is wanted or the header is absent.
+ */
+export function holdingPath(languages: string | null): string {
+  let best = { language: 'en', weight: 0 };
+  for (const part of (languages ?? '').split(',')) {
+    const [tag = '', ...parameters] = part.trim().split(';');
+    const language = tag.trim().toLowerCase().replace(/-.*/, '');
+    const q = parameters.map((parameter) => parameter.trim()).find((parameter) => parameter.startsWith('q='));
+    const weight = q === undefined ? 1 : Number(q.slice(2));
+    const wanted = Number.isNaN(weight) ? 1 : weight;
+    if ((language === 'en' || HOLDING_LANGUAGES.includes(language)) && wanted > best.weight) best = { language, weight: wanted };
+  }
+  return best.language === 'en' ? '/holding' : `/${best.language}/holding`;
+}
+
+/** What the holding page itself loads, served as built: its stylesheet and its link-preview picture. */
+const HOLDING_ASSETS = ['/styles/', '/previews/'];
+
+/**
+ * Production while it holds: the www address sends the visitor to the bare one; its home answers the holding page
+ * in the visitor's language; what the page loads is served; every other address answers the holding page as a 404.
+ */
+async function holding(request: Request, env: WebEnv): Promise<Response> {
+  const url = new URL(request.url);
+  if (url.hostname.startsWith('www.')) {
+    url.hostname = url.hostname.slice('www.'.length);
+    return Response.redirect(url.toString(), 301);
+  }
+  if (HOLDING_ASSETS.some((prefix) => url.pathname.startsWith(prefix))) return env.ASSETS.fetch(request);
+  const page = await env.ASSETS.fetch(new Request(new URL(holdingPath(request.headers.get('accept-language')), url)));
+  const answer = new Response(page.body, { status: url.pathname === '/' ? 200 : 404, headers: page.headers });
+  answer.headers.set('vary', 'accept-language');
+  return answer;
+}
+
 async function route(request: Request, env: WebEnv): Promise<Response> {
   // An unnamed environment cannot know whether it needs a door, so it serves nothing.
   if (!ENVIRONMENTS.has(env.ENVIRONMENT_NAME)) return new Response('Service Unavailable', { status: 503 });
@@ -78,6 +120,8 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
     const refused = await requireDoorSecret(request, env.DOOR_SECRET);
     if (refused) return refused;
   }
+  // Holding, nothing behind the page is reached, so no database is needed.
+  if (env.HOLDING === 'true') return holding(request, env);
   // A Worker deployed without its database cannot prove whose data it serves.
   if (!env.DB) return new Response('Service Unavailable', { status: 503 });
   const wrongStore = await markerGuard(env.ENVIRONMENT_NAME, env.DB).assertEnvironmentMarkers();

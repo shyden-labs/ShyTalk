@@ -139,5 +139,8 @@
     "signInWithRecoveryCode": "Sign in with the code",
     "signInRefused": "That did not work. Check the address and the code, and try again.",
     "codesLeftAfterSignIn": "Signed in. Recovery codes left: {count}."
+  },
+  "holding": {
+    "building": "The ShyTalk app is being built now."
   }
 }
