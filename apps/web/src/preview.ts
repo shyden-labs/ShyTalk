@@ -51,6 +51,14 @@ export function siteOrigin(environment: string | undefined, wrangler: WranglerOr
   return origin;
 }
 
+/** The environment whose `SITE_ORIGIN` an address is on: what a run against a deployed site was built for. */
+export function environmentAt(address: string, wrangler: WranglerOrigins): string {
+  const { origin } = new URL(address);
+  const found = Object.entries(wrangler.env).find(([, settings]) => settings.vars?.SITE_ORIGIN === origin);
+  if (found === undefined) throw new Error(`${origin} is the SITE_ORIGIN of no environment in workers/web/wrangler.json`);
+  return found[0];
+}
+
 export interface PreviewDeps {
   /** Every built page, as its path under the build folder (`id/index.html`). */
   pages(): string[];

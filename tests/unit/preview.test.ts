@@ -7,6 +7,7 @@ import {
   pageUrl,
   previewImageUrl,
   previewKey,
+  environmentAt,
   siteOrigin,
   type PreviewDeps,
 } from '../../apps/web/src/preview.ts';
@@ -113,6 +114,27 @@ describe('siteOrigin', () => {
 
   it('refuses an environment with no SITE_ORIGIN', () => {
     expect(() => siteOrigin('test', wrangler)).toThrow('workers/web/wrangler.json gives test no SITE_ORIGIN');
+  });
+});
+
+describe('environmentAt', () => {
+  const wrangler = {
+    env: {
+      dev: { vars: { SITE_ORIGIN: 'https://dev.site.test' } },
+      prod: { vars: { SITE_ORIGIN: 'https://site.test' } },
+      test: { vars: {} },
+    },
+  };
+
+  it('names the environment whose SITE_ORIGIN the address is on', () => {
+    expect(environmentAt('https://dev.site.test/id/privacy', wrangler)).toBe('dev');
+    expect(environmentAt('https://site.test/', wrangler)).toBe('prod');
+  });
+
+  it('refuses an address on no environment, naming it', () => {
+    expect(() => environmentAt('https://other.test/', wrangler)).toThrow(
+      'https://other.test is the SITE_ORIGIN of no environment in workers/web/wrangler.json',
+    );
   });
 });
 
