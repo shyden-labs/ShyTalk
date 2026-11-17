@@ -13,6 +13,7 @@ import { base32, totpAt } from '../support/totp.ts';
 import AxeBuilder from '@axe-core/playwright';
 import { t } from '../../apps/web/src/i18n/t.ts';
 import { LEGAL_DOCS, legalLines, legalLocale, legalPath } from '../../apps/web/src/legal/legal.ts';
+import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 
 const LANGUAGES = [
   { lang: 'en', locale: 'en', prefix: '' },
@@ -74,6 +75,13 @@ for (const { lang, locale, prefix } of LANGUAGES) {
         const note = page.locator(`[data-english-only="${locale}"]`);
         await expect.soft(note).toBeVisible();
         await expect.soft(note).toHaveText(t(locale, 'footer.englishOnly'));
+      }
+      // #171 AC4: the privacy page shows what an account keeps, in English and in Indonesian.
+      if (doc === 'privacy') {
+        const privacy = words.privacy as Record<string, string | undefined>;
+        for (const key of ACCOUNT_PRIVACY_KEYS) {
+          await expect.soft(page.locator('main').getByText(privacy[key] ?? `(no privacy.${key})`, { exact: true }), key).toBeVisible();
+        }
       }
       const { violations } = await new AxeBuilder({ page }).analyze();
       expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);

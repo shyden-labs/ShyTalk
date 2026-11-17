@@ -45,6 +45,7 @@ function selectorText(locale: Locale, selector: string): string {
   if (selector === '#confirm-button') return t(locale, 'closedTesting.confirmButton');
   if (selector === '[data-governs]') return legalLines(legalLocale(locale)).common.governs;
   if (selector.startsWith('[data-english-only')) return t(locale, 'footer.englishOnly');
+  if (selector === 'main') return Object.values(legalLines(legalLocale(locale)).privacy).join(' ');
   return t(locale, 'home.heading');
 }
 
@@ -98,10 +99,11 @@ const cases = (start: string) => IPHONE_CASES.filter(({ title }) => kind(title).
 /**
  * The checks each test's Playwright twin ran on CI, per test (shyden-labs/ShyTalk#180 AC7):
  * read from smoke-totals on PR #181's web-smoke job, the same on chromium, firefox and webkit.
- * The home page runs three more where its legal pages carry the "English only" note.
+ * The home page runs three more where its legal pages carry the "English only" note, and
+ * 22 more on the privacy page for what an account keeps (#171), read from this PR's smoke-totals.
  */
 const CI_ASSERTIONS: Record<string, Record<string, number>> = {
-  'the home page answers 200': { en: 28, id: 28, th: 31, vi: 31, 'zh-Hans': 31 },
+  'the home page answers 200': { en: 50, id: 50, th: 53, vi: 53, 'zh-Hans': 53 },
   'an unknown page answers 404': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
   'the closed-testing page shows the form and every statement': { en: 17, id: 17, th: 17, vi: 17, 'zh-Hans': 17 },
   'the confirm page passes axe, and its button with a dead link shows link-expired': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
@@ -153,6 +155,12 @@ describe('the iPhone cases', () => {
       );
       await expect(c.run(safari(lang, { text: () => Promise.resolve('Something else') }))).rejects.toThrow('Something else');
       await expect(c.run(safari(lang, { visibleLinks: () => Promise.resolve(0) }))).rejects.toThrow('no visible apply link');
+      // #171 AC4: a privacy page missing what an account keeps fails, naming the line.
+      const page = safari(lang);
+      const shown = page.text.bind(page);
+      await expect(
+        c.run(safari(lang, { text: (selector) => (selector === 'main' ? Promise.resolve('the form only') : shown(selector)) })),
+      ).rejects.toThrow('no privacy.accountH');
       await expect(c.run(safari(lang, { links: (name) => Promise.resolve(name === roadmap ? 1 : 0) }))).rejects.toThrow();
     },
   );
@@ -893,7 +901,7 @@ describe('the English-only note on a legal page (shyden-labs/ShyTalk#190)', () =
   it('waits for the note the page reveals after it loads, as Playwright’s toBeVisible() waits', async () => {
     const check = countingCheck();
     await run(delayedNote(1_000), check);
-    expect(check.count).toBe(31);
+    expect(check.count).toBe(53);
   });
 
   it('fails naming the note when it is not shown within 15 s', async () => {
