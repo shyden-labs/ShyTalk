@@ -4,9 +4,11 @@
  * is unit-tested; the rest is proven by the phone run itself.
  */
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import { connect } from 'node:net';
 import { promisify } from 'node:util';
+import { environmentAt, type WranglerOrigins } from '../../apps/web/src/preview.ts';
 import { IPHONE_CASES } from './iphone-cases.ts';
 import { APPIUM_LOG, capabilities, WDA_LOCAL_PORT, type PhoneDeps } from './run.ts';
 import { safariPage, type WebDriverCall } from './safari.ts';
@@ -160,6 +162,10 @@ export function appiumArgs(port: number): string[] {
 export function realDeps(): PhoneDeps {
   let appium: ChildProcess | undefined;
   return {
+    siteEnvironment(address) {
+      const wrangler = readFileSync(new URL('../../workers/web/wrangler.json', import.meta.url), 'utf8');
+      return environmentAt(address, JSON.parse(wrangler) as WranglerOrigins);
+    },
     async mailboxPassword() {
       // Shyden stored it 2026-11-10; `-w` prints the password alone, which goes nowhere but this process's environment.
       const { stdout } = await exec('security', [

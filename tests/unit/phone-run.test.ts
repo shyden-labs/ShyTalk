@@ -167,6 +167,7 @@ function deps(overrides: Partial<PhoneDeps> = {}): PhoneDeps & { steps: string[]
     };
   return {
     steps,
+    siteEnvironment: () => 'dev',
     mailboxPassword: step('mailbox password', 'secret'),
     forward: step('forward', 'http://127.0.0.1:9333'),
     unforward: step('unforward'),
@@ -200,6 +201,31 @@ describe('runPhones', () => {
     });
     await expect(runPhones('https://site.example', d)).resolves.toBe(0);
     expect(seen).toEqual(['secret', 'secret']);
+  });
+
+  it('names the environment the address was built for to both phones’ runs (shyden-labs/ShyTalk#198)', async () => {
+    vi.stubEnv('SITE_ENVIRONMENT', undefined);
+    const seen: (string | undefined)[] = [];
+    const asked: string[] = [];
+    const d = deps({
+      siteEnvironment: (address) => (asked.push(address), 'test'),
+      playwright: () => (seen.push(process.env.SITE_ENVIRONMENT), Promise.resolve(0)),
+      readOneplusCounts: () => Promise.resolve({ a: 0 }),
+      cases: [{ title: 'a', run: () => (seen.push(process.env.SITE_ENVIRONMENT), Promise.resolve()) }],
+    });
+    await expect(runPhones('https://site.example', d)).resolves.toBe(0);
+    expect(asked).toEqual(['https://site.example']);
+    expect(seen).toEqual(['test', 'test']);
+  });
+
+  it('fails naming why, before touching a phone, when the address is on no environment', async () => {
+    const d = deps({
+      siteEnvironment: () => {
+        throw new Error('https://site.example is the SITE_ORIGIN of no environment in workers/web/wrangler.json');
+      },
+    });
+    await expect(runPhones('https://site.example', d)).resolves.toBe(1);
+    expect(d.steps).toEqual(['print phone-smoke: https://site.example is the SITE_ORIGIN of no environment in workers/web/wrangler.json']);
   });
 
   it('fails naming why, before touching a phone, when the Keychain gives no password', async () => {

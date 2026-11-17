@@ -27,6 +27,8 @@ interface Report {
 }
 
 export interface PhoneDeps {
+  /** The environment the address's site was built for, from workers/web/wrangler.json (shyden-labs/ShyTalk#198). */
+  siteEnvironment(address: string): string;
   /** The test mailbox's password, from this Mac's Keychain (service shytalk-test-mailbox). */
   mailboxPassword(): Promise<string>;
   /** Forwards Chrome's DevTools socket on the OnePlus; answers the endpoint. */
@@ -136,6 +138,8 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
   try {
     // Both phones' closed-testing journey reads its mail from the real test mailbox (shyden-labs/ShyTalk#150):
     // the OnePlus's Playwright inherits this environment, and the iPhone's cases run in this process.
+    // Both phones' link-preview checks expect that environment's addresses, as the build wrote them (shyden-labs/ShyTalk#198).
+    process.env.SITE_ENVIRONMENT = d.siteEnvironment(address);
     process.env.TEST_MAILBOX_PASSWORD = await d.mailboxPassword();
     const endpoint = await d.forward();
     let code: number;
