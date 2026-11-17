@@ -14,6 +14,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { t } from '../../apps/web/src/i18n/t.ts';
 import { LEGAL_DOCS, legalLines, legalLocale, legalPath } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
+import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, PREVIEW_FACTS, PREVIEW_TAGS, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 
@@ -98,6 +99,31 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     expect(response?.status()).toBe(404);
     await expect(page.locator('html')).toHaveAttribute('lang', lang);
     await expect(page.getByRole('navigation')).toBeVisible();
+    expect(refusals).toEqual([]);
+  });
+
+  // The holding page production answers with until the full release (shyden-labs/ShyTalk#261): what ShyTalk is, that
+  // the app is being built, and the contact; no menu or footer, as nothing it would link to is released.
+  test(`${lang}: the holding page shows what ShyTalk is, that the app is being built, and the contact, in ${lang}, passing axe, with no menu and no CSP refusal`, async ({
+    page,
+  }) => {
+    const refusals = cspRefusals(page);
+    const response = await page.goto(`${prefix}/holding`, { waitUntil: 'load' });
+    expect.soft(response?.status()).toBe(200);
+    await expect.soft(page.locator('html')).toHaveAttribute('lang', lang);
+    const heading = page.getByRole('heading', { level: 1 });
+    await expect.soft(heading).toBeVisible();
+    await expect.soft(heading).toHaveText(t(locale, 'home.heading'));
+    for (const key of ['home.intro', 'home.wayTitle', 'holding.building'] as const) {
+      await expect.soft(page.getByText(t(locale, key), { exact: true })).toBeVisible();
+    }
+    const contact = page.getByRole('link', { name: SUPPORT_EMAIL, exact: true });
+    await expect.soft(contact).toBeVisible();
+    await expect.soft(contact).toHaveAttribute('href', `mailto:${SUPPORT_EMAIL}`);
+    await expect.soft(page.getByRole('navigation')).toHaveCount(0);
+    await expect.soft(page.getByRole('contentinfo')).toHaveCount(0);
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
     expect(refusals).toEqual([]);
   });
 

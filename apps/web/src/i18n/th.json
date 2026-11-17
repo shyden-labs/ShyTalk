@@ -140,5 +140,8 @@
     "signInWithRecoveryCode": "เข้าสู่ระบบด้วยรหัส",
     "signInRefused": "ไม่สำเร็จ ตรวจสอบที่อยู่และรหัส แล้วลองอีกครั้ง",
     "codesLeftAfterSignIn": "เข้าสู่ระบบแล้ว รหัสกู้คืนที่เหลือ: {count}"
+  },
+  "holding": {
+    "building": "แอป ShyTalk กำลังอยู่ระหว่างการสร้าง"
   }
 }
