@@ -38,7 +38,7 @@ describe('dev-tail', () => {
   it('watches dev for the asked minutes, at most 30, and a timeout ending the watch is not a failure', () => {
     const text = source();
     expect(text).toContain('if [ "$MINUTES" -lt 1 ] || [ "$MINUTES" -gt 30 ]; then');
-    expect(text).toContain('timeout "$((MINUTES * 60))" npx wrangler tail --env dev --format json');
+    expect(text).toContain('timeout "$((MINUTES * 60))" "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" tail --env dev --format json');
     expect(text).toContain('[ "$status" -eq 124 ]');
   });
 

@@ -100,8 +100,8 @@ describe('deploy-dev', () => {
   it('only bundles on a rehearsal, and deploys the dev environment otherwise', () => {
     const step = deployStep().join('\n');
     const rehearsal = step.indexOf('if [ $DEPLOY_REHEARSAL = true ]; then');
-    const dryRun = step.indexOf('npx wrangler deploy --dry-run --env dev --outdir $RUNNER_TEMP/web');
-    const deploy = step.indexOf('npx wrangler deploy --env dev ||');
+    const dryRun = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --dry-run --env dev --outdir $RUNNER_TEMP/web');
+    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||');
     expect(rehearsal).toBeGreaterThan(-1);
     expect(dryRun).toBeGreaterThan(rehearsal);
     expect(deploy).toBeGreaterThan(dryRun);
@@ -113,9 +113,11 @@ describe('deploy-dev', () => {
   // refuses everything.
   it('sets the door secret after the deploy, and fails naming it when the environment lacks it', () => {
     const step = deployStep().join('\n');
-    const deploy = step.indexOf('npx wrangler deploy --env dev ||');
+    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||');
     const missing = step.indexOf('if [ -z $DOOR_SECRET ]; then');
-    const put = step.indexOf("printf '%s' $DOOR_SECRET | npx wrangler secret put DOOR_SECRET --env dev ||".replaceAll("'", ''));
+    const put = step.indexOf(
+      "printf '%s' $DOOR_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put DOOR_SECRET --env dev ||".replaceAll("'", ''),
+    );
     expect(deploy).toBeGreaterThan(-1);
     expect(missing).toBeGreaterThan(deploy);
     expect(put).toBeGreaterThan(missing);
@@ -127,9 +129,11 @@ describe('deploy-dev', () => {
   // exists, and stops naming the secret when the environment has none.
   it('puts the Better Auth secret after the deploy, and stops naming it when the environment lacks it', () => {
     const step = deployStep().join('\n');
-    const deploy = step.indexOf('npx wrangler deploy --env dev ||');
+    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||');
     const missing = step.indexOf('if [ -z $BETTER_AUTH_SECRET ]; then');
-    const put = step.indexOf('printf %s $BETTER_AUTH_SECRET | npx wrangler secret put BETTER_AUTH_SECRET --env dev ||');
+    const put = step.indexOf(
+      'printf %s $BETTER_AUTH_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put BETTER_AUTH_SECRET --env dev ||',
+    );
     expect(deploy).toBeGreaterThan(-1);
     expect(missing).toBeGreaterThan(deploy);
     expect(put).toBeGreaterThan(missing);
@@ -141,10 +145,12 @@ describe('deploy-dev', () => {
   // environment (never made fresh per deploy) and put after the Worker exists.
   it('puts the authenticator key after the Better Auth secret, and stops naming it when the environment lacks it', () => {
     const step = deployStep().join('\n');
-    const betterAuth = step.indexOf('printf %s $BETTER_AUTH_SECRET | npx wrangler secret put BETTER_AUTH_SECRET --env dev ||');
+    const betterAuth = step.indexOf(
+      'printf %s $BETTER_AUTH_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put BETTER_AUTH_SECRET --env dev ||',
+    );
     const missing = step.indexOf('if [ -z $TOTP_KEY ]; then');
     const put = step.indexOf(
-      'printf %s $TOTP_KEY | npx wrangler secret put TOTP_KEY --env dev || { echo ::error title=deploy-dev failed::the dev authenticator key was not set; exit 1; }',
+      'printf %s $TOTP_KEY | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put TOTP_KEY --env dev || { echo ::error title=deploy-dev failed::the dev authenticator key was not set; exit 1; }',
     );
     expect(betterAuth).toBeGreaterThan(-1);
     expect(missing).toBeGreaterThan(betterAuth);
@@ -202,7 +208,7 @@ describe('deploy-dev', () => {
       '              echo ::error title=$name missing::Set $name in the dev environment (shyden-labs/ShyTalk#88); until then dev sends no mail.',
       '              exit 1',
       '            fi',
-      '            printf %s ${!name} | npx wrangler secret put $name --env dev || { echo ::error title=deploy-dev failed::the dev $name was not set; exit 1; }',
+      '            printf %s ${!name} | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put $name --env dev || { echo ::error title=deploy-dev failed::the dev $name was not set; exit 1; }',
       '          done',
     ]);
   });
@@ -214,12 +220,12 @@ describe('deploy-dev', () => {
     const step = deployStep().join('\n');
     const order = [
       'if [ $DEPLOY_REHEARSAL = true ]; then',
-      'info=$(npx wrangler d1 info shytalk-dev --env dev 2>&1) || {',
-      '*Couldnt find a D1 DB named shytalk-dev*) npx wrangler d1 create shytalk-dev --location apac ||',
-      'npx wrangler d1 migrations apply DB --remote --env dev ||',
-      'npx wrangler d1 execute DB --remote --env dev --command CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT dev WHERE NOT EXISTS (SELECT 1 FROM environment_marker); ||',
-      'marker=$(npx wrangler d1 execute DB --remote --env dev --json --command SELECT name FROM environment_marker) ||',
-      'npx wrangler deploy --env dev ||',
+      'info=$($GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 info shytalk-dev --env dev 2>&1) || {',
+      '*Couldnt find a D1 DB named shytalk-dev*) $GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 create shytalk-dev --location apac ||',
+      '$GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 migrations apply DB --remote --env dev ||',
+      '$GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 execute DB --remote --env dev --command CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT dev WHERE NOT EXISTS (SELECT 1 FROM environment_marker); ||',
+      'marker=$($GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 execute DB --remote --env dev --json --command SELECT name FROM environment_marker) ||',
+      '$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||',
     ].map((line) => step.indexOf(line));
     expect(order.every((at) => at > -1)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -235,11 +241,11 @@ describe('deploy-dev', () => {
 
   it('stops unless the marker reads back as exactly one row, dev', () => {
     const step = deployStep().join('\n');
-    const read = step.indexOf('marker=$(npx wrangler d1 execute DB --remote --env dev --json');
+    const read = step.indexOf('marker=$($GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 execute DB --remote --env dev --json');
     const check = step.indexOf('if [ $(printf %s $marker | jq -c [.[0].results[].name]) != [dev] ]; then');
     expect(read).toBeGreaterThan(-1);
     expect(check).toBeGreaterThan(read);
-    expect(step.indexOf('npx wrangler deploy --env dev ||')).toBeGreaterThan(check);
+    expect(step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||')).toBeGreaterThan(check);
   });
 
   // shyden-labs/ShyTalk#79: the app's UI document, published to the migrated
@@ -248,7 +254,7 @@ describe('deploy-dev', () => {
     const step = deployStep().join('\n');
     const marker = step.indexOf('if [ $(printf %s $marker | jq -c [.[0].results[].name]) != [dev] ]; then');
     const id = step.indexOf(
-      'ui_db=$(npx wrangler d1 info shytalk-dev --env dev --json | jq -er .uuid) || { echo ::error title=deploy-dev failed::the shytalk-dev id could not be read; exit 1; }',
+      'ui_db=$($GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 info shytalk-dev --env dev --json | jq -er .uuid) || { echo ::error title=deploy-dev failed::the shytalk-dev id could not be read; exit 1; }',
     );
     const publish = step.indexOf(
       '(cd $GITHUB_WORKSPACE && UI_ENVIRONMENT=dev UI_DATABASE_NAME=shytalk-dev UI_DATABASE_ID=$ui_db UI_PUBLISHED_BY=ci:deploy-dev node scripts/publish-ui.ts) || { echo ::error title=deploy-dev failed::the UI document was not published; exit 1; }',
@@ -256,7 +262,7 @@ describe('deploy-dev', () => {
     expect(marker).toBeGreaterThan(-1);
     expect(id).toBeGreaterThan(marker);
     expect(publish).toBeGreaterThan(id);
-    expect(step.indexOf('npx wrangler deploy --env dev ||')).toBeGreaterThan(publish);
+    expect(step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||')).toBeGreaterThan(publish);
   });
 
   // Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07, a secret
@@ -265,13 +271,15 @@ describe('deploy-dev', () => {
   // newest UI version. Nothing is stored: each deploy's secret is new.
   it('tells open apps the UI version last, with a fresh masked secret it puts in the Worker', () => {
     const step = deployStep().join('\n');
-    const betterAuth = step.indexOf('printf %s $BETTER_AUTH_SECRET | npx wrangler secret put BETTER_AUTH_SECRET --env dev ||');
+    const betterAuth = step.indexOf(
+      'printf %s $BETTER_AUTH_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put BETTER_AUTH_SECRET --env dev ||',
+    );
     const make = step.indexOf(
       'announce_secret=$(openssl rand -hex 32) || { echo ::error title=deploy-dev failed::no announce secret was made; exit 1; }',
     );
     const mask = step.indexOf('echo ::add-mask::$announce_secret');
     const put = step.indexOf(
-      'printf %s $announce_secret | npx wrangler secret put ANNOUNCE_SECRET --env dev || { echo ::error title=deploy-dev failed::the dev announce secret was not set; exit 1; }',
+      'printf %s $announce_secret | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put ANNOUNCE_SECRET --env dev || { echo ::error title=deploy-dev failed::the dev announce secret was not set; exit 1; }',
     );
     const call = step.indexOf(
       '(cd $GITHUB_WORKSPACE && ANNOUNCE_ENVIRONMENT=dev ANNOUNCE_SECRET=$announce_secret node scripts/announce-ui.ts) || { echo ::error title=deploy-dev failed::open apps were not told the UI version; exit 1; }',
