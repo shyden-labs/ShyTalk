@@ -13,6 +13,9 @@ import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 import { codeIn, MAIL_CEILING_MS, plusAddress, waitForAnyMail, waitForMail } from './test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import { countingCheck, type Check } from './check.ts';
+import { builtSiteOrigin, PAGE_FILES, previewTag, type PictureFacts } from '../support/link-preview.ts';
+import { PREVIEW_HEIGHT, PREVIEW_WIDTH, pagePath, pageUrl, previewImageUrl } from '../../apps/web/src/preview.ts';
+import { sitePages } from '../../apps/web/src/site-pages.ts';
 
 /** What a case can ask of Safari; tests/phones/safari.ts drives it through Appium. */
 export interface SafariPage {
@@ -31,6 +34,10 @@ export interface SafariPage {
   links(name: string): Promise<number>;
   /** The elements `selector` matches: Playwright's `toHaveCount`. */
   count(selector: string): Promise<number>;
+  /** The document's title: Playwright's `page.title()`. */
+  title(): Promise<string>;
+  /** The preview picture at `path`, read in the page by the smoke's own check (shyden-labs/ShyTalk#198). */
+  picture(path: string): Promise<PictureFacts>;
   /** axe's violations on the current page, as `id: node count`. */
   axeViolations(): Promise<string[]>;
   /** A real tap on the element, through WebDriverAgent. */
@@ -213,6 +220,51 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
         await check.waitForText(page, H1, t(locale, 'closedTesting.expiredHeading'));
         check.ok(await page.isVisible(H1), 'no visible top heading');
         check.deepEqual(await page.cspRefusals(), []);
+      },
+    ),
+    counted(
+      `${lang}: every page carries its link preview in ${lang}, and each preview picture is 1200 by 630 and not one flat colour`,
+      async (page, check) => {
+        // Every check on every page runs, as Playwright's soft expects do; each failure names its page (#198).
+        const origin = builtSiteOrigin();
+        const said = (file: string, what: string, actual: unknown) => `${file}: ${what} is ${JSON.stringify(actual)}`;
+        await softly(
+          sitePages(PAGE_FILES, locale).flatMap((file) => {
+            const path = pagePath(file);
+            const tag = (key: string, wanted: string) => async () => {
+              const content = await page.attribute(previewTag(key), 'content');
+              check.equal(content, wanted, said(file, key, content));
+            };
+            return [
+              async () => {
+                await page.goto(pageUrl('', path));
+              },
+              async () => {
+                const shown = await page.attribute('html', 'lang');
+                check.equal(shown, lang, said(file, 'the language', shown));
+              },
+              async () => {
+                const title = await page.title();
+                const content = await page.attribute(previewTag('og:title'), 'content');
+                check.equal(content, title, `${said(file, 'og:title', content)}, the title ${JSON.stringify(title)}`);
+              },
+              tag('og:description', t(locale, 'site.tagline')),
+              tag('og:image', previewImageUrl(origin, path)),
+              tag('og:image:width', String(PREVIEW_WIDTH)),
+              tag('og:image:height', String(PREVIEW_HEIGHT)),
+              tag('og:image:alt', t(locale, 'site.previewAlt')),
+              tag('og:url', pageUrl(origin, path)),
+              tag('og:type', 'website'),
+              tag('twitter:card', 'summary_large_image'),
+              async () => {
+                // The picture is fetched from this server, whatever origin its address names, as the smoke reads it.
+                const picture = await page.picture(new URL(previewImageUrl(origin, path)).pathname);
+                const wanted = { loaded: true, width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT, manyColours: true };
+                check.deepEqual(picture, wanted, said(file, 'the preview picture', picture));
+              },
+            ];
+          }),
+        );
       },
     ),
   ];

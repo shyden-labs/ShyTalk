@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import type { SafariPage } from './iphone-cases.ts';
+import { PICTURE_FACTS, type PictureFacts } from '../support/link-preview.ts';
 
 /** One WebDriver request to Appium, answering the response's `value`. */
 export type WebDriverCall = (method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown) => Promise<unknown>;
@@ -33,6 +34,10 @@ return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidde
 
 const TEXT = `const el = document.querySelector(arguments[0]);
 return el ? (el.textContent ?? '').replace(/\\s+/g, ' ').trim() : null;`;
+
+/** Runs the shared picture check on its path argument, handing WebDriver its answer, or the error it threw. */
+const PICTURE_SCRIPT = `const done = arguments[arguments.length - 1];
+(${PICTURE_FACTS})(arguments[0]).then(done, (error) => done({ error: String(error) }));`;
 
 const AXE = `const done = arguments[arguments.length - 1];
 axe.run(document).then((r) => done(r.violations.map((v) => ({ id: v.id, nodes: v.nodes.length }))));`;
@@ -238,6 +243,18 @@ export function safariPage(
     },
     async count(selector) {
       return (await run(COUNT, selector)) as number;
+    },
+    async title() {
+      return (await run('return document.title;')) as string;
+    },
+    // The same check the smoke runs (tests/support/link-preview.ts), given the minute axe needs: Appium's own script
+    // timeout cut async scripts off at 17-29 ms on the iPhone Air (2026-11-07).
+    async picture(path) {
+      await call('POST', `${at}/timeouts`, { script: AXE_TIMEOUT_MS });
+      const facts = (await call('POST', `${at}/execute/async`, { script: PICTURE_SCRIPT, args: [path] })) as
+        PictureFacts | { error: string };
+      if ('error' in facts) throw new Error(`the picture check of ${path} failed in Safari: ${facts.error}`);
+      return facts;
     },
     async axeViolations() {
       await run(read(AXE_FILE));

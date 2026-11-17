@@ -1,6 +1,7 @@
 import { runInNewContext } from 'node:vm';
 import { describe, it, expect, vi } from 'vitest';
 import { safariPage, type WebDriverCall } from '../phones/safari.ts';
+import { PICTURE_FACTS } from '../support/link-preview.ts';
 
 /**
  * Safari on the iPhone Air, driven through Appium's WebDriver API
@@ -247,7 +248,32 @@ describe('safariPage: reading the page', () => {
     expect((executes[0]?.[2] as { script: string }).script).toBe('window.axe = {};');
   });
 
-  it('gives axe a minute before running it: Appium’s own script timeout cut it off at 17-29 ms on the iPhone Air (2026-11-07)', async () => {
+  it('answers the document’s title, as Playwright’s page.title() (shyden-labs/ShyTalk#198)', async () => {
+    const fake = appium({}, ['Sign up · ShyTalk']);
+    await expect(safariPage(fake.call, 's1', BASE).title()).resolves.toBe('Sign up · ShyTalk');
+    expect(lastScript(fake)).toEqual({ script: 'return document.title;', args: [] });
+  });
+
+  it('reads a preview picture through the shared picture check, given a minute, as the smoke does (shyden-labs/ShyTalk#198)', async () => {
+    const facts = { loaded: true, width: 1200, height: 630, manyColours: true };
+    const fake = appium({}, [facts]);
+    await expect(safariPage(fake.call, 's1', BASE).picture('/previews/id/index.png')).resolves.toEqual(facts);
+    const run = fake.calls.find(([, path]) => path === '/session/s1/execute/async')?.[2] as { script: string; args: unknown[] };
+    expect(run.args).toEqual(['/previews/id/index.png']);
+    expect(run.script).toContain(PICTURE_FACTS);
+    const steps = fake.calls.map(([, path]) => path);
+    expect(fake.calls).toContainEqual(['POST', '/session/s1/timeouts', { script: 60_000 }]);
+    expect(steps.indexOf('/session/s1/timeouts')).toBeLessThan(steps.indexOf('/session/s1/execute/async'));
+  });
+
+  it('fails naming the picture when the check itself throws in Safari', async () => {
+    const fake = appium({}, [{ error: 'TypeError: context is null' }]);
+    await expect(safariPage(fake.call, 's1', BASE).picture('/previews/index.png')).rejects.toThrow(
+      'the picture check of /previews/index.png failed in Safari: TypeError: context is null',
+    );
+  });
+
+  it('gives axe a minute before running it:Appium’s own script timeout cut it off at 17-29 ms on the iPhone Air (2026-11-07)', async () => {
     const fake = appium({}, [null, []]);
     await safariPage(fake.call, 's1', BASE, () => '').axeViolations();
     const steps = fake.calls.map(([, path]) => path);

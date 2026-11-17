@@ -3,6 +3,9 @@ import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
+import { pagePath, pageUrl, previewImageUrl } from '../../apps/web/src/preview.ts';
+import { sitePages } from '../../apps/web/src/site-pages.ts';
+import { builtSiteOrigin, PAGE_FILES, previewTag, type PictureFacts } from '../support/link-preview.ts';
 
 /**
  * Each case of the iPhone copy checks what its Playwright twin checks
@@ -53,6 +56,44 @@ function selectorText(locale: Locale, selector: string): string {
 const VIEWPORT_TAG = 'meta[name="viewport"]';
 const VIEWPORT = 'width=device-width, initial-scale=1, interactive-widget=resizes-content';
 
+/** Every page's title on the stand-in site. */
+const TITLE = 'A page · ShyTalk';
+
+/** A picture as every preview's should be (shyden-labs/ShyTalk#198). */
+const GOOD_PICTURE: PictureFacts = { loaded: true, width: 1200, height: 630, manyColours: true };
+
+const PREVIEW_KEYS = [
+  'og:title',
+  'og:description',
+  'og:image',
+  'og:image:width',
+  'og:image:height',
+  'og:image:alt',
+  'og:url',
+  'og:type',
+  'twitter:card',
+] as const;
+
+/** A preview tag's content on the page at `path`, as the site should write it, built for SITE_ENVIRONMENT. */
+function previewContent(locale: Locale, key: string, path: string): string | null {
+  const origin = builtSiteOrigin();
+  const contents: Record<string, string> = {
+    'og:title': TITLE,
+    'og:description': t(locale, 'site.tagline'),
+    'og:image': previewImageUrl(origin, path),
+    'og:image:width': '1200',
+    'og:image:height': '630',
+    'og:image:alt': t(locale, 'site.previewAlt'),
+    'og:url': pageUrl(origin, path),
+    'og:type': 'website',
+    'twitter:card': 'summary_large_image',
+  };
+  return contents[key] ?? null;
+}
+
+/** The preview key a selector asks for, if it is a preview tag. */
+const previewKeyOf = (selector: string): string | undefined => PREVIEW_KEYS.find((key) => selector === previewTag(key));
+
 /** Safari showing the site as it should be, in `lang`; `broken` replaces one answer. */
 function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { visited: string[] } {
   const locale = LOCALE[lang] ?? 'en';
@@ -68,13 +109,15 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     cspRefusals: () => Promise.resolve([]),
     attribute: (selector, name) =>
       Promise.resolve(
-        selector === 'html' && name === 'lang'
-          ? onLegalPage
-            ? legalLocale(locale)
-            : lang
-          : selector === VIEWPORT_TAG && name === 'content'
-            ? VIEWPORT
-            : null,
+        previewKeyOf(selector) !== undefined && name === 'content'
+          ? previewContent(locale, previewKeyOf(selector) ?? '', visited.at(-1) ?? '')
+          : selector === 'html' && name === 'lang'
+            ? onLegalPage
+              ? legalLocale(locale)
+              : lang
+            : selector === VIEWPORT_TAG && name === 'content'
+              ? VIEWPORT
+              : null,
       ),
     isVisible: (selector) => Promise.resolve(selector !== '[data-english-only]:not([hidden])'),
     text: (selector) => Promise.resolve(selectorText(locale, selector)),
@@ -88,6 +131,8 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     count: () => Promise.resolve(0),
     axeViolations: () => Promise.resolve([]),
+    title: () => Promise.resolve(TITLE),
+    picture: () => Promise.resolve(GOOD_PICTURE),
     ...broken,
   };
 }
@@ -107,9 +152,69 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
   'an unknown page answers 404': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
   'the closed-testing page shows the form and every statement': { en: 17, id: 17, th: 17, vi: 17, 'zh-Hans': 17 },
   'the confirm page passes axe, and its button with a dead link shows link-expired': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
+  // Eleven per page (shyden-labs/ShyTalk#198): the language, nine tags and the picture; 14 pages in en and id, 11 in the rest.
+  'every page carries its link preview': { en: 154, id: 154, th: 121, vi: 121, 'zh-Hans': 121 },
 };
 
 describe('the iPhone cases', () => {
+  // The preview tags name the environment the site was built for (shyden-labs/ShyTalk#198); dev, as the CI smoke's.
+  beforeEach(() => {
+    vi.stubEnv('SITE_ENVIRONMENT', 'dev');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it.each(cases('every page carries its link preview').map((c) => [c.title, c] as const))(
+    '%s: visits every page the site builds in its language, once each',
+    async (_, c) => {
+      const lang = langOf(c.title);
+      const page = safari(lang);
+      await c.run(page);
+      expect(page.visited).toEqual(sitePages(PAGE_FILES, LOCALE[lang] ?? 'en').map((file) => pageUrl('', pagePath(file))));
+    },
+  );
+
+  it.each(cases('every page carries its link preview').map((c) => [c.title, c] as const))(
+    '%s: fails naming the page on a wrong or missing tag, the wrong language, or a wrong title',
+    async (_, c) => {
+      const lang = langOf(c.title);
+      const page = safari(lang);
+      const shown = page.attribute.bind(page);
+      for (const key of PREVIEW_KEYS) {
+        await expect(
+          c.run(
+            safari(lang, { attribute: (selector, name) => (selector === previewTag(key) ? Promise.resolve(null) : shown(selector, name)) }),
+          ),
+        ).rejects.toThrow(/\.html/);
+      }
+      await expect(
+        c.run(safari(lang, { attribute: (selector, name) => (selector === 'html' ? Promise.resolve('fr') : shown(selector, name)) })),
+      ).rejects.toThrow('fr');
+      await expect(c.run(safari(lang, { title: () => Promise.resolve('Another page') }))).rejects.toThrow('Another page');
+    },
+  );
+
+  it.each(cases('every page carries its link preview').map((c) => [c.title, c] as const))(
+    '%s: fails on a picture missing, not 1200 by 630, or one flat colour, reading each page’s own picture',
+    async (_, c) => {
+      const lang = langOf(c.title);
+      const asked: string[] = [];
+      await c.run(safari(lang, { picture: (path) => (asked.push(path), Promise.resolve(GOOD_PICTURE)) }));
+      const origin = builtSiteOrigin();
+      const files = sitePages(PAGE_FILES, LOCALE[lang] ?? 'en');
+      expect(asked).toEqual(files.map((file) => new URL(previewImageUrl(origin, pagePath(file))).pathname));
+      for (const broken of [
+        { loaded: false, width: 0, height: 0, manyColours: false },
+        { ...GOOD_PICTURE, width: 1199 },
+        { ...GOOD_PICTURE, height: 631 },
+        { ...GOOD_PICTURE, manyColours: false },
+      ]) {
+        await expect(c.run(safari(lang, { picture: () => Promise.resolve(broken) }))).rejects.toThrow(/\.html/);
+      }
+    },
+  );
+
   it.each(IPHONE_CASES.filter(({ title }) => langOf(title) in LOCALE).map((c) => [c.title, c] as const))(
     '%s: passes on the site as it should be, running as many checks as its twin on CI',
     async (_, c) => {

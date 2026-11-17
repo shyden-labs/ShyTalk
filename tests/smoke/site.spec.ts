@@ -14,6 +14,9 @@ import AxeBuilder from '@axe-core/playwright';
 import { t } from '../../apps/web/src/i18n/t.ts';
 import { LEGAL_DOCS, legalLines, legalLocale, legalPath } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
+import { sitePages } from '../../apps/web/src/site-pages.ts';
+import { PREVIEW_HEIGHT, PREVIEW_WIDTH, pagePath, pageUrl, previewImageUrl } from '../../apps/web/src/preview.ts';
+import { builtSiteOrigin, PAGE_FILES, PICTURE_FACTS, previewTag, type PictureFacts } from '../support/link-preview.ts';
 
 const LANGUAGES = [
   { lang: 'en', locale: 'en', prefix: '' },
@@ -134,6 +137,34 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     await expect.soft(heading).toBeVisible();
     await expect.soft(heading).toHaveText(t(locale, 'closedTesting.expiredHeading'));
     expect(refusals).toEqual([]);
+  });
+
+  // Link previews (shyden-labs/ShyTalk#198 AC1, AC3): every page the site builds in this language, its tags in its own
+  // language with addresses on the environment's origin, and its picture: 1200 by 630 and more than one colour.
+  test(`${lang}: every page carries its link preview in ${lang}, and each preview picture is 1200 by 630 and not one flat colour`, async ({
+    page,
+  }) => {
+    const origin = builtSiteOrigin();
+    for (const file of sitePages(PAGE_FILES, locale)) {
+      const path = pagePath(file);
+      await page.goto(pageUrl('', path), { waitUntil: 'load' });
+      const meta = (key: string) => page.locator(previewTag(key));
+      await expect.soft(page.locator('html'), file).toHaveAttribute('lang', lang);
+      await expect.soft(meta('og:title'), file).toHaveAttribute('content', await page.title());
+      await expect.soft(meta('og:description'), file).toHaveAttribute('content', t(locale, 'site.tagline'));
+      await expect.soft(meta('og:image'), file).toHaveAttribute('content', previewImageUrl(origin, path));
+      await expect.soft(meta('og:image:width'), file).toHaveAttribute('content', String(PREVIEW_WIDTH));
+      await expect.soft(meta('og:image:height'), file).toHaveAttribute('content', String(PREVIEW_HEIGHT));
+      await expect.soft(meta('og:image:alt'), file).toHaveAttribute('content', t(locale, 'site.previewAlt'));
+      await expect.soft(meta('og:url'), file).toHaveAttribute('content', pageUrl(origin, path));
+      await expect.soft(meta('og:type'), file).toHaveAttribute('content', 'website');
+      await expect.soft(meta('twitter:card'), file).toHaveAttribute('content', 'summary_large_image');
+      // The picture is fetched from this server, whatever origin its address names, so the smoke checks what it serves.
+      const picture = await page.evaluate<PictureFacts>(
+        `(${PICTURE_FACTS})(${JSON.stringify(new URL(previewImageUrl(origin, path)).pathname)})`,
+      );
+      expect.soft(picture, file).toEqual({ loaded: true, width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT, manyColours: true });
+    }
   });
 }
 
