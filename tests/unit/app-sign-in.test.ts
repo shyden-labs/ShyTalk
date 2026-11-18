@@ -487,6 +487,22 @@ describe('the app session and sign-out', () => {
     expect(await again.json()).toEqual({ error: 'signed_out' });
   });
 
+  /** The website's sign-out clears the session cookie too, so nothing of the ended session stays in the browser (shyden-labs/ShyTalk#287). */
+  it("sign-out's answer clears the session cookie, with its own attributes and Max-Age=0", async () => {
+    const { token } = await signedIn();
+    const { name } = (await w.auth.$context).authCookies.sessionToken;
+    const response = await handleSignOut(bearer('sign-out', token), w.env, w.auth);
+    expect(response.status).toBe(200);
+    const [cleared = '', ...more] = response.headers.getSetCookie();
+    expect(more).toEqual([]);
+    expect(cleared.startsWith(`${name}=;`)).toBe(true);
+    expect(cleared).toMatch(/Max-Age=0/);
+    expect(cleared).toMatch(/Path=\//);
+    expect(cleared).toMatch(/HttpOnly/);
+    expect(cleared).toMatch(/Secure/);
+    expect(cleared).toMatch(/SameSite=Lax/i);
+  });
+
   it('each sign-out has its own chain', async () => {
     for (let i = 0; i < 2; i += 1) {
       const { token } = await signedIn();
@@ -499,6 +515,7 @@ describe('the app session and sign-out', () => {
   it('sign-out without a session answers 401 and writes nothing', async () => {
     const response = await handleSignOut(bearer('sign-out', 'not-a-session'), w.env, w.auth);
     expect(response.status).toBe(401);
+    expect(response.headers.getSetCookie()).toEqual([]);
     expect(w.audits).toHaveLength(0);
   });
 
@@ -508,6 +525,7 @@ describe('the app session and sign-out', () => {
     const response = await handleSignOut(bearer('sign-out', token), w.env, w.auth);
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'sign_out_failed' });
+    expect(response.headers.getSetCookie()).toEqual([]);
     expect(w.store['session']).toHaveLength(1);
     expect(signOutRows()).toEqual([]);
   });
@@ -518,6 +536,7 @@ describe('the app session and sign-out', () => {
     const response = await handleSignOut(bearer('sign-out', token), w.env, w.auth);
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'sign_out_failed' });
+    expect(response.headers.getSetCookie()).toEqual([]);
     expect(w.store['session']).toHaveLength(1);
     const [attempt, outcome, ...more] = signOutRows();
     expect(more).toEqual([]);

@@ -15,6 +15,7 @@
  * is still signed in.
  */
 import { APIError } from 'better-auth/api';
+import { serializeCookie } from 'better-call';
 import { audit, type AuditDatabase } from '../audit.ts';
 import { json } from '../http.ts';
 import { listOf, type AuthEnv, type ShyTalkAuth } from '../auth/better-auth.ts';
@@ -117,5 +118,9 @@ export async function handleSignOut(request: Request, env: SignInEnv, auth: ShyT
     await env.DB.batch([row('failure', { error: String(error) })]).catch(() => undefined);
     return json(500, { error: 'sign_out_failed' });
   }
-  return json(200, { ok: true });
+  // The website's browser drops the ended session's cookie too (shyden-labs/ShyTalk#287); the app keeps no cookie.
+  const { name, attributes } = (await auth.$context).authCookies.sessionToken;
+  const answer = json(200, { ok: true });
+  answer.headers.append('set-cookie', serializeCookie(name, '', { ...attributes, maxAge: 0 }));
+  return answer;
 }
