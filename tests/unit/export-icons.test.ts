@@ -29,9 +29,10 @@ const MODULES = `${ROOT}/node_modules`;
 const SVG = '<svg viewBox="0 0 120 120"><rect width="120" height="120" rx="27" fill="#211a52"/></svg>';
 
 describe('ICON_SIZES', () => {
-  it('makes the favicon with round corners, and the Apple and store icons square for the platform to round', () => {
+  it('makes the favicon and the page icon (an <img> SVG cannot use the page fonts) with round corners, and the Apple and store icons square for the platform to round', () => {
     expect(ICON_SIZES).toEqual([
       { file: 'apps/web/public/icons/favicon-32.png', size: 32, square: false },
+      { file: 'apps/web/public/icons/icon-192.png', size: 192, square: false },
       { file: 'apps/web/public/icons/apple-touch-icon.png', size: 180, square: true },
       { file: 'brand/icon-1024.png', size: 1024, square: true },
     ]);
@@ -124,7 +125,7 @@ describe('main', () => {
     expect(await main()).toBe(0);
     expect(readFile).toHaveBeenCalledWith(`${ROOT}/brand/icon.svg`, 'utf8');
     expect(browser.newPage.mock.calls).toEqual(
-      [32, 180, 1024].map((size) => [{ viewport: { width: size, height: size }, deviceScaleFactor: 1 }]),
+      [32, 192, 180, 1024].map((size) => [{ viewport: { width: size, height: size }, deviceScaleFactor: 1 }]),
     );
     for (const [at, page] of pages.entries()) {
       const square = ICON_SIZES[at]?.square ?? false;
@@ -137,7 +138,7 @@ describe('main', () => {
       answer: { path: `${MODULES}/@fontsource/noto-sans-thai/800.css` },
     });
     expect(served).toContainEqual({ url: `${ICON_ORIGIN}/elsewhere.js`, answer: { status: 404 } });
-    expect(log).toHaveBeenCalledWith('export-icons: 3 icons');
+    expect(log).toHaveBeenCalledWith('export-icons: 4 icons');
     expect(browser.close).toHaveBeenCalledOnce();
   });
 

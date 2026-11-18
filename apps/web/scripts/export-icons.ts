@@ -1,6 +1,6 @@
 /**
- * Renders ShyTalk's icons from the master `brand/icon.svg` (shyden-labs/ShyTalk#273): the 32px favicon, the 180px
- * Apple touch icon and the 1024px store master, to be committed.
+ * Renders ShyTalk's icons from the master `brand/icon.svg` (shyden-labs/ShyTalk#273): the 32px favicon, the 192px
+ * icon the pages show (an <img> SVG cannot use the page's fonts), the 180px Apple touch icon and the 1024px store master, to be committed.
  *
  *   node apps/web/scripts/export-icons.ts
  *
@@ -21,6 +21,7 @@ export const ICON_ORIGIN = 'https://icons.shytalk.invalid';
 /** Each icon made, relative to the repository root. */
 export const ICON_SIZES = [
   { file: 'apps/web/public/icons/favicon-32.png', size: 32, square: false },
+  { file: 'apps/web/public/icons/icon-192.png', size: 192, square: false },
   { file: 'apps/web/public/icons/apple-touch-icon.png', size: 180, square: true },
   { file: 'brand/icon-1024.png', size: 1024, square: true },
 ] as const;

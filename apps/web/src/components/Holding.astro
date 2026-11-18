@@ -1,10 +1,18 @@
 ---
 /**
- * The holding page production answers with until the full release (shyden-labs/ShyTalk#261): what ShyTalk is, that
- * the app is being built, and the contact. No menu or footer, as nothing they would link to is released.
+ * The holding page production answers with until the full release (shyden-labs/ShyTalk#261), in ShyTalk's brand
+ * (#273): a language switch, the icon, the name, "Coming soon", the tagline, the floating hellos and the contact. No
+ * menu or footer, as nothing they would link to is released. The fonts are bundled from @fontsource and served from
+ * the site itself, as the content security policy allows only the site's own address.
  */
+import '@fontsource/outfit/500.css';
+import '@fontsource/outfit/800.css';
+import '@fontsource/noto-sans/800.css';
+import '@fontsource/noto-sans-sc/800.css';
+import '@fontsource/noto-sans-thai/800.css';
 import Base from '../layouts/Base.astro';
-import { t, type Locale } from '../i18n/t.ts';
+import Hellos from './Hellos.astro';
+import { LANGUAGE_NAMES, LOCALES, langTag, t, type Locale } from '../i18n/t.ts';
 import { SUPPORT_EMAIL } from '../site.ts';
 
 interface Props {
@@ -14,9 +22,30 @@ const { locale } = Astro.props;
 ---
 
 <Base locale={locale} title={t(locale, 'site.name')} bare>
-  <h1>{t(locale, 'home.heading')}</h1>
-  <p data-holding="intro">{t(locale, 'home.intro')}</p>
-  <h2 data-holding="way">{t(locale, 'home.wayTitle')}</h2>
-  <p data-holding="building">{t(locale, 'holding.building')}</p>
-  <p>{t(locale, 'footer.contact')}: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></p>
+  <div class="holding">
+    <header class="holding-top">
+      <img class="holding-mark" src="/icons/icon-192.png" width="34" height="34" alt="" />
+      <nav aria-label={t(locale, 'holding.languages')}>
+        <ul>
+          {
+            LOCALES.map((other) => (
+              <li>
+                <a href={`/${other}/`} hreflang={langTag(other)} lang={langTag(other)} aria-current={other === locale ? 'page' : undefined}>
+                  {LANGUAGE_NAMES[other]}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+    </header>
+    <div class="holding-stage">
+      <img class="brand-icon" src="/icons/icon-192.png" width="96" height="96" alt="" />
+      <h1 class="wordmark">Shy<span>Talk</span></h1>
+      <p class="badge">{t(locale, 'holding.comingSoon')}</p>
+      <p class="tagline">{t(locale, 'site.tagline')}</p>
+      <Hellos />
+    </div>
+    <p class="holding-contact"><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></p>
+  </div>
 </Base>
