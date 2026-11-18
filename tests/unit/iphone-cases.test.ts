@@ -880,8 +880,17 @@ describe('the iPhone recovery pages', () => {
       if (selector === '#email-address' && looks <= 2) typedWhileHidden = true;
       return type(selector, text);
     };
-    await recovery().run(page, countingCheck());
+    // The quarter-second looks pass on fake time, so the test waits on none (shyden-labs/ShyTalk#264: 504 ms on the real clock).
+    vi.useFakeTimers({ now: 1700000000000 });
+    try {
+      const running = recovery().run(page, countingCheck());
+      await vi.runAllTimersAsync();
+      await running;
+    } finally {
+      vi.useRealTimers();
+    }
     expect(typedWhileHidden).toBe(false);
+    expect(looks).toBeGreaterThan(2);
   });
 
   it('fails naming the recovery form when it never shows', async () => {

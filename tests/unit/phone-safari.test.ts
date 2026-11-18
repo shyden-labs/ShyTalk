@@ -637,8 +637,16 @@ describe('safariPage: tap and waitForText', () => {
     await expect(page.waitForText('h1', 'New')).rejects.toThrow('h1 held "Old", not "New", after 15000 ms');
   });
 
-  it('waits by the real clock when nothing stands in', async () => {
+  it('waits by the timer clock when nothing stands in', async () => {
     const fake = appium({}, ['Old', 'New']);
-    await expect(safariPage(fake.call, 's1', BASE).waitForText('h1', 'New')).resolves.toBeUndefined();
+    // The default wait is a real setTimeout; on fake time it is passed without waiting (shyden-labs/ShyTalk#264: 253 ms).
+    vi.useFakeTimers();
+    try {
+      const waiting = safariPage(fake.call, 's1', BASE).waitForText('h1', 'New');
+      await vi.runAllTimersAsync();
+      await expect(waiting).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
