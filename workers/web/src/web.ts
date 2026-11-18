@@ -93,12 +93,24 @@ export function holdingPath(languages: string | null): string {
   return best.language === 'en' ? '/holding' : `/${best.language}/holding`;
 }
 
-/** What the holding page itself loads, served as built: its stylesheet and its link-preview picture. */
-const HOLDING_ASSETS = ['/styles/', '/previews/'];
+/**
+ * Which holding page answers `pathname` (shyden-labs/ShyTalk#273): the home in the visitor's language, each
+ * language's home (`/en/`, `/id/` and the rest, with or without the slash) in that language whatever the header asks,
+ * so the page's language switch works; every other address the visitor's language as a 404.
+ */
+export function holdingAnswer(pathname: string, languages: string | null): { page: string; status: 200 | 404 } {
+  const home = /^\/([a-z]+)\/?$/.exec(pathname)?.[1];
+  if (home === 'en') return { page: '/holding', status: 200 };
+  if (home !== undefined && HOLDING_LANGUAGES.includes(home)) return { page: `/${home}/holding`, status: 200 };
+  return { page: holdingPath(languages), status: pathname === '/' ? 200 : 404 };
+}
+
+/** What the holding page itself loads, served as built: its stylesheet, icons, fonts and link-preview picture. */
+const HOLDING_ASSETS = ['/styles/', '/previews/', '/icons/', '/_astro/'];
 
 /**
- * Production while it holds: the www address sends the visitor to the bare one; its home answers the holding page
- * in the visitor's language; what the page loads is served; every other address answers the holding page as a 404.
+ * Production while it holds: the www address sends the visitor to the bare one; its homes answer the holding page
+ * (holdingAnswer); what the page loads is served; every other address answers the holding page as a 404.
  */
 async function holding(request: Request, env: WebEnv): Promise<Response> {
   const url = new URL(request.url);
@@ -107,8 +119,9 @@ async function holding(request: Request, env: WebEnv): Promise<Response> {
     return Response.redirect(url.toString(), 301);
   }
   if (HOLDING_ASSETS.some((prefix) => url.pathname.startsWith(prefix))) return env.ASSETS.fetch(request);
-  const page = await env.ASSETS.fetch(new Request(new URL(holdingPath(request.headers.get('accept-language')), url)));
-  const answer = new Response(page.body, { status: url.pathname === '/' ? 200 : 404, headers: page.headers });
+  const { page: path, status } = holdingAnswer(url.pathname, request.headers.get('accept-language'));
+  const page = await env.ASSETS.fetch(new Request(new URL(path, url)));
+  const answer = new Response(page.body, { status, headers: page.headers });
   answer.headers.set('vary', 'accept-language');
   return answer;
 }

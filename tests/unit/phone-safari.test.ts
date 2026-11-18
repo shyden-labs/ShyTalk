@@ -2,6 +2,7 @@ import { runInNewContext } from 'node:vm';
 import { describe, it, expect, vi } from 'vitest';
 import { safariPage, type WebDriverCall } from '../phones/safari.ts';
 import { PREVIEW_FACTS, PREVIEW_TAGS } from '../support/link-preview.ts';
+import { BRAND_FONTS, HOLDING_FACTS, wantedFacts } from '../support/holding-facts.ts';
 
 /**
  * Safari on the iPhone Air, driven through Appium's WebDriver API
@@ -290,6 +291,49 @@ describe('safariPage: reading the page', () => {
   it('fails naming the in-page check’s failure', async () => {
     const page = safariPage(appium({}, [{ failed: 'TypeError: Load failed' }]).call, 's1', BASE);
     await expect(page.previewFacts('/sign-up/')).rejects.toThrow('the link-preview check on /sign-up/ failed: TypeError: Load failed');
+  });
+
+  it('reads the named attributes and the text of every match, as rows (shyden-labs/ShyTalk#273)', async () => {
+    const rows = [
+      ['/en/', 'en', 'English'],
+      ['/id/', 'id', 'Bahasa Indonesia'],
+    ];
+    const fake = appium({}, [rows]);
+    await expect(safariPage(fake.call, 's1', BASE).rows('nav a', ['href', 'hreflang'])).resolves.toEqual(rows);
+    expect(lastScript(fake).args).toEqual(['nav a', ['href', 'hreflang']]);
+    const answer = runInNewContext(`(function () { ${lastScript(fake).script} }).apply(null, args)`, {
+      args: ['li', ['lang']],
+      document: {
+        querySelectorAll: () => [{ getAttribute: (name: string) => (name === 'lang' ? 'th' : null), textContent: ' สวัสดี \n' }],
+      },
+    }) as unknown;
+    expect(answer).toEqual([['th', 'สวัสดี']]);
+  });
+
+  it('measures the holding page with the smoke’s own in-page check and the brand fonts, given a minute (shyden-labs/ShyTalk#273)', async () => {
+    const facts = wantedFacts(420, false);
+    const fake = appium({}, [facts]);
+    await expect(safariPage(fake.call, 's1', BASE).holdingFacts()).resolves.toEqual(facts);
+    const { script, args } = lastAsyncScript(fake);
+    expect(script).toContain(HOLDING_FACTS);
+    expect(args).toEqual([BRAND_FONTS]);
+    const steps = fake.calls.map(([, path]) => path);
+    expect(fake.calls).toContainEqual(['POST', '/session/s1/timeouts', { script: 60_000 }]);
+    expect(steps.indexOf('/session/s1/timeouts')).toBeLessThan(steps.indexOf('/session/s1/execute/async'));
+    const answers: unknown[] = [];
+    const run = (check: string) =>
+      runInNewContext(`(function () { ${script.replace(HOLDING_FACTS, check)} }).apply(null, args)`, {
+        args: [[], (answer: unknown) => answers.push(answer)],
+      }) as unknown;
+    run('async (fonts) => ({ fonts })');
+    run('async () => { throw new Error("no fonts"); }');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(answers).toEqual([{ fonts: [] }, { failed: 'Error: no fonts' }]);
+  });
+
+  it('fails naming the holding check’s failure', async () => {
+    const page = safariPage(appium({}, [{ failed: 'TypeError: null is not an object' }]).call, 's1', BASE);
+    await expect(page.holdingFacts()).rejects.toThrow('the holding-page check failed: TypeError: null is not an object');
   });
 });
 

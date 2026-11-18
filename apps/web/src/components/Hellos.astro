@@ -1,0 +1,12 @@
+---
+/**
+ * The holding page's banner (shyden-labs/ShyTalk#273): hello in seven languages, each word in its own language and
+ * never translated, floating gently; still for reduced motion. A phone shows the first five. Colours and places come
+ * from site.css by position, as the site's content security policy allows no inline style.
+ */
+import { HELLOS } from '../brand.ts';
+---
+
+<ul class="hellos">
+  {HELLOS.map(({ word, lang }) => <li lang={lang}>{word}</li>)}
+</ul>

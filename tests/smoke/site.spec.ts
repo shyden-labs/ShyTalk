@@ -11,7 +11,9 @@ import { test, expect } from './fixture.ts';
 import { codeIn, MAIL_CEILING_MS } from '../phones/test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import AxeBuilder from '@axe-core/playwright';
-import { t } from '../../apps/web/src/i18n/t.ts';
+import { LANGUAGE_NAMES, LOCALES, langTag, t } from '../../apps/web/src/i18n/t.ts';
+import { HELLOS } from '../../apps/web/src/brand.ts';
+import { HOLDING_FACTS, BRAND_FONTS, NARROW_WIDTH, PHONE_WIDTH, wantedFacts, type HoldingFacts } from '../support/holding-facts.ts';
 import { LEGAL_DOCS, legalLines, legalLocale, legalPath } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
@@ -25,6 +27,11 @@ const LANGUAGES = [
   { lang: 'vi', locale: 'vi', prefix: '/vi' },
   { lang: 'zh-Hans', locale: 'zh', prefix: '/zh' },
 ] as const;
+
+/** The holding page's look, measured in the page by the check its iPhone copy runs too (shyden-labs/ShyTalk#273). */
+async function holdingFacts(page: Page): Promise<HoldingFacts> {
+  return page.evaluate<HoldingFacts>(`(${HOLDING_FACTS})(${JSON.stringify(BRAND_FONTS)})`);
+}
 
 /** Every console line the browser writes about the CSP refusing something. */
 function cspRefusals(page: Page): string[] {
@@ -102,28 +109,67 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     expect(refusals).toEqual([]);
   });
 
-  // The holding page production answers with until the full release (shyden-labs/ShyTalk#261): what ShyTalk is, that
-  // the app is being built, and the contact; no menu or footer, as nothing it would link to is released.
-  test(`${lang}: the holding page shows what ShyTalk is, that the app is being built, and the contact, in ${lang}, passing axe, with no menu and no CSP refusal`, async ({
+  // The holding page production answers with until the full release (shyden-labs/ShyTalk#261), in ShyTalk's brand
+  // (#273): a language switch, the icon, the name, "Coming soon", the tagline, the floating hellos and the contact. The
+  // hellos keep still for reduced motion, and a phone's width shows five, inside the page; set here where the browser
+  // can take a width, measured as it is on a phone.
+  test(`${lang}: the holding page shows ShyTalk's brand, the language switch, the hellos and the contact, in ${lang}, passing axe, keeping still for reduced motion and fitting a phone, with no CSP refusal`, async ({
     page,
   }) => {
     const refusals = cspRefusals(page);
     const response = await page.goto(`${prefix}/holding`, { waitUntil: 'load' });
     expect.soft(response?.status()).toBe(200);
     await expect.soft(page.locator('html')).toHaveAttribute('lang', lang);
+    const languages = page.getByRole('navigation', { name: t(locale, 'holding.languages'), exact: true });
+    await expect.soft(languages).toBeVisible();
+    expect
+      .soft(
+        await languages
+          .getByRole('link')
+          .evaluateAll((links) =>
+            links.map((link) => [
+              link.getAttribute('href'),
+              link.getAttribute('hreflang'),
+              link.textContent.trim(),
+              link.getAttribute('aria-current'),
+            ]),
+          ),
+      )
+      .toEqual(LOCALES.map((other) => [`/${other}/`, langTag(other), LANGUAGE_NAMES[other], other === locale ? 'page' : null]));
     const heading = page.getByRole('heading', { level: 1 });
     await expect.soft(heading).toBeVisible();
-    await expect.soft(heading).toHaveText(t(locale, 'home.heading'));
-    for (const key of ['home.intro', 'home.wayTitle', 'holding.building'] as const) {
-      await expect.soft(page.getByText(t(locale, key), { exact: true })).toBeVisible();
-    }
+    await expect.soft(heading).toHaveText('ShyTalk');
+    await expect.soft(heading.locator('span')).toHaveText('Talk');
+    const badge = page.locator('p.badge');
+    await expect.soft(badge).toBeVisible();
+    await expect.soft(badge).toHaveText(t(locale, 'holding.comingSoon'));
+    const tagline = page.locator('p.tagline');
+    await expect.soft(tagline).toBeVisible();
+    await expect.soft(tagline).toHaveText(t(locale, 'site.tagline'));
+    expect
+      .soft(
+        await page
+          .locator('ul.hellos > li')
+          .evaluateAll((hellos) => hellos.map((hello) => [hello.getAttribute('lang'), hello.textContent.trim()])),
+      )
+      .toEqual(HELLOS.map(({ lang: helloLang, word }) => [helloLang, word]));
     const contact = page.getByRole('link', { name: SUPPORT_EMAIL, exact: true });
     await expect.soft(contact).toBeVisible();
     await expect.soft(contact).toHaveAttribute('href', `mailto:${SUPPORT_EMAIL}`);
-    await expect.soft(page.getByRole('navigation')).toHaveCount(0);
-    await expect.soft(page.getByRole('contentinfo')).toHaveCount(0);
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+    const facts = await holdingFacts(page);
+    expect.soft(facts).toEqual(wantedFacts(facts.width, facts.reducedMotion));
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const still = await holdingFacts(page);
+    expect.soft(still).toEqual(wantedFacts(still.width, true));
+    if (still.width > PHONE_WIDTH) {
+      await page.setViewportSize({ width: NARROW_WIDTH, height: 740 });
+      await page.reload({ waitUntil: 'load' });
+    }
+    const phone = await holdingFacts(page);
+    expect.soft(phone.width).toBeLessThanOrEqual(PHONE_WIDTH);
+    expect.soft(phone).toEqual(wantedFacts(phone.width, phone.reducedMotion));
     expect(refusals).toEqual([]);
   });
 
