@@ -11,6 +11,8 @@ import { withoutCommentLines, withoutYamlComments, withoutYamlQuotes, yamlBlock 
 
 const json = (file: string): unknown => JSON.parse(readFileSync(file, 'utf8'));
 const scripts = (json('package.json') as { scripts: Record<string, string> }).scripts;
+const lock = json('package-lock.json') as { packages: Record<string, { version?: string }> };
+const playwrightVersion = lock.packages['node_modules/playwright']?.version ?? '';
 const ci = withoutYamlQuotes(withoutYamlComments(readFileSync('.github/workflows/ci.yml', 'utf8')));
 
 /** Each step of a job as its name and run line ('' where it has none). */
@@ -75,16 +77,26 @@ describe('ci.yml', () => {
 
   // shyden-labs/ShyTalk#109: every target the site supports runs the same suite, and their totals are compared.
   it('builds the site for dev and runs the smoke against that build, so a preview’s addresses are checked (shyden-labs/ShyTalk#198)', () => {
-    expect(yamlBlock(ci, 'web-smoke', '  ').split('\n').slice(0, 5)).toEqual([
+    expect(yamlBlock(ci, 'web-smoke', '  ').split('\n').slice(0, 8)).toEqual([
       '  web-smoke:',
       '    runs-on: ubuntu-26.04',
       '    timeout-minutes: 20',
+      '    container:',
+      `      image: mcr.microsoft.com/playwright:v${playwrightVersion}-resolute`,
+      '      options: --user 1001',
       '    env:',
       '      SITE_ENVIRONMENT: dev',
     ]);
   });
 
-  it('builds the site, installs every browser, runs the smoke and compares the totals in web-smoke, skipping them for docs', () => {
+  // shyden-labs/ShyTalk#281: the browsers and their system libraries come in Microsoft's image for the exact Playwright
+  // in the lockfile, so no run waits on the runner's apt mirror.
+  it('runs web-smoke in the Playwright image of the lockfile’s Playwright version', () => {
+    expect(playwrightVersion).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(yamlBlock(ci, 'web-smoke', '  ')).toContain(`image: mcr.microsoft.com/playwright:v${playwrightVersion}-resolute\n`);
+  });
+
+  it('builds the site, runs the smoke and compares the totals in web-smoke, skipping them for docs', () => {
     expect(steps(yamlBlock(ci, 'web-smoke', '  '))).toEqual([
       { name: '', run: '', if: '' },
       { name: '', run: '|', if: '' },
@@ -92,11 +104,6 @@ describe('ci.yml', () => {
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
       { name: 'Build the site', run: 'npm run build:web', if: CODE },
-      {
-        name: 'Install the browsers',
-        run: '$GITHUB_WORKSPACE/node_modules/.bin/playwright install --with-deps chromium firefox webkit',
-        if: CODE,
-      },
       { name: 'Smoke', run: '|', if: CODE },
       { name: 'Compare the totals', run: 'node scripts/smoke-totals.ts', if: `\${{ !cancelled() && ${CODE} }}` },
     ]);

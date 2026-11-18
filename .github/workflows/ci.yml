@@ -94,6 +94,12 @@ jobs:
   web-smoke:
     runs-on: ubuntu-26.04
     timeout-minutes: 20
+    # Microsoft's image for the lockfile's exact Playwright: browsers and their system libraries come
+    # with it, so no run waits on the runner's apt mirror (shyden-labs/ShyTalk#281). A unit test
+    # keeps the tag equal to the lockfile's version.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-resolute
+      options: --user 1001
     # Built for dev, so each page's preview names the dev origin, and the smoke checks it (shyden-labs/ShyTalk#198).
     env:
       SITE_ENVIRONMENT: dev
@@ -119,9 +125,6 @@ jobs:
       - name: Build the site
         if: steps.classify.outputs.scope != 'docs-only'
         run: npm run build:web
-      - name: Install the browsers
-        if: steps.classify.outputs.scope != 'docs-only'
-        run: $GITHUB_WORKSPACE/node_modules/.bin/playwright install --with-deps chromium firefox webkit
       - name: Smoke
         if: steps.classify.outputs.scope != 'docs-only'
         env:
