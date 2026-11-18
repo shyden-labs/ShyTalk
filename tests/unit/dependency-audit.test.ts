@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { fixCheck, main, unexcused, type AuditException, type AuditReport } from '../../scripts/audit.ts';
+import { excusedLine, fixCheck, main, unexcused, type AuditException, type AuditReport } from '../../scripts/audit.ts';
 
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }));
 
@@ -99,14 +99,12 @@ describe('main', () => {
   const audited = (stdout: string, status = 1) =>
     vi.mocked(spawnSync).mockReturnValue({ status, stdout, stderr: '', pid: 1, output: [], signal: null });
 
-  it('runs npm audit as JSON and passes when every finding is excused, saying which advisories it excused', () => {
-    audited(JSON.stringify(report()));
+  it('runs npm audit as JSON and passes with no finding, saying it excused nothing', () => {
+    audited(JSON.stringify({ vulnerabilities: {} }), 0);
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     expect(main([])).toBe(0);
     expect(spawnSync).toHaveBeenCalledWith('npm', ['audit', '--json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-    expect(log).toHaveBeenCalledWith(
-      `audit: no unexcused finding; excused ${PICOMATCH} (picomatch): Shyden 2026-11-18, shyden-labs/ShyTalk#260`,
-    );
+    expect(log).toHaveBeenCalledWith('audit: no unexcused finding; excused nothing');
   });
 
   it('fails naming every unexcused finding', () => {
@@ -125,10 +123,23 @@ describe('main', () => {
   });
 });
 
+describe('excusedLine', () => {
+  it('names each excused advisory with its package and ruling', () => {
+    expect(excusedLine([EXCUSE])).toBe(
+      `audit: no unexcused finding; excused ${PICOMATCH} (picomatch): Shyden 2026-11-18, shyden-labs/ShyTalk#260`,
+    );
+  });
+
+  it('says it excused nothing when there is no exception', () => {
+    expect(excusedLine([])).toBe('audit: no unexcused finding; excused nothing');
+  });
+});
+
 describe('the exceptions file', () => {
-  it('holds only the picomatch advisory Shyden excused, each exception naming its advisory, package, reason and ruling', () => {
+  /** GitHub withdrew the picomatch advisory on 2026-11-18 (withdrawn_at 2026-11-18T15:38:56Z), so its exception went. */
+  it('holds no exception now, and any exception names its advisory, package, reason and ruling', () => {
     const exceptions = JSON.parse(readFileSync('audit-exceptions.json', 'utf8')) as AuditException[];
-    expect(exceptions.map(({ advisory: id, package: name }) => `${id} ${name}`)).toEqual([`${PICOMATCH} picomatch`]);
+    expect(exceptions).toEqual([]);
     for (const exception of exceptions) {
       expect(exception.advisory).toMatch(/^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/);
       expect(exception.reason).not.toBe('');
@@ -171,6 +182,12 @@ describe('fixCheck', () => {
     ]);
   });
 
+  it('says there is nothing to check when there is no exception, asking GitHub nothing', async () => {
+    const fetch = answer(null);
+    expect(await fixCheck([], fetch)).toEqual(['audit: no exception to check for a fix']);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('reads the fix for the excused package only', async () => {
     expect(await fixCheck([EXCUSE], answer('9.9.9', 'other'))).toEqual([`audit: ${PICOMATCH} (picomatch) still names no fixed release`]);
   });
@@ -182,11 +199,13 @@ describe('fixCheck', () => {
     expect(await fixCheck([EXCUSE], offline)).toEqual([`audit: could not check ${PICOMATCH} for a fix: fetch failed`]);
   });
 
-  it('runs from main with fix-check, printing each line and passing', async () => {
-    vi.stubGlobal('fetch', answer(null));
+  it('runs from main with fix-check and, with no exception, says there is nothing to check, asking GitHub nothing', async () => {
+    const fetch = answer(null);
+    vi.stubGlobal('fetch', fetch);
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     expect(await main(['fix-check'])).toBe(0);
-    expect(log).toHaveBeenCalledWith(`audit: ${PICOMATCH} (picomatch) still names no fixed release`);
+    expect(log).toHaveBeenCalledWith('audit: no exception to check for a fix');
+    expect(fetch).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 });
