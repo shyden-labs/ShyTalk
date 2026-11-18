@@ -77,9 +77,9 @@ describe('dev-tail', () => {
     expect(text).toContain('echo "Watched dev for $MINUTES minutes: $seen events."');
   });
 
-  it('prints how many requests each host and path had, busiest first, with token-like strings blanked and no query', () => {
+  it('prints how many requests each host and path had, busiest first, with email addresses (plain or %40) and token-like strings blanked and no query', () => {
     expect(source()).toContain(
-      'jq -rn \'[inputs | .event.request.url // "(no request)" | sub("^https?://"; "") | sub("[?#].*$"; "") | gsub("[A-Za-z0-9_+=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>")] | group_by(.) | map([length, .[0]]) | sort_by(-.[0]) | .[:30][] | "\\(.[0]) \\(.[1])"\' "$RUNNER_TEMP/events"',
+      'jq -rn \'[inputs | .event.request.url // "(no request)" | sub("^https?://"; "") | sub("[?#].*$"; "") | gsub("[^\\\\s@/]+(@|%40|%2540)[^\\\\s@/]+"; "<email>") | gsub("[A-Za-z0-9_+=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>")] | group_by(.) | map([length, .[0]]) | sort_by(-.[0]) | .[:30][] | "\\(.[0]) \\(.[1])"\' "$RUNNER_TEMP/events"',
     );
   });
 });
