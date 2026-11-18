@@ -142,6 +142,8 @@
     "codesLeftAfterSignIn": "已登录。剩余恢复码：{count}。"
   },
   "holding": {
-    "building": "ShyTalk 应用正在开发中。"
+    "building": "ShyTalk 应用正在开发中。",
+    "comingSoon": "即将推出",
+    "languages": "语言"
   }
 }

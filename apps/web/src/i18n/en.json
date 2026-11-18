@@ -142,6 +142,8 @@
     "codesLeftAfterSignIn": "Signed in. Recovery codes left: {count}."
   },
   "holding": {
-    "building": "The ShyTalk app is being built now."
+    "building": "The ShyTalk app is being built now.",
+    "comingSoon": "Coming soon",
+    "languages": "Language"
   }
 }
