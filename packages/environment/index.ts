@@ -51,32 +51,39 @@ export async function requireDoorSecret(request: Request, configured: string | u
 /** The header a caller already using `Authorization: Bearer` gives the site password in (shyden-labs/ShyTalk#262). */
 export const SITE_PASSWORD_HEADER = 'x-shytalk-site-password';
 
-/** The user name the browser's password box takes, with the site password. */
+/** The user name tests and the deploy type in the browser's box; any name, a blank one included, is accepted (shyden-labs/ShyTalk#290). */
 export const SITE_USER = 'shytalk';
 
-/** `user:password` from an `Authorization: Basic` value, decoded as UTF-8, or '' when it is not one. */
-function basicCredentials(authorization: string | null): string {
+/**
+ * The password from an `Authorization: Basic` value, decoded as UTF-8, or ''
+ * when it is not one. The user name, everything before the first colon (RFC
+ * 7617 forbids one inside it), is not checked (shyden-labs/ShyTalk#290).
+ */
+function basicPassword(authorization: string | null): string {
   const [scheme = '', encoded = ''] = (authorization ?? '').split(' ');
   if (scheme.toLowerCase() !== 'basic' || encoded === '') return '';
+  let credentials: string;
   try {
-    return new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)));
+    credentials = new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)));
   } catch {
     return '';
   }
+  const colon = credentials.indexOf(':');
+  return colon === -1 ? '' : credentials.slice(colon + 1);
 }
 
 /**
  * The dev and test sites' password (shyden-labs/ShyTalk#262): `null` when the
- * request gives `configured`, either as user `shytalk` in the browser's box
- * (`Authorization: Basic`) or, for a caller whose `Authorization` carries a
+ * request gives `configured`, either in the browser's box (`Authorization:
+ * Basic`, with any user name, a blank one included) or, for a caller whose `Authorization` carries a
  * bearer token, in `x-shytalk-site-password`, which wins when present.
  * Otherwise one 401 asking for the box, whatever part was wrong. An unset or
  * empty configured password refuses every request.
  */
 export async function requireSitePassword(request: Request, configured: string | undefined, realm: string): Promise<Response | null> {
   const header = request.headers.get(SITE_PASSWORD_HEADER);
-  const given = header === null ? basicCredentials(request.headers.get('authorization')) : `${SITE_USER}:${header}`;
-  if (await matches(given, configured ? `${SITE_USER}:${configured}` : undefined)) return null;
+  const given = header ?? basicPassword(request.headers.get('authorization'));
+  if (await matches(given, configured)) return null;
   return new Response('Unauthorized', {
     status: 401,
     headers: {
