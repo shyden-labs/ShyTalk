@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { LOCALES, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
 
 /**
  * The site's languages (plan 3 Task 1, shyden-labs/ShyTalk#51): English at
@@ -71,5 +71,21 @@ describe('localePath', () => {
     ['zh', '/closed-testing', '/zh/closed-testing'],
   ] as const)('%s %s is %s', (locale, path, expected) => {
     expect(localePath(locale, path)).toBe(expected);
+  });
+});
+
+describe('each language as the site names and tags it (shyden-labs/ShyTalk#273)', () => {
+  it('names each language in itself, never translated', () => {
+    expect(LANGUAGE_NAMES).toEqual({ en: 'English', id: 'Bahasa Indonesia', th: 'ไทย', vi: 'Tiếng Việt', zh: '中文' });
+  });
+
+  it.each([
+    ['en', 'en'],
+    ['id', 'id'],
+    ['th', 'th'],
+    ['vi', 'vi'],
+    ['zh', 'zh-Hans'],
+  ] as const)('tags %s as %s', (locale, tag) => {
+    expect(langTag(locale)).toBe(tag);
   });
 });

@@ -142,6 +142,8 @@
     "codesLeftAfterSignIn": "Đã đăng nhập. Số mã khôi phục còn lại: {count}."
   },
   "holding": {
-    "building": "Ứng dụng ShyTalk đang được xây dựng."
+    "building": "Ứng dụng ShyTalk đang được xây dựng.",
+    "comingSoon": "Sắp ra mắt",
+    "languages": "Ngôn ngữ"
   }
 }

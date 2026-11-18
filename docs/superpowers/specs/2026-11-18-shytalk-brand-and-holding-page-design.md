@@ -29,7 +29,7 @@ A rounded tile in deep night blue with three speech bubbles stacked, tails alter
 | Middle, tail right | pink `#ff5c8a` | 你好 | Chinese (Simplified) | `#ffffff` |
 | Bottom, tail left | teal `#20c4b0` | สวัสดี | Thai | `#08332e` |
 
-Tile `#211a52` (one step lighter than the page so it stands out on it), corner radius 27 on a 120 grid. Below home-screen size the words blur; the icon then reads as three coloured bubbles, which was shown to Shyden and accepted. The master is an SVG with every word converted to outlines (paths), so no device needs the fonts.
+Tile `#211a52` (one step lighter than the page so it stands out on it), corner radius 27 on a 120 grid. Below home-screen size the words blur; the icon then reads as three coloured bubbles, which was shown to Shyden and accepted. The master is an SVG whose words are text in the brand fonts (changed while building, #273: outlining needed a font-to-path library for one file); every picture of it, favicons included, is a PNG rendered with the fonts loaded, so no device needs the fonts.
 
 ### Wordmark
 
@@ -79,7 +79,7 @@ New lines, read back by Google in id, th, vi and zh before commit: "Coming soon"
 
 ## Approaches considered
 
-1. **Brand as source files in the repository (chosen).** A `brand/` folder holds the master icon SVG (outlined), the wordmark SVG and a README with the colours and type; the site's CSS takes the colours as tokens; a script exports every icon size the site needs (an SVG favicon, a 32px PNG favicon and the 180px Apple touch icon) and the 1024px store master. The site has no web manifest, so no manifest sizes are made. One place, versioned, testable, reused by the app later.
+1. **Brand as source files in the repository (chosen).** A `brand/` folder holds the master icon SVG (outlined), the wordmark SVG and a README with the colours and type; the site's CSS takes the colours as tokens; a script exports every icon size the site needs (a 32px PNG favicon, the 192px icon the page shows, the 180px Apple touch icon) and the 1024px store master; the Apple and store icons are square and opaque, as their platforms round them and the App Store refuses transparency. The site has no web manifest, so no manifest sizes are made. One place, versioned, testable, reused by the app later.
 2. A Design System artifact on claude.ai as the brand's home, with the repository copying from it. More ceremony and a second source of truth for one icon and eleven colours; not worth it now.
 3. A raster logo made in an outside design tool. No such tool is in use here, and an SVG master scales to every size the stores and site need.
 

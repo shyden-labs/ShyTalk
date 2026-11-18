@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import type { SafariPage } from './iphone-cases.ts';
 import { PREVIEW_FACTS, PREVIEW_TAGS, type PreviewFacts } from '../support/link-preview.ts';
+import { BRAND_FONTS, HOLDING_FACTS, type HoldingFacts } from '../support/holding-facts.ts';
 
 /** One WebDriver request to Appium, answering the response's `value`. */
 export type WebDriverCall = (method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown) => Promise<unknown>;
@@ -132,6 +133,14 @@ const ELEMENT = 'element-6066-11e4-a52e-4f735466cecf';
 /** Runs the smoke's link-preview check with the page's path and tags, handing back its answer or its failure. */
 const PREVIEW = `const done = arguments[arguments.length - 1];
 (${PREVIEW_FACTS})(arguments[0], arguments[1]).then(done, (error) => done({ failed: String(error) }));`;
+/** Runs the smoke's holding-page check with the brand fonts, handing back its answer or its failure (#273). */
+const HOLDING = `const done = arguments[arguments.length - 1];
+(${HOLDING_FACTS})(arguments[0]).then(done, (error) => done({ failed: String(error) }));`;
+/** Each match's named attributes, then its trimmed text. */
+const ROWS = `return Array.from(document.querySelectorAll(arguments[0]), (el) => [
+  ...arguments[1].map((name) => el.getAttribute(name)),
+  el.textContent.trim(),
+]);`;
 const AXE_TIMEOUT_MS = 60_000;
 const AXE_FILE = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
 
@@ -239,6 +248,16 @@ export function safariPage(
     },
     async visibleLinks(name) {
       return (await run(LINKS, name, true)) as number;
+    },
+    async rows(selector, attributes) {
+      return (await run(ROWS, selector, attributes)) as (string | null)[][];
+    },
+    async holdingFacts() {
+      await call('POST', `${at}/timeouts`, { script: AXE_TIMEOUT_MS });
+      const answer = (await call('POST', `${at}/execute/async`, { script: HOLDING, args: [BRAND_FONTS] })) as
+        HoldingFacts | { failed: string };
+      if ('failed' in answer) throw new Error(`the holding-page check failed: ${answer.failed}`);
+      return answer;
     },
     async count(selector) {
       return (await run(COUNT, selector)) as number;

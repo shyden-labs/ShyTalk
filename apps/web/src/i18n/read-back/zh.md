@@ -129,3 +129,5 @@
 | account.signInRefused | That did not work. Check the address and the code, and try again. | 未成功。请检查地址和验证码，然后重试。 | Unsuccessful. Please check your address and verification code, then try again. |
 | account.codesLeftAfterSignIn | Signed in. Recovery codes left: {count}. | 已登录。剩余恢复码：{count}。 | Logged in. Remaining recovery codes: {count} . |
 | holding.building | The ShyTalk app is being built now. | ShyTalk 应用正在开发中。 | The ShyTalk app is under development. |
+| holding.comingSoon | Coming soon | 即将推出 | coming soon |
+| holding.languages | Language | 语言 | language |

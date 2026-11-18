@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { handle, holdingPath, type WebEnv } from '../../workers/web/src/web.ts';
+import { handle, holdingAnswer, holdingPath, type WebEnv } from '../../workers/web/src/web.ts';
 
 /**
  * The holding page (shyden-labs/ShyTalk#261; Shyden 2026-11-17: "Holding page first"): while production holds,
@@ -58,6 +58,26 @@ describe('holdingPath', () => {
   });
 });
 
+describe('holdingAnswer (shyden-labs/ShyTalk#273)', () => {
+  it.each([
+    ['/', 'th', '/th/holding', 200],
+    ['/', null, '/holding', 200],
+    ['/en/', 'th', '/holding', 200],
+    ['/en', 'th', '/holding', 200],
+    ['/id/', 'en', '/id/holding', 200],
+    ['/id', 'en', '/id/holding', 200],
+    ['/th/', 'vi', '/th/holding', 200],
+    ['/vi/', null, '/vi/holding', 200],
+    ['/zh/', 'id', '/zh/holding', 200],
+    ['/ID/', 'th', '/th/holding', 404],
+    ['/xx/', 'vi', '/vi/holding', 404],
+    ['/id/sign-in/', 'th', '/th/holding', 404],
+    ['/holding', null, '/holding', 404],
+  ] as const)('answers %s, asked in %j, with %s and %i', (pathname, languages, page, status) => {
+    expect(holdingAnswer(pathname, languages)).toEqual({ page, status });
+  });
+});
+
 describe('a holding production', () => {
   it('answers its home with the holding page, 200, without needing a database, carrying the security headers', async () => {
     const { env, asked } = holding();
@@ -76,7 +96,7 @@ describe('a holding production', () => {
     expect(asked).toEqual(['/th/holding']);
   });
 
-  it.each(['/sign-in/', '/id/', '/closed-testing', '/api/app/sign-in-methods', '/api/closed-testing', '/holding'])(
+  it.each(['/sign-in/', '/ID/', '/xx/', '/id/sign-in/', '/closed-testing', '/api/app/sign-in-methods', '/api/closed-testing', '/holding'])(
     'answers %s with the holding page as a 404, reaching nothing behind it',
     async (path) => {
       const { env, asked } = holding();
@@ -87,7 +107,16 @@ describe('a holding production', () => {
     },
   );
 
-  it.each(['/styles/site.css', '/previews/index.png'])(
+  it('answers each language’s home with that language’s holding page, whatever the header asks, so the switch works', async () => {
+    const { env, asked } = holding();
+    const response = await handle(visit('/th/', { headers: { 'accept-language': 'en' } }), env);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('page /th/holding');
+    expect(asked).toEqual(['/th/holding']);
+    expect(response.headers.get('vary')).toBe('accept-language');
+  });
+
+  it.each(['/styles/site.css', '/previews/index.png', '/icons/favicon-32.png', '/_astro/outfit-latin-800-normal.woff2'])(
     'serves %s, which the holding page and its link preview use, as built',
     async (path) => {
       const { env, asked } = holding();

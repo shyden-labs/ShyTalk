@@ -142,6 +142,8 @@
     "codesLeftAfterSignIn": "เข้าสู่ระบบแล้ว รหัสกู้คืนที่เหลือ: {count}"
   },
   "holding": {
-    "building": "แอป ShyTalk กำลังอยู่ระหว่างการสร้าง"
+    "building": "แอป ShyTalk กำลังอยู่ระหว่างการสร้าง",
+    "comingSoon": "เปิดตัวเร็ว ๆ นี้",
+    "languages": "ภาษา"
   }
 }

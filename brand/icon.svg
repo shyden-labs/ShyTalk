@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="ShyTalk">
+  <rect width="120" height="120" rx="27" fill="#211a52"/>
+  <path d="M10 32a14 14 0 0 1 14-14h44a14 14 0 0 1 0 28H28l-10 8v-9a14 14 0 0 1-8-13z" fill="#ffb020"/>
+  <path d="M110 60a14 14 0 0 0-14-14H56a14 14 0 0 0 0 28h36l10 8v-9a14 14 0 0 0 8-13z" fill="#ff5c8a"/>
+  <path d="M10 88a14 14 0 0 1 14-14h52a14 14 0 0 1 0 28H28l-10 8v-9a14 14 0 0 1-8-13z" fill="#20c4b0"/>
+  <g font-weight="800" text-anchor="middle">
+    <text x="46" y="37.5" font-size="16" fill="#2a1600" font-family="'Noto Sans', sans-serif" xml:lang="en">hello</text>
+    <text x="76" y="66" font-size="17" fill="#ffffff" font-family="'Noto Sans SC', sans-serif" xml:lang="zh-Hans">你好</text>
+    <text x="50" y="94" font-size="15" fill="#08332e" font-family="'Noto Sans Thai', sans-serif" xml:lang="th">สวัสดี</text>
+  </g>
+</svg>

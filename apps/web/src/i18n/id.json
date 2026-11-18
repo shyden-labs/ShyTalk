@@ -142,6 +142,8 @@
     "codesLeftAfterSignIn": "Berhasil masuk. Sisa kode pemulihan: {count}."
   },
   "holding": {
-    "building": "Aplikasi ShyTalk sedang dibangun saat ini."
+    "building": "Aplikasi ShyTalk sedang dibangun saat ini.",
+    "comingSoon": "Segera hadir",
+    "languages": "Bahasa"
   }
 }
