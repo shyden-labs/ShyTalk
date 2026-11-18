@@ -73,6 +73,7 @@ export function unexcused(report: AuditReport, exceptions: AuditException[]): st
 
 /** One line per excused advisory: a fixed release to take now, still none, or why it could not be checked. */
 export function fixCheck(exceptions: AuditException[], fetcher: typeof fetch): Promise<string[]> {
+  if (exceptions.length === 0) return Promise.resolve(['audit: no exception to check for a fix']);
   return Promise.all(
     exceptions.map(async ({ advisory, package: name, ruled }) => {
       try {
@@ -92,6 +93,12 @@ export function fixCheck(exceptions: AuditException[], fetcher: typeof fetch): P
       }
     }),
   );
+}
+
+/** The passing audit's line: each excused advisory with its package and ruling, or that it excused nothing. */
+export function excusedLine(all: AuditException[]): string {
+  const named = all.map(({ advisory, package: name, ruled }) => `${advisory} (${name}): ${ruled}`).join('; ');
+  return `audit: no unexcused finding; excused ${named || 'nothing'}`;
 }
 
 const exceptions = (): AuditException[] => JSON.parse(readFileSync('audit-exceptions.json', 'utf8')) as AuditException[];
@@ -115,8 +122,7 @@ export function main(args: string[]): number | Promise<number> {
   const lines = unexcused(report, all);
   for (const line of lines) console.error(`audit: ${line}`);
   if (lines.length > 0) return 1;
-  const named = all.map(({ advisory, package: name, ruled }) => `${advisory} (${name}): ${ruled}`).join('; ');
-  console.log(`audit: no unexcused finding; excused ${named}`);
+  console.log(excusedLine(all));
   return 0;
 }
 
