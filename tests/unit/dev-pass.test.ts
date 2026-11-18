@@ -9,7 +9,6 @@ import { readDevPass } from '../../packages/environment/dev-pass.ts';
  */
 
 const SECRET = 'test-secret-not-real';
-const HOST = 'dev.shytalk.app';
 const MINTED_AT = 1763520000;
 const EXP = 1763520060;
 const NONCE = 'AAECAwQFBgcICQoLDA0ODw';
@@ -17,6 +16,8 @@ const TOKEN =
   'eyJ2IjoxLCJob3N0IjoiZGV2LnNoeXRhbGsuYXBwIiwiZXhwIjoxNzYzNTIwMDYwLCJub25jZSI6IkFBRUNBd1FGQmdjSUNRb0xEQTBPRHcifQ.IpAei1Y9PFgTJDbfWLP6m6AH_6KxCOc1P6L9w0CFS5c';
 
 const [BODY = '', SIGNATURE = ''] = TOKEN.split('.');
+/** The host the vector was minted for, read from its own payload. */
+const HOST = (JSON.parse(atob(BODY.replaceAll('-', '+').replaceAll('_', '/'))) as { host: string }).host;
 const LAST = TOKEN.slice(-1);
 
 const base64url = (bytes: Uint8Array): string =>
@@ -85,7 +86,7 @@ describe('readDevPass', () => {
   });
 
   it('refuses a pass made for another host', async () => {
-    expect(await readDevPass(await mint(payload({ host: 'dev.example.test' })), SECRET, HOST, MINTED_AT)).toBeNull();
+    expect(await readDevPass(await mint(payload({ host: 'site.example.test' })), SECRET, HOST, MINTED_AT)).toBeNull();
   });
 
   it('refuses a pass of another version', async () => {

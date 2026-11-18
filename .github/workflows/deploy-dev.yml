@@ -94,6 +94,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+          DEV_PASS_SECRET: ${{ secrets.DEV_PASS_SECRET }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
         run: |
@@ -148,6 +149,13 @@ jobs:
             exit 1
           fi
           printf '%s' "$SITE_PASSWORD" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put SITE_PASSWORD --env dev || { echo "::error title=deploy-dev failed::the dev site password was not set"; exit 1; }
+          # shyden-labs/ShyTalk#263: the partner site's link opens dev with a
+          # one-use pass signed with this key; without it no pass is taken.
+          if [ -z "$DEV_PASS_SECRET" ]; then
+            echo "::error title=DEV_PASS_SECRET missing::Set DEV_PASS_SECRET in the dev environment (shyden-labs/ShyTalk#263); until then dev takes no pass."
+            exit 1
+          fi
+          printf '%s' "$DEV_PASS_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put DEV_PASS_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev pass key was not set"; exit 1; }
           # shyden-labs/ShyTalk#76: dev app sign-in answers 503 until the
           # Worker holds Better Auth's secret.
           if [ -z "$BETTER_AUTH_SECRET" ]; then

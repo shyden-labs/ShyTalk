@@ -18,6 +18,8 @@ const DOOR_SECRET = 'integration-door-secret';
 const ANNOUNCE_SECRET = 'integration-announce-secret';
 /** DEV's site password (shyden-labs/ShyTalk#262), given in its header as the app gives it beside a bearer token. */
 const SITE_PASSWORD = 'integration-site-password';
+/** DEV's dev pass key (shyden-labs/ShyTalk#263), as the partner site would sign with it. */
+const DEV_PASS_SECRET = 'integration-dev-pass-secret';
 
 interface DevWorker {
   address: string;
@@ -48,6 +50,14 @@ function configFor(dir: string): string {
   const path = join(dir, 'wrangler.json');
   writeFileSync(path, JSON.stringify(config));
   return path;
+}
+
+/** DEV's host, from the Worker's own SITE_ORIGIN. */
+function devHost(): string {
+  const config = JSON.parse(readFileSync(resolve('workers/web/wrangler.json'), 'utf8')) as {
+    env: Record<string, { vars: { SITE_ORIGIN: string } }>;
+  };
+  return new URL(config.env['dev']?.vars.SITE_ORIGIN ?? '').host;
 }
 
 /** A socket on `/api/app/live` and every message it receives, once it is open. */
@@ -111,7 +121,7 @@ beforeAll(async () => {
     env: 'dev',
     ip: '127.0.0.1',
     persistTo: inject('d1Persist'),
-    vars: { DOOR_SECRET, ANNOUNCE_SECRET, SITE_PASSWORD },
+    vars: { DOOR_SECRET, ANNOUNCE_SECRET, SITE_PASSWORD, DEV_PASS_SECRET },
     logLevel: 'error',
     experimental: { disableExperimentalWarning: true },
   });
@@ -168,5 +178,36 @@ describe('the live announcement, in the real runtime', () => {
       headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET, authorization: `Basic ${btoa(`${SITE_USER}:${SITE_PASSWORD}`)}` },
     });
     expect(box.status).toBe(200);
+  });
+
+  // shyden-labs/ShyTalk#263: a fresh pass, signed as the partner site signs one, opens dev once and sets a cookie that
+  // serves pages; the same pass again gets the box, which proves its nonce was recorded in the real D1 table.
+  it('opens dev once with a fresh dev pass, serves pages on its cookie, and asks with the box for the same pass again', async () => {
+    const encode = (bytes: Uint8Array): string =>
+      btoa(String.fromCharCode(...bytes))
+        .replaceAll('+', '-')
+        .replaceAll('/', '_')
+        .replace(/=+$/, '');
+    const nonce = encode(crypto.getRandomValues(new Uint8Array(16)));
+    const body = encode(
+      new TextEncoder().encode(JSON.stringify({ v: 1, host: devHost(), exp: Math.floor(Date.now() / 1000) + 60, nonce })),
+    );
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(DEV_PASS_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, [
+      'sign',
+    ]);
+    const token = `${body}.${encode(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body))))}`;
+    const link = `http://127.0.0.1:${String(worker.port)}/api/app/health?dev_pass=${token}`;
+    const first = await worker.fetch(link, { headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET }, redirect: 'manual' });
+    expect.soft(first.status).toBe(302);
+    expect.soft(first.headers.get('location')).toBe('/api/app/health');
+    const [cookie = ''] = (first.headers.get('set-cookie') ?? '').split(';');
+    expect.soft(cookie.startsWith('shytalk_site_pass=')).toBe(true);
+    const served = await worker.fetch(`http://127.0.0.1:${String(worker.port)}/api/app/health`, {
+      headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET, cookie },
+    });
+    expect.soft(served.status).toBe(200);
+    const again = await worker.fetch(link, { headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET }, redirect: 'manual' });
+    expect.soft(again.status).toBe(401);
+    expect.soft(again.headers.get('set-cookie')).toBeNull();
   });
 });
