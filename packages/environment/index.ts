@@ -54,6 +54,31 @@ export const SITE_PASSWORD_HEADER = 'x-shytalk-site-password';
 /** The user name the browser's password box takes, with the site password. */
 export const SITE_USER = 'shytalk';
 
+/** The cookie a valid dev pass sets (shyden-labs/ShyTalk#263): it stands in for the password box. */
+export const SITE_PASS_COOKIE = 'shytalk_site_pass';
+
+/**
+ * The site pass cookie's value for `password`: a SHA-256 of it under a fixed
+ * label, base64url, so the cookie never carries the password and a new
+ * password ends every cookie made from the old one.
+ */
+export async function sitePassCookie(password: string): Promise<string> {
+  const digest = await sha256(`shytalk-site-pass-v1:${password}`);
+  return btoa(String.fromCharCode(...digest))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '');
+}
+
+/** The value of the cookie `name` on `request`, or '' when it has none. */
+function cookieValue(request: Request, name: string): string {
+  for (const pair of (request.headers.get('cookie') ?? '').split(';')) {
+    const [key = '', ...value] = pair.trim().split('=');
+    if (key === name) return value.join('=');
+  }
+  return '';
+}
+
 /** `user:password` from an `Authorization: Basic` value, decoded as UTF-8, or '' when it is not one. */
 function basicCredentials(authorization: string | null): string {
   const [scheme = '', encoded = ''] = (authorization ?? '').split(' ');
@@ -74,6 +99,8 @@ function basicCredentials(authorization: string | null): string {
  * empty configured password refuses every request.
  */
 export async function requireSitePassword(request: Request, configured: string | undefined, realm: string): Promise<Response | null> {
+  const pass = cookieValue(request, SITE_PASS_COOKIE);
+  if (pass !== '' && configured && (await matches(pass, await sitePassCookie(configured)))) return null;
   const header = request.headers.get(SITE_PASSWORD_HEADER);
   const given = header === null ? basicCredentials(request.headers.get('authorization')) : `${SITE_USER}:${header}`;
   if (await matches(given, configured ? `${SITE_USER}:${configured}` : undefined)) return null;
