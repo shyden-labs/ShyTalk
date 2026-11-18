@@ -17,6 +17,7 @@ import { handleTotpConfirm, handleTotpSetup } from './totp-routes.ts';
 import { handlePasskey, type PasskeyOperation } from './passkey.ts';
 import type { PreparedPasskeys } from './passkey-hooks.ts';
 import { handleMethods } from './methods.ts';
+import { renewSessionCookie } from './renew-session-cookie.ts';
 import { codeVerifier, passkeyHooksFor, passkeyRouteDeps, sessionReader, totpRouteDeps, type ReadyEnv } from './wiring.ts';
 
 export const APP_API_PREFIX = '/api/app/';
@@ -119,7 +120,14 @@ const EXACT = new Map<string, Route>([
 
 const methods = withSignIn((request, ready) => handleMethods(request, ready, sessionReader(authFor(ready))));
 
-export function handleAppApi(request: Request, env: WebEnv): Promise<Response> {
+/** The app API's answer, with the website's session cookie renewed where sign-in is configured (shyden-labs/ShyTalk#184). */
+export async function handleAppApi(request: Request, env: WebEnv): Promise<Response> {
+  const answer = await routeAppApi(request, env);
+  const ready = readyForSignIn(env);
+  return ready === null ? answer : renewSessionCookie(request, answer, authFor(ready));
+}
+
+function routeAppApi(request: Request, env: WebEnv): Promise<Response> {
   const { pathname } = new URL(request.url);
   const exact = EXACT.get(pathname);
   if (exact !== undefined) return exact(request, env);
