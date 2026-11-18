@@ -130,6 +130,23 @@ describe('deploy-dev', () => {
     expect(step).toContain('DOOR_SECRET: ${{ secrets.DOOR_SECRET }}');
   });
 
+  // shyden-labs/ShyTalk#262: dev asks for the site password; the deploy puts it from the dev environment after the
+  // door secret, and stops naming it when the environment has none, so the announce call can give it.
+  it('sets the site password after the door secret, and fails naming it when the environment lacks it', () => {
+    const step = deployStep().join('\n');
+    const door = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put DOOR_SECRET --env dev ||');
+    const missing = step.indexOf('if [ -z $SITE_PASSWORD ]; then');
+    const put = step.indexOf(
+      'printf %s $SITE_PASSWORD | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put SITE_PASSWORD --env dev ||',
+    );
+    const announce = step.indexOf('node scripts/announce-ui.ts');
+    expect(door).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(door);
+    expect(put).toBeGreaterThan(missing);
+    expect(announce).toBeGreaterThan(put);
+    expect(step).toContain('SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}');
+  });
+
   // #76: dev app sign-in answers 503 until the Worker holds Better Auth's
   // secret, so the deploy puts it from the dev environment, after the Worker
   // exists, and stops naming the secret when the environment has none.

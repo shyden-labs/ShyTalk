@@ -132,6 +132,8 @@ jobs:
         run: |
           SMOKE_DOOR_SECRET=$(openssl rand -hex 32)
           export SMOKE_DOOR_SECRET
+          SMOKE_SITE_PASSWORD=$(openssl rand -hex 32)
+          export SMOKE_SITE_PASSWORD
           npm run test:smoke
       # One suite, run unchanged on every target (shyden-labs/ShyTalk#109):
       # prints each target's total; fails if any differ or a test was skipped.

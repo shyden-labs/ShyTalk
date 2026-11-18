@@ -49,10 +49,11 @@ export interface PreviewFacts {
  * A function's source, run in the browser with a page's path: it fetches the page's HTML as served, reads it with
  * DOMParser (which runs no scripts, as a preview fetcher runs none), then loads the picture its `og:image` names from
  * this same server, whatever origin the address names, and reads its pixels through a canvas. Text, as Playwright and
- * WebDriver each send a script's text to the browser; written for every browser the suite runs in.
+ * WebDriver each send a script's text to the browser; written for every browser the suite runs in. It sends no cookie,
+ * as a preview fetcher sends none; on dev and test, `authorization` gives the site password (shyden-labs/ShyTalk#262).
  */
-export const PREVIEW_FACTS = `async (path, keys) => {
-  const answer = await fetch(path, { credentials: 'omit' });
+export const PREVIEW_FACTS = `async (path, keys, authorization) => {
+  const answer = await fetch(path, { credentials: 'omit', headers: authorization ? { authorization } : {} });
   const html = new DOMParser().parseFromString(await answer.text(), 'text/html');
   const tags = {};
   for (const key of keys) {

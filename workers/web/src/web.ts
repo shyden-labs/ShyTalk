@@ -2,13 +2,13 @@
  * The site's Worker (plan 3 Task 1, shyden-labs/ShyTalk#51; design 4.17).
  * PROD answers shytalk.app; TEST and DEV are the workers.dev origins behind
  * their doors, so there every request needs the door secret
- * (packages/environment). `/api/*` goes to the API; everything else to the
+ * (packages/environment) and then the site password (shyden-labs/ShyTalk#262). `/api/*` goes to the API; everything else to the
  * built pages (Workers static assets, Astro's output). Every answer carries
  * the security headers. After the door, every request checks that `DB` names
  * this environment (plan 4 Task 2, shyden-labs/ShyTalk#75), PROD included, so
  * no Worker serves from another environment's database.
  */
-import { createMarkerGuard, requireDoorSecret, type D1Like } from '../../../packages/environment/index.ts';
+import { createMarkerGuard, requireDoorSecret, requireSitePassword, type D1Like } from '../../../packages/environment/index.ts';
 import { handleClosedTesting, isClosedTesting, type ClosedTestingEnv } from './api/closed-testing.ts';
 import { handleAppApi, isAppApi } from './app/router.ts';
 import { json } from './http.ts';
@@ -23,6 +23,8 @@ export interface WebEnv {
   ENVIRONMENT_NAME: 'prod' | 'test' | 'dev';
   /** The environment's door secret (a Wrangler secret, TEST and DEV only). */
   DOOR_SECRET?: string;
+  /** The site password the browser's box asks for (a Wrangler secret, TEST and DEV only; shyden-labs/ShyTalk#262). */
+  SITE_PASSWORD?: string;
   /** The environment's own D1 database, `shytalk-<env>`, marked with its name; absent only in a Worker deployed without it, which serves nothing. */
   DB?: D1Like;
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -132,6 +134,8 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   if (env.ENVIRONMENT_NAME !== 'prod') {
     const refused = await requireDoorSecret(request, env.DOOR_SECRET);
     if (refused) return refused;
+    const asked = await requireSitePassword(request, env.SITE_PASSWORD, `ShyTalk ${env.ENVIRONMENT_NAME}`);
+    if (asked) return asked;
   }
   // Holding, nothing behind the page is reached, so no database is needed.
   if (env.HOLDING === 'true') return holding(request, env);

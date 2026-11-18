@@ -8,7 +8,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
+import { DOOR_SECRET_HEADER, SITE_USER } from '../../packages/environment/index.ts';
 import { SMOKE_COUNTS, SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
 import { MAIL_STAND_IN_PORT, SMOKE_TARGETS } from './targets.ts';
 
@@ -30,6 +30,13 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 /** A fresh secret per run, from CI; without one the door refuses everything, so fail first, naming it. */
 const secret = process.env.SMOKE_DOOR_SECRET ?? '';
 if (secret === '') throw new Error('SMOKE_DOOR_SECRET is unset: the smoke needs a door secret to send and to configure');
+
+/**
+ * DEV asks for its site password with the browser's own box (shyden-labs/ShyTalk#262); each browser answers the box
+ * with it, as a person would. A fresh one per run, from CI; fail first, naming it.
+ */
+const password = process.env.SMOKE_SITE_PASSWORD ?? '';
+if (password === '') throw new Error('SMOKE_SITE_PASSWORD is unset: the smoke needs a site password to give and to configure');
 
 /**
  * The site answers 503 until its `DB` marks this environment (plan 4 Task 2,
@@ -81,6 +88,7 @@ export default defineConfig({
     baseURL: SITE,
     ignoreHTTPSErrors: true,
     extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret },
+    httpCredentials: { username: SITE_USER, password },
   },
   // Locally no Cloudflare sets the connecting address, so every request would share SIGN_IN_LIMIT's one 'unknown' key
   // (10 a minute); each browser gets its own documentation-range address (RFC 5737) to stay inside it.
@@ -103,9 +111,9 @@ export default defineConfig({
       command: [
         `npx wrangler d1 migrations apply DB ${LOCAL_D1}`,
         `npx wrangler d1 execute DB ${LOCAL_D1} --command "${MARKER_SQL}"`,
-        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --local-protocol https --var DOOR_SECRET:${secret} ${MAIL_VARS}`,
+        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --local-protocol https --var DOOR_SECRET:${secret} --var SITE_PASSWORD:${password} ${MAIL_VARS}`,
       ].join(' && '),
-      // Playwright counts a 403 as up: the door answers before the secret is sent.
+      // Playwright counts a 403 as up: the door answers before the secret is sent (and a 401 for the password after it).
       url: `${SITE}/`,
       ignoreHTTPSErrors: true,
       cwd: ROOT,

@@ -19,6 +19,14 @@ import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, PREVIEW_FACTS, PREVIEW_TAGS, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
+import { SITE_USER } from '../../packages/environment/index.ts';
+
+/**
+ * The site password's box answer (shyden-labs/ShyTalk#262), for the one check that fetches with no cookie and so
+ * cannot use the browser's remembered answer; null where the run gives no password.
+ */
+const sitePassword = process.env.SMOKE_SITE_PASSWORD ?? '';
+const SITE_BOX = sitePassword === '' ? null : `Basic ${btoa(`${SITE_USER}:${sitePassword}`)}`;
 
 const LANGUAGES = [
   { lang: 'en', locale: 'en', prefix: '' },
@@ -222,7 +230,7 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     for (const file of sitePages(PAGE_FILES, locale)) {
       const path = pagePath(file);
       const facts = await page.evaluate<PreviewFacts>(
-        `(${PREVIEW_FACTS})(${JSON.stringify(pageUrl('', path))}, ${JSON.stringify(PREVIEW_TAGS)})`,
+        `(${PREVIEW_FACTS})(${JSON.stringify(pageUrl('', path))}, ${JSON.stringify(PREVIEW_TAGS)}, ${JSON.stringify(SITE_BOX)})`,
       );
       expect.soft(facts.title, file).not.toBe('');
       expect.soft(facts, file).toEqual(wantedPreview(origin, locale, lang, path, facts.title));

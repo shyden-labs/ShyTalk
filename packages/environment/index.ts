@@ -29,17 +29,62 @@ const sha256 = async (value: string): Promise<Uint8Array> =>
   new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
 
 /**
- * `null` when the request carries `configured` as its door secret; otherwise a
- * 403. Both sides are hashed and the 32-byte digests compared without an early
- * exit, so timing reveals neither length nor content. An unset or empty
- * configured secret refuses every request.
+ * Whether `given` equals `configured`: both are hashed and the 32-byte digests
+ * compared without an early exit, so timing reveals neither length nor
+ * content. An unset or empty `configured` matches nothing.
  */
-export async function requireDoorSecret(request: Request, configured: string | undefined): Promise<Response | null> {
-  const given = request.headers.get(DOOR_SECRET_HEADER) ?? '';
+async function matches(given: string, configured: string | undefined): Promise<boolean> {
   const [a, b] = await Promise.all([sha256(given), sha256(configured ?? '')]);
   let difference = 0;
   for (let i = 0; i < a.length; i += 1) difference |= (a[i] as number) ^ (b[i] as number);
-  return difference === 0 && configured ? null : plain(403, 'Forbidden');
+  return difference === 0 && Boolean(configured);
+}
+
+/**
+ * `null` when the request carries `configured` as its door secret; otherwise a
+ * 403. An unset or empty configured secret refuses every request.
+ */
+export async function requireDoorSecret(request: Request, configured: string | undefined): Promise<Response | null> {
+  return (await matches(request.headers.get(DOOR_SECRET_HEADER) ?? '', configured)) ? null : plain(403, 'Forbidden');
+}
+
+/** The header a caller already using `Authorization: Bearer` gives the site password in (shyden-labs/ShyTalk#262). */
+export const SITE_PASSWORD_HEADER = 'x-shytalk-site-password';
+
+/** The user name the browser's password box takes, with the site password. */
+export const SITE_USER = 'shytalk';
+
+/** `user:password` from an `Authorization: Basic` value, decoded as UTF-8, or '' when it is not one. */
+function basicCredentials(authorization: string | null): string {
+  const [scheme = '', encoded = ''] = (authorization ?? '').split(' ');
+  if (scheme.toLowerCase() !== 'basic' || encoded === '') return '';
+  try {
+    return new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)));
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * The dev and test sites' password (shyden-labs/ShyTalk#262): `null` when the
+ * request gives `configured`, either as user `shytalk` in the browser's box
+ * (`Authorization: Basic`) or, for a caller whose `Authorization` carries a
+ * bearer token, in `x-shytalk-site-password`, which wins when present.
+ * Otherwise one 401 asking for the box, whatever part was wrong. An unset or
+ * empty configured password refuses every request.
+ */
+export async function requireSitePassword(request: Request, configured: string | undefined, realm: string): Promise<Response | null> {
+  const header = request.headers.get(SITE_PASSWORD_HEADER);
+  const given = header === null ? basicCredentials(request.headers.get('authorization')) : `${SITE_USER}:${header}`;
+  if (await matches(given, configured ? `${SITE_USER}:${configured}` : undefined)) return null;
+  return new Response('Unauthorized', {
+    status: 401,
+    headers: {
+      'content-type': 'text/plain; charset=utf-8',
+      'www-authenticate': `Basic realm="${realm}", charset="UTF-8"`,
+      'cache-control': 'no-store',
+    },
+  });
 }
 
 const MARKER_SQL = 'SELECT name FROM environment_marker LIMIT 1';

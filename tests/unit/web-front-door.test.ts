@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import web from '../../workers/web/src/index.ts';
 import { CONTENT_SECURITY_POLICY, handle, type WebEnv } from '../../workers/web/src/web.ts';
-import { DOOR_SECRET_HEADER, type D1Like } from '../../packages/environment/index.ts';
+import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER, SITE_USER, type D1Like } from '../../packages/environment/index.ts';
 
 /**
  * The site's Worker (plan 3 Task 1, shyden-labs/ShyTalk#51): `/api/*` goes to
@@ -10,6 +10,9 @@ import { DOOR_SECRET_HEADER, type D1Like } from '../../packages/environment/inde
  */
 
 const SECRET = 'the-door-secret';
+const PASSWORD = 'the-site-password';
+/** The browser box's answer for `password`. */
+const BOX = (password: string): string => `Basic ${btoa(`${SITE_USER}:${password}`)}`;
 
 /**
  * A `DB` whose environment marker reads `marker` (null: no row), counting each
@@ -44,6 +47,7 @@ function env(
     env: {
       ENVIRONMENT_NAME: environment,
       DOOR_SECRET: SECRET,
+      SITE_PASSWORD: PASSWORD,
       DB: db,
       ASSETS: {
         fetch: (request: Request) => {
@@ -55,8 +59,14 @@ function env(
   };
 }
 
-const request = (path: string, secret: string | null = SECRET): Request =>
-  new Request(`https://site.example.test${path}`, { headers: secret === null ? {} : { [DOOR_SECRET_HEADER]: secret } });
+/** A request through the door (`secret`) with the site password in the box (`password`); null leaves either out. */
+const request = (path: string, secret: string | null = SECRET, password: string | null = PASSWORD): Request =>
+  new Request(`https://site.example.test${path}`, {
+    headers: {
+      ...(secret === null ? {} : { [DOOR_SECRET_HEADER]: secret }),
+      ...(password === null ? {} : { authorization: BOX(password) }),
+    },
+  });
 
 describe('routing', () => {
   it('hands the closed-testing form a full D1, whose own route rules then answer', async () => {
@@ -72,7 +82,10 @@ describe('routing', () => {
   it.each(['/api/closed-testing', '/api/closed-testing/confirm'])('sends %s to the closed-testing form', async (path) => {
     const { env: e, asked } = env('dev');
     const response = await handle(
-      new Request(`https://site.example.test${path}`, { method: 'POST', headers: { [DOOR_SECRET_HEADER]: SECRET } }),
+      new Request(`https://site.example.test${path}`, {
+        method: 'POST',
+        headers: { [DOOR_SECRET_HEADER]: SECRET, authorization: BOX(PASSWORD) },
+      }),
       e,
     );
     expect(response.status).toBe(503);
@@ -141,6 +154,67 @@ describe('the door', () => {
     const unnamed = { ...e, ENVIRONMENT_NAME: undefined } as unknown as WebEnv;
     expect((await handle(request('/'), unnamed)).status).toBe(503);
     expect(asked).toEqual([]);
+  });
+});
+
+// shyden-labs/ShyTalk#262: after the door, dev and test ask for the site password with the browser's
+// own box; production never does.
+describe('the site password', () => {
+  it.each(['dev', 'test'] as const)('%s asks with the box (401) before any page or API, reading no database', async (environment) => {
+    for (const path of ['/', '/id/', '/api/x', '/api/app/health']) {
+      const { env: e, asked, reads } = env(environment);
+      const response = await handle(request(path, SECRET, null), e);
+      expect(response.status).toBe(401);
+      expect(response.headers.get('www-authenticate')).toBe(`Basic realm="ShyTalk ${environment}", charset="UTF-8"`);
+      expect(response.headers.get('content-security-policy')).toBe(CONTENT_SECURITY_POLICY);
+      expect(asked).toEqual([]);
+      expect(reads()).toBe(0);
+    }
+  });
+
+  it.each(['dev', 'test'] as const)('%s refuses a wrong password', async (environment) => {
+    const { env: e, asked } = env(environment);
+    expect((await handle(request('/', SECRET, 'wrong'), e)).status).toBe(401);
+    expect(asked).toEqual([]);
+  });
+
+  it.each(['dev', 'test'] as const)('%s serves with the right password in the box', async (environment) => {
+    const { env: e, asked } = env(environment);
+    expect((await handle(request('/', SECRET, PASSWORD), e)).status).toBe(200);
+    expect(asked).toEqual(['/']);
+  });
+
+  it('dev serves a caller giving the password in its header beside a bearer token', async () => {
+    const { env: e } = env('dev');
+    const response = await handle(
+      new Request('https://site.example.test/api/x', {
+        headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, authorization: 'Bearer a-session' },
+      }),
+      e,
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it('refuses everything when dev has no password configured, failing closed', async () => {
+    const { env: e, asked } = env('dev');
+    const unset: WebEnv = { ...e };
+    delete unset.SITE_PASSWORD;
+    expect((await handle(request('/'), unset)).status).toBe(401);
+    expect(asked).toEqual([]);
+  });
+
+  it('checks the door first: without the door secret the answer is 403, never the box', async () => {
+    const { env: e } = env('dev');
+    expect((await handle(request('/', null, null), e)).status).toBe(403);
+  });
+
+  it('prod never asks, even with no password configured', async () => {
+    const { env: e } = env('prod');
+    const unset: WebEnv = { ...e };
+    delete unset.SITE_PASSWORD;
+    const response = await handle(request('/', null, null), unset);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('www-authenticate')).toBeNull();
   });
 });
 

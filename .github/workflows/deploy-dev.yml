@@ -93,6 +93,7 @@ jobs:
           DEPLOY_REHEARSAL: ${{ github.event_name == 'pull_request' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
         run: |
@@ -140,6 +141,13 @@ jobs:
             exit 1
           fi
           printf '%s' "$DOOR_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put DOOR_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev door secret was not set"; exit 1; }
+          # shyden-labs/ShyTalk#262: dev asks for this password with the
+          # browser's own box; without it the Worker refuses every request.
+          if [ -z "$SITE_PASSWORD" ]; then
+            echo "::error title=SITE_PASSWORD missing::Set SITE_PASSWORD in the dev environment (shyden-labs/ShyTalk#262); until then dev refuses every request."
+            exit 1
+          fi
+          printf '%s' "$SITE_PASSWORD" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put SITE_PASSWORD --env dev || { echo "::error title=deploy-dev failed::the dev site password was not set"; exit 1; }
           # shyden-labs/ShyTalk#76: dev app sign-in answers 503 until the
           # Worker holds Better Auth's secret.
           if [ -z "$BETTER_AUTH_SECRET" ]; then
