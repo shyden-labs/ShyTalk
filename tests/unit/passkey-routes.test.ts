@@ -139,6 +139,14 @@ async function registerThrough(deps: PasskeyRouteDeps, token?: string): Promise<
   return { answer, credential };
 }
 
+// Better Auth builds its context, routes and WebAuthn code on first use: about 40 ms under coverage, which the
+// file's first test paid and which reached the 1 s limit on a busy Mac (shyden-labs/ShyTalk#264). One sign-up here,
+// while the file loads, pays it outside every test's time.
+await registerThrough(
+  world({ identity: { kind: 'sign-up', userId: 'u-warm', email: 'warm@example.test', tokenHash: await tokenHash('warm') } }).deps,
+  'warm',
+);
+
 async function signInThrough(deps: PasskeyRouteDeps, credential: SoftCredential): Promise<Response> {
   const options = await call(deps, 'sign-in/options', {});
   const { challenge } = (await options.json()) as { challenge: string };
