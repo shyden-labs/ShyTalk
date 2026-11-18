@@ -34,6 +34,19 @@ describe('requireSitePassword: the browser box (Basic auth)', () => {
     expect(await requireSitePassword(withHeaders({ authorization: basic(SITE_USER, PASSWORD) }), PASSWORD, REALM)).toBeNull();
   });
 
+  it.each([
+    ['a blank user name', ''],
+    ['another user name', 'someone'],
+    ['a user name that is not ASCII', 'ผู้ใช้'],
+  ])('lets the password through with %s, as the other products’ dev sites do (shyden-labs/ShyTalk#290)', async (_case, user) => {
+    expect(await requireSitePassword(withHeaders({ authorization: basic(user, PASSWORD) }), PASSWORD, REALM)).toBeNull();
+  });
+
+  it('keeps a colon inside the password when the user name is blank', async () => {
+    const password = 'a:b:c';
+    expect(await requireSitePassword(withHeaders({ authorization: basic('', password) }), password, REALM)).toBeNull();
+  });
+
   it('reads the scheme in any case', async () => {
     const header = basic(SITE_USER, PASSWORD).replace('Basic', 'bAsIc');
     expect(await requireSitePassword(withHeaders({ authorization: header }), PASSWORD, REALM)).toBeNull();
@@ -55,12 +68,14 @@ describe('requireSitePassword: the browser box (Basic auth)', () => {
 
   it.each([
     ['a wrong password', basic(SITE_USER, 'wrong')],
-    ['a wrong user', basic('someone', PASSWORD)],
-    ['both wrong', basic('someone', 'wrong')],
+    ['another user with a wrong password', basic('someone', 'wrong')],
+    ['a blank user with an empty password', basic('', '')],
+    ['the password given as the user name', basic(PASSWORD, '')],
     ['a prefix of the password', basic(SITE_USER, PASSWORD.slice(0, -1))],
     ['a longer password', basic(SITE_USER, `${PASSWORD}x`)],
     ['the password in another case', basic(SITE_USER, PASSWORD.toUpperCase())],
     ['no colon', `Basic ${btoa(`${SITE_USER}${PASSWORD}`)}`],
+    ['the password alone with no colon', `Basic ${btoa(PASSWORD)}`],
     ['an empty password', basic(SITE_USER, '')],
     ['broken base64', 'Basic %%%not-base64%%%'],
     ['the scheme alone', 'Basic'],
