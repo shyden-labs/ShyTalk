@@ -52,7 +52,9 @@ export async function devPassGate(request: Request, env: DevPassEnv, now: number
   const token = url.searchParams.get(PARAMETER);
   if (env.ENVIRONMENT_NAME !== 'dev' || token === null) return null;
   url.searchParams.delete(PARAMETER);
-  const headers = new Headers({ location: `${url.pathname}${url.search}`, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' });
+  // One leading slash only: two slashes, or a slash and a backslash, would send the browser to another site.
+  const path = `/${url.pathname.replace(/^[/\\]+/, '')}`;
+  const headers = new Headers({ location: `${path}${url.search}`, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' });
   const value = await earnedCookie(token, env, now);
   if (value !== null) {
     headers.set('set-cookie', `${SITE_PASS_COOKIE}=${value}; Path=/; Max-Age=${SITE_PASS_SECONDS}; Secure; HttpOnly; SameSite=Lax`);

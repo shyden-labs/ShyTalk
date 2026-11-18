@@ -110,6 +110,22 @@ describe('devPassGate: a valid pass used once', () => {
     expect(answer?.headers.get('location')).toBe('/closed-testing/?a=1&b=2');
   });
 
+  it.each([
+    ['two leading slashes', `//elsewhere.example.test/x?dev_pass=${TOKEN}`, '/elsewhere.example.test/x'],
+    ['a leading backslash', `/\\elsewhere.example.test/x?dev_pass=${TOKEN}`, '/elsewhere.example.test/x'],
+    ['three leading slashes', `///elsewhere.example.test/?dev_pass=${TOKEN}`, '/elsewhere.example.test/'],
+  ])('never sends the browser to another site for a path with %s', async (_case, path, location) => {
+    const { env: e } = env();
+    const valid = await devPassGate(new Request(`https://origin.example.test${path}`), e, NOW);
+    expect(valid?.headers.get('location')).toBe(location);
+    const refused = await devPassGate(
+      new Request(`https://origin.example.test${path}`, { headers: { authorization: box(PASSWORD) } }),
+      e,
+      NOW,
+    );
+    expect(refused?.headers.get('location')).toBe(location);
+  });
+
   it('answers with no caching and no referrer, so the pass is neither stored nor passed on', async () => {
     const { env: e } = env();
     const answer = await devPassGate(request(), e, NOW);
