@@ -7,7 +7,8 @@
  * case checks what its Playwright twin checks.
  */
 import assert from 'node:assert/strict';
-import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { LANGUAGE_NAMES, LOCALES, langTag, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { HELLOS } from '../../apps/web/src/brand.ts';
 import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
@@ -16,6 +17,7 @@ import { base32, totpAt } from '../support/totp.ts';
 import { countingCheck, type Check } from './check.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
+import { PHONE_WIDTH, wantedFacts, type HoldingFacts } from '../support/holding-facts.ts';
 
 /** What a case can ask of Safari; tests/phones/safari.ts drives it through Appium. */
 export interface SafariPage {
@@ -32,6 +34,10 @@ export interface SafariPage {
   visibleLinks(name: string): Promise<number>;
   /** Links whose accessible name is exactly `name`, visible or not. */
   links(name: string): Promise<number>;
+  /** Each element `selector` matches, as its `attributes` in order and then its trimmed text. */
+  rows(selector: string, attributes: string[]): Promise<(string | null)[][]>;
+  /** The holding page's look, by the smoke's own in-page check (shyden-labs/ShyTalk#273). */
+  holdingFacts(): Promise<HoldingFacts>;
   /** The elements `selector` matches: Playwright's `toHaveCount`. */
   count(selector: string): Promise<number>;
   /** axe's violations on the current page, as `id: node count`. */
@@ -60,11 +66,10 @@ const LANGUAGES = [
   { lang: 'zh-Hans', locale: 'zh', prefix: '/zh' },
 ] as const;
 
-/** The holding page's lines after its heading, by their `data-holding` name (shyden-labs/ShyTalk#261). */
+/** The holding page's lines under its name, by selector (shyden-labs/ShyTalk#273). */
 const HOLDING_LINES = [
-  ['intro', 'home.intro'],
-  ['way', 'home.wayTitle'],
-  ['building', 'holding.building'],
+  ['p.badge', 'holding.comingSoon'],
+  ['p.tagline', 'site.tagline'],
 ] as const;
 
 /** Playwright's `getByRole('navigation')` and `getByRole('heading', { level: 1 })`, as CSS. */
@@ -194,24 +199,42 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       await inLanguageWithoutRefusal(page, check, lang);
     }),
     counted(
-      `${lang}: the holding page shows what ShyTalk is, that the app is being built, and the contact, in ${lang}, passing axe, with no menu and no CSP refusal`,
+      `${lang}: the holding page shows ShyTalk's brand, the language switch, the hellos and the contact, in ${lang}, passing axe, keeping still for reduced motion and fitting a phone, with no CSP refusal`,
       async (page, check) => {
         check.equal(await page.goto(`${prefix}/holding`), 200);
         check.equal(await page.attribute('html', 'lang'), lang);
+        // Playwright's getByRole('navigation', { name, exact: true }) seen, then its links in order.
+        const languages = `nav[aria-label="${t(locale, 'holding.languages')}"]`;
+        check.ok(await page.isVisible(languages), 'no visible language switch');
+        check.deepEqual(
+          await page.rows(`${languages} a`, ['href', 'hreflang', 'aria-current']),
+          LOCALES.map((other) => [`/${other}/`, langTag(other), other === locale ? 'page' : null, LANGUAGE_NAMES[other]]),
+        );
         check.ok(await page.isVisible(H1), 'no visible top heading');
-        check.equal(await page.text(H1), t(locale, 'home.heading'));
-        // Playwright's getByText(…, { exact: true }) seen: the line shown, holding exactly its words.
-        for (const [name, key] of HOLDING_LINES) {
-          const selector = `[data-holding="${name}"]`;
-          const words = await page.text(selector);
-          const wanted = t(locale, key);
-          check.ok((await page.isVisible(selector)) && words === wanted, `no visible ${selector} holding "${wanted}": "${words}"`);
+        check.equal(await page.text(H1), 'ShyTalk');
+        check.equal(await page.text('h1 span'), 'Talk');
+        // Playwright's toBeVisible and toHaveText on each line.
+        for (const [selector, key] of HOLDING_LINES) {
+          check.ok(await page.isVisible(selector), `no visible ${selector}`);
+          check.equal(await page.text(selector), t(locale, key), selector);
         }
+        check.deepEqual(
+          await page.rows('ul.hellos > li', ['lang']),
+          HELLOS.map(({ lang: helloLang, word }) => [helloLang, word]),
+        );
         check.equal(await page.visibleLinks(SUPPORT_EMAIL), 1, 'no visible contact link');
         check.equal(await page.attribute('a[href^="mailto:"]', 'href'), `mailto:${SUPPORT_EMAIL}`);
-        check.equal(await page.count(NAV), 0, 'a menu shows');
-        check.equal(await page.count('footer, [role="contentinfo"]'), 0, 'a footer shows');
         check.deepEqual(await page.axeViolations(), []);
+        const facts = await page.holdingFacts();
+        check.deepEqual(facts, wantedFacts(facts.width, facts.reducedMotion));
+        // The smoke turns reduced motion on and narrows the page to a phone's width. WebDriver can do neither in
+        // Safari: reduced motion is the iPhone's own setting (Settings > Accessibility > Motion), and its width is the
+        // phone's own. Each step is measured as the phone stands, so the hellos move or keep still as its setting asks.
+        const still = await page.holdingFacts();
+        check.deepEqual(still, wantedFacts(still.width, still.reducedMotion));
+        const phone = await page.holdingFacts();
+        check.ok(phone.width <= PHONE_WIDTH, `the page is ${String(phone.width)} wide, not a phone's`);
+        check.deepEqual(phone, wantedFacts(phone.width, phone.reducedMotion));
         check.deepEqual(await page.cspRefusals(), []);
       },
     ),
