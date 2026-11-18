@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { main, announceOrigin } from '../../scripts/announce-ui.ts';
-import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
+import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER } from '../../packages/environment/index.ts';
 
 /**
  * The deploy's announcement (plan 4 Task 8, shyden-labs/ShyTalk#81; Shyden's
@@ -38,7 +38,12 @@ function fakeFetch(answer: Response) {
   };
 }
 
-const settings = { ANNOUNCE_ENVIRONMENT: 'dev', ANNOUNCE_SECRET: 'fresh-secret', DOOR_SECRET: 'the-door-secret' };
+const settings = {
+  ANNOUNCE_ENVIRONMENT: 'dev',
+  ANNOUNCE_SECRET: 'fresh-secret',
+  DOOR_SECRET: 'the-door-secret',
+  SITE_PASSWORD: 'the-site-password',
+};
 
 describe('announce-ui', () => {
   it.each([
@@ -69,6 +74,7 @@ describe('announce-ui', () => {
     const headers = new Headers(fake.calls[0]?.init?.headers);
     expect(headers.get('authorization')).toBe('Bearer fresh-secret');
     expect(headers.get(DOOR_SECRET_HEADER)).toBe('the-door-secret');
+    expect(headers.get(SITE_PASSWORD_HEADER)).toBe('the-site-password');
     expect(lines).toEqual(['announce-ui: dev announced UI version 6']);
   });
 
@@ -77,6 +83,7 @@ describe('announce-ui', () => {
     await main([], { ANNOUNCE_ENVIRONMENT: 'prod', ANNOUNCE_SECRET: 'fresh-secret' }, read, fake.fetch, () => undefined);
     expect(fake.calls[0]?.url).toBe('https://shytalk.app/api/app/live/announce');
     expect(new Headers(fake.calls[0]?.init?.headers).has(DOOR_SECRET_HEADER)).toBe(false);
+    expect(new Headers(fake.calls[0]?.init?.headers).has(SITE_PASSWORD_HEADER)).toBe(false);
   });
 
   it.each(['dev', 'test'])('fails naming DOOR_SECRET when %s has none, calling nothing', async (environment) => {
@@ -84,6 +91,21 @@ describe('announce-ui', () => {
     await expect(
       main([], { ANNOUNCE_ENVIRONMENT: environment, ANNOUNCE_SECRET: 'fresh-secret' }, read, fake.fetch, () => undefined),
     ).rejects.toThrow(`announce-ui: missing DOOR_SECRET, which ${environment} needs`);
+    expect(fake.calls).toEqual([]);
+  });
+
+  // shyden-labs/ShyTalk#262: dev and test ask for the site password; the announce already uses the bearer token.
+  it.each(['dev', 'test'])('fails naming SITE_PASSWORD when %s has none, calling nothing', async (environment) => {
+    const fake = fakeFetch(new Response(null, { status: 200 }));
+    await expect(
+      main(
+        [],
+        { ANNOUNCE_ENVIRONMENT: environment, ANNOUNCE_SECRET: 'fresh-secret', DOOR_SECRET: 'door' },
+        read,
+        fake.fetch,
+        () => undefined,
+      ),
+    ).rejects.toThrow(`announce-ui: missing SITE_PASSWORD, which ${environment} needs`);
     expect(fake.calls).toEqual([]);
   });
 
@@ -142,7 +164,7 @@ describe('announce-ui', () => {
 });
 
 describe('waiting for the fresh secret to go live (shyden-labs/ShyTalk#154)', () => {
-  const settings = { ANNOUNCE_ENVIRONMENT: 'dev', ANNOUNCE_SECRET: 'fresh-secret', DOOR_SECRET: 'door' };
+  const settings = { ANNOUNCE_ENVIRONMENT: 'dev', ANNOUNCE_SECRET: 'fresh-secret', DOOR_SECRET: 'door', SITE_PASSWORD: 'password' };
   const unauthorized = (): Response => Response.json({ error: 'unauthorized' }, { status: 401 });
   const announced = (): Response => Response.json({ announced: 7 }, { status: 200 });
 

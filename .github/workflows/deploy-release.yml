@@ -59,6 +59,7 @@ jobs:
           TARGET: ${{ github.ref == 'refs/heads/main' && 'prod' || 'test' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
         run: |
@@ -111,13 +112,20 @@ jobs:
           fi
           printf '%s' "$TOTP_KEY" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put TOTP_KEY --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET authenticator key was not set"; exit 1; }
           # The TEST origin refuses every request without its door secret
-          # (decision 216); PROD has no door.
+          # (decision 216) and its site password (shyden-labs/ShyTalk#262); PROD has neither.
           if [ "$TARGET" = test ]; then
             if [ -z "$DOOR_SECRET" ]; then
               echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the test environment (decision 216); until then the TEST origin refuses every request."
               exit 1
             fi
             printf '%s' "$DOOR_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put DOOR_SECRET --env test || { echo "::error title=deploy-release failed::the test door secret was not set"; exit 1; }
+            # shyden-labs/ShyTalk#262: TEST asks for this password with the
+            # browser's own box; PROD never does.
+            if [ -z "$SITE_PASSWORD" ]; then
+              echo "::error title=SITE_PASSWORD missing::Set SITE_PASSWORD in the test environment (shyden-labs/ShyTalk#262); until then TEST refuses every request."
+              exit 1
+            fi
+            printf '%s' "$SITE_PASSWORD" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put SITE_PASSWORD --env test || { echo "::error title=deploy-release failed::the test site password was not set"; exit 1; }
           fi
           # Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07): last,
           # every open app hears the newest UI version. Each deploy makes a

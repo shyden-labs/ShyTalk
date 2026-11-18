@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { d1UiStore, publishUi } from '../../workers/web/src/app/ui.ts';
-import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
+import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER, SITE_USER } from '../../packages/environment/index.ts';
 import { localDev } from './d1.ts';
 
 /**
@@ -16,6 +16,8 @@ import { localDev } from './d1.ts';
 
 const DOOR_SECRET = 'integration-door-secret';
 const ANNOUNCE_SECRET = 'integration-announce-secret';
+/** DEV's site password (shyden-labs/ShyTalk#262), given in its header as the app gives it beside a bearer token. */
+const SITE_PASSWORD = 'integration-site-password';
 
 interface DevWorker {
   address: string;
@@ -53,7 +55,7 @@ async function open(): Promise<{ socket: WebSocket; messages: unknown[]; next: (
   const messages: unknown[] = [];
   const waiting: ((message: unknown) => void)[] = [];
   const socket = new WebSocket(`ws://127.0.0.1:${String(worker.port)}/api/app/live`, {
-    headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET },
+    headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET, [SITE_PASSWORD_HEADER]: SITE_PASSWORD },
   });
   socket.addEventListener('message', (event) => {
     const message = JSON.parse(String(event.data)) as unknown;
@@ -81,7 +83,7 @@ async function open(): Promise<{ socket: WebSocket; messages: unknown[]; next: (
 const announceCall = (secret = ANNOUNCE_SECRET): Promise<Response> =>
   worker.fetch(`http://127.0.0.1:${String(worker.port)}/api/app/live/announce`, {
     method: 'POST',
-    headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET, authorization: `Bearer ${secret}` },
+    headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET, [SITE_PASSWORD_HEADER]: SITE_PASSWORD, authorization: `Bearer ${secret}` },
   });
 
 beforeAll(async () => {
@@ -109,7 +111,7 @@ beforeAll(async () => {
     env: 'dev',
     ip: '127.0.0.1',
     persistTo: inject('d1Persist'),
-    vars: { DOOR_SECRET, ANNOUNCE_SECRET },
+    vars: { DOOR_SECRET, ANNOUNCE_SECRET, SITE_PASSWORD },
     logLevel: 'error',
     experimental: { disableExperimentalWarning: true },
   });
@@ -149,5 +151,22 @@ describe('the live announcement, in the real runtime', () => {
   it('refuses an announcement without the secret', async () => {
     const response = await announceCall('not-the-secret');
     expect(response.status).toBe(401);
+  });
+
+  // shyden-labs/ShyTalk#262: the real runtime asks for DEV's site password with the browser's box and lets the box's
+  // answer through.
+  it('asks for the site password with the box, and serves the right one given in the box', async () => {
+    const address = `http://127.0.0.1:${String(worker.port)}/api/app/health`;
+    const asked = await worker.fetch(address, { headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET } });
+    expect(asked.status).toBe(401);
+    expect(asked.headers.get('www-authenticate')).toBe('Basic realm="ShyTalk dev", charset="UTF-8"');
+    const wrong = await worker.fetch(address, {
+      headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET, authorization: `Basic ${btoa(`${SITE_USER}:wrong`)}` },
+    });
+    expect(wrong.status).toBe(401);
+    const box = await worker.fetch(address, {
+      headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET, authorization: `Basic ${btoa(`${SITE_USER}:${SITE_PASSWORD}`)}` },
+    });
+    expect(box.status).toBe(200);
   });
 });

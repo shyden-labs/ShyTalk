@@ -8,7 +8,10 @@ import {
   type LiveSocket,
 } from '../../workers/web/src/app/announcer.ts';
 import { handle, type WebEnv } from '../../workers/web/src/web.ts';
-import { DOOR_SECRET_HEADER } from '../../packages/environment/index.ts';
+import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER } from '../../packages/environment/index.ts';
+
+/** The dev and test site password (shyden-labs/ShyTalk#262), given in its header as the app gives it beside a bearer token. */
+const PASSWORD = 'the-site-password';
 
 /**
  * The live announcement (plan 4 Task 8, shyden-labs/ShyTalk#81): one
@@ -276,12 +279,15 @@ function d1(version: number | null): NonNullable<WebEnv['DB']> {
 }
 
 const live = (headers: Record<string, string> = { upgrade: 'websocket' }): Request =>
-  new Request('https://site.example.test/api/app/live', { headers: { [DOOR_SECRET_HEADER]: SECRET, ...headers } });
+  new Request('https://site.example.test/api/app/live', {
+    headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, ...headers },
+  });
 
 function webEnv(version: number | null, announcer?: ReturnType<typeof fakeNamespace>): WebEnv {
   return {
     ENVIRONMENT_NAME: 'dev',
     DOOR_SECRET: SECRET,
+    SITE_PASSWORD: PASSWORD,
     DB: d1(version),
     ASSETS: { fetch: () => Promise.resolve(new Response('page')) },
     ...(announcer === undefined ? {} : { ANNOUNCER: announcer.namespace }),
@@ -326,7 +332,7 @@ describe('GET /api/app/live', () => {
     const fake = fakeNamespace(() => upgraded);
     const request = new Request('https://site.example.test/api/app/live', {
       method: 'POST',
-      headers: { [DOOR_SECRET_HEADER]: SECRET, upgrade: 'websocket' },
+      headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, upgrade: 'websocket' },
     });
     const response = await handle(request, webEnv(5, fake));
     expect(response.status).toBe(405);
@@ -354,7 +360,10 @@ describe('GET /api/app/live', () => {
 const ANNOUNCE_SECRET = 'the-announce-secret';
 
 const announceCall = (headers: Record<string, string> = { authorization: `Bearer ${ANNOUNCE_SECRET}` }, method = 'POST'): Request =>
-  new Request('https://site.example.test/api/app/live/announce', { method, headers: { [DOOR_SECRET_HEADER]: SECRET, ...headers } });
+  new Request('https://site.example.test/api/app/live/announce', {
+    method,
+    headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, ...headers },
+  });
 
 const withSecret = (env: WebEnv): WebEnv => ({ ...env, ANNOUNCE_SECRET });
 

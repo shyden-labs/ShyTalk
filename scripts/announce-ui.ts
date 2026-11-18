@@ -15,7 +15,7 @@
  * has no door, at its `SITE_ORIGIN` (workers/web/wrangler.json).
  */
 import { readFileSync } from 'node:fs';
-import { DOOR_SECRET_HEADER } from '../packages/environment/index.ts';
+import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER } from '../packages/environment/index.ts';
 import { runIfEntry } from './cli.ts';
 
 const SITE_CONFIG = 'workers/web/wrangler.json';
@@ -66,6 +66,10 @@ function announceSettings(env: Record<string, string | undefined>): { environmen
     const door = env['DOOR_SECRET'];
     if (!door) throw new Error(`announce-ui: missing DOOR_SECRET, which ${environment} needs`);
     headers[DOOR_SECRET_HEADER] = door;
+    // shyden-labs/ShyTalk#262: dev and test ask for the site password, given in its header beside the bearer token.
+    const password = env['SITE_PASSWORD'];
+    if (!password) throw new Error(`announce-ui: missing SITE_PASSWORD, which ${environment} needs`);
+    headers[SITE_PASSWORD_HEADER] = password;
   }
   return { environment, headers };
 }

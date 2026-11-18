@@ -150,6 +150,25 @@ describe('deploy-release', () => {
     expect(step).not.toContain('secret put DOOR_SECRET --env $TARGET');
   });
 
+  // shyden-labs/ShyTalk#262: TEST asks for the site password, PROD never does.
+  it('puts the site password on TEST only, after the door secret, failing by name when test lacks it', () => {
+    const step = deployStep();
+    const door = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put DOOR_SECRET --env test ||');
+    const missing = step.indexOf('if [ -z $SITE_PASSWORD ]; then');
+    const put = step.indexOf(
+      'printf %s $SITE_PASSWORD | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put SITE_PASSWORD --env test ||',
+    );
+    const testEnd = step.indexOf('fi', put);
+    const announce = step.indexOf('node scripts/announce-ui.ts');
+    expect(door).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(door);
+    expect(put).toBeGreaterThan(missing);
+    expect(announce).toBeGreaterThan(testEnd);
+    expect(step).toContain('SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}');
+    expect(step).not.toContain('secret put SITE_PASSWORD --env prod');
+    expect(step).not.toContain('secret put SITE_PASSWORD --env $TARGET');
+  });
+
   // Plan 4 Task 8 (shyden-labs/ShyTalk#81): as on DEV, last, a fresh masked
   // announce secret is put in the Worker and the Worker is called with it, on
   // TEST and PROD alike (after the TEST-only door block).

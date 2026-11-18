@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { CONTENT_SECURITY_POLICY, handle, type WebEnv } from '../../workers/web/src/web.ts';
 import { json } from '../../workers/web/src/http.ts';
 import { isAppApi } from '../../workers/web/src/app/router.ts';
-import { DOOR_SECRET_HEADER, type D1Like } from '../../packages/environment/index.ts';
+import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER, type D1Like } from '../../packages/environment/index.ts';
+
+/** The dev and test site password (shyden-labs/ShyTalk#262), given in its header as the app gives it beside a bearer token. */
+const PASSWORD = 'the-site-password';
 
 /**
  * The app's API door (plan 4 Task 1, shyden-labs/ShyTalk#74): `/api/app/*`
@@ -21,12 +24,14 @@ function env(environment: WebEnv['ENVIRONMENT_NAME']): WebEnv {
   return {
     ENVIRONMENT_NAME: environment,
     DOOR_SECRET: SECRET,
+    SITE_PASSWORD: PASSWORD,
     DB: marked(environment),
     ASSETS: { fetch: () => Promise.resolve(new Response('page')) },
   };
 }
 
-const get = (path: string): Request => new Request(`https://site.example.test${path}`, { headers: { [DOOR_SECRET_HEADER]: SECRET } });
+const get = (path: string): Request =>
+  new Request(`https://site.example.test${path}`, { headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD } });
 
 describe('/api/app/*', () => {
   it.each(['dev', 'test', 'prod'] as const)('health answers 200 naming %s, never cached', async (environment) => {
@@ -51,7 +56,10 @@ describe('/api/app/*', () => {
 
   it('answers only GET on health', async () => {
     const response = await handle(
-      new Request('https://site.example.test/api/app/health', { method: 'POST', headers: { [DOOR_SECRET_HEADER]: SECRET } }),
+      new Request('https://site.example.test/api/app/health', {
+        method: 'POST',
+        headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD },
+      }),
       env('dev'),
     );
     expect(response.status).toBe(405);
@@ -91,7 +99,11 @@ describe('/api/app/sign-in and sign-out', () => {
     SIGN_IN_LIMIT: { limit: () => Promise.resolve({ success: true }) },
   });
   const postTo = (path: string, body: string): Request =>
-    new Request(`https://site.example.test${path}`, { method: 'POST', body, headers: { [DOOR_SECRET_HEADER]: SECRET } });
+    new Request(`https://site.example.test${path}`, {
+      method: 'POST',
+      body,
+      headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD },
+    });
 
   it.each(['/api/app/sign-in/google', '/api/app/sign-in/apple'])(
     '%s reaches the sign-in handler (a bad body answers 400)',
