@@ -63,11 +63,23 @@ describe('dev-tail', () => {
     );
   });
 
-  it('prints how many events it saw in all, so an empty watch is told apart from a broken stream', () => {
+  /**
+   * wrangler tail --format json prints each event as indented JSON over many
+   * lines (wrangler 4.162 logger.json: JSON.stringify(data, null, 4)), so the
+   * count is of JSON values, never of lines (shyden-labs/ShyTalk#226).
+   */
+  it('prints how many events it saw in all, counted as JSON values, not lines, so an empty watch is told apart from a broken stream', () => {
     const text = source();
     expect(text).toContain('| tee "$RUNNER_TEMP/events" \\');
-    expect(text).toContain('seen=$(wc -l < "$RUNNER_TEMP/events")');
+    expect(text).toContain('seen=$(jq -n \'[inputs] | length\' "$RUNNER_TEMP/events")');
+    expect(text).not.toContain('wc -l');
     expect(text).toContain('if [ "$seen" -eq 0 ]; then');
     expect(text).toContain('echo "Watched dev for $MINUTES minutes: $seen events."');
+  });
+
+  it('prints how many requests each host and path had, busiest first, with token-like strings blanked and no query', () => {
+    expect(source()).toContain(
+      'jq -rn \'[inputs | .event.request.url // "(no request)" | sub("^https?://"; "") | sub("[?#].*$"; "") | gsub("[A-Za-z0-9_+=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>")] | group_by(.) | map([length, .[0]]) | sort_by(-.[0]) | .[:30][] | "\\(.[0]) \\(.[1])"\' "$RUNNER_TEMP/events"',
+    );
   });
 });

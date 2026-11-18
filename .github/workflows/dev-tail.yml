@@ -59,12 +59,17 @@ jobs:
           # requests, so no event at all means the stream never connected: that fails, saying so. The events file
           # lives on the runner alone and goes with it.
           if [ "$status" -eq 0 ] || [ "$status" -eq 124 ]; then
-            seen=$(wc -l < "$RUNNER_TEMP/events")
+            # wrangler prints each event as indented JSON over many lines, so events are counted as JSON
+            # values, never lines (shyden-labs/ShyTalk#226: a line count read 28,752 "events" in 20 minutes).
+            seen=$(jq -n '[inputs] | length' "$RUNNER_TEMP/events")
             if [ "$seen" -eq 0 ]; then
               echo "::error title=dev-tail::no event reached the watch in $MINUTES minutes: the stream did not connect, or nothing was asked of dev"
               exit 1
             fi
             echo "Watched dev for $MINUTES minutes: $seen events."
+            # What asked dev for what: requests per host and path, busiest first, query dropped and token-like
+            # strings blanked as in the failing-request print above.
+            jq -rn '[inputs | .event.request.url // "(no request)" | sub("^https?://"; "") | sub("[?#].*$"; "") | gsub("[A-Za-z0-9_+=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>")] | group_by(.) | map([length, .[0]]) | sort_by(-.[0]) | .[:30][] | "\(.[0]) \(.[1])"' "$RUNNER_TEMP/events"
             exit 0
           fi
           echo "::error title=dev-tail::the watch stopped with status $status"
