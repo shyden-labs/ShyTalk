@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main, realDeps, run, type Deps } from '../../scripts/i18n/google-read-back.ts';
@@ -136,6 +136,19 @@ describe('google-read-back', () => {
     expect(await run(['th'], d)).toBe(1);
     expect(d.files.all.get(TABLE)).toBe('a table from the same millisecond');
     expect(d.out).toContain(`${TABLE} is already there; this run's table was not written over it`);
+  });
+
+  it('checks its table can be written before sending anything, so a taken path spends no characters (shyden-labs/ShyTalk#266)', async () => {
+    const d = deps({ files: { [TABLE]: 'a table from the same millisecond', [LEDGER]: JSON.stringify({ [DAY]: 100 }) } });
+    expect(await run(['th'], d)).toBe(1);
+    expect(d.sent).toEqual([]);
+    expect(ledger(d)).toEqual({ [DAY]: 100 });
+  });
+
+  it('leaves no empty table behind when Google refuses (shyden-labs/ShyTalk#266)', async () => {
+    const d = deps({ status: 403, body: { error: { message: 'API key not valid' } } });
+    expect(await run(['th'], d)).toBe(1);
+    expect(d.files.all.has(TABLE)).toBe(false);
   });
 
   it('moves the ledger by the characters sent, and says so', async () => {
@@ -290,6 +303,39 @@ describe('the real deps', () => {
       await real.fetch('https://example.test/', {});
       expect(fetched).toEqual(['https://example.test/']);
     } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it('make the table folder when the checkout has none, and write the table there (shyden-labs/ShyTalk#266)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'read-back-'));
+    try {
+      const table = join(dir, '.superpowers', 'sdd', 'plan-03', 'read-back-th.md');
+      expect(realDeps().files.create(table, 'the table')).toBe(true);
+      expect(readFileSync(table, 'utf8')).toBe('the table');
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it('name the real cause of a write that fails for any reason but the file being there (shyden-labs/ShyTalk#266)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'read-back-'));
+    try {
+      writeFileSync(join(dir, 'a-file'), '');
+      // A folder that is a file: neither "already there" nor a silent false.
+      expect(() => realDeps().files.create(join(dir, 'a-file', 'table.md'), 'the table')).toThrow(/ENOTDIR|EEXIST/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it('name the real cause when the folder refuses the file (shyden-labs/ShyTalk#266)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'read-back-'));
+    try {
+      chmodSync(dir, 0o500);
+      expect(() => realDeps().files.create(join(dir, 'table.md'), 'the table')).toThrow(/EACCES/);
+    } finally {
+      chmodSync(dir, 0o700);
       rmSync(dir, { recursive: true });
     }
   });

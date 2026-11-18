@@ -117,6 +117,10 @@ export async function run(args: string[], deps: Deps): Promise<number> {
   const apiKey = googleKey(deps.env, deps.files.read(keyFile), keyFile);
   const ledgerPath = `${deps.home}/.config/shyden/google-translate-ledger.json`;
   const lockPath = `${deps.home}/.config/shyden/google-translate.lock`;
+  const stamp = deps.now().toISOString().replaceAll(':', '-');
+  const tablePath = `${deps.cwd}/.superpowers/sdd/plan-03/read-back-${locale}-${stamp}.md`;
+  let reserved = false;
+  let written = false;
   const release = await takeLock(
     deps.files,
     lockPath,
@@ -124,6 +128,13 @@ export async function run(args: string[], deps: Deps): Promise<number> {
     deps.clock,
   );
   try {
+    // One table per run, named by its UTC time, so a later run never replaces an earlier one (#247). Its path is taken
+    // before anything is sent, so a table that cannot be written spends no characters (#266).
+    if (!deps.files.create(tablePath, '')) {
+      deps.say(`${tablePath} is already there; this run's table was not written over it`);
+      return 1;
+    }
+    reserved = true;
     const day = quotaDay(deps.now());
     const needed = plan.reduce((sum, item) => sum + item.chars, 0);
     const left = charactersLeft(readLedger(deps.files, ledgerPath), day);
@@ -151,13 +162,8 @@ export async function run(args: string[], deps: Deps): Promise<number> {
       locale,
       rows.map((row) => ({ ...row, google: readings.get(row.key) as string })),
     );
-    // One table per run, named by its UTC time, so a later run never replaces an earlier one (#247).
-    const stamp = deps.now().toISOString().replaceAll(':', '-');
-    const tablePath = `${deps.cwd}/.superpowers/sdd/plan-03/read-back-${locale}-${stamp}.md`;
-    if (!deps.files.create(tablePath, table)) {
-      deps.say(`${tablePath} is already there; this run's table was not written over it`);
-      return 1;
-    }
+    deps.files.write(tablePath, table);
+    written = true;
     deps.say(`table: ${tablePath}`);
     const total = readLedger(deps.files, ledgerPath)[day] as number;
     deps.say(
@@ -166,6 +172,7 @@ export async function run(args: string[], deps: Deps): Promise<number> {
     return 0;
   } finally {
     release();
+    if (reserved && !written) deps.files.remove(tablePath);
   }
 }
 
@@ -188,12 +195,15 @@ export function realDeps(): Deps {
           return undefined;
         }
       },
+      // False only when the file is already there; any other failure is thrown with its own cause (#266).
       create: (path, text) => {
+        mkdirSync(dirname(path), { recursive: true });
         let fd: number;
         try {
           fd = openSync(path, 'wx');
-        } catch {
-          return false;
+        } catch (error) {
+          if ((error as { code?: string }).code === 'EEXIST') return false;
+          throw error;
         }
         writeSync(fd, text);
         closeSync(fd);
