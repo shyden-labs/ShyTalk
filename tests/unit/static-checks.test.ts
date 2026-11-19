@@ -78,16 +78,12 @@ describe('ci.yml', () => {
 
   // shyden-labs/ShyTalk#109: every target the site supports runs the same suite, and their totals are compared.
   it('builds the site for dev and runs the smoke against that build, so a preview’s addresses are checked (shyden-labs/ShyTalk#198)', () => {
-    expect(yamlBlock(ci, 'web-smoke', '  ').split('\n').slice(0, 9)).toEqual([
+    expect(yamlBlock(ci, 'web-smoke', '  ').split('\n').slice(0, 7)).toEqual([
       '  web-smoke:',
       '    runs-on: ubuntu-26.04',
       '    timeout-minutes: 20',
       '    container:',
       `      image: mcr.microsoft.com/playwright:v${playwrightVersion}-resolute`,
-      // Root, so Edge can be installed (shyden-labs/ShyTalk#239); Firefox refuses root with another user's HOME,
-      // so root gets its own inside the container only (the runner's docker would read it too at job level).
-      '      env:',
-      '        HOME: /root',
       '    env:',
       '      SITE_ENVIRONMENT: dev',
     ]);
@@ -102,6 +98,15 @@ describe('ci.yml', () => {
 
   // shyden-labs/ShyTalk#239: the desktop browsers and the one-suite checks come from the shared package
   // @shyden-labs/playwright-devices; Edge is not in Microsoft's image, so it is installed per run.
+  // Root (for Edge's install) with the runner's HOME, which belongs to another user, stops Firefox from launching; the
+  // runner sets HOME for every step after the container's own env, so the Smoke step gives root its own.
+  it('gives the Smoke step root’s own HOME, so Firefox launches as root', () => {
+    const smoke = yamlBlock(ci, 'web-smoke', '  ')
+      .split(/\n(?= {6}- )/)
+      .find((step) => step.includes('name: Smoke'));
+    expect(smoke).toMatch(/^ {8}env:\n(?: {10}.*\n)* {10}HOME: \/root$/m);
+  });
+
   it('runs the smoke on Chromium, Firefox, WebKit and Edge', () => {
     expect(SMOKE_TARGETS).toEqual(['chromium', 'firefox', 'webkit', 'msedge']);
   });

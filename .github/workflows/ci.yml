@@ -98,12 +98,8 @@ jobs:
     # with it, so no run waits on the runner's apt mirror (shyden-labs/ShyTalk#281). A unit test
     # keeps the tag equal to the lockfile's version. It runs as root so Edge can be installed
     # (shyden-labs/ShyTalk#239).
-    # Firefox refuses to run as root with another user's home folder, so root gets its own, set inside the
-    # container only: at job level the runner's own docker commands would read it too.
     container:
       image: mcr.microsoft.com/playwright:v1.65.1-resolute
-      env:
-        HOME: /root
     # Built for dev, so each page's preview names the dev origin, and the smoke checks it (shyden-labs/ShyTalk#198).
     env:
       SITE_ENVIRONMENT: dev
@@ -136,10 +132,13 @@ jobs:
       - name: Build the site
         if: steps.classify.outputs.scope != 'docs-only'
         run: npm run build:web
+      # Firefox refuses to launch as root with another user's HOME, and the runner sets its own HOME for every
+      # step (over the container's), so root gets its own here (shyden-labs/ShyTalk#239).
       - name: Smoke
         if: steps.classify.outputs.scope != 'docs-only'
         env:
           WRANGLER_SEND_METRICS: 'false'
+          HOME: /root
         run: |
           SMOKE_DOOR_SECRET=$(openssl rand -hex 32)
           export SMOKE_DOOR_SECRET
