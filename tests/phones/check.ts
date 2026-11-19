@@ -58,3 +58,8 @@ export function countingCheck(): Check {
     },
   };
 }
+
+/** Scratch for shyden-labs/ShyTalk#211 AC3: a helper line no unit test runs. Never merged. */
+export function unrunHelper(): string {
+  return 'no unit test runs this line';
+}
