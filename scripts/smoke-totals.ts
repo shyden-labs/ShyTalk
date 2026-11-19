@@ -1,22 +1,11 @@
 /**
- * Compares the smoke's totals across its targets (shyden-labs/ShyTalk#109):
- * one suite runs unchanged on every target, so each target runs the same
- * number of tests and skips none. Reads Playwright's JSON report
- * (tests/smoke/playwright.config.ts), prints each target's total and fails,
- * naming why, if a target ran nothing, an unlisted target ran, the totals
- * differ, any test was skipped, or the report cannot be read.
- *
- *   node scripts/smoke-totals.ts
+ * Compares the phone run's totals across the phones and against the desktop
+ * browsers' total (shyden-labs/ShyTalk#109, #112): one suite runs unchanged on
+ * every target, so each runs the same tests and skips none. The desktop
+ * browsers are checked by the shared package's `one-suite` in CI
+ * (shyden-labs/ShyTalk#239); this stays for the phone run (tests/phones/run.ts)
+ * until it moves to the shared device runner (shyden-labs/ShyTalk#238).
  */
-import { readFileSync } from 'node:fs';
-import { runIfEntry } from './cli.ts';
-import { SMOKE_TARGETS } from '../tests/smoke/targets.ts';
-
-/** Where the smoke's JSON reporter writes, relative to the repository root. */
-export const SMOKE_REPORT = 'test-results/smoke-report.json';
-
-/** Where the smoke's assertion counter (tests/smoke/assertion-counts.ts) writes. */
-export const SMOKE_COUNTS = 'test-results/smoke-assertions.json';
 
 type Counts = Record<string, Record<string, number>>;
 
@@ -82,26 +71,3 @@ export function smokeTotals(report: Report, targets: readonly string[], expected
   for (const { target, skipped } of perTarget) for (const { title } of skipped) errors.push(`${target} skipped "${title}"`);
   return { lines, errors };
 }
-
-export function main(): number {
-  let totals: { lines: string[]; errors: string[] };
-  try {
-    totals = smokeTotals(JSON.parse(readFileSync(SMOKE_REPORT, 'utf8')) as Report, SMOKE_TARGETS);
-  } catch (error) {
-    console.error(`smoke-totals: cannot read ${SMOKE_REPORT}: ${(error as Error).message}`);
-    return 1;
-  }
-  let assertions: { lines: string[]; errors: string[] };
-  try {
-    assertions = assertionTotals(JSON.parse(readFileSync(SMOKE_COUNTS, 'utf8')) as Counts, SMOKE_TARGETS);
-  } catch (error) {
-    assertions = { lines: [], errors: [`cannot read ${SMOKE_COUNTS}: ${(error as Error).message}`] };
-  }
-  const lines = [...totals.lines, ...assertions.lines];
-  const errors = [...totals.errors, ...assertions.errors];
-  for (const line of lines) console.log(`smoke-totals: ${line}`);
-  for (const line of errors) console.error(`smoke-totals: ${line}`);
-  return errors.length === 0 ? 0 : 1;
-}
-
-await runIfEntry(import.meta.url, main);

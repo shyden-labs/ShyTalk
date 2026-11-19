@@ -18,7 +18,7 @@ ShyTalk is a friendly place to learn languages and cultures by talking with peop
 | `packages/ui-document` | The app's UI document (menus, colours, sizes and words sent by the server) and its validation. |
 | `migrations` | The database (Cloudflare D1) migrations, applied by each deploy. |
 | `tests/unit` | Unit tests: fast, in-process, with every outside service stood in. |
-| `tests/integration`, `tests/smoke`, `tests/phones` | Integration tests, the browser smoke suite (Chromium, Firefox and WebKit) and the real-phone runs. |
+| `tests/integration`, `tests/smoke`, `tests/phones` | Integration tests, the browser smoke suite (Chromium, Firefox, WebKit and Edge) and the real-phone runs. |
 | `scripts` | Tools for CI, the dependency audit, releases and the project board. |
 | `docs` | How the board, release cuts, SonarCloud and the static checks work. |
 | `brand` | The ShyTalk icon and wordmark. |

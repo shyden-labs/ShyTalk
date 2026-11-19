@@ -1,11 +1,5 @@
-import { describe, it, expect, vi, beforeEach, type MockInstance } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { assertionTotals, smokeTotals, main, SMOKE_COUNTS, SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
-import { SMOKE_TARGETS } from '../smoke/targets.ts';
-
-// The report is stood in: a unit test reads nothing from disk.
-vi.mock('node:fs', () => ({ readFileSync: vi.fn() }));
-const read = vi.mocked(readFileSync);
+import { describe, it, expect } from 'vitest';
+import { assertionTotals, smokeTotals } from '../../scripts/smoke-totals.ts';
 
 type Status = 'expected' | 'unexpected' | 'flaky' | 'skipped';
 
@@ -113,84 +107,10 @@ describe('smokeTotals: the phones against the CI browsers’ total (shyden-labs/
   });
 });
 
-describe('main', () => {
-  let log: MockInstance<typeof console.log>;
-  let error: MockInstance<typeof console.error>;
-  const printed = (spy: MockInstance<typeof console.log>) => spy.mock.calls.map((call) => String(call[0]));
-  const COUNTS = JSON.stringify({ chromium: { a: 2 }, firefox: { a: 2 }, webkit: { a: 2 } });
-  /** Answers the report and the assertion counts by their paths. */
-  const files = (report: string, counts = COUNTS) => {
-    read.mockImplementation((path) => (path === SMOKE_COUNTS ? counts : report));
-  };
-
-  beforeEach(() => {
-    read.mockReset();
-    log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-  });
-
-  it('reads the report from the repository root and checks the listed smoke targets', () => {
-    files(JSON.stringify({ suites: [{ title: 'f', specs: [spec('a', everywhere('expected'))] }] }));
-    expect(main()).toBe(0);
-    expect(read).toHaveBeenCalledWith('test-results/smoke-report.json', 'utf8');
-    expect(SMOKE_REPORT).toBe('test-results/smoke-report.json');
-    expect(SMOKE_TARGETS).toEqual(['chromium', 'firefox', 'webkit']);
-    expect(printed(log)).toEqual([
-      'smoke-totals: chromium: 1 tests, 0 skipped',
-      'smoke-totals: firefox: 1 tests, 0 skipped',
-      'smoke-totals: webkit: 1 tests, 0 skipped',
-      'smoke-totals: assertions in "a": chromium 2, firefox 2, webkit 2',
-    ]);
-    expect(error).not.toHaveBeenCalled();
-  });
-
-  it('prints the totals and every fault, and fails', () => {
-    files(
-      JSON.stringify({ suites: [{ title: 'f', specs: [spec('a', { chromium: 'expected', firefox: 'expected', webkit: 'skipped' })] }] }),
-    );
-    expect(main()).toBe(1);
-    expect(printed(log)).toContain('smoke-totals: webkit: 1 tests, 1 skipped');
-    expect(printed(error)).toEqual(['smoke-totals: webkit skipped "a"']);
-  });
-
-  it('fails naming the file when there is no report', () => {
-    read.mockImplementation(() => {
-      throw new Error('ENOENT: no such file');
-    });
-    expect(main()).toBe(1);
-    expect(printed(error)).toEqual(['smoke-totals: cannot read test-results/smoke-report.json: ENOENT: no such file']);
-  });
-
-  it.each(['not json', '{}', '{"suites":[{"specs":[{"title":"a"}]}]}'])('fails naming the file on a report it cannot read: %s', (text) => {
-    read.mockReturnValue(text);
-    expect(main()).toBe(1);
-    expect(printed(error)).toHaveLength(1);
-    expect(printed(error)[0]).toMatch(/^smoke-totals: cannot read test-results\/smoke-report\.json: /);
-  });
-
-  it('reads the assertion counts from the repository root, and fails when they differ', () => {
-    files(
-      JSON.stringify({ suites: [{ title: 'f', specs: [spec('a', everywhere('expected'))] }] }),
-      JSON.stringify({ chromium: { a: 2 }, firefox: { a: 1 }, webkit: { a: 2 } }),
-    );
-    expect(main()).toBe(1);
-    expect(read).toHaveBeenCalledWith('test-results/smoke-assertions.json', 'utf8');
-    expect(SMOKE_COUNTS).toBe('test-results/smoke-assertions.json');
-    expect(printed(error)).toEqual(['smoke-totals: "a" ran different numbers of assertions: chromium 2, firefox 1, webkit 2']);
-  });
-
-  it('fails naming the file when the assertion counts cannot be read', () => {
-    files(JSON.stringify({ suites: [{ title: 'f', specs: [spec('a', everywhere('expected'))] }] }), 'not json');
-    expect(main()).toBe(1);
-    expect(printed(error)).toHaveLength(1);
-    expect(printed(error)[0]).toMatch(/^smoke-totals: cannot read test-results\/smoke-assertions\.json: /);
-  });
-});
-
 describe('assertionTotals: the assertions each test ran, per target (shyden-labs/ShyTalk#180)', () => {
   it('prints each test with every target’s count, in the order the tests first appear, finding nothing wrong when all agree', () => {
     const counts = { chromium: { b: 3, a: 1 }, firefox: { a: 1, b: 3 }, webkit: { b: 3, a: 1 } };
-    expect(assertionTotals(counts, SMOKE_TARGETS)).toEqual({
+    expect(assertionTotals(counts, TARGETS)).toEqual({
       lines: ['assertions in "b": chromium 3, firefox 3, webkit 3', 'assertions in "a": chromium 1, firefox 1, webkit 1'],
       errors: [],
     });
@@ -198,14 +118,14 @@ describe('assertionTotals: the assertions each test ran, per target (shyden-labs
 
   it('fails on a test whose counts differ, or that a target did not count, naming every target', () => {
     const counts = { chromium: { a: 2, b: 1 }, firefox: { a: 2 }, webkit: { a: 3, b: 1 } };
-    expect(assertionTotals(counts, SMOKE_TARGETS).errors).toEqual([
+    expect(assertionTotals(counts, TARGETS).errors).toEqual([
       '"a" ran different numbers of assertions: chromium 2, firefox 2, webkit 3',
       '"b" ran different numbers of assertions: chromium 1, firefox none, webkit 1',
     ]);
   });
 
   it('names a target that counted nothing at all against every test', () => {
-    expect(assertionTotals({ chromium: { a: 1 }, firefox: { a: 1 } }, SMOKE_TARGETS).errors).toEqual([
+    expect(assertionTotals({ chromium: { a: 1 }, firefox: { a: 1 } }, TARGETS).errors).toEqual([
       '"a" ran different numbers of assertions: chromium 1, firefox 1, webkit none',
     ]);
   });

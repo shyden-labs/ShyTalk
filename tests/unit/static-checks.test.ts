@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, statSync } from 'node:fs';
 import { withoutCommentLines, withoutYamlComments, withoutYamlQuotes, yamlBlock } from './source-text.ts';
+import { SMOKE_TARGETS } from '../smoke/targets.ts';
 
 /**
  * The static checks (issue shyden-labs/repo-template#61): typecheck, lint and format-check run as
@@ -83,9 +84,10 @@ describe('ci.yml', () => {
       '    timeout-minutes: 20',
       '    container:',
       `      image: mcr.microsoft.com/playwright:v${playwrightVersion}-resolute`,
-      '      options: --user 1001',
       '    env:',
       '      SITE_ENVIRONMENT: dev',
+      // Root, so Edge can be installed (shyden-labs/ShyTalk#239); Firefox refuses root with another user's HOME.
+      '      HOME: /root',
     ]);
   });
 
@@ -96,16 +98,32 @@ describe('ci.yml', () => {
     expect(yamlBlock(ci, 'web-smoke', '  ')).toContain(`image: mcr.microsoft.com/playwright:v${playwrightVersion}-resolute\n`);
   });
 
-  it('builds the site, runs the smoke and compares the totals in web-smoke, skipping them for docs', () => {
+  // shyden-labs/ShyTalk#239: the desktop browsers and the one-suite checks come from the shared package
+  // @shyden-labs/playwright-devices; Edge is not in Microsoft's image, so it is installed per run.
+  it('runs the smoke on Chromium, Firefox, WebKit and Edge', () => {
+    expect(SMOKE_TARGETS).toEqual(['chromium', 'firefox', 'webkit', 'msedge']);
+  });
+
+  it('builds the site, runs the smoke and checks it is one suite in web-smoke, skipping them for docs', () => {
     expect(steps(yamlBlock(ci, 'web-smoke', '  '))).toEqual([
       { name: '', run: '', if: '' },
       { name: '', run: '|', if: '' },
       { name: '', run: '', if: '' },
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
+      { name: 'Install Microsoft Edge', run: 'node_modules/.bin/playwright install --with-deps msedge', if: CODE },
       { name: 'Build the site', run: 'npm run build:web', if: CODE },
       { name: 'Smoke', run: '|', if: CODE },
-      { name: 'Compare the totals', run: 'node scripts/smoke-totals.ts', if: `\${{ !cancelled() && ${CODE} }}` },
+      {
+        name: 'List the tests each browser should run',
+        run: 'SMOKE_DOOR_SECRET=list SMOKE_SITE_PASSWORD=list node_modules/.bin/playwright test -c tests/smoke --list --reporter=json > test-results/smoke-list.json',
+        if: `\${{ !cancelled() && ${CODE} }}`,
+      },
+      {
+        name: 'One-suite checks over the desktop browsers',
+        run: `node_modules/.bin/one-suite --group desktop=${SMOKE_TARGETS.join(',')} --list test-results/smoke-list.json --report test-results/smoke-report.json --assertions test-results/smoke-assertions.json`,
+        if: `\${{ !cancelled() && ${CODE} }}`,
+      },
     ]);
   });
 
