@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import web from '../../workers/web/src/index.ts';
 import { CONTENT_SECURITY_POLICY, handle, type WebEnv } from '../../workers/web/src/web.ts';
 import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER, SITE_USER, type D1Like } from '../../packages/environment/index.ts';
@@ -215,6 +215,97 @@ describe('the site password', () => {
     const response = await handle(request('/', null, null), unset);
     expect(response.status).toBe(200);
     expect(response.headers.get('www-authenticate')).toBeNull();
+  });
+});
+
+// shyden-labs/ShyTalk#263: the partner site's link opens dev with a one-use pass.
+describe('the dev pass', () => {
+  const PASS_SECRET = 'test-secret-not-real';
+  /** The partner's own test vector, valid at 1763520000 for DEV's host. */
+  const TOKEN =
+    'eyJ2IjoxLCJob3N0IjoiZGV2LnNoeXRhbGsuYXBwIiwiZXhwIjoxNzYzNTIwMDYwLCJub25jZSI6IkFBRUNBd1FGQmdjSUNRb0xEQTBPRHcifQ.IpAei1Y9PFgTJDbfWLP6m6AH_6KxCOc1P6L9w0CFS5c';
+
+  /** The host the vector was minted for, read from its own payload. */
+  const HOST = (JSON.parse(atob((TOKEN.split('.')[0] ?? '').replaceAll('-', '+').replaceAll('_', '/'))) as { host: string }).host;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** `environment`'s env with a database that answers the marker and records nonces, at the vector's mint time. */
+  function passEnv(environment: WebEnv['ENVIRONMENT_NAME']): { env: WebEnv; asked: string[]; nonces: string[] } {
+    vi.useFakeTimers({ now: 1763520000 * 1000, toFake: ['Date'] });
+    const { env: e, asked } = env(environment);
+    const nonces: string[] = [];
+    const statement = (sql: string, values: unknown[] = []) => ({
+      sql,
+      values,
+      bind: (...bound: unknown[]) => statement(sql, bound),
+      first: <T>() => Promise.resolve({ name: environment } as T),
+    });
+    const db = {
+      prepare: (sql: string) => statement(sql),
+      batch: (batch: { sql: string; values: unknown[] }[]) =>
+        Promise.resolve(
+          batch.map(({ sql, values }) => {
+            if (!sql.startsWith('INSERT')) return { meta: { changes: 0 }, results: [] };
+            const [nonce] = values as [string];
+            if (nonces.includes(nonce)) return { meta: { changes: 0 }, results: [] };
+            nonces.push(nonce);
+            return { meta: { changes: 1 }, results: [] };
+          }),
+        ),
+    };
+    return {
+      env: {
+        ...e,
+        DB: db,
+        SITE_ORIGIN: environment === 'dev' ? `https://${HOST}` : 'https://site.example.test',
+        DEV_PASS_SECRET: PASS_SECRET,
+      },
+      asked,
+      nonces,
+    };
+  }
+
+  it('dev takes a valid pass in place of the box once, then the cookie it sets serves pages', async () => {
+    const { env: e, asked, nonces } = passEnv('dev');
+    const first = await handle(request(`/?dev_pass=${TOKEN}`, SECRET, null), e);
+    expect(first.status).toBe(302);
+    expect(first.headers.get('location')).toBe('/');
+    expect(first.headers.get('content-security-policy')).toBe(CONTENT_SECURITY_POLICY);
+    expect(asked).toEqual([]);
+    expect(nonces).toEqual(['AAECAwQFBgcICQoLDA0ODw']);
+    const [cookie = ''] = (first.headers.get('set-cookie') ?? '').split(';');
+    const page = await handle(new Request('https://site.example.test/', { headers: { [DOOR_SECRET_HEADER]: SECRET, cookie } }), e);
+    expect(page.status).toBe(200);
+    expect(asked).toEqual(['/']);
+  });
+
+  it('dev asks with the box when the same pass comes a second time', async () => {
+    const { env: e } = passEnv('dev');
+    await handle(request(`/?dev_pass=${TOKEN}`, SECRET, null), e);
+    const again = await handle(request(`/?dev_pass=${TOKEN}`, SECRET, null), e);
+    expect(again.status).toBe(401);
+    expect(again.headers.get('www-authenticate')).toBe('Basic realm="ShyTalk dev", charset="UTF-8"');
+  });
+
+  it('checks the door first: a pass without the door secret is refused with 403 and not recorded', async () => {
+    const { env: e, nonces } = passEnv('dev');
+    expect((await handle(request(`/?dev_pass=${TOKEN}`, null, null), e)).status).toBe(403);
+    expect(nonces).toEqual([]);
+  });
+
+  it('test reads no pass and takes no pass cookie, asking with the box', async () => {
+    const { env: e, nonces } = passEnv('test');
+    const answer = await handle(request(`/?dev_pass=${TOKEN}`, SECRET, null), e);
+    expect(answer.status).toBe(401);
+    expect(answer.headers.get('set-cookie')).toBeNull();
+    expect(nonces).toEqual([]);
+    const { env: dev } = passEnv('dev');
+    const [cookie = ''] = ((await handle(request(`/?dev_pass=${TOKEN}`, SECRET, null), dev)).headers.get('set-cookie') ?? '').split(';');
+    const withCookie = await handle(new Request('https://site.example.test/', { headers: { [DOOR_SECRET_HEADER]: SECRET, cookie } }), e);
+    expect(withCookie.status).toBe(401);
   });
 });
 

@@ -147,6 +147,22 @@ describe('deploy-dev', () => {
     expect(step).toContain('SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}');
   });
 
+  // shyden-labs/ShyTalk#263: dev takes the partner site's one-use pass, signed with DEV_PASS_SECRET; the deploy puts it
+  // after the site password and stops naming it when the environment has none.
+  it('sets the dev pass key after the site password, and fails naming it when the environment lacks it', () => {
+    const step = deployStep().join('\n');
+    const password = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put SITE_PASSWORD --env dev ||');
+    const missing = step.indexOf('if [ -z $DEV_PASS_SECRET ]; then');
+    const put = step.indexOf(
+      'printf %s $DEV_PASS_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put DEV_PASS_SECRET --env dev ||',
+    );
+    expect(password).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(password);
+    expect(put).toBeGreaterThan(missing);
+    expect(step).toContain('DEV_PASS_SECRET: ${{ secrets.DEV_PASS_SECRET }}');
+    expect(step).toContain('::error title=DEV_PASS_SECRET missing::');
+  });
+
   // #76: dev app sign-in answers 503 until the Worker holds Better Auth's
   // secret, so the deploy puts it from the dev environment, after the Worker
   // exists, and stops naming the secret when the environment has none.

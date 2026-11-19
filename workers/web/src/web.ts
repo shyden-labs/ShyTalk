@@ -11,6 +11,7 @@
 import { createMarkerGuard, requireDoorSecret, requireSitePassword, type D1Like } from '../../../packages/environment/index.ts';
 import { handleClosedTesting, isClosedTesting, type ClosedTestingEnv } from './api/closed-testing.ts';
 import { handleAppApi, isAppApi } from './app/router.ts';
+import { devPassGate } from './dev-pass-gate.ts';
 import { json } from './http.ts';
 import type { RateLimit } from './app/sign-in.ts';
 import type { AnnouncerNamespace } from './app/announcer.ts';
@@ -25,6 +26,8 @@ export interface WebEnv {
   DOOR_SECRET?: string;
   /** The site password the browser's box asks for (a Wrangler secret, TEST and DEV only; shyden-labs/ShyTalk#262). */
   SITE_PASSWORD?: string;
+  /** The key the partner site signs dev passes with (a Wrangler secret, DEV only; shyden-labs/ShyTalk#263). */
+  DEV_PASS_SECRET?: string;
   /** The environment's own D1 database, `shytalk-<env>`, marked with its name; absent only in a Worker deployed without it, which serves nothing. */
   DB?: D1Like;
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -134,7 +137,11 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   if (env.ENVIRONMENT_NAME !== 'prod') {
     const refused = await requireDoorSecret(request, env.DOOR_SECRET);
     if (refused) return refused;
-    const asked = await requireSitePassword(request, env.SITE_PASSWORD, `ShyTalk ${env.ENVIRONMENT_NAME}`);
+    const now = Math.floor(Date.now() / 1000);
+    const passed = await devPassGate(request, { ...env, DB: hasFullD1(env) ? env.DB : undefined }, now);
+    if (passed) return passed;
+    const pass = env.ENVIRONMENT_NAME === 'dev' ? { key: env.DEV_PASS_SECRET, now } : undefined;
+    const asked = await requireSitePassword(request, env.SITE_PASSWORD, `ShyTalk ${env.ENVIRONMENT_NAME}`, pass);
     if (asked) return asked;
   }
   // Holding, nothing behind the page is reached, so no database is needed.
