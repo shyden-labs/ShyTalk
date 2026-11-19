@@ -78,16 +78,18 @@ describe('ci.yml', () => {
 
   // shyden-labs/ShyTalk#109: every target the site supports runs the same suite, and their totals are compared.
   it('builds the site for dev and runs the smoke against that build, so a preview’s addresses are checked (shyden-labs/ShyTalk#198)', () => {
-    expect(yamlBlock(ci, 'web-smoke', '  ').split('\n').slice(0, 8)).toEqual([
+    expect(yamlBlock(ci, 'web-smoke', '  ').split('\n').slice(0, 9)).toEqual([
       '  web-smoke:',
       '    runs-on: ubuntu-26.04',
       '    timeout-minutes: 20',
       '    container:',
       `      image: mcr.microsoft.com/playwright:v${playwrightVersion}-resolute`,
+      // Root, so Edge can be installed (shyden-labs/ShyTalk#239); Firefox refuses root with another user's HOME,
+      // so root gets its own inside the container only (the runner's docker would read it too at job level).
+      '      env:',
+      '        HOME: /root',
       '    env:',
       '      SITE_ENVIRONMENT: dev',
-      // Root, so Edge can be installed (shyden-labs/ShyTalk#239); Firefox refuses root with another user's HOME.
-      '      HOME: /root',
     ]);
   });
 
@@ -107,6 +109,8 @@ describe('ci.yml', () => {
   it('builds the site, runs the smoke and checks it is one suite in web-smoke, skipping them for docs', () => {
     expect(steps(yamlBlock(ci, 'web-smoke', '  '))).toEqual([
       { name: '', run: '', if: '' },
+      // As root, git refuses the runner user's checkout until it is marked safe (shyden-labs/ShyTalk#239).
+      { name: '', run: 'git config --global --add safe.directory $GITHUB_WORKSPACE', if: '' },
       { name: '', run: '|', if: '' },
       { name: '', run: '', if: '' },
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
