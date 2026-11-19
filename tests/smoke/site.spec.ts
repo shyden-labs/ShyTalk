@@ -109,6 +109,8 @@ for (const { lang, locale, prefix } of LANGUAGES) {
   });
 
   test(`${lang}: an unknown page answers 404 in ${lang}, with no CSP refusal`, async ({ page }) => {
+    // PROOF ONLY (#239 AC2, never merged): one test skipped on Edge.
+    test.skip(test.info().project.name === 'msedge' && lang === 'id', 'proof of the one-suite skip check');
     const refusals = cspRefusals(page);
     const response = await page.goto(`${prefix}/no-such-page`, { waitUntil: 'load' });
     expect(response?.status()).toBe(404);

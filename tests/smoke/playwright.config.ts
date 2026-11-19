@@ -94,6 +94,8 @@ export default defineConfig({
   // phone emulation.
   projects: desktopProjects(SMOKE_TARGETS).map((project, index) => ({
     ...project,
+    // PROOF ONLY (#239 AC2, never merged): webkit is not given one test.
+    ...(project.name === 'webkit' ? { grepInvert: /en: an unknown page answers 404/ } : {}),
     // A project's headers replace the top-level ones, so the door secret is repeated here.
     use: {
       ...project.use,
