@@ -15,7 +15,7 @@
  * and the mail is read from the real test mailbox (tests/phones/test-mailbox.ts).
  */
 import { test as base } from '@playwright/test';
-import { plusAddress, waitForAnyMail, waitForMail, type Mail } from '../phones/test-mailbox.ts';
+import { envMailboxPassword, plusAddress, waitForAnyMail, waitForMail, type Mail } from '../phones/test-mailbox.ts';
 import { MAIL_STAND_IN_PORT } from './targets.ts';
 
 export { expect } from '@playwright/test';
@@ -43,10 +43,10 @@ export const test = base.extend<{ mailbox: Mailbox }, { mailSource: MailSource }
       await use({
         address: plusAddress(tag),
         mail: async () => {
-          const { subject, confirmLink } = await waitForMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' });
+          const { subject, confirmLink } = await waitForMail(tag, { password: envMailboxPassword() });
           return { subject, confirmLink };
         },
-        anyMail: () => waitForAnyMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' }),
+        anyMail: () => waitForAnyMail(tag, { password: envMailboxPassword() }),
       });
       return;
     }

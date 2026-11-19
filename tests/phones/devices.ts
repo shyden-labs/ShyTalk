@@ -1,7 +1,8 @@
 /**
  * The real steps of the phone run (tests/phones/run.ts, shyden-labs/ShyTalk#112):
- * adb for the OnePlus, devicectl and Appium for the iPhone Air. `pickIphone`
- * is unit-tested; the rest is proven by the phone run itself.
+ * adb for the OnePlus, devicectl and Appium for the iPhone Air. Unit-tested
+ * with each process, file and socket stood in (tests/unit/phone-devices-real.test.ts,
+ * shyden-labs/ShyTalk#211); the phone run proves them on the phones.
  */
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { mkdir, readFile, rm } from 'node:fs/promises';
@@ -53,14 +54,14 @@ export function pickIphone(list: DeviceList): string {
   const iphones = list.result.devices.filter(
     ({ hardwareProperties: h, connectionProperties: c }) => h.deviceType === 'iPhone' && c.transportType === 'wired',
   );
-  if (iphones.length === 0) throw new Error('no iPhone is connected by cable');
+  const [only] = iphones;
+  if (only === undefined) throw new Error('no iPhone is connected by cable');
   if (iphones.length > 1) {
     throw new Error(
       `more than one iPhone is connected by cable: ${iphones.map(({ hardwareProperties: h }) => h.marketingName ?? h.udid).join(', ')}`,
     );
   }
-  const [only] = iphones;
-  return only?.hardwareProperties.udid ?? '';
+  return only.hardwareProperties.udid;
 }
 
 /** Resolves with the child's exit code; rejects naming it if it outlasts `ms`. */

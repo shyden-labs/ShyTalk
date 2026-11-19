@@ -41,6 +41,11 @@ export function plusAddress(tag: string): string {
   return `${USER}+${tag}@${DOMAIN}`;
 }
 
+/** The password the run was given in `TEST_MAILBOX_PASSWORD` (tests/phones/run.ts sets it from the Keychain); '' when unset, which the waits refuse by name. */
+export function envMailboxPassword(): string {
+  return process.env.TEST_MAILBOX_PASSWORD ?? '';
+}
+
 /** Waits for any mail sent to `plusAddress(tag)`, looking every 5 s and failing at 120 s. */
 export async function waitForAnyMail(tag: string, deps: WaitDeps): Promise<Mail> {
   if (deps.password === '')

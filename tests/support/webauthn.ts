@@ -50,12 +50,13 @@ export function cbor(value: Cbor): Uint8Array {
 }
 
 /** An ECDSA signature as WebCrypto gives it (r‖s) in the DER form WebAuthn carries. */
-function der(raw: Uint8Array): Uint8Array {
+export function der(raw: Uint8Array): Uint8Array {
   const integer = (bytes: Uint8Array): Uint8Array => {
     let start = 0;
     while (start < bytes.length - 1 && bytes[start] === 0) start += 1;
     const trimmed = bytes.slice(start);
-    const padded = (trimmed[0] ?? 0) & 0x80 ? concat(new Uint8Array([0]), trimmed) : trimmed;
+    // The trim keeps at least one byte, so its first byte is always there to read.
+    const padded = new DataView(trimmed.buffer).getUint8(0) & 0x80 ? concat(new Uint8Array([0]), trimmed) : trimmed;
     return concat(new Uint8Array([0x02, padded.length]), padded);
   };
   const body = concat(integer(raw.slice(0, 32)), integer(raw.slice(32)));
@@ -107,15 +108,16 @@ const clientData = (type: string, { origin, challenge }: Ceremony): Uint8Array =
 export async function register(ceremony: Ceremony): Promise<{ credential: SoftCredential; response: RegistrationAnswer }> {
   const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
   const jwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
-  const fromB64url = (text: string | undefined): Uint8Array =>
-    Uint8Array.from(atob((text ?? '').replaceAll('-', '+').replaceAll('_', '/')), (char) => char.charCodeAt(0));
+  const fromB64url = (text: string): Uint8Array =>
+    Uint8Array.from(atob(text.replaceAll('-', '+').replaceAll('_', '/')), (char) => char.charCodeAt(0));
   const coseKey = cbor(
     new Map<number, Cbor>([
       [1, 2],
       [3, -7],
       [-1, 1],
-      [-2, fromB64url(jwk.x)],
-      [-3, fromB64url(jwk.y)],
+      // A P-256 public key's JWK always carries both coordinates (RFC 7518 §6.2.1).
+      [-2, fromB64url(jwk.x as string)],
+      [-3, fromB64url(jwk.y as string)],
     ]),
   );
   const id = crypto.getRandomValues(new Uint8Array(16));

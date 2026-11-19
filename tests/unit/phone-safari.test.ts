@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import { describe, it, expect, vi } from 'vitest';
 import { safariPage, type WebDriverCall } from '../phones/safari.ts';
@@ -249,6 +251,14 @@ describe('safariPage: reading the page', () => {
     const executes = fake.calls.filter(([, path]) => path.includes('/execute/'));
     expect(executes.map(([, path]) => path)).toEqual(['/session/s1/execute/sync', '/session/s1/execute/async']);
     expect((executes[0]?.[2] as { script: string }).script).toBe('window.axe = {};');
+  });
+
+  it('reads axe-core’s installed file itself when given no reader', async () => {
+    const fake = appium({}, [null, []]);
+    await safariPage(fake.call, 's1', BASE).axeViolations();
+    const [first] = fake.calls.filter(([, path]) => path.includes('/execute/'));
+    const installed = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
+    expect((first?.[2] as { script: string }).script).toBe(installed);
   });
 
   it('gives axe a minute before running it: Appium’s own script timeout cut it off at 17-29 ms on the iPhone Air (2026-11-07)', async () => {

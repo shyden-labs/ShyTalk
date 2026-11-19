@@ -12,7 +12,7 @@ import { HELLOS } from '../../apps/web/src/brand.ts';
 import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
-import { codeIn, MAIL_CEILING_MS, plusAddress, waitForAnyMail, waitForMail } from './test-mailbox.ts';
+import { codeIn, envMailboxPassword, MAIL_CEILING_MS, plusAddress, waitForAnyMail, waitForMail } from './test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import { countingCheck, type Check } from './check.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
@@ -313,7 +313,7 @@ const JOURNEY: IphoneCase = counted('applying and following the mailed link conf
   await check.waitForText(page, '#apply-answer', t('en', 'closedTesting.sent'));
   check.ok(await page.isVisible('#apply-answer'), 'no visible answer');
 
-  const { subject, confirmLink } = await waitForMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' });
+  const { subject, confirmLink } = await waitForMail(tag, { password: envMailboxPassword() });
   check.equal(subject, t('en', 'closedTesting.mailSubject'));
 
   const { pathname, search } = new URL(confirmLink);
@@ -343,7 +343,7 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     await page.tap('#email-submit');
     await check.waitForText(page, '#email-answer', t('en', 'account.sent'));
     check.ok(await page.isVisible('#email-answer'), 'no visible answer');
-    const codeMail = await waitForAnyMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' });
+    const codeMail = await waitForAnyMail(tag, { password: envMailboxPassword() });
     check.equal(codeMail.subject, t('en', 'email.codeSubject'));
     await page.type('#email-code', codeIn(codeMail));
     await page.tap('#code-submit');
@@ -407,7 +407,7 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
       waitFor(
         'the recovery code mail',
         async () => {
-          const code = codeIn(await waitForAnyMail(tag, { password: process.env.TEST_MAILBOX_PASSWORD ?? '' }));
+          const code = codeIn(await waitForAnyMail(tag, { password: envMailboxPassword() }));
           return code === signUpCode ? null : code;
         },
         MAIL_CEILING_MS,

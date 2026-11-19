@@ -33,6 +33,16 @@ describe('pickIphone', () => {
       'more than one iPhone is connected by cable: iPhone A, iPhone B',
     );
   });
+
+  it('names an iPhone without a marketing name by its udid', () => {
+    const unnamed = {
+      hardwareProperties: { udid: 'B', reality: 'physical', deviceType: 'iPhone' },
+      connectionProperties: { transportType: 'wired' },
+    };
+    expect(() => pickIphone({ result: { devices: [device('A', 'physical', 'iPhone', 'wired'), unnamed] } })).toThrow(
+      'more than one iPhone is connected by cable: iPhone A, B',
+    );
+  });
 });
 
 describe('oneplusCounts', () => {

@@ -270,6 +270,14 @@ describe('runPhones', () => {
     expect(d.steps).toEqual(['print phone-smoke: the address must start with https://, not http://site.example']);
   });
 
+  it('gives the reason of a case that fails with something other than an Error', async () => {
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the point: a case rejecting with a bare string
+    const d = deps({ cases: [{ title: 'a', run: () => Promise.reject('the page went away') }] });
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
+    expect(d.steps).toContain('print iphone-air: a FAILED: the page went away');
+    expect(d.steps).toContain('print phone-smoke: iphone-air failed "a": the page went away');
+  });
+
   it('fails, printing why, when a phone fails a test', async () => {
     const d = deps({ cases: [failing('a', 'no visible navigation')] });
     await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);

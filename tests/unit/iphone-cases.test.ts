@@ -29,7 +29,11 @@ const mailbox = vi.hoisted(() => ({
   ),
   codeIn: vi.fn((mail: { text: string }) => /\b\d{6}\b/.exec(mail.text)?.[0] ?? ''),
 }));
-vi.mock('../phones/test-mailbox.ts', () => mailbox);
+// The password helper stays real, so each test sets the variable it reads.
+vi.mock('../phones/test-mailbox.ts', async (original) => ({
+  envMailboxPassword: (await original<typeof import('../phones/test-mailbox.ts')>()).envMailboxPassword,
+  ...mailbox,
+}));
 
 // The authenticator's code is stood in: the real one awaits WebCrypto outside fake time, so a journey's waits on fake
 // time could start after the test had moved its clock on (a race seen on CI, shyden-labs/ShyTalk#180).
@@ -235,6 +239,19 @@ describe('the iPhone cases', () => {
       await expect(broken).rejects.toThrow(/500[\s\S]*color-contrast: 1/);
     },
   );
+
+  it('gives the reason of a soft check that fails with something other than an Error, and still runs the rest', async () => {
+    const [c] = cases('the home page answers');
+    // A WebDriver client may reject with a bare string; the soft checks still name it, and still run every check after it.
+    const broken = c?.run(
+      safari('en', {
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the point: a WebDriver client rejecting with a bare string
+        attribute: () => Promise.reject('the session went away'),
+        axeViolations: () => Promise.resolve(['color-contrast: 1']),
+      }),
+    );
+    await expect(broken).rejects.toThrow(/the session went away[\s\S]*color-contrast: 1/);
+  });
 
   it.each(cases('the home page answers').map((c) => [c.title, c] as const))(
     '%s: fails on a CSP refusal on any page it opened, though each goto starts the console afresh',
@@ -515,6 +532,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     overrides: {
       notice?: (pending: boolean) => boolean;
       noticeText?: string;
+      answerText?: string;
       shown?: (selector: string) => boolean;
       count?: (selector: string) => number | undefined;
       firstCode?: string;
@@ -557,7 +575,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
         if (selector === CODES) return Promise.resolve(overrides.firstCode ?? 'AB12-CD34-EF56-GH78');
         if (selector === '[data-testid="method-authenticator"]') return Promise.resolve(t('en', 'account.authenticatorOn'));
         if (selector === '#email-answer')
-          return Promise.resolve(t('en', 'account.recoveryStarted').replace('{completesAt}', '14 Nov 2026, 10:00'));
+          return Promise.resolve(overrides.answerText ?? t('en', 'account.recoveryStarted').replace('{completesAt}', '14 Nov 2026, 10:00'));
         if (selector === '#recovery-pending-text')
           return Promise.resolve(overrides.noticeText ?? t('en', 'account.recoveryPending').replace('{startedAt}', '13 Nov 2026, 10:00'));
         return Promise.resolve('');
@@ -739,6 +757,11 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
   it('fails naming the notice when it never shows', async () => {
     const { page } = accountPages({ notice: () => false });
     await expect(run(page)).rejects.toThrow('waited 60 s for the recovery notice');
+  });
+
+  it('fails naming the recovery-started answer when the page never shows it', async () => {
+    const { page } = accountPages({ answerText: t('en', 'account.sent') });
+    await expect(run(page)).rejects.toThrow('waited 60 s for the recovery-started answer');
   });
 
   it('fails when the notice says something else', async () => {
