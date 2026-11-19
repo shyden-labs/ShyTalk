@@ -5,11 +5,11 @@
  * laptop runs unit tests, types, lint and format. Typed against the DOM
  * (tests/smoke/tsconfig.json), which Playwright's own types need.
  */
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
+import { desktopProjects } from '@shyden-labs/playwright-devices/desktop';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { DOOR_SECRET_HEADER, SITE_USER } from '../../packages/environment/index.ts';
-import { SMOKE_COUNTS, SMOKE_REPORT } from '../../scripts/smoke-totals.ts';
 import { MAIL_STAND_IN_PORT, SMOKE_TARGETS } from './targets.ts';
 
 const PORT = 8787;
@@ -22,8 +22,6 @@ const PORT = 8787;
  */
 const SITE = `https://127.0.0.1:${String(PORT)}`;
 
-/** Each target's desktop browser (shyden-labs/ShyTalk#109); the suite runs unchanged on all of them. */
-const DEVICE = { chromium: 'Desktop Chrome', firefox: 'Desktop Firefox', webkit: 'Desktop Safari' } as const;
 /** wrangler runs from the repository root, where its config paths start. */
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -77,12 +75,12 @@ export default defineConfig({
   testDir: '.',
   forbidOnly: true,
   retries: 0,
-  // scripts/smoke-totals.ts reads the JSON report from the repository root;
-  // Playwright resolves a relative outputFile from this config's folder, so it is made absolute.
+  // CI's one-suite check (shyden-labs/ShyTalk#239) reads the JSON report and the shared package's assertion counts
+  // from the repository root; Playwright resolves a relative outputFile from this config's folder, so each is absolute.
   reporter: [
     ['list'],
-    ['json', { outputFile: `${ROOT}${SMOKE_REPORT}` }],
-    ['./assertion-counts.ts', { outputFile: `${ROOT}${SMOKE_COUNTS}` }],
+    ['json', { outputFile: `${ROOT}test-results/smoke-report.json` }],
+    ['@shyden-labs/playwright-devices/assertion-counter', { outputFile: `${ROOT}test-results/smoke-assertions.json` }],
   ],
   use: {
     baseURL: SITE,
@@ -92,11 +90,13 @@ export default defineConfig({
   },
   // Locally no Cloudflare sets the connecting address, so every request would share SIGN_IN_LIMIT's one 'unknown' key
   // (10 a minute); each browser gets its own documentation-range address (RFC 5737) to stay inside it.
-  projects: SMOKE_TARGETS.map((name, index) => ({
-    name,
+  // Each browser's project comes from the shared package (shyden-labs/ShyTalk#239): a real desktop browser, no
+  // phone emulation.
+  projects: desktopProjects(SMOKE_TARGETS).map((project, index) => ({
+    ...project,
     // A project's headers replace the top-level ones, so the door secret is repeated here.
     use: {
-      ...devices[DEVICE[name]],
+      ...project.use,
       extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret, 'cf-connecting-ip': `198.51.100.${String(index + 1)}` },
     },
   })),

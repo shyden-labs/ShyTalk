@@ -90,16 +90,16 @@ jobs:
   # real web Worker under `wrangler dev` as DEV, behind the door with a fresh
   # secret per run; each language's home 200 and 404 404, in its language,
   # with no CSP refusal (playwright.config.ts, tests/smoke/), on Chromium,
-  # Firefox and WebKit (shyden-labs/ShyTalk#109).
+  # Firefox, WebKit (shyden-labs/ShyTalk#109) and Edge (shyden-labs/ShyTalk#239).
   web-smoke:
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     # Microsoft's image for the lockfile's exact Playwright: browsers and their system libraries come
     # with it, so no run waits on the runner's apt mirror (shyden-labs/ShyTalk#281). A unit test
-    # keeps the tag equal to the lockfile's version.
+    # keeps the tag equal to the lockfile's version. It runs as root so Edge can be installed
+    # (shyden-labs/ShyTalk#239).
     container:
       image: mcr.microsoft.com/playwright:v1.65.1-resolute
-      options: --user 1001
     # Built for dev, so each page's preview names the dev origin, and the smoke checks it (shyden-labs/ShyTalk#198).
     env:
       SITE_ENVIRONMENT: dev
@@ -107,6 +107,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
+      # The checkout belongs to the runner's user, so git, running as root here, refuses it until it is marked
+      # safe (shyden-labs/ShyTalk#239).
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143).
       - id: node
         run: |
@@ -122,25 +125,37 @@ jobs:
       - id: classify
         run: node scripts/change-scope.ts
       - run: node scripts/npm-ci.ts
+      # Edge is not in Microsoft's image; its own installer adds it each run (shyden-labs/ShyTalk#239).
+      - name: Install Microsoft Edge
+        if: steps.classify.outputs.scope != 'docs-only'
+        run: node_modules/.bin/playwright install --with-deps msedge
       - name: Build the site
         if: steps.classify.outputs.scope != 'docs-only'
         run: npm run build:web
+      # Firefox refuses to launch as root with another user's HOME, and the runner sets its own HOME for every
+      # step (over the container's), so root gets its own here (shyden-labs/ShyTalk#239).
       - name: Smoke
         if: steps.classify.outputs.scope != 'docs-only'
         env:
           WRANGLER_SEND_METRICS: 'false'
+          HOME: /root
         run: |
           SMOKE_DOOR_SECRET=$(openssl rand -hex 32)
           export SMOKE_DOOR_SECRET
           SMOKE_SITE_PASSWORD=$(openssl rand -hex 32)
           export SMOKE_SITE_PASSWORD
           npm run test:smoke
-      # One suite, run unchanged on every target (shyden-labs/ShyTalk#109):
-      # prints each target's total; fails if any differ or a test was skipped.
-      # Runs after a red smoke too, so the totals always print.
-      - name: Compare the totals
+      # One suite, run unchanged on every target (shyden-labs/ShyTalk#109): the package's one-suite prints
+      # each browser's total and fails on any difference, skip, unlisted run or untagged group-only test.
+      # Both steps run after a red smoke too, so the totals always print.
+      # The shared package's checks (shyden-labs/ShyTalk#239) need the tests listed per browser; listing
+      # starts no server, but the config refuses to load without its two values, so placeholders are given.
+      - name: List the tests each browser should run
         if: ${{ !cancelled() && steps.classify.outputs.scope != 'docs-only' }}
-        run: node scripts/smoke-totals.ts
+        run: SMOKE_DOOR_SECRET=list SMOKE_SITE_PASSWORD=list node_modules/.bin/playwright test -c tests/smoke --list --reporter=json > test-results/smoke-list.json
+      - name: One-suite checks over the desktop browsers
+        if: ${{ !cancelled() && steps.classify.outputs.scope != 'docs-only' }}
+        run: node_modules/.bin/one-suite --group desktop=chromium,firefox,webkit,msedge --list test-results/smoke-list.json --report test-results/smoke-report.json --assertions test-results/smoke-assertions.json
 
   # The integration suite (shyden-labs/ShyTalk#59, decision 230: a required
   # check): tests under tests/integration against Cloudflare's own local
