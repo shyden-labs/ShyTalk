@@ -14,7 +14,6 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { assertionTotals, smokeTotals } from '../../scripts/smoke-totals.ts';
 import { countingCheck } from './check.ts';
-import { SITE_USER } from '../../packages/environment/index.ts';
 import { environmentAt, type WranglerOrigins } from '../../apps/web/src/preview.ts';
 import type { IphoneCase, SafariPage } from './iphone-cases.ts';
 
@@ -156,16 +155,9 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     // the OnePlus's Playwright inherits this environment, and the iPhone's cases run in this process.
     process.env.TEST_MAILBOX_PASSWORD = await d.mailboxPassword();
     // DEV and TEST ask for their site password with the browser's own box (shyden-labs/ShyTalk#262): the OnePlus's
-    // Playwright answers it from this environment, the iPhone's Safari from the address. Production asks for none.
-    let iphoneAddress = address;
-    if (environment !== 'prod') {
-      const password = await d.sitePassword(environment);
-      process.env.SMOKE_SITE_PASSWORD = password;
-      const credentialed = new URL(address);
-      credentialed.username = SITE_USER;
-      credentialed.password = password;
-      iphoneAddress = credentialed.href.replace(/\/$/, '');
-    }
+    // Playwright answers it from this environment. Production asks for none. The iPhone gets no password: Safari
+    // opened no page given it in the address (2026-11-20), so it waits for the shared device runner (Shyden's ruling).
+    if (environment !== 'prod') process.env.SMOKE_SITE_PASSWORD = await d.sitePassword(environment);
     const endpoint = await d.forward();
     let code: number;
     try {
@@ -184,7 +176,7 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     try {
       const session = await d.openSession(udid);
       try {
-        iphone = await runCases(d.cases, d.page(session, iphoneAddress));
+        iphone = await runCases(d.cases, d.page(session, address));
       } finally {
         await d.closeSession(session);
       }
