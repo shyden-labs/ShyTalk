@@ -11,8 +11,6 @@ const WORKER = JSON.parse(readFileSync('workers/web/wrangler.json', 'utf8')) as 
 const DEV_ORIGIN = WORKER.env.dev.vars.SITE_ORIGIN;
 const TEST_ORIGIN = WORKER.env.test.vars.SITE_ORIGIN;
 const PROD_ORIGIN = WORKER.env.prod.vars.SITE_ORIGIN;
-/** An origin with the site's user and the stand-in site password in it, as the iPhone is given it. */
-const withPassword = (origin: string): string => origin.replace('https://', 'https://shytalk:site-pw@');
 
 /**
  * The phone run (shyden-labs/ShyTalk#112 AC4, AC6): one command runs the smoke
@@ -245,7 +243,7 @@ describe('runPhones', () => {
     await expect(runPhones(TEST_ORIGIN, d)).resolves.toBe(0);
     expect(seen).toEqual(['site-pw']);
     expect(d.steps).toContain('site password test');
-    expect(d.steps).toContain(`page ${withPassword(TEST_ORIGIN)}`);
+    expect(d.steps).toContain(`page ${TEST_ORIGIN}`);
   });
 
   it('asks the Keychain for no site password on production, which asks for none (shyden-labs/ShyTalk#262)', async () => {
@@ -285,7 +283,7 @@ describe('runPhones', () => {
       'start appium',
       "print phone-smoke: Appium's full log: test-results/appium.log",
       'open session UDID-1',
-      `page ${withPassword(DEV_ORIGIN)}`,
+      `page ${DEV_ORIGIN}`,
       'close session s1',
       'stop appium',
       'print iphone-air: a passed',
@@ -372,9 +370,21 @@ describe('runPhones', () => {
     expect(d.steps.at(-1)).toBe('print phone-smoke: ENOENT: phone-oneplus-assertions.json');
   });
 
-  it('runs the iPhone cases against the address it was given, carrying the site password (shyden-labs/ShyTalk#262)', async () => {
+  it('runs the iPhone cases against the address it was given, with no password in it (shyden-labs/ShyTalk#262)', async () => {
+    // Safari opened no page given the password in the address, and every failure line then printed the password
+    // (iPhone Air, 2026-11-20): the iPhone waits for the shared device runner to answer the box (Shyden's ruling).
     const pageFor = vi.fn(() => page);
     await runPhones(TEST_ORIGIN, deps({ page: pageFor }));
-    expect(pageFor).toHaveBeenCalledWith('s1', withPassword(TEST_ORIGIN));
+    expect(pageFor).toHaveBeenCalledWith('s1', TEST_ORIGIN);
+  });
+
+  it('prints no line holding the site password when an iPhone case fails naming its address (shyden-labs/ShyTalk#262)', async () => {
+    const d = deps({
+      page: (_session: string, address: string) => ({ ...page, goto: () => Promise.reject(new Error(`no document for ${address}`)) }),
+      cases: [{ title: 'a', run: (p) => p.goto('/').then(() => undefined) }],
+    });
+    await runPhones(DEV_ORIGIN, d);
+    expect(d.steps.some((line) => line.includes(`no document for ${DEV_ORIGIN}`))).toBe(true);
+    expect(d.steps.filter((line) => line.includes('site-pw'))).toEqual([]);
   });
 });
