@@ -99,12 +99,16 @@ describe('the real phone steps', () => {
     expect(ran).toEqual([['security', 'find-generic-password', '-s', 'shytalk-dev-site-password', '-a', 'shytalk', '-w']]);
   });
 
-  it('start Chrome on the OnePlus, forward its DevTools socket to 9333, and later remove the forward', async () => {
+  it('start a fresh Chrome on the OnePlus with no leftover command line, forward its DevTools socket to 9333, and later remove the forward', async () => {
     printed = { adb: '' };
     const deps = realDeps();
     expect(await deps.forward()).toBe('http://127.0.0.1:9333');
     await deps.unforward();
     expect(ran).toEqual([
+      // An unfinished Playwright launch elsewhere leaves this file, which renames the socket (shyden-labs/ShyTalk#302).
+      ['adb', 'shell', 'rm', '-f', '/data/local/tmp/chrome-command-line'],
+      ['adb', 'shell', 'am', 'set-debug-app', '--persistent', 'com.android.chrome'],
+      ['adb', 'shell', 'am', 'force-stop', 'com.android.chrome'],
       ['adb', 'shell', 'am', 'start', '-n', 'com.android.chrome/com.google.android.apps.chrome.Main', '-d', 'about:blank'],
       ['adb', 'forward', 'tcp:9333', 'localabstract:chrome_devtools_remote'],
       ['adb', 'forward', '--remove', 'tcp:9333'],

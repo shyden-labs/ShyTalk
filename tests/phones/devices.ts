@@ -188,6 +188,12 @@ export function realDeps(): PhoneDeps {
       return stdout.trim();
     },
     async forward() {
+      // An unfinished Playwright launch (another project's, on this shared phone) leaves a command-line file that
+      // renames Chrome's DevTools socket; removing it and restarting Chrome as the debug app brings the usual socket
+      // back (shyden-labs/ShyTalk#302, found in shyden-labs/playwright-devices#33).
+      await exec('adb', ['shell', 'rm', '-f', '/data/local/tmp/chrome-command-line']);
+      await exec('adb', ['shell', 'am', 'set-debug-app', '--persistent', 'com.android.chrome']);
+      await exec('adb', ['shell', 'am', 'force-stop', 'com.android.chrome']);
       // Chrome opens its DevTools socket once it runs; about:blank starts it without a page of ours.
       await exec('adb', ['shell', 'am', 'start', '-n', 'com.android.chrome/com.google.android.apps.chrome.Main', '-d', 'about:blank']);
       await exec('adb', ['forward', `tcp:${String(DEVTOOLS_PORT)}`, 'localabstract:chrome_devtools_remote']);
