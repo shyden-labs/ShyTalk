@@ -93,6 +93,12 @@ describe('the real phone steps', () => {
     expect(ran).toEqual([['security', 'find-generic-password', '-s', 'shytalk-test-mailbox', '-a', 'shytalk-tests@shyden.co.uk', '-w']]);
   });
 
+  it('read an environment’s site password from the Keychain, alone, without its line end (shyden-labs/ShyTalk#262)', async () => {
+    printed = { security: 'the-site-password\n' };
+    expect(await realDeps().sitePassword('dev')).toBe('the-site-password');
+    expect(ran).toEqual([['security', 'find-generic-password', '-s', 'shytalk-dev-site-password', '-a', 'shytalk', '-w']]);
+  });
+
   it('start Chrome on the OnePlus, forward its DevTools socket to 9333, and later remove the forward', async () => {
     printed = { adb: '' };
     const deps = realDeps();

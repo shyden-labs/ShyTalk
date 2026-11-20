@@ -11,6 +11,7 @@ import { promisify } from 'node:util';
 import { IPHONE_CASES } from './iphone-cases.ts';
 import { APPIUM_LOG, capabilities, WDA_LOCAL_PORT, type PhoneDeps } from './run.ts';
 import { safariPage, type WebDriverCall } from './safari.ts';
+import { SITE_USER } from '../../packages/environment/index.ts';
 
 const exec = promisify(execFile);
 
@@ -169,6 +170,19 @@ export function realDeps(): PhoneDeps {
         'shytalk-test-mailbox',
         '-a',
         'shytalk-tests@shyden.co.uk',
+        '-w',
+      ]);
+      return stdout.trim();
+    },
+    async sitePassword(environment) {
+      // Shyden stores it (2026-11-20 ruling, shyden-labs/ShyTalk#262); like the mailbox's, it goes nowhere but this
+      // process's environment.
+      const { stdout } = await exec('security', [
+        'find-generic-password',
+        '-s',
+        `shytalk-${environment}-site-password`,
+        '-a',
+        SITE_USER,
         '-w',
       ]);
       return stdout.trim();

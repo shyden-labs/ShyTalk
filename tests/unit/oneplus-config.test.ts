@@ -12,8 +12,11 @@ import { MAIL_CEILING_MS } from '../phones/test-mailbox.ts';
 // tsconfig with the DOM lib).
 vi.stubEnv('PHONE_BASE_URL', 'https://phone.example.test');
 vi.stubEnv('SMOKE_CDP_ENDPOINT', 'http://127.0.0.1:9');
+vi.stubEnv('SMOKE_SITE_PASSWORD', 'site-pw');
 const configUrl = new URL('../smoke/oneplus.config.ts', import.meta.url).href;
-const { default: config } = (await import(/* @vite-ignore */ configUrl)) as { default: { timeout?: number } };
+const { default: config } = (await import(/* @vite-ignore */ configUrl)) as {
+  default: { timeout?: number; use?: { httpCredentials?: unknown } };
+};
 
 describe('the OnePlus phone config', () => {
   afterAll(() => {
@@ -24,5 +27,9 @@ describe('the OnePlus phone config', () => {
     expect(config.timeout).toBe(180_000);
     expect(MAIL_CEILING_MS).toBe(120_000);
     expect(config.timeout).toBeGreaterThan(MAIL_CEILING_MS);
+  });
+
+  it('answers the site’s password box with the run’s site password (shyden-labs/ShyTalk#262)', () => {
+    expect(config.use?.httpCredentials).toEqual({ username: 'shytalk', password: 'site-pw' });
   });
 });

@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { assertionTotals, smokeTotals } from '../../scripts/smoke-totals.ts';
 import { countingCheck } from './check.ts';
+import { SITE_USER } from '../../packages/environment/index.ts';
 import { environmentAt, type WranglerOrigins } from '../../apps/web/src/preview.ts';
 import type { IphoneCase, SafariPage } from './iphone-cases.ts';
 
@@ -34,6 +35,8 @@ interface Report {
 export interface PhoneDeps {
   /** The test mailbox's password, from this Mac's Keychain (service shytalk-test-mailbox). */
   mailboxPassword(): Promise<string>;
+  /** An environment's site password, from this Mac's Keychain (service shytalk-<environment>-site-password). */
+  sitePassword(environment: string): Promise<string>;
   /** Forwards Chrome's DevTools socket on the OnePlus; answers the endpoint. */
   forward(): Promise<string>;
   unforward(): Promise<void>;
@@ -138,8 +141,10 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
   }
   // The iPhone's cases and the OnePlus's Playwright check each preview's addresses on the origin the deployed site
   // was built for (shyden-labs/ShyTalk#198).
+  let environment: string;
   try {
-    process.env.SITE_ENVIRONMENT = environmentAt(address, JSON.parse(readFileSync(WRANGLER, 'utf8')) as WranglerOrigins);
+    environment = environmentAt(address, JSON.parse(readFileSync(WRANGLER, 'utf8')) as WranglerOrigins);
+    process.env.SITE_ENVIRONMENT = environment;
   } catch (error) {
     d.print(`phone-smoke: ${(error as Error).message}`);
     return 1;
@@ -150,6 +155,17 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     // Both phones' closed-testing journey reads its mail from the real test mailbox (shyden-labs/ShyTalk#150):
     // the OnePlus's Playwright inherits this environment, and the iPhone's cases run in this process.
     process.env.TEST_MAILBOX_PASSWORD = await d.mailboxPassword();
+    // DEV and TEST ask for their site password with the browser's own box (shyden-labs/ShyTalk#262): the OnePlus's
+    // Playwright answers it from this environment, the iPhone's Safari from the address. Production asks for none.
+    let iphoneAddress = address;
+    if (environment !== 'prod') {
+      const password = await d.sitePassword(environment);
+      process.env.SMOKE_SITE_PASSWORD = password;
+      const credentialed = new URL(address);
+      credentialed.username = SITE_USER;
+      credentialed.password = password;
+      iphoneAddress = credentialed.href.replace(/\/$/, '');
+    }
     const endpoint = await d.forward();
     let code: number;
     try {
@@ -168,7 +184,7 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     try {
       const session = await d.openSession(udid);
       try {
-        iphone = await runCases(d.cases, d.page(session, address));
+        iphone = await runCases(d.cases, d.page(session, iphoneAddress));
       } finally {
         await d.closeSession(session);
       }

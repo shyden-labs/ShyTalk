@@ -11,6 +11,7 @@
 import { defineConfig } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import type { MailSource } from './fixture.ts';
+import { SITE_USER } from '../../packages/environment/index.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -18,6 +19,10 @@ const address = process.env.PHONE_BASE_URL ?? '';
 if (!address.startsWith('https://')) throw new Error('PHONE_BASE_URL must be the https address the phones test');
 if ((process.env.SMOKE_CDP_ENDPOINT ?? '') === '')
   throw new Error('SMOKE_CDP_ENDPOINT is unset: without the OnePlus the suite would run on this Mac');
+// DEV and TEST ask for their site password with Chrome's own box (shyden-labs/ShyTalk#262); the phone run reads it
+// from the Keychain. Production asks for none, so there it is empty and
+// never used.
+const password = process.env.SMOKE_SITE_PASSWORD ?? '';
 
 export default defineConfig<object, { mailSource: MailSource }>({
   testDir: '.',
@@ -34,6 +39,11 @@ export default defineConfig<object, { mailSource: MailSource }>({
     ['./assertion-counts.ts', { outputFile: `${ROOT}test-results/phone-oneplus-assertions.json` }],
   ],
   // Chrome on Android refuses a set window size (measured 2026-11-06): the phone's own screen it is.
-  use: { baseURL: address, viewport: null, mailSource: 'imap' },
+  use: {
+    baseURL: address,
+    viewport: null,
+    mailSource: 'imap',
+    httpCredentials: { username: SITE_USER, password },
+  },
   projects: [{ name: 'oneplus' }],
 });
