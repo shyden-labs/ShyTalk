@@ -38,4 +38,5 @@ How each phone runs (shyden-labs/ShyTalk#112, Shyden's choices of 2026-11-06):
 - Both phones on USB, unlocked and awake. Only one session uses the phones at a time: claim `~/.claude/locks/usb-devices` first.
 - The OnePlus with USB debugging on, and Chrome installed.
 - The iPhone Air paired with this Mac, Developer Mode on, and Web Inspector on (Settings > Apps > Safari > Advanced).
+- The site password of the environment being tested in this Mac's Keychain, for DEV and TEST (which ask for it; production does not): service `shytalk-dev-site-password` or `shytalk-test-site-password`, account `shytalk`, stored once with `security add-generic-password -s shytalk-dev-site-password -a shytalk -w`. The OnePlus answers Chrome's password box with it, and the iPhone gets it in the address (shyden-labs/ShyTalk#262).
 - Appium installed globally (`appium` 3.4.2) with the `xcuitest` driver. WebDriverAgent is signed with this Mac's Apple Development identity (team `2YV2Y2GFD3`).

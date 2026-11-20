@@ -6,10 +6,13 @@ import { countingCheck } from '../phones/check.ts';
 
 /** Each environment's address, as the Worker's own settings give it: tests never name a door host. */
 const WORKER = JSON.parse(readFileSync('workers/web/wrangler.json', 'utf8')) as {
-  env: Record<'dev' | 'test', { vars: { SITE_ORIGIN: string } }>;
+  env: Record<'dev' | 'test' | 'prod', { vars: { SITE_ORIGIN: string } }>;
 };
 const DEV_ORIGIN = WORKER.env.dev.vars.SITE_ORIGIN;
 const TEST_ORIGIN = WORKER.env.test.vars.SITE_ORIGIN;
+const PROD_ORIGIN = WORKER.env.prod.vars.SITE_ORIGIN;
+/** An origin with the site's user and the stand-in site password in it, as the iPhone is given it. */
+const withPassword = (origin: string): string => origin.replace('https://', 'https://shytalk:site-pw@');
 
 /**
  * The phone run (shyden-labs/ShyTalk#112 AC4, AC6): one command runs the smoke
@@ -176,6 +179,7 @@ function deps(overrides: Partial<PhoneDeps> = {}): PhoneDeps & { steps: string[]
   return {
     steps,
     mailboxPassword: step('mailbox password', 'secret'),
+    sitePassword: step('site password', 'site-pw'),
     forward: step('forward', 'http://127.0.0.1:9333'),
     unforward: step('unforward'),
     playwright: step('playwright', 0),
@@ -184,7 +188,7 @@ function deps(overrides: Partial<PhoneDeps> = {}): PhoneDeps & { steps: string[]
     iphoneUdid: step('udid', 'UDID-1'),
     startAppium: step('start appium'),
     openSession: step('open session', 's1'),
-    page: () => (steps.push('page'), page),
+    page: (_session: string, address: string) => (steps.push(`page ${address}`), page),
     closeSession: step('close session'),
     stopAppium: step('stop appium'),
     cases: [checking('a', 2)],
@@ -234,6 +238,32 @@ describe('runPhones', () => {
     expect(d.steps).toEqual(['print phone-smoke: https://site.example is the SITE_ORIGIN of no environment in workers/web/wrangler.json']);
   });
 
+  it('hands the environment’s site password from the Keychain to the OnePlus’s Playwright (shyden-labs/ShyTalk#262)', async () => {
+    vi.stubEnv('SMOKE_SITE_PASSWORD', undefined);
+    const seen: (string | undefined)[] = [];
+    const d = deps({ playwright: () => (seen.push(process.env.SMOKE_SITE_PASSWORD), Promise.resolve(0)) });
+    await expect(runPhones(TEST_ORIGIN, d)).resolves.toBe(0);
+    expect(seen).toEqual(['site-pw']);
+    expect(d.steps).toContain('site password test');
+    expect(d.steps).toContain(`page ${withPassword(TEST_ORIGIN)}`);
+  });
+
+  it('asks the Keychain for no site password on production, which asks for none (shyden-labs/ShyTalk#262)', async () => {
+    vi.stubEnv('SMOKE_SITE_PASSWORD', undefined);
+    const seen: (string | undefined)[] = [];
+    const d = deps({ playwright: () => (seen.push(process.env.SMOKE_SITE_PASSWORD), Promise.resolve(0)) });
+    await expect(runPhones(PROD_ORIGIN, d)).resolves.toBe(0);
+    expect(seen).toEqual([undefined]);
+    expect(d.steps.filter((line) => line.startsWith('site password'))).toEqual([]);
+    expect(d.steps).toContain(`page ${PROD_ORIGIN}`);
+  });
+
+  it('fails naming why, before touching a phone, when the Keychain gives no site password (shyden-labs/ShyTalk#262)', async () => {
+    const d = deps({ sitePassword: () => Promise.reject(new Error('security: item not found')) });
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
+    expect(d.steps).toEqual(['mailbox password', 'print phone-smoke: security: item not found']);
+  });
+
   it('fails naming why, before touching a phone, when the Keychain gives no password', async () => {
     const d = deps({ mailboxPassword: () => Promise.reject(new Error('security: item not found')) });
     await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
@@ -245,6 +275,7 @@ describe('runPhones', () => {
     await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(0);
     expect(d.steps).toEqual([
       'mailbox password',
+      'site password dev',
       'forward',
       `playwright ${DEV_ORIGIN} http://127.0.0.1:9333`,
       'unforward',
@@ -254,7 +285,7 @@ describe('runPhones', () => {
       'start appium',
       "print phone-smoke: Appium's full log: test-results/appium.log",
       'open session UDID-1',
-      'page',
+      `page ${withPassword(DEV_ORIGIN)}`,
       'close session s1',
       'stop appium',
       'print iphone-air: a passed',
@@ -296,7 +327,7 @@ describe('runPhones', () => {
   it('removes the adb forward when Playwright cannot run, and fails naming why', async () => {
     const d = deps({ playwright: () => Promise.reject(new Error('npx not found')) });
     await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
-    expect(d.steps).toEqual(['mailbox password', 'forward', 'unforward', 'print phone-smoke: npx not found']);
+    expect(d.steps).toEqual(['mailbox password', 'site password dev', 'forward', 'unforward', 'print phone-smoke: npx not found']);
   });
 
   it('closes the session and stops Appium when a case throws outside its checks', async () => {
@@ -341,9 +372,9 @@ describe('runPhones', () => {
     expect(d.steps.at(-1)).toBe('print phone-smoke: ENOENT: phone-oneplus-assertions.json');
   });
 
-  it('runs the iPhone cases against the address it was given', async () => {
+  it('runs the iPhone cases against the address it was given, carrying the site password (shyden-labs/ShyTalk#262)', async () => {
     const pageFor = vi.fn(() => page);
     await runPhones(TEST_ORIGIN, deps({ page: pageFor }));
-    expect(pageFor).toHaveBeenCalledWith('s1', TEST_ORIGIN);
+    expect(pageFor).toHaveBeenCalledWith('s1', withPassword(TEST_ORIGIN));
   });
 });
