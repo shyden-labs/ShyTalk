@@ -226,6 +226,19 @@ describe('Dependabot keeps the pins from rotting', () => {
     expect(config, 'the actions that run CI are unwatched').toMatch(/package-ecosystem:\s*["']?github-actions["']?/);
   });
 
+  it('takes every newer @shyden-labs/playwright-devices, so it is declared as a >= range, never pinned', () => {
+    // Global rule 2026-11-20 (shyden-labs/ShyTalk#299): every project moves to its newest release each time.
+    const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const declared =
+      manifest.devDependencies?.['@shyden-labs/playwright-devices'] ?? manifest.dependencies?.['@shyden-labs/playwright-devices'];
+
+    expect(declared, 'the shared device package is not declared').toBeDefined();
+    expect(declared, 'pinned, so a new release never reaches this project').toMatch(/^>=\d+\.\d+\.\d+$/);
+  });
+
   it('opens every PR against develop, never straight at main', () => {
     const config = configBody();
     const ecosystems = count(config, /package-ecosystem:/);
