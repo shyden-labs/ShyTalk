@@ -20,7 +20,12 @@ export default {
       // is named, with its reason, in tests/unit/coverage-scope.test.ts.
       include: ['**/*.{ts,mts,cts,js,mjs,cjs}'],
       exclude: [
-        'tests/**',
+        // Test helpers are measured (shyden-labs/ShyTalk#211); the tests themselves, Playwright's configuration and the
+        // integration suite, which no unit test runs, are not.
+        'tests/unit/**',
+        '**/*.{test,spec}.ts',
+        'tests/smoke/*.config.ts',
+        'tests/integration/**',
         '**/*.d.ts',
         'vitest.*.config.ts',
         'eslint.config.js',

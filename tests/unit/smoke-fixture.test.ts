@@ -16,7 +16,11 @@ const mailbox = vi.hoisted(() => ({
   ),
   waitForAnyMail: vi.fn(() => Promise.resolve({ subject: 'Your ShyTalk code', text: '\n402913\n' })),
 }));
-vi.mock('../phones/test-mailbox.ts', () => mailbox);
+// The password helper stays real, so each test sets the variable it reads.
+vi.mock('../phones/test-mailbox.ts', async (original) => ({
+  envMailboxPassword: (await original<typeof import('../phones/test-mailbox.ts')>()).envMailboxPassword,
+  ...mailbox,
+}));
 
 /** Typed against the DOM in its own project (tests/smoke/tsconfig.json), so loaded by a path the root check does not follow. */
 const FIXTURE: string = '../smoke/fixture.ts';

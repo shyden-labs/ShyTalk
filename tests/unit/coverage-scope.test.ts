@@ -35,7 +35,10 @@ function sourceFiles(dir = '.', prefix = ''): string[] {
 
 /** What the figure leaves out, each with its reason. */
 const LEFT_OUT: [RegExp, string][] = [
-  [/^tests\//, 'the tests themselves and their helpers (helpers: shyden-labs/ShyTalk#211)'],
+  [/^tests\/unit\//, 'the unit tests themselves'],
+  [/\.(?:test|spec)\.ts$/, 'the tests themselves, in every suite'],
+  [/^tests\/smoke\/[a-z]+\.config\.ts$/, 'Playwright configuration, run by Playwright'],
+  [/^tests\/integration\//, 'the integration suite and its helpers, which no unit test runs and CI runs whole'],
   [/\.d\.ts$/, 'type declarations, which hold no code'],
   [/^(?:vitest\.[a-z]+\.config\.ts|eslint\.config\.js|apps\/web\/astro\.config\.mjs)$/, 'tool configuration, run by the tools'],
 ];
@@ -53,10 +56,21 @@ describe('the coverage figure', () => {
     },
   );
 
-  it.each(['tests/unit/x.test.ts', 'tests/phones/run.ts', 'types/globals.d.ts', 'vitest.unit.config.ts'])(
-    'leaves out %s, as named',
+  it.each(['tests/phones/run.ts', 'tests/support/totp.ts', 'tests/smoke/targets.ts', 'tests/setup/files.ts'])(
+    'measures %s, a test helper with unit tests (shyden-labs/ShyTalk#211)',
     (file) => {
-      expect(measured(file)).toBe(false);
+      expect(measured(file)).toBe(true);
     },
   );
+
+  it.each([
+    'tests/unit/x.test.ts',
+    'tests/smoke/site.spec.ts',
+    'tests/smoke/playwright.config.ts',
+    'tests/integration/d1.ts',
+    'types/globals.d.ts',
+    'vitest.unit.config.ts',
+  ])('leaves out %s, as named', (file) => {
+    expect(measured(file)).toBe(false);
+  });
 });

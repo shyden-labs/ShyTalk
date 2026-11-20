@@ -20,13 +20,12 @@ import type { IphoneCase, SafariPage } from './iphone-cases.ts';
 /** The Worker's settings, whose `SITE_ORIGIN` names each environment's address. */
 const WRANGLER = fileURLToPath(new URL('../../workers/web/wrangler.json', import.meta.url));
 
-export interface CaseResult {
+/** One case's result: a failed case always carries its reason. */
+export type CaseResult = {
   title: string;
-  status: 'expected' | 'unexpected';
-  error?: string;
   /** The checks the case ran, failed ones too (shyden-labs/ShyTalk#180 AC7). */
   assertions: number;
-}
+} & ({ status: 'expected' } | { status: 'unexpected'; error: string });
 
 interface Report {
   suites: { title: string; specs: { title: string; tests: { projectName: string; status: string }[] }[] }[];
@@ -68,7 +67,7 @@ export async function runCases(cases: IphoneCase[], page: SafariPage): Promise<C
       await run(page, check);
       results.push({ title, status: 'expected', assertions: check.count });
     } catch (error) {
-      results.push({ title, status: 'unexpected', error: (error as Error).message, assertions: check.count });
+      results.push({ title, status: 'unexpected', error: error instanceof Error ? error.message : String(error), assertions: check.count });
     }
   }
   return results;
@@ -102,7 +101,7 @@ export function phoneVerdict(
       if (tests.some(({ status }) => status === 'unexpected' || status === 'flaky')) errors.push(`oneplus failed "${title}"`);
     }
   }
-  for (const { title, status, error } of iphone) if (status === 'unexpected') errors.push(`iphone-air failed "${title}": ${error ?? ''}`);
+  for (const result of iphone) if (result.status === 'unexpected') errors.push(`iphone-air failed "${result.title}": ${result.error}`);
   return { lines, errors };
 }
 
@@ -176,8 +175,8 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     } finally {
       await d.stopAppium();
     }
-    for (const { title, status, error } of iphone)
-      d.print(status === 'expected' ? `iphone-air: ${title} passed` : `iphone-air: ${title} FAILED: ${error ?? ''}`);
+    for (const result of iphone)
+      d.print(result.status === 'expected' ? `iphone-air: ${result.title} passed` : `iphone-air: ${result.title} FAILED: ${result.error}`);
     const verdict = phoneVerdict(oneplus, oneplusCounts, iphone, d.cases.length);
     for (const line of verdict.lines) d.print(line);
     errors.push(...verdict.errors);
