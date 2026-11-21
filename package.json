@@ -52,7 +52,7 @@
     "@better-auth/utils": "0.5.1",
     "@simplewebauthn/browser": "13.3.0",
     "better-auth": "1.7.25",
-    "better-call": "1.4.5",
+    "better-call": "2.0.6",
     "jose": "6.2.17",
     "valibot": "1.5.0"
   }
