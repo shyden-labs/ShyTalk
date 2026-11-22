@@ -27,7 +27,11 @@ const as = (userId: string): StaffDeps => ({
 });
 
 const post = (body: unknown): Request =>
-  new Request('https://site.example.test/api/staff/floor', { method: 'POST', body: JSON.stringify(body) });
+  new Request('https://site.example.test/api/staff/floor', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 const read = (): Request => new Request('https://site.example.test/api/staff/floor');
 
 describe('the staff floor on D1', () => {

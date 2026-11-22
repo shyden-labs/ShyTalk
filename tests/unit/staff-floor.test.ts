@@ -133,6 +133,19 @@ describe('POST /api/staff/floor', () => {
     expect(await response.json()).toEqual({ error: 'bad_request' });
   });
 
+  it('answers 400 for a body not sent as JSON, so a cross-site form cannot post one', async () => {
+    const { value, changes } = deps(ADMIN);
+    const request = new Request('https://site.example.test/api/staff/floor', {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: JSON.stringify({ platform: 'android', version: '1.5.0' }),
+    });
+    const response = await handleStaffApi(request, value);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'bad_request' });
+    expect(changes).toEqual([]);
+  });
+
   it('answers 400 for a JSON body that is not an object', async () => {
     expect((await handleStaffApi(post('null'), deps(ADMIN).value)).status).toBe(400);
   });

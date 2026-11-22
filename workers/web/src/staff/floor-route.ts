@@ -52,6 +52,8 @@ interface FloorRequest {
 
 /** The body as a floor request, or the 400 that answers it. */
 async function readFloorRequest(request: Request): Promise<FloorRequest | Response> {
+  // JSON only, as the other write routes: a cross-site form cannot send it without a CORS preflight.
+  if (request.headers.get('content-type')?.split(';')[0] !== 'application/json') return badRequest('bad_request');
   let body: unknown;
   try {
     body = await request.json();
