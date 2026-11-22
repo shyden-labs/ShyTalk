@@ -1212,6 +1212,13 @@ describe('the ticket page (shyden-labs/ShyTalk#37 AC1)', () => {
     expect(check.count).toBe(8);
   });
 
+  it('reads a page language the site does not have as English, the language-free page staying where it is', async () => {
+    const page = safari('fr');
+    const check = countingCheck();
+    await expect(ticket?.run(page, check)).resolves.toBeUndefined();
+    expect(check.count).toBe(8);
+  });
+
   it('fails naming the address when the page loses the emailed token', async () => {
     const page = safari('en', { url: () => Promise.resolve(`${DEV}${TICKET_PATH}`) });
     await expect(ticket?.run(page)).rejects.toThrow(TICKET_PATH);
