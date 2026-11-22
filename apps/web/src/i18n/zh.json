@@ -15,7 +15,7 @@
     "terms": "条款",
     "privacy": "隐私",
     "guidelines": "社区准则",
-    "contact": "联系方式",
+    "contact": "联系客服",
     "englishOnly": "此页面仅提供英文版。"
   },
   "home": {
@@ -145,5 +145,12 @@
     "building": "ShyTalk 应用正在开发中。",
     "comingSoon": "即将推出",
     "languages": "语言"
+  },
+  "support": {
+    "title": "帮助与支持",
+    "intro": "提出问题或报告故障，回复将通过电子邮件发送。",
+    "englishForm": "表单目前仅提供英文版本。",
+    "ticketTitle": "您的支持请求",
+    "noScript": "客服表单需要 JavaScript。请启用后再发送请求。"
   }
 }

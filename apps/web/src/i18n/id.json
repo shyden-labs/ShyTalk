@@ -15,7 +15,7 @@
     "terms": "Syarat dan Ketentuan",
     "privacy": "Privasi",
     "guidelines": "Pedoman komunitas",
-    "contact": "Kontak",
+    "contact": "Hubungi bantuan",
     "englishOnly": "Halaman ini hanya tersedia dalam bahasa Inggris."
   },
   "home": {
@@ -145,5 +145,12 @@
     "building": "Aplikasi ShyTalk sedang dibangun saat ini.",
     "comingSoon": "Segera hadir",
     "languages": "Bahasa"
+  },
+  "support": {
+    "title": "Bantuan",
+    "intro": "Ajukan pertanyaan atau laporkan masalah. Balasan akan dikirim lewat email.",
+    "englishForm": "Untuk sementara, formulir ini hanya tersedia dalam bahasa Inggris.",
+    "ticketTitle": "Permintaan bantuan Anda",
+    "noScript": "Formulir bantuan memerlukan JavaScript. Aktifkan JavaScript untuk mengirim permintaan."
   }
 }

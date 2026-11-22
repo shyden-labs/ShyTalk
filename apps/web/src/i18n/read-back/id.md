@@ -13,7 +13,7 @@
 | footer.terms | Terms | Syarat dan Ketentuan | Terms and Conditions |
 | footer.privacy | Privacy | Privasi | Privacy |
 | footer.guidelines | Community guidelines | Pedoman komunitas | Community guidelines |
-| footer.contact | Contact | Kontak | Contact |
+| footer.contact | Contact support | Hubungi bantuan | Contact help |
 | home.title | ShyTalk | ShyTalk | ShyTalk |
 | home.heading | Learn languages and cultures by talking | Belajar bahasa dan budaya dengan bercakap-cakap | Learn language and culture by having conversations |
 | home.intro | ShyTalk is a friendly place to practise a language out loud and discover the cultures behind it. | ShyTalk adalah tempat yang ramah untuk berlatih berbicara dalam suatu bahasa dan mengenal budaya di baliknya. | ShyTalk is a friendly place to practice speaking a language and get to know the culture behind it. |
@@ -131,3 +131,8 @@
 | holding.building | The ShyTalk app is being built now. | Aplikasi ShyTalk sedang dibangun saat ini. | The ShyTalk app is currently under construction. |
 | holding.comingSoon | Coming soon | Segera hadir | Coming soon |
 | holding.languages | Language | Bahasa | Language |
+| support.title | Support | Bantuan | Help |
+| support.intro | Ask a question or report a problem. The reply comes by email. | Ajukan pertanyaan atau laporkan masalah. Balasan akan dikirim lewat email. | Ask a question or report a problem. A reply will be sent via email. |
+| support.englishForm | The form is in English for now. | Untuk sementara, formulir ini hanya tersedia dalam bahasa Inggris. | For the time being, this form is only available in English. |
+| support.ticketTitle | Your support request | Permintaan bantuan Anda | Your request for help |
+| support.noScript | The support form needs JavaScript. Turn it on to send a request. | Formulir bantuan memerlukan JavaScript. Aktifkan JavaScript untuk mengirim permintaan. | The help form requires JavaScript. Please enable JavaScript to submit requests. |
