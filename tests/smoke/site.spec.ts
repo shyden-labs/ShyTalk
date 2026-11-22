@@ -11,7 +11,9 @@ import { test, expect } from './fixture.ts';
 import { codeIn, MAIL_CEILING_MS } from '../phones/test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import AxeBuilder from '@axe-core/playwright';
-import { LANGUAGE_NAMES, LOCALES, langTag, t } from '../../apps/web/src/i18n/t.ts';
+import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t } from '../../apps/web/src/i18n/t.ts';
+import { SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
+import { SMOKE_TICKET_TOKEN, builtShydeskOrigin } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
 import { HOLDING_FACTS, BRAND_FONTS, NARROW_WIDTH, PHONE_WIDTH, wantedFacts, type HoldingFacts } from '../support/holding-facts.ts';
 import { LEGAL_DOCS, legalLines, legalLocale, legalPath } from '../../apps/web/src/legal/legal.ts';
@@ -74,6 +76,10 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     await expect.soft(page.getByRole('link', { name: t(locale, 'home.roadmap') })).toHaveCount(0);
     const home = await new AxeBuilder({ page }).analyze();
     expect.soft(home.violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+    // The footer reaches support through its page, never an email address (shyden-labs/ShyTalk#37 AC3).
+    const supportLink = page.getByRole('contentinfo').getByRole('link', { name: t(locale, 'footer.contact'), exact: true });
+    await expect.soft(supportLink).toHaveCount(1);
+    await expect.soft(supportLink).toHaveAttribute('href', localePath(locale, SUPPORT_PATH));
 
     const words = legalLines(legalLocale(locale));
     for (const doc of LEGAL_DOCS) {
@@ -222,6 +228,30 @@ for (const { lang, locale, prefix } of LANGUAGES) {
   // fetcher reads it (its HTML as served, no scripts run, so a page that sends a signed-out visitor on still counts),
   // its tags in this language with addresses on the built environment's origin, and its picture 1200 by 630 and more
   // than one colour. The home page opens once; each page is fetched from it.
+  // The support page embeds ShyDesk's support piece (shyden-labs/ShyTalk#37 AC1).
+  test(`${lang}: the support page shows its heading and lines, and embeds ShyDesk's contact piece in ${lang}, passes axe, with no CSP refusal`, async ({
+    page,
+  }) => {
+    const refusals = cspRefusals(page);
+    const response = await page.goto(localePath(locale, SUPPORT_PATH), { waitUntil: 'load' });
+    expect.soft(response?.status()).toBe(200);
+    await expect.soft(page.locator('html')).toHaveAttribute('lang', lang);
+    await expect.soft(page.getByRole('heading', { level: 1 })).toHaveText(t(locale, 'support.title'));
+    for (const line of ['intro', 'englishForm']) {
+      const statement = page.locator(`[data-line="${line}"]`);
+      await expect.soft(statement).toBeVisible();
+      await expect.soft(statement).toHaveText(t(locale, `support.${line}`));
+    }
+    const piece = page.locator('shydesk-support');
+    await expect.soft(piece).toHaveAttribute('product', 'shytalk');
+    await expect.soft(piece).toHaveAttribute('view', 'contact');
+    await expect.soft(piece).toHaveAttribute('lang', locale);
+    await expect.soft(page.locator('script[src$="/embed.js"]')).toHaveAttribute('src', `${builtShydeskOrigin()}/embed.js`);
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+    expect(refusals).toEqual([]);
+  });
+
   test(`${lang}: every page carries its link preview in ${lang}, and each preview picture is 1200 by 630 and not one flat colour`, async ({
     page,
   }) => {
@@ -245,6 +275,31 @@ for (const { lang, locale, prefix } of LANGUAGES) {
  * mail goes to the stand-in; the phones' goes out for real, to the test mailbox
  * (the `mailbox` fixture). Each browser applies once, inside APPLY_LIMIT's 5 a minute.
  */
+/**
+ * The one ticket page ShyDesk's emailed link opens (shyden-labs/ShyTalk#37 AC1): it lands on the ticket page of the
+ * language it shows, with the emailed token still in the fragment, and opens the piece's ticket view in that language.
+ * Which browser language picks which page is the unit test's (tests/unit/support-page.test.ts).
+ */
+test('the ticket page opens the ticket view in the browser’s language, keeping the emailed token, passes axe, with no CSP refusal', async ({
+  page,
+}) => {
+  const refusals = cspRefusals(page);
+  const response = await page.goto(`${TICKET_PATH}#t=${SMOKE_TICKET_TOKEN}`, { waitUntil: 'load' });
+  expect.soft(response?.status()).toBe(200);
+  const piece = page.locator('shydesk-support[view="ticket"]');
+  await expect.soft(piece).toHaveCount(1);
+  const shown = await page.locator('html').getAttribute('lang');
+  const locale = LOCALES.find((each) => langTag(each) === shown) ?? 'en';
+  const address = new URL(page.url());
+  expect.soft(`${address.pathname}${address.hash}`).toBe(`${localePath(locale, TICKET_PATH)}#t=${SMOKE_TICKET_TOKEN}`);
+  await expect.soft(page.getByRole('heading', { level: 1 })).toHaveText(t(locale, 'support.ticketTitle'));
+  await expect.soft(piece).toHaveAttribute('product', 'shytalk');
+  await expect.soft(piece).toHaveAttribute('lang', locale);
+  const { violations } = await new AxeBuilder({ page }).analyze();
+  expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+  expect(refusals).toEqual([]);
+});
+
 test('applying and following the mailed link confirms the address', async ({ page, mailbox }) => {
   await page.goto('/closed-testing', { waitUntil: 'load' });
   await page.getByLabel(t('en', 'closedTesting.emailLabel')).pressSequentially(mailbox.address);

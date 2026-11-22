@@ -7,7 +7,9 @@
  * case checks what its Playwright twin checks.
  */
 import assert from 'node:assert/strict';
-import { LANGUAGE_NAMES, LOCALES, langTag, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
+import { SMOKE_TICKET_TOKEN, builtShydeskOrigin } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
 import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
@@ -30,6 +32,8 @@ export interface SafariPage {
   attribute(selector: string, name: string): Promise<string | null>;
   isVisible(selector: string): Promise<boolean>;
   text(selector: string): Promise<string>;
+  /** The address Safari shows, after any redirect the page made itself. */
+  url(): Promise<string>;
   /** Visible links whose accessible name is exactly `name`. */
   visibleLinks(name: string): Promise<number>;
   /** Links whose accessible name is exactly `name`, visible or not. */
@@ -158,6 +162,12 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
           async () => {
             check.deepEqual(await page.axeViolations(), []);
           },
+          async () => {
+            // The footer reaches support through its page, never an email address (shyden-labs/ShyTalk#37 AC3):
+            // Playwright's getByRole('contentinfo').getByRole('link', { name }), as the footer's support link.
+            check.equal(await page.text('footer a[data-support]'), t(locale, 'footer.contact'));
+            check.equal(await page.attribute('footer a[data-support]', 'href'), localePath(locale, SUPPORT_PATH));
+          },
         ]);
         // Then each footer legal link (shyden-labs/ShyTalk#56 AC4; #180: one journey, as both opened the home page
         // first). A legal page in a language without its own text is the English page with an English footer, so the
@@ -273,6 +283,29 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       },
     ),
     counted(
+      `${lang}: the support page shows its heading and lines, and embeds ShyDesk's contact piece in ${lang}, passes axe, with no CSP refusal`,
+      async (page, check) => {
+        check.equal(await page.goto(localePath(locale, SUPPORT_PATH)), 200);
+        check.equal(await page.attribute('html', 'lang'), lang);
+        check.equal(await page.text(H1), t(locale, 'support.title'));
+        for (const line of ['intro', 'englishForm']) {
+          const selector = `[data-line="${line}"]`;
+          check.ok(await page.isVisible(selector), `${line} is not visible`);
+          check.equal(await page.text(selector), t(locale, `support.${line}`));
+        }
+        for (const [name, wanted] of [
+          ['product', 'shytalk'],
+          ['view', 'contact'],
+          ['lang', locale],
+        ] as const) {
+          check.equal(await page.attribute('shydesk-support', name), wanted);
+        }
+        check.equal(await page.attribute('script[src$="/embed.js"]', 'src'), `${builtShydeskOrigin()}/embed.js`);
+        check.deepEqual(await page.axeViolations(), []);
+        check.deepEqual(await page.cspRefusals(), []);
+      },
+    ),
+    counted(
       `${lang}: every page carries its link preview in ${lang}, and each preview picture is 1200 by 630 and not one flat colour`,
       async (page, check) => {
         const origin = builtSiteOrigin();
@@ -297,6 +330,27 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
     ),
   ];
 }
+
+/**
+ * The one ticket page ShyDesk's emailed link opens (tests/smoke/site.spec.ts, shyden-labs/ShyTalk#37 AC1): it lands on
+ * the ticket page of the language it shows, the emailed token still in the fragment, with the piece's ticket view.
+ */
+const TICKET_PAGE: IphoneCase = counted(
+  'the ticket page opens the ticket view in the browser’s language, keeping the emailed token, passes axe, with no CSP refusal',
+  async (page, check) => {
+    check.equal(await page.goto(`${TICKET_PATH}#t=${SMOKE_TICKET_TOKEN}`), 200);
+    check.equal(await page.count('shydesk-support[view="ticket"]'), 1);
+    const shown = await page.attribute('html', 'lang');
+    const locale = LOCALES.find((each) => langTag(each) === shown) ?? 'en';
+    const address = new URL(await page.url());
+    check.equal(`${address.pathname}${address.hash}`, `${localePath(locale, TICKET_PATH)}#t=${SMOKE_TICKET_TOKEN}`);
+    check.equal(await page.text(H1), t(locale, 'support.ticketTitle'));
+    check.equal(await page.attribute('shydesk-support', 'product'), 'shytalk');
+    check.equal(await page.attribute('shydesk-support', 'lang'), locale);
+    check.deepEqual(await page.axeViolations(), []);
+    check.deepEqual(await page.cspRefusals(), []);
+  },
+);
 
 /**
  * The closed-testing journey, in English, once (tests/smoke/site.spec.ts's last
@@ -510,6 +564,7 @@ const RECOVERY_PAGES: IphoneCase = counted(
 
 export const IPHONE_CASES: IphoneCase[] = [
   ...LANGUAGES.flatMap(({ lang, locale, prefix }) => casesFor(lang, locale, prefix)),
+  TICKET_PAGE,
   JOURNEY,
   SIGN_UP_JOURNEY,
   RECOVERY_PAGES,

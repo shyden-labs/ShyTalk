@@ -235,6 +235,9 @@ export function safariPage(
         name,
       )) as string | null;
     },
+    async url() {
+      return (await call('GET', `${at}/url`)) as string;
+    },
     async isVisible(selector) {
       return (await run(VISIBLE, selector)) as boolean;
     },
