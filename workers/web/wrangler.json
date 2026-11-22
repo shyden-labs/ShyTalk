@@ -30,7 +30,8 @@
         "APPLE_AUDIENCES": "com.shyden.shytalk",
         "MAIL_REGION": "ap-singapore-1",
         "MAIL_FROM": "no-reply@shytalk.app",
-        "HOLDING": "true"
+        "HOLDING": "true",
+        "SHYDESK_ORIGIN": "https://shydesk.dpdns.org"
       },
       "d1_databases": [
         {
@@ -76,7 +77,8 @@
         "GOOGLE_CLIENT_IDS": "415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com,415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com",
         "APPLE_AUDIENCES": "com.shyden.shytalk",
         "MAIL_REGION": "uk-london-1",
-        "MAIL_FROM": "no-reply@dev.shytalk.app"
+        "MAIL_FROM": "no-reply@dev.shytalk.app",
+        "SHYDESK_ORIGIN": "https://shydesk.dpdns.org"
       },
       "d1_databases": [
         {
@@ -122,7 +124,8 @@
         "GOOGLE_CLIENT_IDS": "415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com,415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com",
         "APPLE_AUDIENCES": "com.shyden.shytalk",
         "MAIL_REGION": "uk-london-1",
-        "MAIL_FROM": "no-reply@dev.shytalk.app"
+        "MAIL_FROM": "no-reply@dev.shytalk.app",
+        "SHYDESK_ORIGIN": "https://shydesk.shydesk-non-prod.workers.dev"
       },
       "d1_databases": [
         {

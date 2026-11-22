@@ -19,6 +19,34 @@ import type { AnnouncerNamespace } from './app/announcer.ts';
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
 
+/** Where ShyDesk's support piece runs its human check: Cloudflare Turnstile. */
+const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
+
+/** The support page in every language and its one ticket page, the only pages that embed ShyDesk (shyden-labs/ShyTalk#37). */
+const SUPPORT_PATH = /^\/(?:(?:id|th|vi|zh)\/)?support(?:\/ticket|\/)?$/u;
+
+/**
+ * The support pages' policy: the site's own plus only what ShyDesk's piece needs, its scripts and API on the
+ * environment's ShyDesk, Turnstile, and `blob:` previews of the photos and videos a member attaches. Inline styles
+ * are allowed until the piece adopts its style sheets (shyden-labs/shydesk#266).
+ */
+export function supportPolicy(shydeskOrigin: string): string {
+  const extra = [
+    `script-src 'self' ${shydeskOrigin} ${TURNSTILE_ORIGIN}`,
+    `connect-src 'self' ${shydeskOrigin}`,
+    `frame-src ${TURNSTILE_ORIGIN}`,
+    "img-src 'self' blob:",
+    "media-src 'self' blob:",
+    "style-src 'self' 'unsafe-inline'",
+  ];
+  return [CONTENT_SECURITY_POLICY, ...extra].join('; ');
+}
+
+/** The policy for a path: the support policy on the support pages of a Worker that names its ShyDesk, else the site's. */
+function policyFor(pathname: string, shydeskOrigin: string | undefined): string {
+  return shydeskOrigin !== undefined && SUPPORT_PATH.test(pathname) ? supportPolicy(shydeskOrigin) : CONTENT_SECURITY_POLICY;
+}
+
 export interface WebEnv {
   /** Which environment this Worker is (a var): only TEST and DEV sit behind a door. */
   ENVIRONMENT_NAME: 'prod' | 'test' | 'dev';
@@ -28,6 +56,8 @@ export interface WebEnv {
   SITE_PASSWORD?: string;
   /** The key the partner site signs dev passes with (a Wrangler secret, DEV only; shyden-labs/ShyTalk#263). */
   DEV_PASS_SECRET?: string;
+  /** The ShyDesk whose support piece this environment's support pages embed (a var; shyden-labs/ShyTalk#37). */
+  SHYDESK_ORIGIN?: string;
   /** The environment's own D1 database, `shytalk-<env>`, marked with its name; absent only in a Worker deployed without it, which serves nothing. */
   DB?: D1Like;
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -162,7 +192,7 @@ export async function handle(request: Request, env: WebEnv): Promise<Response> {
   // A WebSocket upgrade's 101 carries the socket, which a copied Response would lose; it carries no page to protect.
   if (answer.status === 101) return answer;
   const response = new Response(answer.body, answer);
-  response.headers.set('content-security-policy', CONTENT_SECURITY_POLICY);
+  response.headers.set('content-security-policy', policyFor(new URL(request.url).pathname, env.SHYDESK_ORIGIN));
   response.headers.set('x-content-type-options', 'nosniff');
   response.headers.set('referrer-policy', 'strict-origin-when-cross-origin');
   return response;
