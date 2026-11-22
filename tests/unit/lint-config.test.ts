@@ -28,7 +28,8 @@ describe('eslint.config.js', () => {
     expect(config.map((c) => c.languageOptions?.parserOptions).filter((p) => p !== undefined)).toEqual([
       // The Astro config sits outside tsconfig (its import pulls in browser-typed declarations),
       // so the project service lints it under a default project rather than skipping it.
-      { projectService: { allowDefaultProject: ['apps/web/astro.config.mjs'] }, tsconfigRootDir: ROOT },
+      // So does the app's Jest config, outside every tsconfig (plan 6.1 Task 1).
+      { projectService: { allowDefaultProject: ['apps/web/astro.config.mjs', 'apps/app/jest.config.js'] }, tsconfigRootDir: ROOT },
     ]);
   });
 
@@ -77,6 +78,9 @@ describe('eslint.config.js', () => {
       '.superpowers/',
       'apps/web/dist/',
       'apps/web/.astro/',
+      'apps/app/coverage/',
+      'apps/app/ios/',
+      'apps/app/android/',
     ]);
   });
 });

@@ -21,10 +21,13 @@
  * person's commits before pushing them.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runIfEntry } from './cli.ts';
+
+/** The app's own npm project, whose installed packages a commit holding it shares too. */
+const APP = 'apps/app';
 
 /** The npm scripts run on each commit, in this order. */
 export const CHECKS = ['format:check', 'lint', 'typecheck'];
@@ -73,6 +76,8 @@ function checkCommit(sha: string, root: string, git: (args: string[]) => string)
   git(['worktree', 'add', '--detach', dir, sha]);
   try {
     symlinkSync(join(root, 'node_modules'), join(dir, 'node_modules'));
+    // The app is its own npm project (plan 6.1 Task 1); a commit that holds it is checked with its packages too.
+    if (existsSync(join(dir, APP))) symlinkSync(join(root, APP, 'node_modules'), join(dir, APP, 'node_modules'));
     for (const check of CHECKS) {
       try {
         execFileSync('npm', ['run', '--silent', check], { cwd: dir, stdio: 'inherit' }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)

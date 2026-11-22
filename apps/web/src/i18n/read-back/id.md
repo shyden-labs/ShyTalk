@@ -131,3 +131,13 @@
 | holding.building | The ShyTalk app is being built now. | Aplikasi ShyTalk sedang dibangun saat ini. | The ShyTalk app is currently under construction. |
 | holding.comingSoon | Coming soon | Segera hadir | Coming soon |
 | holding.languages | Language | Bahasa | Language |
+| staff.floor.title | Oldest app version allowed | Versi aplikasi tertua yang diizinkan | The oldest version of the application allowed |
+| staff.floor.android | Android | Android | Android |
+| staff.floor.ios | iPhone | iPhone | iPhone |
+| staff.floor.noneSet | None set | Belum diatur | Not yet set |
+| staff.floor.save | Save | Simpan | Save |
+| staff.floor.lower | That is lower than the current floor ({current}). Older apps will be let back in. | Itu lebih rendah dari batas saat ini ({current}). Aplikasi yang lebih lama akan diizinkan masuk kembali. | That's lower than the current limit ( {current} ). Older apps will be allowed back in. |
+| staff.floor.setAnyway | Set it anyway | Simpan saja | Just save it |
+| staff.floor.notAllowed | Only staff who manage the app version can use this page. | Hanya staf yang mengelola versi aplikasi yang dapat menggunakan halaman ini. | Only staff who manage the application version can use this page. |
+| staff.floor.saved | Saved. | Disimpan. | Saved. |
+| staff.floor.failed | That did not save. Try again. | Gagal menyimpan. Coba lagi. | Failed to save. Please try again. |

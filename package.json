@@ -7,9 +7,9 @@
     "node": "^24.16.0 || >=26.3.0"
   },
   "scripts": {
-    "test:unit": "vitest run --config vitest.unit.config.ts",
-    "test:coverage": "vitest run --config vitest.unit.config.ts --coverage.enabled",
-    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tests/smoke && tsc --noEmit -p apps/web/scripts",
+    "test:unit": "npm --prefix apps/app test && vitest run --config vitest.unit.config.ts",
+    "test:coverage": "npm --prefix apps/app run test:coverage && vitest run --config vitest.unit.config.ts --coverage.enabled",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tests/smoke && tsc --noEmit -p apps/web/scripts && npm --prefix apps/app run typecheck",
     "build:web": "astro build --root apps/web",
     "test:smoke": "playwright test -c tests/smoke",
     "test:phones": "node tests/phones/phone-smoke.ts",

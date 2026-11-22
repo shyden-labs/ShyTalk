@@ -145,5 +145,19 @@
     "building": "ShyTalk 应用正在开发中。",
     "comingSoon": "即将推出",
     "languages": "语言"
+  },
+  "staff": {
+    "floor": {
+      "title": "允许的最旧应用版本",
+      "android": "Android",
+      "ios": "iPhone",
+      "noneSet": "未设置",
+      "save": "保存",
+      "lower": "这低于当前的最低版本（{current}）。较旧的应用将重新被允许使用。",
+      "setAnyway": "仍然保存",
+      "notAllowed": "只有管理应用版本的工作人员才能使用此页面。",
+      "saved": "已保存。",
+      "failed": "未能保存，请重试。"
+    }
   }
 }

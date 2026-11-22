@@ -32,7 +32,10 @@ const CODE = 'steps.classify.outputs.scope != docs-only';
 
 describe('package.json', () => {
   it.each([
-    ['typecheck', 'tsc --noEmit -p . && tsc --noEmit -p tests/smoke && tsc --noEmit -p apps/web/scripts'],
+    [
+      'typecheck',
+      'tsc --noEmit -p . && tsc --noEmit -p tests/smoke && tsc --noEmit -p apps/web/scripts && npm --prefix apps/app run typecheck',
+    ],
     ['build:web', 'astro build --root apps/web'],
     ['test:smoke', 'playwright test -c tests/smoke'],
     ['lint', 'eslint --max-warnings 0 .'],
@@ -55,6 +58,8 @@ describe('ci.yml', () => {
       { name: '', run: '', if: '' },
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
+      // The app's own install (plan 6.1 Task 1).
+      { name: '', run: 'node ../../scripts/npm-ci.ts', if: '' },
       { name: 'Audit', run: 'node scripts/audit.ts', if: '' },
       { name: 'Typecheck', run: 'npm run typecheck', if: CODE },
       { name: 'Lint', run: 'npm run lint', if: CODE },
@@ -72,6 +77,7 @@ describe('ci.yml', () => {
       { name: '', run: '', if: '' },
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
+      { name: '', run: 'node ../../scripts/npm-ci.ts', if: '' },
       { name: '', run: 'npm run test:coverage', if: CODE },
     ]);
   });

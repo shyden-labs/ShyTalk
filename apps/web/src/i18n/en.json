@@ -145,5 +145,19 @@
     "building": "The ShyTalk app is being built now.",
     "comingSoon": "Coming soon",
     "languages": "Language"
+  },
+  "staff": {
+    "floor": {
+      "title": "Oldest app version allowed",
+      "android": "Android",
+      "ios": "iPhone",
+      "noneSet": "None set",
+      "save": "Save",
+      "lower": "That is lower than the current floor ({current}). Older apps will be let back in.",
+      "setAnyway": "Set it anyway",
+      "notAllowed": "Only staff who manage the app version can use this page.",
+      "saved": "Saved.",
+      "failed": "That did not save. Try again."
+    }
   }
 }

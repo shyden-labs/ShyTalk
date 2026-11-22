@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { d1UiStore, publishUi } from '../../workers/web/src/app/ui.ts';
 import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER, SITE_USER } from '../../packages/environment/index.ts';
 import { localDev } from './d1.ts';
+import { appHeaders } from '../support/app-headers.ts';
 
 /**
  * The live announcement against the real runtime (plan 4 Task 8,
@@ -65,7 +66,7 @@ async function open(): Promise<{ socket: WebSocket; messages: unknown[]; next: (
   const messages: unknown[] = [];
   const waiting: ((message: unknown) => void)[] = [];
   const socket = new WebSocket(`ws://127.0.0.1:${String(worker.port)}/api/app/live`, {
-    headers: { [DOOR_SECRET_HEADER]: DOOR_SECRET, [SITE_PASSWORD_HEADER]: SITE_PASSWORD },
+    headers: { ...appHeaders('android', '1.0.0'), [DOOR_SECRET_HEADER]: DOOR_SECRET, [SITE_PASSWORD_HEADER]: SITE_PASSWORD },
   });
   socket.addEventListener('message', (event) => {
     const message = JSON.parse(String(event.data)) as unknown;

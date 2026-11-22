@@ -36,6 +36,8 @@ export default {
         'coverage/**',
         '.superpowers/**',
         '**/.wrangler/**',
+        // The app is measured by its own Jest run at the same 100% (apps/app/jest.config.js; plan 6.1 Task 1).
+        'apps/app/**',
       ],
       reporter: ['text-summary', 'lcov'],
       thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },

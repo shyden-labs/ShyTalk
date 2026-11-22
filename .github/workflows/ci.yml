@@ -44,6 +44,9 @@ jobs:
       - id: classify
         run: node scripts/change-scope.ts
       - run: node scripts/npm-ci.ts
+      # The app is its own npm project (plan 6.1 Task 1): its packages too, for the type check, lint and its tests.
+      - run: node ../../scripts/npm-ci.ts
+        working-directory: apps/app
       # Any known vulnerability, of any severity and dev dependencies included, fails the build (shyden-labs/repo-template#156).
       - name: Audit
         run: node scripts/audit.ts
@@ -83,6 +86,9 @@ jobs:
       - id: classify
         run: node scripts/change-scope.ts
       - run: node scripts/npm-ci.ts
+      # The app is its own npm project (plan 6.1 Task 1): its packages too, for the type check, lint and its tests.
+      - run: node ../../scripts/npm-ci.ts
+        working-directory: apps/app
       - if: steps.classify.outputs.scope != 'docs-only'
         run: npm run test:coverage
 

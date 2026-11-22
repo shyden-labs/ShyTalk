@@ -62,6 +62,9 @@ jobs:
         with:
           node-version: ${{ steps.node.outputs.version }}
       - run: node scripts/npm-ci.ts
+      # The app is its own npm project (plan 6.1 Task 1): its packages too, for the type check, lint and its tests.
+      - run: node ../../scripts/npm-ci.ts
+        working-directory: apps/app
       - run: npm run test:coverage
       # The migrations are SQLite (Cloudflare D1), a dialect SonarCloud does not have, so `.sql` is not read as
       # Oracle PL/SQL. The home-page smoke test's checks are all expect.soft, which SonarCloud does not count as
@@ -74,11 +77,11 @@ jobs:
           args: >
             -Dsonar.organization=${{ inputs.organization }}
             -Dsonar.projectKey=${{ inputs.project-key }}
-            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info,apps/app/coverage/lcov.info
             -Dsonar.sources=.
-            -Dsonar.tests=tests
-            -Dsonar.exclusions=tests/**
-            -Dsonar.coverage.exclusions=eslint.config.js,vitest.unit.config.ts
+            -Dsonar.tests=tests,apps/app/tests
+            -Dsonar.exclusions=tests/**,apps/app/tests/**
+            -Dsonar.coverage.exclusions=eslint.config.js,vitest.unit.config.ts,apps/app/jest.config.js
             -Dsonar.plsql.file.suffixes=.plsql
             -Dsonar.issue.ignore.multicriteria=softChecks
             -Dsonar.issue.ignore.multicriteria.softChecks.ruleKey=typescript:S2699

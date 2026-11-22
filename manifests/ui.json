@@ -1,13 +1,187 @@
 {
-  "schemaVersion": 1,
-  "navigation": [{ "id": "rooms", "route": "rooms", "label": "nav.rooms" }],
-  "tokens": { "color.primary": "#2F6FEB", "radius.card": 12 },
-  "switches": { "rooms.voice": true },
+  "schemaVersion": 2,
+  "navigation": [
+    {
+      "id": "home",
+      "route": "home",
+      "label": "nav.home"
+    }
+  ],
+  "tokens": {
+    "color.background": "#16123A",
+    "color.text": "#FFFFFF",
+    "color.primary": "#A78BFA",
+    "color.onPrimary": "#16123A",
+    "size.s": 8,
+    "size.m": 16,
+    "size.l": 24,
+    "radius.card": 12
+  },
+  "switches": {
+    "rooms.voice": true
+  },
   "copy": {
-    "en": { "nav.rooms": "Rooms" },
-    "id": { "nav.rooms": "Ruang" },
-    "th": { "nav.rooms": "ห้อง" },
-    "vi": { "nav.rooms": "Phòng" },
-    "zh": { "nav.rooms": "房间" }
+    "en": {
+      "nav.home": "Home",
+      "home.logo": "ShyTalk",
+      "home.title": "Welcome to ShyTalk",
+      "home.roomsSoon": "Rooms, where you talk, are coming soon.",
+      "sealed.update.title": "Update ShyTalk",
+      "sealed.update.body": "This version of ShyTalk is no longer supported. Update it to keep going.",
+      "sealed.update.button": "Update"
+    },
+    "id": {
+      "nav.home": "Beranda",
+      "home.logo": "ShyTalk",
+      "home.title": "Selamat datang di ShyTalk",
+      "home.roomsSoon": "Ruang obrolan, tempat kamu berbicara, segera hadir.",
+      "sealed.update.title": "Perbarui ShyTalk",
+      "sealed.update.body": "Versi ShyTalk ini tidak lagi didukung. Perbarui untuk melanjutkan.",
+      "sealed.update.button": "Perbarui"
+    },
+    "th": {
+      "nav.home": "หน้าแรก",
+      "home.logo": "ShyTalk",
+      "home.title": "ยินดีต้อนรับสู่ ShyTalk",
+      "home.roomsSoon": "ห้องสำหรับพูดคุยจะมาเร็วๆ นี้",
+      "sealed.update.title": "อัปเดต ShyTalk",
+      "sealed.update.body": "ShyTalk เวอร์ชันนี้ไม่ได้รับการสนับสนุนแล้ว อัปเดตเพื่อใช้งานต่อ",
+      "sealed.update.button": "อัปเดต"
+    },
+    "vi": {
+      "nav.home": "Trang chủ",
+      "home.logo": "ShyTalk",
+      "home.title": "Chào mừng bạn đến với ShyTalk",
+      "home.roomsSoon": "Phòng, nơi bạn trò chuyện, sắp ra mắt.",
+      "sealed.update.title": "Cập nhật ShyTalk",
+      "sealed.update.body": "Phiên bản ShyTalk này không còn được hỗ trợ. Hãy cập nhật để tiếp tục.",
+      "sealed.update.button": "Cập nhật"
+    },
+    "zh": {
+      "nav.home": "首页",
+      "home.logo": "ShyTalk",
+      "home.title": "欢迎来到 ShyTalk",
+      "home.roomsSoon": "房间（你在这里交谈）即将推出。",
+      "sealed.update.title": "更新 ShyTalk",
+      "sealed.update.body": "此版本的 ShyTalk 已不再受支持。请更新以继续使用。",
+      "sealed.update.button": "立即更新"
+    }
+  },
+  "screens": {
+    "home": {
+      "compact": {
+        "id": "root",
+        "part": "column",
+        "props": {
+          "gap": "size.m",
+          "padding": "size.l",
+          "align": "center"
+        },
+        "children": [
+          {
+            "id": "logo",
+            "part": "image",
+            "props": {
+              "asset": "brand.logo",
+              "label": "home.logo"
+            }
+          },
+          {
+            "id": "title",
+            "part": "text",
+            "props": {
+              "copy": "home.title",
+              "style": "title"
+            }
+          },
+          {
+            "id": "soon",
+            "part": "card",
+            "props": {
+              "padding": "size.m"
+            },
+            "children": [
+              {
+                "id": "soonText",
+                "part": "text",
+                "props": {
+                  "copy": "home.roomsSoon",
+                  "style": "body"
+                }
+              }
+            ]
+          },
+          {
+            "id": "version",
+            "part": "text",
+            "props": {
+              "bind": "app.version",
+              "style": "caption"
+            }
+          }
+        ]
+      },
+      "expanded": {
+        "id": "root",
+        "part": "row",
+        "props": {
+          "gap": "size.l",
+          "padding": "size.l",
+          "align": "center"
+        },
+        "children": [
+          {
+            "id": "logo",
+            "part": "image",
+            "props": {
+              "asset": "brand.logo",
+              "label": "home.logo"
+            }
+          },
+          {
+            "id": "words",
+            "part": "column",
+            "props": {
+              "gap": "size.m"
+            },
+            "children": [
+              {
+                "id": "title",
+                "part": "text",
+                "props": {
+                  "copy": "home.title",
+                  "style": "title"
+                }
+              },
+              {
+                "id": "soon",
+                "part": "card",
+                "props": {
+                  "padding": "size.m"
+                },
+                "children": [
+                  {
+                    "id": "soonText",
+                    "part": "text",
+                    "props": {
+                      "copy": "home.roomsSoon",
+                      "style": "body"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "version",
+                "part": "text",
+                "props": {
+                  "bind": "app.version",
+                  "style": "caption"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
   }
 }

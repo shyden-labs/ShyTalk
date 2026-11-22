@@ -4,3 +4,6 @@ coverage/
 # Docs are prose, kept as written: their exact wording is pinned by tests, and
 # reflowed emphasis or padded tables would change the text those tests read.
 *.md
+# The app's native projects, made by Expo's prebuild and git-ignored in apps/app.
+apps/app/ios/
+apps/app/android/

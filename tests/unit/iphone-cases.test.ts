@@ -151,8 +151,8 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
     vi: 20,
     'zh-Hans': 20,
   },
-  // Two per page: its title is not empty, and its preview is as wanted (shyden-labs/ShyTalk#198).
-  'every page carries its link preview': { en: 30, id: 30, th: 24, vi: 24, 'zh-Hans': 24 },
+  // Two per page: its title is not empty, and its preview is as wanted (shyden-labs/ShyTalk#198); staff/floor added two (plan 6.1 Task 4).
+  'every page carries its link preview': { en: 32, id: 32, th: 26, vi: 26, 'zh-Hans': 26 },
 };
 
 describe('the iPhone cases', () => {

@@ -1,3 +1,4 @@
+import { appHeaders } from '../support/app-headers.ts';
 import { describe, it, expect, vi } from 'vitest';
 import {
   Announcer,
@@ -280,7 +281,8 @@ function d1(version: number | null): NonNullable<WebEnv['DB']> {
 
 const live = (headers: Record<string, string> = { upgrade: 'websocket' }): Request =>
   new Request('https://site.example.test/api/app/live', {
-    headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, ...headers },
+    // The app holds the socket open, naming its platform and version (plan 6.1 Task 3).
+    headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, ...appHeaders('android', '1.0.0'), ...headers },
   });
 
 function webEnv(version: number | null, announcer?: ReturnType<typeof fakeNamespace>): WebEnv {
@@ -332,7 +334,7 @@ describe('GET /api/app/live', () => {
     const fake = fakeNamespace(() => upgraded);
     const request = new Request('https://site.example.test/api/app/live', {
       method: 'POST',
-      headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, upgrade: 'websocket' },
+      headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, ...appHeaders('android', '1.0.0'), upgrade: 'websocket' },
     });
     const response = await handle(request, webEnv(5, fake));
     expect(response.status).toBe(405);
@@ -362,7 +364,8 @@ const ANNOUNCE_SECRET = 'the-announce-secret';
 const announceCall = (headers: Record<string, string> = { authorization: `Bearer ${ANNOUNCE_SECRET}` }, method = 'POST'): Request =>
   new Request('https://site.example.test/api/app/live/announce', {
     method,
-    headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, ...headers },
+    // The app holds the socket open, naming its platform and version (plan 6.1 Task 3).
+    headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, ...appHeaders('android', '1.0.0'), ...headers },
   });
 
 const withSecret = (env: WebEnv): WebEnv => ({ ...env, ANNOUNCE_SECRET });

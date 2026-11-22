@@ -1,3 +1,4 @@
+import { PLATFORM_HEADER } from '../support/app-headers.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { handle, type WebEnv } from '../../workers/web/src/web.ts';
 import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER } from '../../packages/environment/index.ts';
@@ -44,7 +45,9 @@ const signInReady: WebEnv = {
 };
 
 const get = (path: string): Request =>
-  new Request(`https://site.example.test${path}`, { headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD } });
+  new Request(`https://site.example.test${path}`, {
+    headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, [PLATFORM_HEADER]: 'web' },
+  });
 
 describe('the app API renews the session cookie', () => {
   it.each(['/api/app/health', '/api/app/unknown'])('passes %s through the renewal, with the request and the answer', async (path) => {

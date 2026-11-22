@@ -22,6 +22,9 @@ export type Refusable = {
   globals: Owner;
 };
 
+/** The real entries each install replaced, by the globals it marked. */
+const originals = new WeakMap<Owner, [owner: Owner, key: string, real: unknown][]>();
+
 type Entry = [owner: Owner, key: string, entry: string, reason: string];
 
 const CHILD_PROCESS = ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork'];
@@ -82,7 +85,9 @@ export function installRefusals(m: Refusable, who: () => string): string[] {
       throw new Error(`unit refusals cannot refuse ${entry}: it is not a function here`);
     }
   }
+  const kept: [owner: Owner, key: string, real: unknown][] = [];
   for (const [owner, key, entry, reason] of planned) {
+    kept.push([owner, key, Reflect.get(owner, key)]);
     const refused = function refused(): never {
       throw new Error(
         `unit test refused: "${who()}" called ${entry}. ${reason} Stand the dependency in, or move the case to an integration suite (#92).`,
@@ -91,6 +96,23 @@ export function installRefusals(m: Refusable, who: () => string): string[] {
     Object.defineProperty(owner, key, { value: refused, writable: true, configurable: true });
   }
   const refusedEntries = planned.map(([, , entry]) => entry);
-  Object.defineProperty(m.globals, REFUSED, { value: refusedEntries });
+  Object.defineProperty(m.globals, REFUSED, { value: refusedEntries, configurable: true });
+  originals.set(m.globals, kept);
   return refusedEntries;
+}
+
+/**
+ * Puts back every entry `installRefusals` replaced on these modules and removes
+ * its mark. Jest runs a few fast files inside its own process, where Node's
+ * modules are Jest's too, so apps/app lifts the refusals as each file ends
+ * (plan 6.1 Task 1). Fails closed when nothing was installed here.
+ */
+export function restoreRefusals(m: Refusable): void {
+  const kept = originals.get(m.globals);
+  if (!kept) throw new Error('unit refusals were not installed here, so there is nothing to restore');
+  for (const [owner, key, real] of kept) {
+    Object.defineProperty(owner, key, { value: real, writable: true, configurable: true });
+  }
+  originals.delete(m.globals);
+  Reflect.deleteProperty(m.globals, REFUSED);
 }

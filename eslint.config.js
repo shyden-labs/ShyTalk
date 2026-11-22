@@ -10,15 +10,26 @@ import tseslint from 'typescript-eslint';
 export default defineConfig(
   // .superpowers/ is the git-ignored private working folder: never committed, so never linted.
   // apps/web/dist/ and apps/web/.astro/ are the site's build output and generated types.
-  { ignores: ['coverage/', 'node_modules/', '.superpowers/', 'apps/web/dist/', 'apps/web/.astro/'] },
+  {
+    ignores: [
+      'coverage/',
+      'node_modules/',
+      '.superpowers/',
+      'apps/web/dist/',
+      'apps/web/.astro/',
+      'apps/app/coverage/',
+      'apps/app/ios/',
+      'apps/app/android/',
+    ],
+  },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   {
     languageOptions: {
       parserOptions: {
         // The Astro config is outside tsconfig (its import pulls in browser-typed declarations),
-        // so it is linted under a default project rather than skipped.
-        projectService: { allowDefaultProject: ['apps/web/astro.config.mjs'] },
+        // so it is linted under a default project rather than skipped; so is the app's Jest config.
+        projectService: { allowDefaultProject: ['apps/web/astro.config.mjs', 'apps/app/jest.config.js'] },
         tsconfigRootDir: import.meta.dirname,
       },
     },

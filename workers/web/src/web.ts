@@ -10,7 +10,8 @@
  */
 import { createMarkerGuard, requireDoorSecret, requireSitePassword, type D1Like } from '../../../packages/environment/index.ts';
 import { handleClosedTesting, isClosedTesting, type ClosedTestingEnv } from './api/closed-testing.ts';
-import { handleAppApi, isAppApi } from './app/router.ts';
+import { handleAppApi, handleStaff, isAppApi } from './app/router.ts';
+import { STAFF_API_PREFIX } from './staff/floor-route.ts';
 import { devPassGate } from './dev-pass-gate.ts';
 import { json } from './http.ts';
 import type { RateLimit } from './app/sign-in.ts';
@@ -48,6 +49,8 @@ export interface WebEnv {
   TOTP_KEY?: string;
   /** Closed-testing applications per IP (wrangler.json `ratelimits`); absent, the form answers 503. */
   APPLY_LIMIT?: RateLimit;
+  /** Who holds the staff admin role (a Wrangler secret: comma-separated user ids; plan 6.1 Task 4); absent, no one does. */
+  STAFF_ADMINS?: string;
 }
 
 const ENVIRONMENTS = new Set(['prod', 'test', 'dev']);
@@ -152,6 +155,7 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   if (wrongStore) return wrongStore;
   const { pathname } = new URL(request.url);
   if (isAppApi(pathname)) return handleAppApi(request, env);
+  if (pathname.startsWith(STAFF_API_PREFIX)) return handleStaff(request, env);
   if (pathname.startsWith('/api/')) return handleApi(request, env);
   return env.ASSETS.fetch(request);
 }

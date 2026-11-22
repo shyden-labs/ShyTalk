@@ -19,7 +19,7 @@ describe('call', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/app/email/start', {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-shytalk-platform': 'web' },
       body: '{"email":"a@example.test"}',
     });
   });
@@ -28,14 +28,33 @@ describe('call', () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{"pending":null}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     await expect(call('recovery', undefined, 'GET')).resolves.toEqual({ status: 200, body: { pending: null } });
-    expect(fetchMock).toHaveBeenCalledWith('/api/app/recovery', { method: 'GET', credentials: 'same-origin' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/app/recovery', {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { 'x-shytalk-platform': 'web' },
+    });
+  });
+
+  it('reaches the staff API under its own base (plan 6.1 Task 4)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"permissions":[]}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(call('me', undefined, 'GET', '/api/staff/')).resolves.toEqual({ status: 200, body: { permissions: [] } });
+    expect(fetchMock).toHaveBeenCalledWith('/api/staff/me', {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { 'x-shytalk-platform': 'web' },
+    });
   });
 
   it('sends a DELETE with no body', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     await call('sessions/s-1', undefined, 'DELETE');
-    expect(fetchMock).toHaveBeenCalledWith('/api/app/sessions/s-1', { method: 'DELETE', credentials: 'same-origin' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/app/sessions/s-1', {
+      method: 'DELETE',
+      credentials: 'same-origin',
+      headers: { 'x-shytalk-platform': 'web' },
+    });
   });
 
   it('answers a body that is not JSON as null', async () => {

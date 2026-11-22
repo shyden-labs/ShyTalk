@@ -1,0 +1,115 @@
+---
+import Base from '../layouts/Base.astro';
+import { localePath, t, type Locale } from '../i18n/t.ts';
+
+/**
+ * The staff page for the oldest app version allowed on each platform (plan 6.1
+ * Task 4, shyden-labs/ShyTalk#77 AC 4). Staff with `floor.manage` see and set
+ * the Android and iPhone floors; a lower floor asks first. Signed out, it goes
+ * to the sign-in page as the account page does.
+ */
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const line = (key: string): string => t(locale, `staff.floor.${key}`);
+const keys = ['noneSet', 'lower', 'notAllowed', 'saved', 'failed'];
+const data = Object.fromEntries(keys.map((key) => [`data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`, line(key)]));
+const platforms = [
+  { id: 'android', label: line('android') },
+  { id: 'ios', label: line('ios') },
+];
+---
+
+<Base locale={locale} title={line('title')}>
+  <h1>{line('title')}</h1>
+  <noscript><p>{t(locale, 'account.noScript')}</p></noscript>
+  <div id="staff-floor" data-sign-in={localePath(locale, '/sign-in/')} {...data}>
+    <p id="floor-not-allowed" data-testid="floor-not-allowed" hidden>{line('notAllowed')}</p>
+    <section id="floor-rows" hidden>
+      {
+        platforms.map(({ id, label }) => (
+          <form data-platform={id} data-testid={`floor-${id}`}>
+            <h2>{label}</h2>
+            <p data-testid={`floor-${id}-current`} />
+            <p>
+              <label>
+                {label} <input name="version" inputmode="decimal" autocomplete="off" required pattern="\d+\.\d+\.\d+" />
+              </label>
+              <button type="submit">{line('save')}</button>
+            </p>
+          </form>
+        ))
+      }
+    </section>
+    <p id="floor-answer" role="status" hidden></p>
+    <p><button id="floor-force" type="button" hidden>{line('setAnyway')}</button></p>
+  </div>
+</Base>
+
+<script>
+  import { call } from '../account/api.ts';
+  import { floorMessage } from '../staff/answers.ts';
+
+  type Platform = 'android' | 'ios';
+  type Floors = Record<Platform, string | null>;
+
+  const STAFF = '/api/staff/';
+  const root = document.querySelector<HTMLElement>('#staff-floor');
+  const answer = document.querySelector<HTMLElement>('#floor-answer');
+  const force = document.querySelector<HTMLButtonElement>('#floor-force');
+  const text = (key: string): string => root?.dataset[key] ?? '';
+  let pending: { platform: Platform; version: string } | null = null;
+
+  const say = (words: string): void => {
+    if (!answer) return;
+    answer.textContent = words;
+    answer.hidden = false;
+  };
+
+  function showFloors(floors: Floors): void {
+    for (const platform of ['android', 'ios'] as const) {
+      const current = document.querySelector(`[data-testid="floor-${platform}-current"]`);
+      if (current) current.textContent = floors[platform] ?? text('noneSet');
+    }
+    document.querySelector<HTMLElement>('#floor-rows')?.removeAttribute('hidden');
+  }
+
+  async function load(): Promise<void> {
+    const answered = await call('floor', undefined, 'GET', STAFF);
+    const message = floorMessage(answered.status);
+    if (message === 'signedOut') return location.assign(text('signIn') || '/');
+    if (message === 'notAllowed') return void document.querySelector('#floor-not-allowed')?.removeAttribute('hidden');
+    if (message !== 'saved') return say(text('failed'));
+    showFloors(answered.body as Floors);
+  }
+
+  async function save(platform: Platform, version: string, forced: boolean): Promise<void> {
+    if (force) force.hidden = true;
+    const answered = await call('floor', { platform, version, force: forced }, 'POST', STAFF);
+    const message = floorMessage(answered.status);
+    if (message === 'signedOut') return location.assign(text('signIn') || '/');
+    if (message === 'lower') {
+      pending = { platform, version };
+      say(text('lower').replace('{current}', (answered.body as { current: string }).current));
+      if (force) force.hidden = false;
+      return;
+    }
+    say(text(message));
+    if (message === 'saved') await load();
+  }
+
+  if (root && answer) {
+    void load();
+    for (const form of document.querySelectorAll<HTMLFormElement>('form[data-platform]')) {
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const version = new FormData(form).get('version');
+        void save(form.dataset['platform'] as Platform, typeof version === 'string' ? version.trim() : '', false);
+      });
+    }
+    force?.addEventListener('click', () => {
+      if (pending !== null) void save(pending.platform, pending.version, true);
+    });
+  }
+</script>

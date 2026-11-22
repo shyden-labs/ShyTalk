@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, symlinkSync } from 'node:fs';
 import { CHECKS, commitsToCheck, main, parseUpdates, type Update } from '../../scripts/pre-push.ts';
 
 // git, npm and the temporary worktree are stood in: a unit test starts no process and writes no file.
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 vi.mock('node:fs', async (original) => ({
   ...(await original<typeof import('node:fs')>()),
+  existsSync: vi.fn(),
   mkdtempSync: vi.fn(),
   readFileSync: vi.fn(),
   symlinkSync: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock('node:fs', async (original) => ({
 const run = vi.mocked(execFileSync);
 const mkdtemp = vi.mocked(mkdtempSync);
 const symlink = vi.mocked(symlinkSync);
+const exists = vi.mocked(existsSync);
 const read = vi.mocked(readFileSync);
 
 /**
@@ -98,6 +100,7 @@ describe('main', () => {
     run.mockReset();
     mkdtemp.mockReset().mockReturnValue(TMP);
     symlink.mockReset();
+    exists.mockReset().mockReturnValue(false);
     calls = [];
     err = [];
     vi.spyOn(process.stderr, 'write').mockImplementation((t) => (err.push(String(t)), true));
@@ -116,6 +119,20 @@ describe('main', () => {
     );
     expect(calls.find(({ args }) => args[1] === 'add')).toEqual({ cmd: 'git', args: ['worktree', 'add', '--detach', TMP, B], cwd: ROOT });
     expect(symlink).toHaveBeenCalledWith(`${ROOT}/node_modules`, `${TMP}/node_modules`);
+  });
+
+  // The app is its own npm project (plan 6.1 Task 1): its checks need its own installed packages too.
+  it("shares the app's installed packages with a commit that holds the app", () => {
+    serve(`${B}\n`);
+    exists.mockImplementation((path) => path === `${TMP}/apps/app`);
+    main(['origin', 'url'], line(B, A));
+    expect(symlink).toHaveBeenCalledWith(`${ROOT}/apps/app/node_modules`, `${TMP}/apps/app/node_modules`);
+  });
+
+  it('links no app packages into a commit without the app', () => {
+    serve(`${B}\n`);
+    main(['origin', 'url'], line(B, A));
+    expect(symlink.mock.calls).toEqual([[`${ROOT}/node_modules`, `${TMP}/node_modules`]]);
   });
 
   it('runs format, lint and typecheck, in that order', () => {

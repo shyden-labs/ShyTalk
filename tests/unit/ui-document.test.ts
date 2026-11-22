@@ -19,26 +19,26 @@ describe('the UI document: shape (AC1)', () => {
 
   it('refuses a copy key missing in id, naming key and locale', () => {
     const doc = manifest();
-    doc.copy.id = {};
-    expect(errors(doc)).toEqual(['copy.id is missing nav.rooms']);
+    delete doc.copy.id['nav.home'];
+    expect(errors(doc)).toEqual(['copy.id is missing nav.home']);
   });
 
   it('refuses a copy key missing in th, naming key and locale', () => {
     const doc = manifest();
-    doc.copy.th = {};
-    expect(errors(doc)).toEqual(['copy.th is missing nav.rooms']);
+    delete doc.copy.th['nav.home'];
+    expect(errors(doc)).toEqual(['copy.th is missing nav.home']);
   });
 
   it('refuses a copy key missing in vi, naming key and locale', () => {
     const doc = manifest();
-    doc.copy.vi = {};
-    expect(errors(doc)).toEqual(['copy.vi is missing nav.rooms']);
+    delete doc.copy.vi['nav.home'];
+    expect(errors(doc)).toEqual(['copy.vi is missing nav.home']);
   });
 
   it('refuses a copy key missing in zh, naming key and locale', () => {
     const doc = manifest();
-    doc.copy.zh = {};
-    expect(errors(doc)).toEqual(['copy.zh is missing nav.rooms']);
+    delete doc.copy.zh['nav.home'];
+    expect(errors(doc)).toEqual(['copy.zh is missing nav.home']);
   });
 
   it('refuses a copy key that English lacks, naming key and locale', () => {
@@ -55,26 +55,22 @@ describe('the UI document: shape (AC1)', () => {
 
   it('refuses a locale outside the five', () => {
     const doc = manifest() as unknown as { copy: Record<string, unknown> };
-    doc.copy.fr = { 'nav.rooms': 'Salons' };
+    doc.copy.fr = { 'nav.home': 'Accueil' };
     expect(errors(doc)).toEqual(['copy.fr: Invalid key: Expected never but received "fr"']);
   });
 
   it('refuses an empty line', () => {
     const doc = manifest();
-    doc.copy.en['nav.rooms'] = '';
-    expect(errors(doc)).toEqual(['copy.en.nav.rooms: Invalid length: Expected >=1 but received 0']);
+    doc.copy.en['nav.home'] = '';
+    expect(errors(doc)).toEqual(['copy.en.nav.home: Invalid length: Expected >=1 but received 0']);
   });
 
   it('refuses an unknown top-level key', () => {
     expect(errors({ ...manifest(), extra: 1 })).toEqual(['extra: Invalid key: Expected never but received "extra"']);
   });
 
-  it('refuses screens until Part 2', () => {
-    expect(errors({ ...manifest(), screens: [] })).toEqual(['screens: Invalid key: Expected never but received "screens"']);
-  });
-
-  it('refuses a schema version other than 1', () => {
-    expect(errors({ ...manifest(), schemaVersion: 2 })).toEqual(['schemaVersion: Invalid type: Expected 1 but received 2']);
+  it('refuses a schema version other than 2', () => {
+    expect(errors({ ...manifest(), schemaVersion: 3 })).toEqual(['schemaVersion: Invalid type: Expected 2 but received 3']);
   });
 
   it('refuses something that is not a document', () => {
@@ -83,33 +79,33 @@ describe('the UI document: shape (AC1)', () => {
 
   it('refuses a navigation label that is not a copy key', () => {
     const doc = manifest();
-    doc.navigation.push({ id: 'x', route: 'rooms', label: 'Profile' });
+    doc.navigation.push({ id: 'x', route: 'home', label: 'Profile' });
     expect(errors(doc)).toEqual(['navigation x label Profile is not a copy key']);
   });
 
   it('refuses two navigation items with one id', () => {
     const doc = manifest();
-    doc.navigation.push({ id: 'rooms', route: 'rooms', label: 'nav.rooms' });
-    expect(errors(doc)).toEqual(['navigation rooms is listed twice']);
+    doc.navigation.push({ id: 'home', route: 'home', label: 'nav.home' });
+    expect(errors(doc)).toEqual(['navigation home is listed twice']);
   });
 });
 
 describe('the UI document: sealed routes (AC2)', () => {
-  it.each(['ban', 'suspension', 'app-lock', 'cohort', 'unsafe-device', 'delete-account'])(
+  it.each(['ban', 'suspension', 'app-lock', 'cohort', 'unsafe-device', 'delete-account', 'update'])(
     'refuses the sealed route %s in navigation',
     (route) => {
       const doc = manifest();
-      doc.navigation.push({ id: 'x', route, label: 'nav.rooms' });
+      doc.navigation.push({ id: 'x', route, label: 'nav.home' });
       expect(errors(doc)).toEqual([`navigation x names sealed route ${route}`]);
     },
   );
 
   // A menu links only to routes the server knows as menu routes: a sealed screen under any other name is refused too.
-  it.each(['account-deletion', 'age-group', 'settings/app-lock', 'App-Lock', '/ban', 'ban/', ' ban', 'unsafe_device', 'ban?x=1', 'rooms/'])(
+  it.each(['account-deletion', 'age-group', 'settings/app-lock', 'App-Lock', '/ban', 'ban/', ' ban', 'unsafe_device', 'ban?x=1', 'home/'])(
     'refuses the route %j, which is not a menu route',
     (route) => {
       const doc = manifest();
-      doc.navigation.push({ id: 'x', route, label: 'nav.rooms' });
+      doc.navigation.push({ id: 'x', route, label: 'nav.home' });
       expect(errors(doc)).toEqual([`navigation x names route ${route}, which is not a menu route`]);
     },
   );
@@ -120,7 +116,7 @@ describe('the UI document: sealed routes (AC2)', () => {
 
   it('lets a menu route through', () => {
     const doc = manifest();
-    doc.navigation.push({ id: 'x', route: 'rooms', label: 'nav.rooms' });
+    doc.navigation.push({ id: 'x', route: 'home', label: 'nav.home' });
     expect(errors(doc)).toEqual([]);
   });
 });
