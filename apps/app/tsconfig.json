@@ -1,0 +1,20 @@
+{
+  "//": "The app and its unit tests (plan 6.1 Task 1), on Expo's base settings with the repo's strictness. skipLibCheck stays Expo's default: expo-router 58.0.32's declarations do not type-check against react-native 0.88.1's (84 errors, all in node_modules, measured 2026-11-22). The root tsconfig.json leaves apps/app to this file.",
+  "extends": "expo/tsconfig.base.json",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "app.config.ts", "tests/**/*.ts", "tests/**/*.tsx"]
+}

@@ -17,8 +17,8 @@ export default defineConfig(
     languageOptions: {
       parserOptions: {
         // The Astro config is outside tsconfig (its import pulls in browser-typed declarations),
-        // so it is linted under a default project rather than skipped.
-        projectService: { allowDefaultProject: ['apps/web/astro.config.mjs'] },
+        // so it is linted under a default project rather than skipped; so is the app's Jest config.
+        projectService: { allowDefaultProject: ['apps/web/astro.config.mjs', 'apps/app/jest.config.js'] },
         tsconfigRootDir: import.meta.dirname,
       },
     },

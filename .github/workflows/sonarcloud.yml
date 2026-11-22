@@ -74,11 +74,11 @@ jobs:
           args: >
             -Dsonar.organization=${{ inputs.organization }}
             -Dsonar.projectKey=${{ inputs.project-key }}
-            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info,apps/app/coverage/lcov.info
             -Dsonar.sources=.
-            -Dsonar.tests=tests
-            -Dsonar.exclusions=tests/**
-            -Dsonar.coverage.exclusions=eslint.config.js,vitest.unit.config.ts
+            -Dsonar.tests=tests,apps/app/tests
+            -Dsonar.exclusions=tests/**,apps/app/tests/**
+            -Dsonar.coverage.exclusions=eslint.config.js,vitest.unit.config.ts,apps/app/jest.config.js
             -Dsonar.plsql.file.suffixes=.plsql
             -Dsonar.issue.ignore.multicriteria=softChecks
             -Dsonar.issue.ignore.multicriteria.softChecks.ruleKey=typescript:S2699

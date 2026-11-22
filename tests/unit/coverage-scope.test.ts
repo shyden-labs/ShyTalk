@@ -40,6 +40,7 @@ const LEFT_OUT: [RegExp, string][] = [
   [/^tests\/smoke\/[a-z]+\.config\.ts$/, 'Playwright configuration, run by Playwright'],
   [/^tests\/integration\//, 'the integration suite and its helpers, which no unit test runs and CI runs whole'],
   [/\.d\.ts$/, 'type declarations, which hold no code'],
+  [/^apps\/app\//, 'the app, measured by its own Jest run at the same threshold (apps/app/jest.config.js)'],
   [/^(?:vitest\.[a-z]+\.config\.ts|eslint\.config\.js|apps\/web\/astro\.config\.mjs)$/, 'tool configuration, run by the tools'],
 ];
 

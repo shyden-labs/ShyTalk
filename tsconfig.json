@@ -33,6 +33,7 @@
     "apps/web/.astro",
     "apps/web/astro.config.mjs",
     "apps/web/scripts",
-    "tests/smoke"
+    "tests/smoke",
+    "apps/app"
   ]
 }

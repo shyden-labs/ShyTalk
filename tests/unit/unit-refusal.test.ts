@@ -9,7 +9,7 @@ import http2 from 'node:http2';
 import { createRequire } from 'node:module';
 import net from 'node:net';
 import tls from 'node:tls';
-import { REFUSED, installRefusals, testName } from '../setup/refusals.ts';
+import { REFUSED, installRefusals, restoreRefusals, testName } from '../setup/refusals.ts';
 
 /**
  * A unit test starts no process and opens no connection (shyden-labs/repo-template#92). The refusals are installed by tests/setup/unit-refusal.ts
@@ -159,6 +159,32 @@ describe('installRefusals, on stand-in modules', () => {
     const m = standIns();
     Reflect.deleteProperty(m.dns.Resolver.prototype, 'resolveTxt');
     expect(() => installRefusals(m, vi.fn().mockReturnValue('t'))).toThrow('found no lookup, resolve or reverse function on dns.Resolver#');
+  });
+});
+
+// Jest runs a few fast app test files inside its own process, where Node's modules are shared with Jest itself, so
+// apps/app lifts the refusals when each file ends (plan 6.1 Task 1); a Vitest worker never needs to.
+describe('restoreRefusals, on stand-in modules', () => {
+  it.each(ENTRIES)('puts back the real %s', (_entry, at, key) => {
+    const m = standIns();
+    const real: unknown = Reflect.get(at(m), key);
+    installRefusals(m, () => 't');
+    restoreRefusals(m);
+    expect(Reflect.get(at(m), key)).toBe(real);
+  });
+
+  it('removes its mark, so a later install refuses everything again', () => {
+    const m = standIns();
+    installRefusals(m, () => 't');
+    restoreRefusals(m);
+    expect(Reflect.has(m.globals, REFUSED)).toBe(false);
+    expect(installRefusals(m, () => 't')).toEqual(ENTRIES.map(([entry]) => entry));
+  });
+
+  it('fails closed when nothing was installed on these modules', () => {
+    expect(() => {
+      restoreRefusals(standIns());
+    }).toThrow('unit refusals were not installed here, so there is nothing to restore');
   });
 });
 

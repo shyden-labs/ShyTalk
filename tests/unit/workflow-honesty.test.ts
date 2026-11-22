@@ -76,10 +76,11 @@ describe('sonarcloud.yml', () => {
   it('scans the source code, with tests as tests', () => {
     expect(read('sonarcloud.yml')).toContain(
       [
-        '            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info',
+        // The app's Jest run writes its own report (plan 6.1 Task 1).
+        '            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info,apps/app/coverage/lcov.info',
         '            -Dsonar.sources=.',
-        '            -Dsonar.tests=tests',
-        '            -Dsonar.exclusions=tests/**',
+        '            -Dsonar.tests=tests,apps/app/tests',
+        '            -Dsonar.exclusions=tests/**,apps/app/tests/**',
       ].join('\n'),
     );
   });
