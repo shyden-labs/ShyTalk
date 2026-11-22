@@ -97,6 +97,8 @@ describe('app sign-in config', () => {
         MAIL_FROM: MAIL[name as keyof typeof MAIL].from,
         // Production holds until the full release; dev and test never do (shyden-labs/ShyTalk#261).
         ...(name === 'prod' ? { HOLDING: 'true' } : {}),
+        // The ShyDesk each environment's support pages embed (shyden-labs/ShyTalk#37): TEST uses the live desk.
+        SHYDESK_ORIGIN: name === 'dev' ? 'https://shydesk.shydesk-non-prod.workers.dev' : 'https://shydesk.dpdns.org',
       });
     },
   );
