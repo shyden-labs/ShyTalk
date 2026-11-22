@@ -37,7 +37,9 @@
   },
   "overrides": {
     "test-exclude": "8.0.0",
-    "jsdom": "31.0.1"
+    "jsdom": "31.0.1",
+    "minimatch": "11.0.3",
+    "glob": "14.0.6"
   },
   "allowScripts": {
     "fsevents": false,
