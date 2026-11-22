@@ -35,6 +35,17 @@ describe('call', () => {
     });
   });
 
+  it('reaches the staff API under its own base (plan 6.1 Task 4)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"permissions":[]}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(call('me', undefined, 'GET', '/api/staff/')).resolves.toEqual({ status: 200, body: { permissions: [] } });
+    expect(fetchMock).toHaveBeenCalledWith('/api/staff/me', {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { 'x-shytalk-platform': 'web' },
+    });
+  });
+
   it('sends a DELETE with no body', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);

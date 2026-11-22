@@ -78,6 +78,9 @@ describe('eslint.config.js', () => {
       '.superpowers/',
       'apps/web/dist/',
       'apps/web/.astro/',
+      'apps/app/coverage/',
+      'apps/app/ios/',
+      'apps/app/android/',
     ]);
   });
 });

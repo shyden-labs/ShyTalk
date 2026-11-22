@@ -11,14 +11,15 @@ export interface Answer {
   body: unknown;
 }
 
-export async function call(path: string, body?: unknown, method: 'GET' | 'POST' | 'DELETE' = 'POST'): Promise<Answer> {
+/** `path` under `base`: the app API by default, or `/api/staff/` for the staff pages. */
+export async function call(path: string, body?: unknown, method: 'GET' | 'POST' | 'DELETE' = 'POST', base = '/api/app/'): Promise<Answer> {
   const init: RequestInit =
     method === 'POST'
       ? { method, credentials: 'same-origin', headers: { 'content-type': 'application/json', ...PLATFORM }, body: JSON.stringify(body) }
       : { method, credentials: 'same-origin', headers: PLATFORM };
   let response: Response;
   try {
-    response = await fetch(`/api/app/${path}`, init);
+    response = await fetch(`${base}${path}`, init);
   } catch {
     return { status: 0, body: null };
   }

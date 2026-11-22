@@ -131,3 +131,13 @@
 | holding.building | The ShyTalk app is being built now. | ShyTalk 应用正在开发中。 | The ShyTalk app is under development. |
 | holding.comingSoon | Coming soon | 即将推出 | coming soon |
 | holding.languages | Language | 语言 | language |
+| staff.floor.title | Oldest app version allowed | 允许的最旧应用版本 | The oldest allowed application version |
+| staff.floor.android | Android | Android | Android |
+| staff.floor.ios | iPhone | iPhone | iPhone |
+| staff.floor.noneSet | None set | 未设置 | Not set |
+| staff.floor.save | Save | 保存 | save |
+| staff.floor.lower | That is lower than the current floor ({current}). Older apps will be let back in. | 这低于当前的最低版本（{current}）。较旧的应用将重新被允许使用。 | This is below the current minimum version ( {current} ). Older applications will be allowed to be used again. |
+| staff.floor.setAnyway | Set it anyway | 仍然保存 | Still save |
+| staff.floor.notAllowed | Only staff who manage the app version can use this page. | 只有管理应用版本的工作人员才能使用此页面。 | This page is only accessible to staff who manage application versions. |
+| staff.floor.saved | Saved. | 已保存。 | Saved. |
+| staff.floor.failed | That did not save. Try again. | 未能保存，请重试。 | Failed to save, please try again. |

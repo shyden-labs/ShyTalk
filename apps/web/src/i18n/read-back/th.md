@@ -131,3 +131,13 @@
 | holding.building | The ShyTalk app is being built now. | แอป ShyTalk กำลังอยู่ระหว่างการสร้าง | The ShyTalk app is currently under development. |
 | holding.comingSoon | Coming soon | เปิดตัวเร็ว ๆ นี้ | Launching soon. |
 | holding.languages | Language | ภาษา | language |
+| staff.floor.title | Oldest app version allowed | เวอร์ชันแอปที่เก่าที่สุดที่อนุญาต | The oldest app version allowed. |
+| staff.floor.android | Android | Android | Android |
+| staff.floor.ios | iPhone | iPhone | iPhone |
+| staff.floor.noneSet | None set | ยังไม่ได้ตั้งค่า | Not yet configured. |
+| staff.floor.save | Save | บันทึก | record |
+| staff.floor.lower | That is lower than the current floor ({current}). Older apps will be let back in. | เวอร์ชันนี้ต่ำกว่าขั้นต่ำปัจจุบัน ({current}) แอปเวอร์ชันเก่าจะกลับมาใช้งานได้อีก | This version is below the current minimum ( {current} ). Older app versions will be available again. |
+| staff.floor.setAnyway | Set it anyway | ยืนยันการตั้งค่า | Confirm settings |
+| staff.floor.notAllowed | Only staff who manage the app version can use this page. | เฉพาะเจ้าหน้าที่ที่ดูแลเวอร์ชันแอปเท่านั้นที่ใช้หน้านี้ได้ | Only the staff responsible for maintaining the app version have access to this page. |
+| staff.floor.saved | Saved. | บันทึกแล้ว | Recorded. |
+| staff.floor.failed | That did not save. Try again. | บันทึกไม่สำเร็จ ลองอีกครั้ง | Saving failed. Try again. |

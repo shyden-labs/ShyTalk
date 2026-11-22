@@ -261,6 +261,18 @@ describe('/api/app/sign-in and sign-out', () => {
     }
   });
 
+  it('/api/staff/* reaches the staff routes (plan 6.1 Task 4): a POST to me answers 405', async () => {
+    const response = await handle(postTo('/api/staff/me', '{}'), ready());
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe('GET');
+  });
+
+  it('without the sign-in settings, /api/staff/me answers 503 sign_in_unavailable', async () => {
+    const response = await handle(get('/api/staff/me'), env('dev'));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'sign_in_unavailable' });
+  });
+
   it.each(['/api/app/sign-in', '/api/app/sign-in/github', '/api/app/sign-in/google/extra'])('%s is not a route: 404', async (path) => {
     const response = await handle(postTo(path, '{}'), ready());
     expect(response.status).toBe(404);

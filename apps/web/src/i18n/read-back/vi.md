@@ -131,3 +131,13 @@
 | holding.building | The ShyTalk app is being built now. | Ứng dụng ShyTalk đang được xây dựng. | The ShyTalk app is currently under development. |
 | holding.comingSoon | Coming soon | Sắp ra mắt | Coming soon |
 | holding.languages | Language | Ngôn ngữ | Language |
+| staff.floor.title | Oldest app version allowed | Phiên bản ứng dụng cũ nhất được phép | The oldest version of the application is allowed. |
+| staff.floor.android | Android | Android | Android |
+| staff.floor.ios | iPhone | iPhone | iPhone |
+| staff.floor.noneSet | None set | Chưa thiết lập | Not yet set up |
+| staff.floor.save | Save | Lưu | Save |
+| staff.floor.lower | That is lower than the current floor ({current}). Older apps will be let back in. | Phiên bản này thấp hơn mức tối thiểu hiện tại ({current}). Các ứng dụng cũ hơn sẽ lại được phép hoạt động. | This version is lower than the current minimum ( {current} ). Older applications will be allowed to run again. |
+| staff.floor.setAnyway | Set it anyway | Vẫn đặt mức thấp hơn | Still set at a lower level. |
+| staff.floor.notAllowed | Only staff who manage the app version can use this page. | Chỉ nhân viên quản lý phiên bản ứng dụng mới dùng được trang này. | Only application version control staff can use this page. |
+| staff.floor.saved | Saved. | Đã lưu. | Saved. |
+| staff.floor.failed | That did not save. Try again. | Không lưu được. Hãy thử lại. | Unable to save. Please try again. |

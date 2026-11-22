@@ -145,5 +145,19 @@
     "building": "Aplikasi ShyTalk sedang dibangun saat ini.",
     "comingSoon": "Segera hadir",
     "languages": "Bahasa"
+  },
+  "staff": {
+    "floor": {
+      "title": "Versi aplikasi tertua yang diizinkan",
+      "android": "Android",
+      "ios": "iPhone",
+      "noneSet": "Belum diatur",
+      "save": "Simpan",
+      "lower": "Itu lebih rendah dari batas saat ini ({current}). Aplikasi yang lebih lama akan diizinkan masuk kembali.",
+      "setAnyway": "Simpan saja",
+      "notAllowed": "Hanya staf yang mengelola versi aplikasi yang dapat menggunakan halaman ini.",
+      "saved": "Disimpan.",
+      "failed": "Gagal menyimpan. Coba lagi."
+    }
   }
 }

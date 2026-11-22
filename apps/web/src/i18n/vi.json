@@ -145,5 +145,19 @@
     "building": "Ứng dụng ShyTalk đang được xây dựng.",
     "comingSoon": "Sắp ra mắt",
     "languages": "Ngôn ngữ"
+  },
+  "staff": {
+    "floor": {
+      "title": "Phiên bản ứng dụng cũ nhất được phép",
+      "android": "Android",
+      "ios": "iPhone",
+      "noneSet": "Chưa thiết lập",
+      "save": "Lưu",
+      "lower": "Phiên bản này thấp hơn mức tối thiểu hiện tại ({current}). Các ứng dụng cũ hơn sẽ lại được phép hoạt động.",
+      "setAnyway": "Vẫn đặt mức thấp hơn",
+      "notAllowed": "Chỉ nhân viên quản lý phiên bản ứng dụng mới dùng được trang này.",
+      "saved": "Đã lưu.",
+      "failed": "Không lưu được. Hãy thử lại."
+    }
   }
 }
