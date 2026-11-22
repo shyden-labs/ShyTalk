@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
 import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
-import { SUPPORT_PATH } from '../../apps/web/src/support.ts';
+import { SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
+import { SMOKE_TICKET_TOKEN } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
 import { wantedFacts } from '../support/holding-facts.ts';
 import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
@@ -1192,5 +1193,32 @@ describe('the iPhone link-preview cases (shyden-labs/ShyTalk#198)', () => {
   it.each(previews)('%s: fails naming why when the run names no environment', async (title, c) => {
     vi.stubEnv('SITE_ENVIRONMENT', '');
     await expect(c.run(safari(langOf(title)))).rejects.toThrow('SITE_ENVIRONMENT is unset');
+  });
+});
+
+describe('the ticket page (shyden-labs/ShyTalk#37 AC1)', () => {
+  const ticket = IPHONE_CASES.find(({ title }) => title.startsWith('the ticket page opens the ticket view'));
+  const TOKEN_ADDRESS = `${TICKET_PATH}#t=${SMOKE_TICKET_TOKEN}`;
+
+  it('is in the suite once', () => {
+    expect(IPHONE_CASES.filter(({ title }) => title.startsWith('the ticket page opens the ticket view'))).toHaveLength(1);
+  });
+
+  it('passes on the site as it should be, running the 8 checks its twin runs on CI', async () => {
+    const page = safari('en');
+    const check = countingCheck();
+    await expect(ticket?.run(page, check)).resolves.toBeUndefined();
+    expect(page.visited).toEqual([TOKEN_ADDRESS]);
+    expect(check.count).toBe(8);
+  });
+
+  it('fails naming the address when the page loses the emailed token', async () => {
+    const page = safari('en', { url: () => Promise.resolve(`${DEV}${TICKET_PATH}`) });
+    await expect(ticket?.run(page)).rejects.toThrow(TICKET_PATH);
+  });
+
+  it('fails when the page shows one language but sits at another language’s address', async () => {
+    const page = safari('th', { url: () => Promise.resolve(`${DEV}${TOKEN_ADDRESS}`) });
+    await expect(ticket?.run(page)).rejects.toThrow(`/th${TICKET_PATH}`);
   });
 });
