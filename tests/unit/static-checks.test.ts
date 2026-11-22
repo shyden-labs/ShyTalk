@@ -58,6 +58,8 @@ describe('ci.yml', () => {
       { name: '', run: '', if: '' },
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
+      // The app's own install (plan 6.1 Task 1).
+      { name: '', run: 'node ../../scripts/npm-ci.ts', if: '' },
       { name: 'Audit', run: 'node scripts/audit.ts', if: '' },
       { name: 'Typecheck', run: 'npm run typecheck', if: CODE },
       { name: 'Lint', run: 'npm run lint', if: CODE },
@@ -75,6 +77,7 @@ describe('ci.yml', () => {
       { name: '', run: '', if: '' },
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
+      { name: '', run: 'node ../../scripts/npm-ci.ts', if: '' },
       { name: '', run: 'npm run test:coverage', if: CODE },
     ]);
   });

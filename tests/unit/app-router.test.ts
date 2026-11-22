@@ -3,6 +3,7 @@ import { CONTENT_SECURITY_POLICY, handle, type WebEnv } from '../../workers/web/
 import { json } from '../../workers/web/src/http.ts';
 import { isAppApi } from '../../workers/web/src/app/router.ts';
 import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER, type D1Like } from '../../packages/environment/index.ts';
+import { PLATFORM_HEADER, appHeaders } from '../support/app-headers.ts';
 
 /** The dev and test site password (shyden-labs/ShyTalk#262), given in its header as the app gives it beside a bearer token. */
 const PASSWORD = 'the-site-password';
@@ -30,8 +31,35 @@ function env(environment: WebEnv['ENVIRONMENT_NAME']): WebEnv {
   };
 }
 
+/** A call as the website makes it: it names platform `web`, which has no version floor (plan 6.1 Task 3). */
 const get = (path: string): Request =>
-  new Request(`https://site.example.test${path}`, { headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD } });
+  new Request(`https://site.example.test${path}`, {
+    headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, [PLATFORM_HEADER]: 'web' },
+  });
+
+describe('/api/app/* and the version floor (plan 6.1 Task 3, shyden-labs/ShyTalk#77)', () => {
+  it('answers an app naming no platform 426 before it reads the UI store', async () => {
+    const db = { ...marked('dev'), batch: () => Promise.reject(new Error('the UI store was read')), exec: () => Promise.resolve() };
+    const response = await handle(
+      new Request('https://site.example.test/api/app/ui', { headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD } }),
+      { ...env('dev'), DB: db },
+    );
+    expect(response.status).toBe(426);
+    expect(await response.json()).toEqual({ error: 'update_required', floor: '0.0.0' });
+  });
+});
+
+describe('/api/app/* with no full D1 bound', () => {
+  it('holds an app to no floor, so the call goes on to its route', async () => {
+    const response = await handle(
+      new Request('https://site.example.test/api/app/unknown', {
+        headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, ...appHeaders('android', '1.0.0') },
+      }),
+      env('dev'),
+    );
+    expect(response.status).toBe(404);
+  });
+});
 
 describe('/api/app/*', () => {
   it.each(['dev', 'test', 'prod'] as const)('health answers 200 naming %s, never cached', async (environment) => {
@@ -102,7 +130,7 @@ describe('/api/app/sign-in and sign-out', () => {
     new Request(`https://site.example.test${path}`, {
       method: 'POST',
       body,
-      headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD },
+      headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, [PLATFORM_HEADER]: 'web' },
     });
 
   it.each(['/api/app/sign-in/google', '/api/app/sign-in/apple'])(

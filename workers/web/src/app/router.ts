@@ -10,6 +10,7 @@ import { getAuth } from '../auth/better-auth.ts';
 import { handleSignIn, handleSignOut, type Provider } from './sign-in.ts';
 import { handleAnnounce, handleLive } from './announcer.ts';
 import { d1UiStore, handleUi } from './ui.ts';
+import { checkFloor, d1FloorStore, type FloorStore } from './floor.ts';
 import { emailDeps, handleEmailStart, handleEmailVerify } from './email-routes.ts';
 import { handleRecoveryCancel, handleRecoveryPending } from './recovery.ts';
 import { handleCodeSignIn, type CodeKind } from './code-sign-in.ts';
@@ -120,8 +121,16 @@ const EXACT = new Map<string, Route>([
 
 const methods = withSignIn((request, ready) => handleMethods(request, ready, sessionReader(authFor(ready))));
 
+/** The floors in D1 (plan 6.1 Task 3); with no full D1 bound, no platform has a floor, and web.ts answers 503 before this. */
+function floorStore(env: WebEnv): FloorStore {
+  const { DB } = env;
+  return DB !== undefined && isD1(DB) ? d1FloorStore(DB) : { floor: () => Promise.resolve(null) };
+}
+
 /** The app API's answer, with the website's session cookie renewed where sign-in is configured (shyden-labs/ShyTalk#184). */
 export async function handleAppApi(request: Request, env: WebEnv): Promise<Response> {
+  const tooOld = await checkFloor(request, floorStore(env));
+  if (tooOld !== null) return tooOld;
   const answer = await routeAppApi(request, env);
   const ready = readyForSignIn(env);
   return ready === null ? answer : renewSessionCookie(request, answer, authFor(ready));
