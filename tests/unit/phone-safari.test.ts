@@ -37,6 +37,7 @@ function appium(logs: Record<string, unknown[][]> = {}, executes: unknown[] = []
   let visit = '';
   const call: WebDriverCall = (method, path, body) => {
     calls.push([method, path, body]);
+    if (method === 'GET' && path.endsWith('/url')) return Promise.resolve(`${BASE}/th/support/ticket?phone-smoke=v1#t=abc`);
     if (path.endsWith('/url')) visit = new URL((body as { url: string }).url).searchParams.get('phone-smoke') ?? '';
     if (path.endsWith('/se/log'))
       return Promise.resolve(
@@ -658,5 +659,14 @@ describe('safariPage: tap and waitForText', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('safariPage: url', () => {
+  it('answers the address Safari shows, as Playwright’s page.url() does, so a page’s own redirect is seen (#37)', async () => {
+    const fake = appium();
+    const page = safariPage(fake.call, 's1', BASE, undefined, () => 'v1');
+    await expect(page.url()).resolves.toBe(`${BASE}/th/support/ticket?phone-smoke=v1#t=abc`);
+    expect(fake.calls).toEqual([['GET', '/session/s1/url', undefined]]);
   });
 });

@@ -1,7 +1,7 @@
 ---
-import { t, type Locale } from '../i18n/t.ts';
+import { localePath, t, type Locale } from '../i18n/t.ts';
 import { LEGAL_DOCS, legalPath } from '../legal/legal.ts';
-import { SUPPORT_EMAIL } from '../site.ts';
+import { SUPPORT_PATH } from '../support.ts';
 
 interface Props {
   locale: Locale;
@@ -20,6 +20,6 @@ const { locale } = Astro.props;
         </li>
       ))
     }
-    <li>{t(locale, 'footer.contact')}: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
+    <li><a data-support href={localePath(locale, SUPPORT_PATH)}>{t(locale, 'footer.contact')}</a></li>
   </ul>
 </footer>

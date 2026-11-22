@@ -13,7 +13,7 @@
 | footer.terms | Terms | Điều khoản sử dụng | Terms of Use |
 | footer.privacy | Privacy | Quyền riêng tư | Privacy |
 | footer.guidelines | Community guidelines | Nguyên tắc cộng đồng | Community principles |
-| footer.contact | Contact | Liên hệ | Contact |
+| footer.contact | Contact support | Liên hệ hỗ trợ | Contact support |
 | home.title | ShyTalk | ShyTalk | SyTalk |
 | home.heading | Learn languages and cultures by talking | Học ngôn ngữ và văn hóa qua trò chuyện | Learn language and culture through conversation. |
 | home.intro | ShyTalk is a friendly place to practise a language out loud and discover the cultures behind it. | ShyTalk là một nơi thân thiện để luyện nói một ngôn ngữ thành tiếng và khám phá những nền văn hóa đằng sau nó. | ShyTalk is a friendly place to practice speaking a language aloud and explore the cultures behind it. |
@@ -131,3 +131,8 @@
 | holding.building | The ShyTalk app is being built now. | Ứng dụng ShyTalk đang được xây dựng. | The ShyTalk app is currently under development. |
 | holding.comingSoon | Coming soon | Sắp ra mắt | Coming soon |
 | holding.languages | Language | Ngôn ngữ | Language |
+| support.title | Support | Hỗ trợ | Support |
+| support.intro | Ask a question or report a problem. The reply comes by email. | Đặt câu hỏi hoặc báo cáo sự cố. Câu trả lời sẽ được gửi qua email. | Ask a question or report a problem. The answer will be sent via email. |
+| support.englishForm | The form is in English for now. | Hiện tại biểu mẫu chỉ có bằng tiếng Anh. | Currently, the form is only available in English. |
+| support.ticketTitle | Your support request | Yêu cầu hỗ trợ bạn đã gửi | The support request you submitted |
+| support.noScript | The support form needs JavaScript. Turn it on to send a request. | Biểu mẫu hỗ trợ cần JavaScript. Hãy bật JavaScript để gửi yêu cầu. | The support form requires JavaScript. Please enable JavaScript to submit requests. |

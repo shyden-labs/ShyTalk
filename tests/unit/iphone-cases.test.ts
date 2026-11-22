@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
-import { LANGUAGE_NAMES, LOCALES, langTag, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
+import { SMOKE_TICKET_TOKEN } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
 import { wantedFacts } from '../support/holding-facts.ts';
 import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
@@ -77,6 +79,13 @@ const VIEWPORT = 'width=device-width, initial-scale=1, interactive-widget=resize
 const DEV = (JSON.parse(readFileSync('workers/web/wrangler.json', 'utf8')) as { env: { dev: { vars: { SITE_ORIGIN: string } } } }).env.dev
   .vars.SITE_ORIGIN;
 
+/** The footer's support link (shyden-labs/ShyTalk#37 AC3). */
+const SUPPORT_LINK = 'footer a[data-support]';
+
+/** The ShyDesk the dev build embeds, from the Worker's settings (shyden-labs/ShyTalk#37). */
+const SHYDESK = (JSON.parse(readFileSync('workers/web/wrangler.json', 'utf8')) as { env: { dev: { vars: { SHYDESK_ORIGIN: string } } } })
+  .env.dev.vars.SHYDESK_ORIGIN;
+
 /** Safari showing the site as it should be, in `lang`; `broken` replaces one answer. */
 function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { visited: string[] } {
   const locale = LOCALE[lang] ?? 'en';
@@ -89,6 +98,7 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
       return Promise.resolve(path.endsWith('/no-such-page') ? 404 : 200);
     },
     freshStart: () => Promise.resolve(),
+    url: () => Promise.resolve(`${DEV}${visited.at(-1) ?? '/'}`),
     cspRefusals: () => Promise.resolve([]),
     attribute: (selector, name) =>
       Promise.resolve(
@@ -98,12 +108,34 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
             : lang
           : selector === VIEWPORT_TAG && name === 'content'
             ? VIEWPORT
-            : selector === 'a[href^="mailto:"]' && name === 'href'
-              ? `mailto:${SUPPORT_EMAIL}`
-              : null,
+            : selector === 'footer a[data-support]' && name === 'href'
+              ? localePath(locale, SUPPORT_PATH)
+              : selector === 'shydesk-support'
+                ? ((
+                    {
+                      product: 'shytalk',
+                      view: visited.at(-1)?.includes('/ticket') === true ? 'ticket' : 'contact',
+                      lang: locale,
+                    } as Record<string, string>
+                  )[name] ?? null)
+                : selector === 'script[src$="/embed.js"]' && name === 'src'
+                  ? `${SHYDESK}/embed.js`
+                  : selector === 'a[href^="mailto:"]' && name === 'href'
+                    ? `mailto:${SUPPORT_EMAIL}`
+                    : null,
       ),
     isVisible: (selector) => Promise.resolve(selector !== '[data-english-only]:not([hidden])'),
-    text: (selector) => Promise.resolve(selectorText(locale, selector, visited.at(-1)?.endsWith('/holding') ?? false)),
+    text: (selector) => {
+      const at = visited.at(-1) ?? '';
+      if (selector === 'footer a[data-support]') return Promise.resolve(t(locale, 'footer.contact'));
+      if (at.includes('/support')) {
+        const line = /data-line="(\w+)"/.exec(selector)?.[1];
+        return Promise.resolve(
+          t(locale, line === undefined ? (at.includes('/ticket') ? 'support.ticketTitle' : 'support.title') : `support.${line}`),
+        );
+      }
+      return Promise.resolve(selectorText(locale, selector, at.endsWith('/holding')));
+    },
     rows: (selector) =>
       Promise.resolve(
         selector.startsWith('nav[aria-label=')
@@ -121,7 +153,8 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     waitForText: () => Promise.resolve(),
     visibleLinks: (name) => Promise.resolve(name === t(locale, 'home.apply') || name === SUPPORT_EMAIL ? 1 : 0),
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
-    count: () => Promise.resolve(0),
+    count: (selector) =>
+      Promise.resolve(selector === 'shydesk-support[view="ticket"]' && visited.at(-1)?.includes('/ticket') === true ? 1 : 0),
     axeViolations: () => Promise.resolve([]),
     previewFacts: (path) => Promise.resolve(wantedPreview(DEV, locale, lang, path, `${path} · ShyTalk`)),
     ...broken,
@@ -139,7 +172,10 @@ const cases = (start: string) => IPHONE_CASES.filter(({ title }) => kind(title).
  * 22 more on the privacy page for what an account keeps (#171), read from this PR's smoke-totals.
  */
 const CI_ASSERTIONS: Record<string, Record<string, number>> = {
-  'the home page answers 200': { en: 50, id: 50, th: 53, vi: 53, 'zh-Hans': 53 },
+  // Two more for the footer's support link (shyden-labs/ShyTalk#37 AC3): counted, to be confirmed on CI's smoke-totals.
+  'the home page answers 200': { en: 52, id: 52, th: 55, vi: 55, 'zh-Hans': 55 },
+  // The support page (#37 AC1): counted from its Playwright twin, to be confirmed on CI's smoke-totals.
+  "the support page shows its heading and lines, and embeds ShyDesk's contact piece": { en: 13, id: 13, th: 13, vi: 13, 'zh-Hans': 13 },
   'an unknown page answers 404': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
   'the closed-testing page shows the form and every statement': { en: 17, id: 17, th: 17, vi: 17, 'zh-Hans': 17 },
   'the confirm page passes axe, and its button with a dead link shows link-expired': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
@@ -152,7 +188,8 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
     'zh-Hans': 20,
   },
   // Two per page: its title is not empty, and its preview is as wanted (shyden-labs/ShyTalk#198).
-  'every page carries its link preview': { en: 30, id: 30, th: 24, vi: 24, 'zh-Hans': 24 },
+  // Four more each for the support and ticket pages (#37), to be confirmed on CI's smoke-totals.
+  'every page carries its link preview': { en: 34, id: 34, th: 28, vi: 28, 'zh-Hans': 28 },
 };
 
 describe('the iPhone cases', () => {
@@ -374,7 +411,16 @@ describe('the iPhone cases', () => {
       await c.run(
         safari(lang, {
           // The home page is in this language; a legal page, once a link was tapped, in its legal language.
-          attribute: (selector) => Promise.resolve(selector === VIEWPORT_TAG ? VIEWPORT : tapped.length === 0 ? lang : legalLocale(locale)),
+          attribute: (selector) =>
+            Promise.resolve(
+              selector === VIEWPORT_TAG
+                ? VIEWPORT
+                : selector === SUPPORT_LINK
+                  ? localePath(locale, SUPPORT_PATH)
+                  : tapped.length === 0
+                    ? lang
+                    : legalLocale(locale),
+            ),
           tap: (selector) => {
             tapped.push(selector);
             return Promise.resolve();
@@ -400,7 +446,16 @@ describe('the iPhone cases', () => {
     let tapped = false;
     const page = safari(lang, {
       tap: () => ((tapped = true), Promise.resolve()),
-      attribute: (selector) => Promise.resolve(selector === VIEWPORT_TAG ? VIEWPORT : tapped ? 'fr' : lang),
+      attribute: (selector) =>
+        Promise.resolve(
+          selector === VIEWPORT_TAG
+            ? VIEWPORT
+            : selector === SUPPORT_LINK
+              ? localePath(LOCALE[langOf(c.title)] ?? 'en', SUPPORT_PATH)
+              : tapped
+                ? 'fr'
+                : lang,
+        ),
     });
     await expect(c.run(page)).rejects.toThrow(/'fr'/);
   });
@@ -982,7 +1037,7 @@ describe('the English-only note on a legal page (shyden-labs/ShyTalk#190)', () =
   it('waits for the note the page reveals after it loads, as Playwright’s toBeVisible() waits', async () => {
     const check = countingCheck();
     await run(delayedNote(1_000), check);
-    expect(check.count).toBe(53);
+    expect(check.count).toBe(55);
   });
 
   it('fails naming the note when it is not shown within 15 s', async () => {
@@ -1138,5 +1193,39 @@ describe('the iPhone link-preview cases (shyden-labs/ShyTalk#198)', () => {
   it.each(previews)('%s: fails naming why when the run names no environment', async (title, c) => {
     vi.stubEnv('SITE_ENVIRONMENT', '');
     await expect(c.run(safari(langOf(title)))).rejects.toThrow('SITE_ENVIRONMENT is unset');
+  });
+});
+
+describe('the ticket page (shyden-labs/ShyTalk#37 AC1)', () => {
+  const ticket = IPHONE_CASES.find(({ title }) => title.startsWith('the ticket page opens the ticket view'));
+  const TOKEN_ADDRESS = `${TICKET_PATH}#t=${SMOKE_TICKET_TOKEN}`;
+
+  it('is in the suite once', () => {
+    expect(IPHONE_CASES.filter(({ title }) => title.startsWith('the ticket page opens the ticket view'))).toHaveLength(1);
+  });
+
+  it('passes on the site as it should be, running the 8 checks its twin runs on CI', async () => {
+    const page = safari('en');
+    const check = countingCheck();
+    await expect(ticket?.run(page, check)).resolves.toBeUndefined();
+    expect(page.visited).toEqual([TOKEN_ADDRESS]);
+    expect(check.count).toBe(8);
+  });
+
+  it('reads a page language the site does not have as English, the language-free page staying where it is', async () => {
+    const page = safari('fr');
+    const check = countingCheck();
+    await expect(ticket?.run(page, check)).resolves.toBeUndefined();
+    expect(check.count).toBe(8);
+  });
+
+  it('fails naming the address when the page loses the emailed token', async () => {
+    const page = safari('en', { url: () => Promise.resolve(`${DEV}${TICKET_PATH}`) });
+    await expect(ticket?.run(page)).rejects.toThrow(TICKET_PATH);
+  });
+
+  it('fails when the page shows one language but sits at another language’s address', async () => {
+    const page = safari('th', { url: () => Promise.resolve(`${DEV}${TOKEN_ADDRESS}`) });
+    await expect(ticket?.run(page)).rejects.toThrow(`/th${TICKET_PATH}`);
   });
 });

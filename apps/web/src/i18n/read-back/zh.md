@@ -13,7 +13,7 @@
 | footer.terms | Terms | 条款 | Terms and Conditions |
 | footer.privacy | Privacy | 隐私 | privacy |
 | footer.guidelines | Community guidelines | 社区准则 | Community Guidelines |
-| footer.contact | Contact | 联系方式 | Contact information |
+| footer.contact | Contact support | 联系客服 | Contact customer service |
 | home.title | ShyTalk | ShyTalk | ShyTalk |
 | home.heading | Learn languages and cultures by talking | 在交谈中学习语言和文化 | Learn language and culture through conversation |
 | home.intro | ShyTalk is a friendly place to practise a language out loud and discover the cultures behind it. | ShyTalk 是一个友好的地方，让你开口练习语言，并探索语言背后的文化。 | ShyTalk is a friendly place where you can practice speaking the language and explore the culture behind it. |
@@ -131,3 +131,8 @@
 | holding.building | The ShyTalk app is being built now. | ShyTalk 应用正在开发中。 | The ShyTalk app is under development. |
 | holding.comingSoon | Coming soon | 即将推出 | coming soon |
 | holding.languages | Language | 语言 | language |
+| support.title | Support | 帮助与支持 | Help and support |
+| support.intro | Ask a question or report a problem. The reply comes by email. | 提出问题或报告故障，回复将通过电子邮件发送。 | Ask a question or report a problem, and a response will be sent via email. |
+| support.englishForm | The form is in English for now. | 表单目前仅提供英文版本。 | The form is currently only available in English. |
+| support.ticketTitle | Your support request | 您的支持请求 | Your support request |
+| support.noScript | The support form needs JavaScript. Turn it on to send a request. | 客服表单需要 JavaScript。请启用后再发送请求。 | The customer service form requires JavaScript. Please enable it before sending a request. |
