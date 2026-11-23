@@ -43,6 +43,11 @@ export interface PreviewFacts {
   tags: Record<string, string | null>;
   /** Whether the picture loaded, its size, and whether it holds more than one colour. */
   picture: { loaded: boolean; width: number; height: number; manyColours: boolean };
+  /**
+   * Every email address the page offers: each `mailto:` link and each address in its text. Support requests come only
+   * through the support form, so no page shows one (shyden-labs/ShyTalk#333; Shyden 2026-11-23, decisions 226-227).
+   */
+  addresses: string[];
 }
 
 /**
@@ -82,7 +87,12 @@ export const PREVIEW_FACTS = `async (path, keys, authorization) => {
       picture.loaded = false;
     }
   }
-  return { lang: html.documentElement.getAttribute('lang'), title: html.title, tags, picture };
+  const addresses = [];
+  for (const link of html.querySelectorAll('a[href]')) {
+    if (link.getAttribute('href').trim().toLowerCase().startsWith('mailto:')) addresses.push(link.getAttribute('href'));
+  }
+  for (const found of (html.body ? html.body.textContent : '').match(/[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+/g) || []) addresses.push(found);
+  return { lang: html.documentElement.getAttribute('lang'), title: html.title, tags, picture, addresses };
 }`;
 
 /**
@@ -105,5 +115,6 @@ export function wantedPreview(origin: string, locale: Locale, lang: string, path
       'twitter:card': 'summary_large_image',
     },
     picture: { loaded: true, width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT, manyColours: true },
+    addresses: [],
   };
 }

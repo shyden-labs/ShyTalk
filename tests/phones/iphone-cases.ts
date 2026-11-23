@@ -13,7 +13,6 @@ import { SMOKE_TICKET_TOKEN, builtShydeskOrigin } from '../support/support-page.
 import { HELLOS } from '../../apps/web/src/brand.ts';
 import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
-import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
 import { codeIn, envMailboxPassword, MAIL_CEILING_MS, plusAddress, waitForAnyMail, waitForMail } from './test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import { countingCheck, type Check } from './check.ts';
@@ -209,7 +208,7 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       await inLanguageWithoutRefusal(page, check, lang);
     }),
     counted(
-      `${lang}: the holding page shows ShyTalk's brand, the language switch, the hellos and the contact, in ${lang}, passing axe, keeping still for reduced motion and fitting a phone, with no CSP refusal`,
+      `${lang}: the holding page shows ShyTalk's brand, the language switch and the hellos, in ${lang}, passing axe, keeping still for reduced motion and fitting a phone, with no CSP refusal`,
       async (page, check) => {
         check.equal(await page.goto(`${prefix}/holding`), 200);
         check.equal(await page.attribute('html', 'lang'), lang);
@@ -232,8 +231,6 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
           await page.rows('ul.hellos > li', ['lang']),
           HELLOS.map(({ lang: helloLang, word }) => [helloLang, word]),
         );
-        check.equal(await page.visibleLinks(SUPPORT_EMAIL), 1, 'no visible contact link');
-        check.equal(await page.attribute('a[href^="mailto:"]', 'href'), `mailto:${SUPPORT_EMAIL}`);
         check.deepEqual(await page.axeViolations(), []);
         const facts = await page.holdingFacts();
         check.deepEqual(facts, wantedFacts(facts.width, facts.reducedMotion));
@@ -306,7 +303,7 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       },
     ),
     counted(
-      `${lang}: every page carries its link preview in ${lang}, and each preview picture is 1200 by 630 and not one flat colour`,
+      `${lang}: every page carries its link preview in ${lang}, each preview picture is 1200 by 630 and not one flat colour, and no page offers an email address`,
       async (page, check) => {
         const origin = builtSiteOrigin();
         await page.goto(`${prefix}/`);
