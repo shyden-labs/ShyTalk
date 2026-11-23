@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { main, RELEASE_SECRETS_FILE } from '../../scripts/check-release-secrets.ts';
 import { withoutYamlComments, withoutYamlQuotes, yamlBlock as topLevel } from './source-text.ts';
@@ -56,6 +56,14 @@ describe('check-release-secrets', () => {
     [{ RELEASE_ENVIRONMENT: 'production', RELEASE_SECRETS: '[]' }, 'check-release-secrets: RELEASE_SECRETS is not a JSON object'],
   ])('refuses %j', async (env, message) => {
     await expect(run(env)).rejects.toThrow(message);
+  });
+
+  it('reads the real list and prints to standard output when nothing is stood in', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const secrets = JSON.stringify(Object.fromEntries((list['production'] ?? []).map((name) => [name, 'set'])));
+    expect(await main([], { RELEASE_ENVIRONMENT: 'production', RELEASE_SECRETS: secrets })).toBe(0);
+    expect(write).toHaveBeenCalledWith('check-release-secrets: production holds all 8 secrets this release reads\n');
+    write.mockRestore();
   });
 
   it('takes no arguments', async () => {
