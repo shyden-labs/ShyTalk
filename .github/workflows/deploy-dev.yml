@@ -97,6 +97,7 @@ jobs:
           DEV_PASS_SECRET: ${{ secrets.DEV_PASS_SECRET }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
+          ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}
         run: |
           if ! grep -qE '^(apps/web/|workers/web/|migrations/|packages/environment/|packages/mail/|packages/ui-document/|manifests/|scripts/publish-ui\.ts$|scripts/announce-ui\.ts$|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
             echo "Nothing deployable changed, so dev deploys nothing."
@@ -171,6 +172,13 @@ jobs:
             exit 1
           fi
           printf '%s' "$TOTP_KEY" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put TOTP_KEY --env dev || { echo "::error title=deploy-dev failed::the dev authenticator key was not set"; exit 1; }
+          # shyden-labs/ShyTalk#321: the roadmap reads the board as its
+          # read-only App (#320), whose key is kept in the dev environment.
+          if [ -z "$ROADMAP_APP_KEY" ]; then
+            echo "::error title=ROADMAP_APP_KEY missing::Set ROADMAP_APP_KEY in the dev environment (shyden-labs/ShyTalk#320); until then the dev roadmap cannot read the board."
+            exit 1
+          fi
+          printf '%s' "$ROADMAP_APP_KEY" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put ROADMAP_APP_KEY --env dev || { echo "::error title=deploy-dev failed::the dev roadmap App key was not set"; exit 1; }
           # Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07): last,
           # every open app hears the newest UI version. Each deploy makes a
           # fresh announce secret, puts it in the Worker and calls the Worker

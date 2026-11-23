@@ -99,6 +99,9 @@ describe('app sign-in config', () => {
         ...(name === 'prod' ? { HOLDING: 'true' } : {}),
         // The ShyDesk each environment's support pages embed (shyden-labs/ShyTalk#37): TEST uses the live desk.
         SHYDESK_ORIGIN: name === 'dev' ? 'https://shydesk.shydesk-non-prod.workers.dev' : 'https://shydesk.dpdns.org',
+        // The roadmap reads the board as its read-only App, the same in every environment (shyden-labs/ShyTalk#320, #321).
+        ROADMAP_APP_ID: '5880693',
+        ROADMAP_INSTALLATION_ID: '184830629',
       });
     },
   );
@@ -123,11 +126,19 @@ describe('app sign-in config', () => {
   // The live announcement (plan 4 Task 8, shyden-labs/ShyTalk#81). Durable
   // Object bindings are not inherited, so each environment names its own;
   // the Free plan runs only SQLite-backed objects.
-  it.each(Object.keys(ORIGINS))('%s binds ANNOUNCER to the Announcer class and nothing else', (name) => {
-    expect(environment(name)['durable_objects']).toEqual({ bindings: [{ name: 'ANNOUNCER', class_name: 'Announcer' }] });
+  it.each(Object.keys(ORIGINS))('%s binds ANNOUNCER to the Announcer class and ROADMAP to the Roadmap class, and nothing else', (name) => {
+    expect(environment(name)['durable_objects']).toEqual({
+      bindings: [
+        { name: 'ANNOUNCER', class_name: 'Announcer' },
+        { name: 'ROADMAP', class_name: 'Roadmap' },
+      ],
+    });
   });
 
-  it('creates the Announcer as a SQLite-backed class in its first migration', () => {
-    expect(config()['migrations']).toEqual([{ tag: 'v1', new_sqlite_classes: ['Announcer'] }]);
+  it('creates the Announcer, then the Roadmap (shyden-labs/ShyTalk#321), each a SQLite-backed class in its own migration', () => {
+    expect(config()['migrations']).toEqual([
+      { tag: 'v1', new_sqlite_classes: ['Announcer'] },
+      { tag: 'v2', new_sqlite_classes: ['Roadmap'] },
+    ]);
   });
 });

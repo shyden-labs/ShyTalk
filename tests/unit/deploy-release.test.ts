@@ -204,6 +204,21 @@ describe('deploy-release', () => {
     expect(step).not.toContain('secrets.ANNOUNCE_SECRET');
   });
 
+  // The roadmap reads the board as its read-only App (shyden-labs/ShyTalk#321);
+  // a missing key fails the job-start check by name (#330), so it is only put.
+  it('puts the roadmap App key on TEST and PROD after the authenticator key', () => {
+    const step = deployStep();
+    const totp = step.indexOf('printf %s $TOTP_KEY | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put TOTP_KEY --env $TARGET ||');
+    const put = step.indexOf(
+      'printf %s $ROADMAP_APP_KEY | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put ROADMAP_APP_KEY --env $TARGET || { echo ::error title=deploy-release failed::the $TARGET roadmap App key was not set; exit 1; }',
+    );
+    expect(totp).toBeGreaterThan(-1);
+    expect(put).toBeGreaterThan(totp);
+    expect(step).toContain('ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}');
+    const onlyTest = step.indexOf('if [ $TARGET = test ]; then');
+    expect(onlyTest === -1 || put < onlyTest).toBe(true);
+  });
+
   // Authenticator-app sign-in answers 503 until the Worker holds TOTP_KEY
   // (shyden-labs/ShyTalk#134); it seals stored secrets, so TEST and PROD each
   // keep their own in their GitHub environment.

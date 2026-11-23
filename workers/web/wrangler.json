@@ -31,7 +31,9 @@
         "MAIL_REGION": "ap-singapore-1",
         "MAIL_FROM": "no-reply@shytalk.app",
         "HOLDING": "true",
-        "SHYDESK_ORIGIN": "https://shydesk.dpdns.org"
+        "SHYDESK_ORIGIN": "https://shydesk.dpdns.org",
+        "ROADMAP_APP_ID": "5880693",
+        "ROADMAP_INSTALLATION_ID": "184830629"
       },
       "d1_databases": [
         {
@@ -63,6 +65,10 @@
           {
             "name": "ANNOUNCER",
             "class_name": "Announcer"
+          },
+          {
+            "name": "ROADMAP",
+            "class_name": "Roadmap"
           }
         ]
       }
@@ -78,7 +84,9 @@
         "APPLE_AUDIENCES": "com.shyden.shytalk",
         "MAIL_REGION": "uk-london-1",
         "MAIL_FROM": "no-reply@dev.shytalk.app",
-        "SHYDESK_ORIGIN": "https://shydesk.dpdns.org"
+        "SHYDESK_ORIGIN": "https://shydesk.dpdns.org",
+        "ROADMAP_APP_ID": "5880693",
+        "ROADMAP_INSTALLATION_ID": "184830629"
       },
       "d1_databases": [
         {
@@ -110,6 +118,10 @@
           {
             "name": "ANNOUNCER",
             "class_name": "Announcer"
+          },
+          {
+            "name": "ROADMAP",
+            "class_name": "Roadmap"
           }
         ]
       }
@@ -125,7 +137,9 @@
         "APPLE_AUDIENCES": "com.shyden.shytalk",
         "MAIL_REGION": "uk-london-1",
         "MAIL_FROM": "no-reply@dev.shytalk.app",
-        "SHYDESK_ORIGIN": "https://shydesk.shydesk-non-prod.workers.dev"
+        "SHYDESK_ORIGIN": "https://shydesk.shydesk-non-prod.workers.dev",
+        "ROADMAP_APP_ID": "5880693",
+        "ROADMAP_INSTALLATION_ID": "184830629"
       },
       "d1_databases": [
         {
@@ -157,6 +171,10 @@
           {
             "name": "ANNOUNCER",
             "class_name": "Announcer"
+          },
+          {
+            "name": "ROADMAP",
+            "class_name": "Roadmap"
           }
         ]
       }
@@ -166,6 +184,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["Announcer"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["Roadmap"]
     }
   ]
 }

@@ -15,6 +15,8 @@ import { devPassGate } from './dev-pass-gate.ts';
 import { json } from './http.ts';
 import type { RateLimit } from './app/sign-in.ts';
 import type { AnnouncerNamespace } from './app/announcer.ts';
+import { HOOK_PATH, handleGithubHook, type HookEnv } from './roadmap/hook-route.ts';
+import { handleRoadmapApi, isRoadmapApi } from './roadmap/routes.ts';
 
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
@@ -47,7 +49,7 @@ function policyFor(pathname: string, shydeskOrigin: string | undefined): string 
   return shydeskOrigin !== undefined && SUPPORT_PATH.test(pathname) ? supportPolicy(shydeskOrigin) : CONTENT_SECURITY_POLICY;
 }
 
-export interface WebEnv {
+export interface WebEnv extends HookEnv {
   /** Which environment this Worker is (a var): only TEST and DEV sit behind a door. */
   ENVIRONMENT_NAME: 'prod' | 'test' | 'dev';
   /** The environment's door secret (a Wrangler secret, TEST and DEV only). */
@@ -140,12 +142,19 @@ export function holdingAnswer(pathname: string, languages: string | null): { pag
   return { page: holdingPath(languages), status: pathname === '/' ? 200 : 404 };
 }
 
+/**
+ * The legal pages, which answer while production holds (shyden-labs/ShyTalk#317, Shyden 2026-11-22): in English and
+ * Indonesian, the only languages they are written in, as ShyDesk's support form links to them.
+ */
+const HOLDING_LEGAL = /^\/(?:id\/)?(?:privacy|terms|guidelines)\/?$/u;
+
 /** What the holding page itself loads, served as built: its stylesheet, icons, fonts and link-preview picture. */
 const HOLDING_ASSETS = ['/styles/', '/previews/', '/icons/', '/_astro/'];
 
 /**
  * Production while it holds: the www address sends the visitor to the bare one; its homes answer the holding page
- * (holdingAnswer); what the page loads is served; every other address answers the holding page as a 404.
+ * (holdingAnswer); what the page loads, and the legal pages, are served; every other address answers the holding page
+ * as a 404.
  */
 async function holding(request: Request, env: WebEnv): Promise<Response> {
   const url = new URL(request.url);
@@ -154,6 +163,7 @@ async function holding(request: Request, env: WebEnv): Promise<Response> {
     return Response.redirect(url.toString(), 301);
   }
   if (HOLDING_ASSETS.some((prefix) => url.pathname.startsWith(prefix))) return env.ASSETS.fetch(request);
+  if (HOLDING_LEGAL.test(url.pathname)) return env.ASSETS.fetch(request);
   const { page: path, status } = holdingAnswer(url.pathname, request.headers.get('accept-language'));
   const page = await env.ASSETS.fetch(new Request(new URL(path, url)));
   const answer = new Response(page.body, { status, headers: page.headers });
@@ -167,6 +177,10 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   if (env.ENVIRONMENT_NAME !== 'prod') {
     const refused = await requireDoorSecret(request, env.DOOR_SECRET);
     if (refused) return refused;
+  }
+  // The webhook comes from GitHub, which has no password or DEV pass to give; its signature guards it (shyden-labs/ShyTalk#321).
+  if (new URL(request.url).pathname === HOOK_PATH) return handleGithubHook(request, env);
+  if (env.ENVIRONMENT_NAME !== 'prod') {
     const now = Math.floor(Date.now() / 1000);
     const passed = await devPassGate(request, { ...env, DB: hasFullD1(env) ? env.DB : undefined }, now);
     if (passed) return passed;
@@ -181,6 +195,7 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   const wrongStore = await markerGuard(env.ENVIRONMENT_NAME, env.DB).assertEnvironmentMarkers();
   if (wrongStore) return wrongStore;
   const { pathname } = new URL(request.url);
+  if (isRoadmapApi(pathname)) return handleRoadmapApi(request, env);
   if (isAppApi(pathname)) return handleAppApi(request, env);
   if (pathname.startsWith('/api/')) return handleApi(request, env);
   return env.ASSETS.fetch(request);
