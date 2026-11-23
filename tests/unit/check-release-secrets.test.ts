@@ -25,16 +25,14 @@ const run = async (env: Record<string, string | undefined>) => {
 
 describe('check-release-secrets', () => {
   it('passes and says so when the environment holds every listed secret', async () => {
-    const secrets = JSON.stringify({ CLOUDFLARE_API_TOKEN: 'a', TOTP_KEY: 'b', OCI_USER: 'c', github_token: 'd' });
-    expect(await run({ RELEASE_ENVIRONMENT: 'production', RELEASE_SECRETS: secrets })).toEqual({
+    expect(await run({ RELEASE_ENVIRONMENT: 'production', CLOUDFLARE_API_TOKEN: 'a', TOTP_KEY: 'b', OCI_USER: 'c' })).toEqual({
       code: 0,
       lines: ['check-release-secrets: production holds all 3 secrets this release reads'],
     });
   });
 
   it('fails naming each missing or empty secret, and never a value', async () => {
-    const secrets = JSON.stringify({ CLOUDFLARE_API_TOKEN: 'the-token-value', TOTP_KEY: '' });
-    const failing = run({ RELEASE_ENVIRONMENT: 'production', RELEASE_SECRETS: secrets });
+    const failing = run({ RELEASE_ENVIRONMENT: 'production', CLOUDFLARE_API_TOKEN: 'the-token-value', TOTP_KEY: '' });
     await expect(failing).rejects.toThrow(
       'check-release-secrets: production is missing TOTP_KEY, OCI_USER; set each in the production environment before releasing',
     );
@@ -42,26 +40,22 @@ describe('check-release-secrets', () => {
   });
 
   it('checks the test environment against its own list', async () => {
-    const secrets = JSON.stringify({ CLOUDFLARE_API_TOKEN: 'a' });
-    await expect(run({ RELEASE_ENVIRONMENT: 'test', RELEASE_SECRETS: secrets })).rejects.toThrow(
+    await expect(run({ RELEASE_ENVIRONMENT: 'test', CLOUDFLARE_API_TOKEN: 'a', TOTP_KEY: 'b' })).rejects.toThrow(
       'check-release-secrets: test is missing SITE_PASSWORD; set each in the test environment before releasing',
     );
   });
 
   it.each([
-    [{ RELEASE_SECRETS: '{}' }, 'check-release-secrets: missing RELEASE_ENVIRONMENT'],
-    [{ RELEASE_ENVIRONMENT: 'production' }, 'check-release-secrets: missing RELEASE_SECRETS'],
-    [{ RELEASE_ENVIRONMENT: 'dev', RELEASE_SECRETS: '{}' }, `check-release-secrets: ${RELEASE_SECRETS_FILE} lists no secrets for dev`],
-    [{ RELEASE_ENVIRONMENT: 'production', RELEASE_SECRETS: 'not json' }, 'check-release-secrets: RELEASE_SECRETS is not a JSON object'],
-    [{ RELEASE_ENVIRONMENT: 'production', RELEASE_SECRETS: '[]' }, 'check-release-secrets: RELEASE_SECRETS is not a JSON object'],
+    [{ CLOUDFLARE_API_TOKEN: 'a' }, 'check-release-secrets: missing RELEASE_ENVIRONMENT'],
+    [{ RELEASE_ENVIRONMENT: 'dev' }, `check-release-secrets: ${RELEASE_SECRETS_FILE} lists no secrets for dev`],
   ])('refuses %j', async (env, message) => {
     await expect(run(env)).rejects.toThrow(message);
   });
 
   it('reads the real list and prints to standard output when nothing is stood in', async () => {
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    const secrets = JSON.stringify(Object.fromEntries((list['production'] ?? []).map((name) => [name, 'set'])));
-    expect(await main([], { RELEASE_ENVIRONMENT: 'production', RELEASE_SECRETS: secrets })).toBe(0);
+    const secrets = Object.fromEntries((list['production'] ?? []).map((name) => [name, 'set']));
+    expect(await main([], { RELEASE_ENVIRONMENT: 'production', ...secrets })).toBe(0);
     expect(write).toHaveBeenCalledWith('check-release-secrets: production holds all 8 secrets this release reads\n');
     write.mockRestore();
   });
@@ -103,7 +97,8 @@ describe('check-release-secrets', () => {
       '        if: ${{ github.event_name != pull_request }}',
       '        env:',
       '          RELEASE_ENVIRONMENT: ${{ github.ref == refs/heads/main && production || test }}',
-      '          RELEASE_SECRETS: ${{ toJSON(secrets) }}',
+      // Each listed secret by name, and no other (SonarCloud githubactions:S7634): test's list holds production's.
+      ...(list['test'] ?? []).map((name) => `          ${name}: \${{ secrets.${name} }}`),
       '        run: node scripts/check-release-secrets.ts',
     ]);
   });
