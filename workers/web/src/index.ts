@@ -5,6 +5,7 @@
 import { handle, type WebEnv } from './web.ts';
 
 export { Announcer } from './app/announcer.ts';
+export { Roadmap } from './roadmap/worker.ts';
 
 export default {
   fetch: (request: Request, env: WebEnv): Promise<Response> => handle(request, env),

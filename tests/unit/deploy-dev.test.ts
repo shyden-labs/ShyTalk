@@ -197,6 +197,25 @@ describe('deploy-dev', () => {
     expect(step).toContain('TOTP_KEY: ${{ secrets.TOTP_KEY }}');
   });
 
+  // shyden-labs/ShyTalk#321: the roadmap reads the board as its read-only App,
+  // whose key is kept in the dev environment and put after the authenticator key.
+  it('puts the roadmap App key after the authenticator key, and stops naming it when the environment lacks it', () => {
+    const step = deployStep().join('\n');
+    const totp = step.indexOf('printf %s $TOTP_KEY | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put TOTP_KEY --env dev ||');
+    const missing = step.indexOf('if [ -z $ROADMAP_APP_KEY ]; then');
+    const named = step.indexOf(
+      'echo ::error title=ROADMAP_APP_KEY missing::Set ROADMAP_APP_KEY in the dev environment (shyden-labs/ShyTalk#320); until then the dev roadmap cannot read the board.',
+    );
+    const put = step.indexOf(
+      'printf %s $ROADMAP_APP_KEY | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put ROADMAP_APP_KEY --env dev || { echo ::error title=deploy-dev failed::the dev roadmap App key was not set; exit 1; }',
+    );
+    expect(totp).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(totp);
+    expect(named).toBeGreaterThan(missing);
+    expect(put).toBeGreaterThan(named);
+    expect(step).toContain('ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}');
+  });
+
   // shyden-labs/ShyTalk#88: the five Oracle secrets reach only a last step of
   // their own, which runs nothing but `wrangler secret put`, and only after the
   // deploy step deployed (it records `deployed=true` last). The build and the

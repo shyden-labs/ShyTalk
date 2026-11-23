@@ -60,6 +60,7 @@ jobs:
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
+          ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}
           OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
           OCI_USER: ${{ secrets.OCI_USER }}
           OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
@@ -82,6 +83,7 @@ jobs:
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
+          ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}
         run: |
           SITE_ENVIRONMENT=$TARGET npm run build:web || { echo "::error title=deploy-release failed::the website did not build"; exit 1; }
           cd workers/web
@@ -131,6 +133,9 @@ jobs:
             exit 1
           fi
           printf '%s' "$TOTP_KEY" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put TOTP_KEY --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET authenticator key was not set"; exit 1; }
+          # shyden-labs/ShyTalk#321: the roadmap reads the board as its read-only
+          # App (#320); a missing key fails the job-start check by name (#330).
+          printf '%s' "$ROADMAP_APP_KEY" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put ROADMAP_APP_KEY --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET roadmap App key was not set"; exit 1; }
           # The TEST origin refuses every request without its door secret
           # (decision 216) and its site password (shyden-labs/ShyTalk#262); PROD has neither.
           if [ "$TARGET" = test ]; then

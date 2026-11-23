@@ -39,7 +39,7 @@ export interface AnnouncerRuntime {
 }
 
 /** The Workers runtime's own pair and upgrade answer. */
-const workersRuntime: AnnouncerRuntime = {
+export const workersRuntime: AnnouncerRuntime = {
   pair() {
     const pair = new (globalThis as unknown as { WebSocketPair: new () => Record<0 | 1, LiveSocket> }).WebSocketPair();
     return [pair[0], pair[1]];
