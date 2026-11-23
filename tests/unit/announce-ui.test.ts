@@ -78,9 +78,38 @@ describe('announce-ui', () => {
     expect(lines).toEqual(['announce-ui: dev announced UI version 6']);
   });
 
+  // shyden-labs/ShyTalk#331 (Shyden 2026-11-23): while an environment holds, every address answers the holding
+  // page, the announce included, and no app can be open, so the release says so and carries on.
+  /** The site config with prod's HOLDING var set to `holding`, or removed when undefined. */
+  const prodHolding = (holding: string | undefined) => {
+    const site = JSON.parse(read('workers/web/wrangler.json')) as { env: { prod: { vars: Record<string, string> } } };
+    const vars = site.env.prod.vars;
+    if (holding === undefined) delete vars['HOLDING'];
+    else vars['HOLDING'] = holding;
+    const text = JSON.stringify(site);
+    return (path: string): string => (path === 'workers/web/wrangler.json' ? text : read(path));
+  };
+  const prodSettings = { ANNOUNCE_ENVIRONMENT: 'prod', ANNOUNCE_SECRET: 'fresh-secret' };
+
+  it('tells nothing while production holds, says why, and succeeds', async () => {
+    const fake = fakeFetch(new Response('Coming soon', { status: 404 }));
+    const lines: string[] = [];
+    expect(await main([], prodSettings, prodHolding('true'), fake.fetch, (line) => lines.push(line))).toBe(0);
+    expect(fake.calls).toEqual([]);
+    expect(lines).toEqual(['production holds: no app can be open, so nothing to tell']);
+  });
+
+  it.each([['false'], [undefined]])('announces on PROD when HOLDING is %s', async (holding) => {
+    const fake = fakeFetch(new Response(JSON.stringify({ announced: 6 }), { status: 200 }));
+    const lines: string[] = [];
+    expect(await main([], prodSettings, prodHolding(holding), fake.fetch, (line) => lines.push(line))).toBe(0);
+    expect(fake.calls).toHaveLength(1);
+    expect(lines).toEqual(['announce-ui: prod announced UI version 6']);
+  });
+
   it('sends PROD no door secret, as PROD has no door', async () => {
     const fake = fakeFetch(new Response(JSON.stringify({ announced: 6 }), { status: 200 }));
-    await main([], { ANNOUNCE_ENVIRONMENT: 'prod', ANNOUNCE_SECRET: 'fresh-secret' }, read, fake.fetch, () => undefined);
+    await main([], prodSettings, prodHolding(undefined), fake.fetch, () => undefined);
     expect(fake.calls[0]?.url).toBe('https://shytalk.app/api/app/live/announce');
     expect(new Headers(fake.calls[0]?.init?.headers).has(DOOR_SECRET_HEADER)).toBe(false);
     expect(new Headers(fake.calls[0]?.init?.headers).has(SITE_PASSWORD_HEADER)).toBe(false);
