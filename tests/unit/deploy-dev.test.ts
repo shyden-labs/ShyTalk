@@ -216,6 +216,27 @@ describe('deploy-dev', () => {
     expect(step).toContain('ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}');
   });
 
+  // shyden-labs/ShyTalk#320 AC3: the roadmap believes only a webhook delivery
+  // signed with ROADMAP_WEBHOOK_SECRET, kept in the dev environment.
+  it('puts the roadmap webhook secret after the App key, and stops naming it when the environment lacks it', () => {
+    const step = deployStep().join('\n');
+    const appKey = step.indexOf(
+      'printf %s $ROADMAP_APP_KEY | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put ROADMAP_APP_KEY --env dev ||',
+    );
+    const missing = step.indexOf('if [ -z $ROADMAP_WEBHOOK_SECRET ]; then');
+    const named = step.indexOf(
+      'echo ::error title=ROADMAP_WEBHOOK_SECRET missing::Set ROADMAP_WEBHOOK_SECRET in the dev environment (shyden-labs/ShyTalk#320); until then the dev roadmap believes no webhook delivery.',
+    );
+    const put = step.indexOf(
+      'printf %s $ROADMAP_WEBHOOK_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put ROADMAP_WEBHOOK_SECRET --env dev || { echo ::error title=deploy-dev failed::the dev roadmap webhook secret was not set; exit 1; }',
+    );
+    expect(appKey).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(appKey);
+    expect(named).toBeGreaterThan(missing);
+    expect(put).toBeGreaterThan(named);
+    expect(step).toContain('ROADMAP_WEBHOOK_SECRET: ${{ secrets.ROADMAP_WEBHOOK_SECRET }}');
+  });
+
   // shyden-labs/ShyTalk#88: the five Oracle secrets reach only a last step of
   // their own, which runs nothing but `wrangler secret put`, and only after the
   // deploy step deployed (it records `deployed=true` last). The build and the
