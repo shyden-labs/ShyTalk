@@ -68,7 +68,7 @@ const event = (key: string, durationSeconds: number | null, type: PunishmentEven
   subjectUserId: 'user_1',
   punishment: { key, label: 'A label', durationSeconds },
   reportTicketId: 'tkt_1',
-  appealUrl: type === 'punishment.apply' ? 'https://dev.shytalk.app/appeal#appeal=x' : null,
+  appealUrl: type === 'punishment.apply' ? 'https://site.example.test/appeal#appeal=x' : null,
   issuedAt: '2026-11-23T15:00:00Z',
 });
 
@@ -111,7 +111,7 @@ describe('applyPunishment', () => {
         NOW,
         NOW + 604_800_000,
         'tkt_1',
-        'https://dev.shytalk.app/appeal#appeal=x',
+        'https://site.example.test/appeal#appeal=x',
         '2026-11-23T15:00:00Z',
       ],
     });
