@@ -107,6 +107,29 @@ describe('a holding production', () => {
     },
   );
 
+  // shyden-labs/ShyTalk#317 (Shyden 2026-11-22): while production holds, the legal pages answer too, in English and
+  // Indonesian, the only languages they are written in; ShyDesk's support form links to them (shyden-labs/shydesk#78).
+  it.each(['/privacy', '/terms', '/guidelines', '/privacy/', '/id/privacy', '/id/terms', '/id/guidelines', '/id/terms/'])(
+    'serves the legal page %s as built, 200',
+    async (path) => {
+      const { env, asked } = holding();
+      const response = await handle(visit(`${path}?from=th`, { headers: { 'accept-language': 'vi' } }), env);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe(`page ${path}`);
+      expect(asked).toEqual([path]);
+    },
+  );
+
+  it.each(['/th/privacy', '/vi/terms', '/zh/guidelines', '/privacy-old', '/id/privacy/more', '/en/privacy'])(
+    'answers %s, which is no legal page, with the holding page as a 404',
+    async (path) => {
+      const { env, asked } = holding();
+      const response = await handle(visit(path, { headers: { 'accept-language': 'vi' } }), env);
+      expect(response.status).toBe(404);
+      expect(asked).toEqual(['/vi/holding']);
+    },
+  );
+
   it('answers each language’s home with that language’s holding page, whatever the header asks, so the switch works', async () => {
     const { env, asked } = holding();
     const response = await handle(visit('/th/', { headers: { 'accept-language': 'en' } }), env);

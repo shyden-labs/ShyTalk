@@ -38,7 +38,7 @@
     "intro": "Closed testing lets a small group try the ShyTalk app before it launches.",
     "noAccess": "Sending this form does not give access to closed testing.",
     "moreDetails": "If you are preliminarily selected, you will be asked for more details.",
-    "safeList": "Add support@shytalk.app to your safe list so that messages reach you.",
+    "safeList": "Add shytalk.app to your list of safe senders so that messages reach you.",
     "removed": "If you are not selected, your details are removed.",
     "retention": "Your details are kept only until closed testing ends.",
     "emailLabel": "Email address",

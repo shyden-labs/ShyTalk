@@ -8,7 +8,6 @@ import { SMOKE_TICKET_TOKEN } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
 import { wantedFacts } from '../support/holding-facts.ts';
 import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
-import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, wantedPreview } from '../support/link-preview.ts';
 
@@ -120,9 +119,7 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
                   )[name] ?? null)
                 : selector === 'script[src$="/embed.js"]' && name === 'src'
                   ? `${SHYDESK}/embed.js`
-                  : selector === 'a[href^="mailto:"]' && name === 'href'
-                    ? `mailto:${SUPPORT_EMAIL}`
-                    : null,
+                  : null,
       ),
     isVisible: (selector) => Promise.resolve(selector !== '[data-english-only]:not([hidden])'),
     text: (selector) => {
@@ -151,7 +148,7 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     },
     type: () => Promise.resolve(),
     waitForText: () => Promise.resolve(),
-    visibleLinks: (name) => Promise.resolve(name === t(locale, 'home.apply') || name === SUPPORT_EMAIL ? 1 : 0),
+    visibleLinks: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     count: (selector) =>
       Promise.resolve(selector === 'shydesk-support[view="ticket"]' && visited.at(-1)?.includes('/ticket') === true ? 1 : 0),
@@ -179,13 +176,13 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
   'an unknown page answers 404': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
   'the closed-testing page shows the form and every statement': { en: 17, id: 17, th: 17, vi: 17, 'zh-Hans': 17 },
   'the confirm page passes axe, and its button with a dead link shows link-expired': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
-  // Counted from its Playwright twin's 20 checks (shyden-labs/ShyTalk#273); confirmed against CI's smoke-totals.
-  "the holding page shows ShyTalk's brand, the language switch, the hellos and the contact,": {
-    en: 20,
-    id: 20,
-    th: 20,
-    vi: 20,
-    'zh-Hans': 20,
+  // Counted from its Playwright twin's 18 checks (shyden-labs/ShyTalk#273, less the contact's two, #333); confirmed against CI's smoke-totals.
+  "the holding page shows ShyTalk's brand, the language switch and the hellos,": {
+    en: 18,
+    id: 18,
+    th: 18,
+    vi: 18,
+    'zh-Hans': 18,
   },
   // Two per page: its title is not empty, and its preview is as wanted (shyden-labs/ShyTalk#198).
   // Four more each for the support and ticket pages (#37), to be confirmed on CI's smoke-totals.
@@ -1120,11 +1117,6 @@ describe('the iPhone holding-page cases (shyden-labs/ShyTalk#261, #273)', () => 
       }
     },
   );
-
-  it.each(holding)('%s: fails when the contact link is missing or points elsewhere', async (title, c) => {
-    await expect(c.run(safari(langOf(title), { visibleLinks: () => Promise.resolve(0) }))).rejects.toThrow();
-    await expect(c.run(safari(langOf(title), { attribute: () => Promise.resolve('mailto:someone@else.example') }))).rejects.toThrow();
-  });
 
   it.each(holding)('%s: fails on an axe violation or a CSP refusal', async (title, c) => {
     await expect(c.run(safari(langOf(title), { axeViolations: () => Promise.resolve(['region: 1']) }))).rejects.toThrow();
