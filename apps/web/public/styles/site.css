@@ -360,18 +360,6 @@ main:has(.holding) {
   }
 }
 
-.holding-contact {
-  margin: 0;
-  padding: 1rem 1.25rem 1.375rem;
-  border-top: 1px solid #2a2458;
-  text-align: center;
-  font-size: 0.8125rem;
-}
-
-.holding-contact a {
-  color: #a78bfa;
-}
-
 /* ShyDesk's support piece, in the site's colours (shyden-labs/ShyTalk#37). */
 shydesk-support {
   display: block;

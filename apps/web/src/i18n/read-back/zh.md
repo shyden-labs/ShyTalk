@@ -34,7 +34,7 @@
 | closedTesting.intro | Closed testing lets a small group try the ShyTalk app before it launches. | 封闭测试让一小部分人在 ShyTalk 应用发布前抢先试用。 | The closed beta test allowed a small group of people to try out the ShyTalk app before its official release. |
 | closedTesting.noAccess | Sending this form does not give access to closed testing. | 提交此表单并不代表获得封闭测试资格。 | Submitting this form does not guarantee access to the closed beta test. |
 | closedTesting.moreDetails | If you are preliminarily selected, you will be asked for more details. | 如果您通过初步筛选，将需要提供更多信息。 | If you pass the initial screening, you will need to provide more information. |
-| closedTesting.safeList | Add support@shytalk.app to your safe list so that messages reach you. | 请将 support@shytalk.app 加入安全发件人名单，以确保能收到邮件。 | Please add support@shytalk.app to your secure sender list to ensure you receive emails. |
+| closedTesting.safeList | Add shytalk.app to your list of safe senders so that messages reach you. | 请将 shytalk.app 加入安全发件人名单，以确保能收到邮件。 | Please add shytalk.app to your safe sender list to ensure you receive emails. |
 | closedTesting.removed | If you are not selected, your details are removed. | 如果您未入选，您的信息将被删除。 | If you are not selected, your information will be deleted. |
 | closedTesting.retention | Your details are kept only until closed testing ends. | 您的信息仅保留到封闭测试结束。 | Your information will only be retained until the closed test ends. |
 | closedTesting.emailLabel | Email address | 电子邮箱地址 | Email address |

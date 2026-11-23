@@ -18,7 +18,6 @@ import { HELLOS } from '../../apps/web/src/brand.ts';
 import { HOLDING_FACTS, BRAND_FONTS, NARROW_WIDTH, PHONE_WIDTH, wantedFacts, type HoldingFacts } from '../support/holding-facts.ts';
 import { LEGAL_DOCS, legalLines, legalLocale, legalPath } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
-import { SUPPORT_EMAIL } from '../../apps/web/src/site.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, PREVIEW_FACTS, PREVIEW_TAGS, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 import { SITE_USER } from '../../packages/environment/index.ts';
@@ -124,10 +123,11 @@ for (const { lang, locale, prefix } of LANGUAGES) {
   });
 
   // The holding page production answers with until the full release (shyden-labs/ShyTalk#261), in ShyTalk's brand
-  // (#273): a language switch, the icon, the name, "Coming soon", the tagline, the floating hellos and the contact. The
+  // (#273): a language switch, the icon, the name, "Coming soon", the tagline, and the floating hellos (no contact address,
+  // shyden-labs/ShyTalk#333). The
   // hellos keep still for reduced motion, and a phone's width shows five, inside the page; set here where the browser
   // can take a width, measured as it is on a phone.
-  test(`${lang}: the holding page shows ShyTalk's brand, the language switch, the hellos and the contact, in ${lang}, passing axe, keeping still for reduced motion and fitting a phone, with no CSP refusal`, async ({
+  test(`${lang}: the holding page shows ShyTalk's brand, the language switch and the hellos, in ${lang}, passing axe, keeping still for reduced motion and fitting a phone, with no CSP refusal`, async ({
     page,
   }) => {
     const refusals = cspRefusals(page);
@@ -167,9 +167,6 @@ for (const { lang, locale, prefix } of LANGUAGES) {
           .evaluateAll((hellos) => hellos.map((hello) => [hello.getAttribute('lang'), hello.textContent.trim()])),
       )
       .toEqual(HELLOS.map(({ lang: helloLang, word }) => [helloLang, word]));
-    const contact = page.getByRole('link', { name: SUPPORT_EMAIL, exact: true });
-    await expect.soft(contact).toBeVisible();
-    await expect.soft(contact).toHaveAttribute('href', `mailto:${SUPPORT_EMAIL}`);
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
     const facts = await holdingFacts(page);
@@ -252,7 +249,7 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     expect(refusals).toEqual([]);
   });
 
-  test(`${lang}: every page carries its link preview in ${lang}, and each preview picture is 1200 by 630 and not one flat colour`, async ({
+  test(`${lang}: every page carries its link preview in ${lang}, each preview picture is 1200 by 630 and not one flat colour, and no page offers an email address`, async ({
     page,
   }) => {
     const origin = builtSiteOrigin();
