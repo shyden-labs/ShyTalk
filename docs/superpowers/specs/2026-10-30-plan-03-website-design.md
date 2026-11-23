@@ -63,7 +63,8 @@ item is hidden (my call).
    asked for more; add support@shytalk.app to your safe list; if not selected your details are removed;
    details are kept only until closed testing ends (the retention criterion GDPR Art. 13(2)(a) and UU PDP
    Pasal 21 require).
-3. One email with a click-to-confirm link; only confirmed addresses join the list. The page answers the
+3. One email whose link opens a page with a confirm button; only the button confirms, because mail
+   scanners open links (Shyden's choice 2026-11-08, #55). Only confirmed addresses join the list. The page answers the
    same way whether or not the address is already on the list (OWASP, no enumeration).
 4. Stored: email, confirmed time, applied time, site language. Unconfirmed sign-ups expire by timestamp
    (my call: 48 hours), removed on the next write to the list, never by a timer (decision 176).

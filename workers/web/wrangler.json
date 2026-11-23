@@ -1,7 +1,7 @@
 {
   "name": "shytalk-web",
   "main": "src/index.ts",
-  "compatibility_date": "2026-10-01",
+  "compatibility_date": "2026-10-20",
   "assets": {
     "directory": "../../apps/web/dist",
     "binding": "ASSETS",
@@ -13,20 +13,156 @@
       "name": "shytalk-web",
       "account_id": "debdf0b47ce2f7e5554e99c1f5d3a1e0",
       "workers_dev": false,
-      "routes": [{ "pattern": "shytalk.app", "custom_domain": true }],
-      "vars": { "ENVIRONMENT_NAME": "prod" }
+      "routes": [
+        {
+          "pattern": "shytalk.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "www.shytalk.app",
+          "custom_domain": true
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT_NAME": "prod",
+        "SITE_ORIGIN": "https://shytalk.app",
+        "GOOGLE_CLIENT_IDS": "415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com,415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com",
+        "APPLE_AUDIENCES": "com.shyden.shytalk",
+        "MAIL_REGION": "ap-singapore-1",
+        "MAIL_FROM": "no-reply@shytalk.app",
+        "HOLDING": "true"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "shytalk-prod",
+          "migrations_dir": "../../migrations"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "SIGN_IN_LIMIT",
+          "namespace_id": "1001",
+          "simple": {
+            "limit": 10,
+            "period": 60
+          }
+        },
+        {
+          "name": "APPLY_LIMIT",
+          "namespace_id": "1004",
+          "simple": {
+            "limit": 5,
+            "period": 60
+          }
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "ANNOUNCER",
+            "class_name": "Announcer"
+          }
+        ]
+      }
     },
     "test": {
       "name": "shytalk-test",
       "account_id": "6a27c9ff4b4eefef2c46535449ea4f49",
       "workers_dev": true,
-      "vars": { "ENVIRONMENT_NAME": "test" }
+      "vars": {
+        "ENVIRONMENT_NAME": "test",
+        "SITE_ORIGIN": "https://test.shytalk.app",
+        "GOOGLE_CLIENT_IDS": "415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com,415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com",
+        "APPLE_AUDIENCES": "com.shyden.shytalk",
+        "MAIL_REGION": "uk-london-1",
+        "MAIL_FROM": "no-reply@dev.shytalk.app"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "shytalk-test",
+          "migrations_dir": "../../migrations"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "SIGN_IN_LIMIT",
+          "namespace_id": "1002",
+          "simple": {
+            "limit": 10,
+            "period": 60
+          }
+        },
+        {
+          "name": "APPLY_LIMIT",
+          "namespace_id": "1005",
+          "simple": {
+            "limit": 5,
+            "period": 60
+          }
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "ANNOUNCER",
+            "class_name": "Announcer"
+          }
+        ]
+      }
     },
     "dev": {
       "name": "shytalk-dev",
       "account_id": "6a27c9ff4b4eefef2c46535449ea4f49",
       "workers_dev": true,
-      "vars": { "ENVIRONMENT_NAME": "dev" }
+      "vars": {
+        "ENVIRONMENT_NAME": "dev",
+        "SITE_ORIGIN": "https://dev.shytalk.app",
+        "GOOGLE_CLIENT_IDS": "415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com,415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com",
+        "APPLE_AUDIENCES": "com.shyden.shytalk",
+        "MAIL_REGION": "uk-london-1",
+        "MAIL_FROM": "no-reply@dev.shytalk.app"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "shytalk-dev",
+          "migrations_dir": "../../migrations"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "SIGN_IN_LIMIT",
+          "namespace_id": "1003",
+          "simple": {
+            "limit": 10,
+            "period": 60
+          }
+        },
+        {
+          "name": "APPLY_LIMIT",
+          "namespace_id": "1006",
+          "simple": {
+            "limit": 5,
+            "period": 60
+          }
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "ANNOUNCER",
+            "class_name": "Announcer"
+          }
+        ]
+      }
     }
-  }
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["Announcer"]
+    }
+  ]
 }

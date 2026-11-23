@@ -63,8 +63,11 @@ jobs:
           node-version: ${{ steps.node.outputs.version }}
       - run: node scripts/npm-ci.ts
       - run: npm run test:coverage
+      # The migrations are SQLite (Cloudflare D1), a dialect SonarCloud does not have, so `.sql` is not read as
+      # Oracle PL/SQL. The home-page smoke test's checks are all expect.soft, which SonarCloud does not count as
+      # assertions, though a failed one fails the test (run 43480438187) (#245).
       - name: Scan
-        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
@@ -72,11 +75,24 @@ jobs:
             -Dsonar.organization=${{ inputs.organization }}
             -Dsonar.projectKey=${{ inputs.project-key }}
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.sources=.
             -Dsonar.tests=tests
             -Dsonar.exclusions=tests/**
             -Dsonar.coverage.exclusions=eslint.config.js,vitest.unit.config.ts
+            -Dsonar.plsql.file.suffixes=.plsql
+            -Dsonar.issue.ignore.multicriteria=softChecks
+            -Dsonar.issue.ignore.multicriteria.softChecks.ruleKey=typescript:S2699
+            -Dsonar.issue.ignore.multicriteria.softChecks.resourceKey=tests/smoke/site.spec.ts
+      # A pull request's analysis counts only the files it changed, so the verdict is given
+      # that list to judge whether no source lines means the scan read none (issue #240).
       - name: Read the quality gate of this scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
-        run: node scripts/sonar-verdict.ts .scannerwork/report-task.txt
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ -n "$SONAR_PULL_REQUEST" ]; then
+            git diff --name-only "origin/$BASE_REF...HEAD" > "$RUNNER_TEMP/changed-files.txt"
+            export SONAR_CHANGED_FILES="$RUNNER_TEMP/changed-files.txt"
+          fi
+          node scripts/sonar-verdict.ts .scannerwork/report-task.txt

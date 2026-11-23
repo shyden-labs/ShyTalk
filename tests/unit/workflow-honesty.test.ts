@@ -23,10 +23,22 @@ describe('every workflow', () => {
       'ci.yml',
       'deploy-dev.yml',
       'deploy-doors.yml',
+      'deploy-release.yml',
+      'dev-tail.yml',
       'door-count-trigger.yml',
       'door-count.yml',
       'sonarcloud.yml',
     ]);
+  });
+
+  // #242 (SonarCloud githubactions:S8543, S6505): `npx <tool>` fetches a release from the registry when the
+  // installed one is missing; a workflow runs the lockfile's installed binary or fails.
+  it.each(files)('%s runs no tool through npx', (file) => {
+    expect(
+      read(file)
+        .split('\n')
+        .filter((line) => /\bnpx\b/.test(line) && !/^\s*#/.test(line)),
+    ).toEqual([]);
   });
 
   it.each(files)('%s swallows no failure and gates no step on the token', (file) => {
@@ -57,6 +69,36 @@ describe('sonarcloud.yml', () => {
       scans: true,
       problems: [],
     });
+  });
+
+  // Issue #240: sonar.tests without sonar.sources left the scanner indexing tests/ alone, so the
+  // gate passed on no source code (measured 2026-11-17: 0 source files, 136 test files on develop).
+  it('scans the source code, with tests as tests', () => {
+    expect(read('sonarcloud.yml')).toContain(
+      [
+        '            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info',
+        '            -Dsonar.sources=.',
+        '            -Dsonar.tests=tests',
+        '            -Dsonar.exclusions=tests/**',
+      ].join('\n'),
+    );
+  });
+
+  // Issue #240: a pull request's analysis counts only the files it changed, so the verdict is
+  // handed the pull request's file list to judge whether no source lines means no scan.
+  it("hands the verdict the pull request's changed files", () => {
+    expect(read('sonarcloud.yml')).toContain(
+      [
+        '          SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}',
+        '          BASE_REF: ${{ github.base_ref }}',
+        '        run: |',
+        '          if [ -n "$SONAR_PULL_REQUEST" ]; then',
+        '            git diff --name-only "origin/$BASE_REF...HEAD" > "$RUNNER_TEMP/changed-files.txt"',
+        '            export SONAR_CHANGED_FILES="$RUNNER_TEMP/changed-files.txt"',
+        '          fi',
+        '          node scripts/sonar-verdict.ts .scannerwork/report-task.txt',
+      ].join('\n'),
+    );
   });
 });
 

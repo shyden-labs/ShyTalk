@@ -121,7 +121,7 @@ const splitPins = (uses: Use[]) => {
 describe('the CI supply chain is pinned', () => {
   it('pins each action at one SHA in every workflow, judged over every pinned use', () => {
     const uses = externalUses();
-    expect({ pinned: uses.length, split: splitPins(uses) }).toEqual({ pinned: 17, split: [] });
+    expect({ pinned: uses.length, split: splitPins(uses) }).toEqual({ pinned: 23, split: [] });
   });
 
   it('names an action whose bump reached one workflow and missed another', () => {
@@ -327,12 +327,14 @@ const setupNodeSteps = (file: string, source: string): { where: string; wrong: s
   });
 };
 
-/** The exact Node the Dockerfile pins, or what is wrong with it: one line, `FROM node:26.<minor>.<patch>`, at or above 26.3.0. */
+/** The exact Node the Dockerfile pins, or what is wrong with it: `FROM node:26.<minor>.<patch>`, at or above 26.3.0, then `USER node`. */
 const nodePin = (text: string): { version: string } | { wrong: string } => {
   const lines = text.split('\n');
   if (lines.at(-1) === '') lines.pop();
-  if (lines.length !== 1) return { wrong: `holds ${lines.length} lines, not one` };
-  const line = lines[0] as string;
+  // #242 (SonarCloud docker:S6471): the image never runs as root, as shyden-labs/repo-template PR #190 does.
+  if (lines.length !== 2) return { wrong: `holds ${lines.length} lines, not two` };
+  const [line, user] = lines as [string, string];
+  if (user !== 'USER node') return { wrong: `${user} is not USER node` };
   const pin = /^FROM node:26\.(\d+)\.(\d+)$/.exec(line);
   if (pin === null) return { wrong: `${line} is not FROM node:26.<minor>.<patch>` };
   if (Number(pin[1]) < 3) return { wrong: `${line} is below 26.3.0` };
@@ -342,7 +344,7 @@ const nodePin = (text: string): { version: string } | { wrong: string } => {
 describe('the template runs one Node and one runner, pinned exactly', () => {
   it(`every job runs on ${RUNNER}, judged over every runs-on read`, () => {
     const runners = workflowFiles().flatMap((f) => runnersIn(f, workflow(f)));
-    expect({ read: runners.length, floating: floating(runners) }).toEqual({ read: 9, floating: [] });
+    expect({ read: runners.length, floating: floating(runners) }).toEqual({ read: 12, floating: [] });
   });
 
   const job = (runsOn: string) => ['jobs:', '  build:', `    runs-on:${runsOn}`, '    steps:', '      - run: true', ''].join('\n');
@@ -373,7 +375,7 @@ describe('the template runs one Node and one runner, pinned exactly', () => {
 
   it("every setup-node step takes the read step's version and follows it, judged over every step read", () => {
     const steps = workflowFiles().flatMap((f) => setupNodeSteps(f, workflow(f)));
-    expect({ read: steps.length, wrong: steps.filter(({ wrong }) => wrong.length > 0) }).toEqual({ read: 8, wrong: [] });
+    expect({ read: steps.length, wrong: steps.filter(({ wrong }) => wrong.length > 0) }).toEqual({ read: 11, wrong: [] });
   });
 
   const steps = (...lines: string[]) => ['    steps:', ...lines, ''].join('\n');
@@ -468,23 +470,25 @@ describe('the template runs one Node and one runner, pinned exactly', () => {
   });
 
   it.each([
-    ['a bare major', 'FROM node:26\n', 'FROM node:26 is not FROM node:26.<minor>.<patch>'],
-    ['a major and minor', 'FROM node:26.12\n', 'FROM node:26.12 is not FROM node:26.<minor>.<patch>'],
-    ['lts', 'FROM node:lts\n', 'FROM node:lts is not FROM node:26.<minor>.<patch>'],
-    ['latest', 'FROM node:latest\n', 'FROM node:latest is not FROM node:26.<minor>.<patch>'],
-    ['a digest', 'FROM node@sha256:abc\n', 'FROM node@sha256:abc is not FROM node:26.<minor>.<patch>'],
-    ['another image', 'FROM nodejs:26.12.1\n', 'FROM nodejs:26.12.1 is not FROM node:26.<minor>.<patch>'],
-    ['a suffixed tag', 'FROM node:26.12.1-alpine\n', 'FROM node:26.12.1-alpine is not FROM node:26.<minor>.<patch>'],
-    ['another major', 'FROM node:27.0.0\n', 'FROM node:27.0.0 is not FROM node:26.<minor>.<patch>'],
-    ['a version below 26.3.0', 'FROM node:26.2.9\n', 'FROM node:26.2.9 is below 26.3.0'],
-    ['two lines', 'FROM node:26.12.1\nFROM node:26.13.0\n', 'holds 2 lines, not one'],
-    ['nothing', '', 'holds 0 lines, not one'],
+    ['a bare major', 'FROM node:26\nUSER node\n', 'FROM node:26 is not FROM node:26.<minor>.<patch>'],
+    ['a major and minor', 'FROM node:26.12\nUSER node\n', 'FROM node:26.12 is not FROM node:26.<minor>.<patch>'],
+    ['lts', 'FROM node:lts\nUSER node\n', 'FROM node:lts is not FROM node:26.<minor>.<patch>'],
+    ['latest', 'FROM node:latest\nUSER node\n', 'FROM node:latest is not FROM node:26.<minor>.<patch>'],
+    ['a digest', 'FROM node@sha256:abc\nUSER node\n', 'FROM node@sha256:abc is not FROM node:26.<minor>.<patch>'],
+    ['another image', 'FROM nodejs:26.12.1\nUSER node\n', 'FROM nodejs:26.12.1 is not FROM node:26.<minor>.<patch>'],
+    ['a suffixed tag', 'FROM node:26.12.1-alpine\nUSER node\n', 'FROM node:26.12.1-alpine is not FROM node:26.<minor>.<patch>'],
+    ['another major', 'FROM node:27.0.0\nUSER node\n', 'FROM node:27.0.0 is not FROM node:26.<minor>.<patch>'],
+    ['a version below 26.3.0', 'FROM node:26.2.9\nUSER node\n', 'FROM node:26.2.9 is below 26.3.0'],
+    ['two FROM lines', 'FROM node:26.12.1\nFROM node:26.13.0\nUSER node\n', 'holds 3 lines, not two'],
+    ['no USER line', 'FROM node:26.12.1\n', 'holds 1 lines, not two'],
+    ['a root user', 'FROM node:26.12.1\nUSER root\n', 'USER root is not USER node'],
+    ['nothing', '', 'holds 0 lines, not two'],
   ])('refuses a Dockerfile holding %s', (_, text, wrong) => {
     expect(nodePin(text)).toEqual({ wrong });
   });
 
   it('accepts a pin with no final newline', () => {
-    expect(nodePin('FROM node:26.3.0')).toEqual({ version: '26.3.0' });
+    expect(nodePin('FROM node:26.3.0\nUSER node')).toEqual({ version: '26.3.0' });
   });
 
   it('has Dependabot bump the Dockerfile within major 26, on develop', () => {

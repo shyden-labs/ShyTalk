@@ -1,0 +1,85 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { withoutYamlComments, withoutYamlQuotes, yamlBlock as topLevel } from './source-text.ts';
+
+/**
+ * Watching dev's live log stream (shyden-labs/ShyTalk#204; Shyden 2026-11-14:
+ * a hand-started job, nothing stored, production untouched). The repository
+ * is public, so its job log is too: only each failing request's time, outcome,
+ * method, path and exceptions are printed, never a header, query or body.
+ * Read from comment-stripped, quote-free text.
+ */
+
+const source = () => withoutYamlComments(readFileSync('.github/workflows/dev-tail.yml', 'utf8'));
+const job = () => withoutYamlQuotes(source());
+
+describe('dev-tail', () => {
+  it('runs only when started by hand, for a number of minutes', () => {
+    expect(topLevel(job(), 'on').split('\n')).toEqual([
+      'on:',
+      '  workflow_dispatch:',
+      '    inputs:',
+      '      minutes:',
+      '        description: How long to watch, 1 to 30',
+      '        required: true',
+      '        default: 10',
+      '        type: number',
+    ]);
+  });
+
+  it('reads only, in the dev environment, with dev’s own key', () => {
+    const text = job();
+    expect(topLevel(text, 'permissions').split('\n')).toEqual(['permissions:', '  contents: read']);
+    expect(text.split('\n').filter((line) => /^ {4}environment:/.test(line))).toEqual(['    environment: dev']);
+    expect(text).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
+    expect(text).not.toMatch(/prod|production|release/i);
+  });
+
+  it('watches dev for the asked minutes, at most 30, and a timeout ending the watch is not a failure', () => {
+    const text = source();
+    expect(text).toContain('if [ "$MINUTES" -lt 1 ] || [ "$MINUTES" -gt 30 ]; then');
+    expect(text).toContain('timeout "$((MINUTES * 60))" "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" tail --env dev --format json');
+    expect(text).toContain('[ "$status" -eq 124 ]');
+  });
+
+  it('prints only the time, outcome, method, path, exceptions and error logs of a request that did not end ok or logged an error', () => {
+    const text = source();
+    expect(text).toContain(
+      'jq -c --unbuffered \'select(.outcome != "ok" or (.exceptions | length) > 0 or any(.logs[]; .level == "error")) | {at: .eventTimestamp, outcome, method: .event.request.method, path: (.event.request.url | sub("^https?://[^/]+"; "") | sub("[?#].*$"; "")), ',
+    );
+    expect(text).not.toMatch(/headers/);
+  });
+
+  /** A caught error is logged rather than thrown (shyden-labs/ShyTalk#204 AC3), so the watch reads error logs too (Shyden, 2026-11-16). */
+  it('prints only error-level logs, blanking every email address (plain or %40), long token-like string and 6-digit-or-longer number in them', () => {
+    expect(source()).toContain(
+      'errors: [.logs[] | select(.level == "error") | .message | map(tostring) | join(" ") | gsub("[^\\\\s@]+(@|%40|%2540)[^\\\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>")]',
+    );
+  });
+
+  it('blanks every email address (plain or %40), long token-like string and 6-digit-or-longer number in an exception before printing it', () => {
+    expect(source()).toContain(
+      'exceptions: [.exceptions[] | {name, message: (.message | gsub("[^\\\\s@]+(@|%40|%2540)[^\\\\s@]+"; "<email>") | gsub("[A-Za-z0-9_+/=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>"))}]',
+    );
+  });
+
+  /**
+   * wrangler tail --format json prints each event as indented JSON over many
+   * lines (wrangler 4.162 logger.json: JSON.stringify(data, null, 4)), so the
+   * count is of JSON values, never of lines (shyden-labs/ShyTalk#226).
+   */
+  it('prints how many events it saw in all, counted as JSON values, not lines, so an empty watch is told apart from a broken stream', () => {
+    const text = source();
+    expect(text).toContain('| tee "$RUNNER_TEMP/events" \\');
+    expect(text).toContain('seen=$(jq -n \'[inputs] | length\' "$RUNNER_TEMP/events")');
+    expect(text).not.toContain('wc -l');
+    expect(text).toContain('if [ "$seen" -eq 0 ]; then');
+    expect(text).toContain('echo "Watched dev for $MINUTES minutes: $seen events."');
+  });
+
+  it('prints how many requests each host and path had, busiest first, with email addresses (plain or %40) and token-like strings blanked and no query', () => {
+    expect(source()).toContain(
+      'jq -rn \'[inputs | .event.request.url // "(no request)" | sub("^https?://"; "") | sub("[?#].*$"; "") | gsub("[^\\\\s@/]+(@|%40|%2540)[^\\\\s@/]+"; "<email>") | gsub("[A-Za-z0-9_+=-]{20,}"; "<token>") | gsub("[0-9]{6,}"; "<number>")] | group_by(.) | map([length, .[0]]) | sort_by(-.[0]) | .[:30][] | "\\(.[0]) \\(.[1])"\' "$RUNNER_TEMP/events"',
+    );
+  });
+});

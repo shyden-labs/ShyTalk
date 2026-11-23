@@ -34,3 +34,9 @@
 - Next ticket: `node scripts/board-next.ts PVT_kwDOEOcG584BpkXr "ShyTalk Stories"`.
 - Progress: `node scripts/board-progress.ts PVT_kwDOEOcG584BpkXr "ShyTalk Stories"`.
 - File a story: `node scripts/file-story.ts PVT_kwDOEOcG584BpkXr "ShyTalk Stories" <story.json>`.
+
+## Progress report
+
+- ShyTalk's progress page: https://claude.ai/artifact/K58mvus5Tnn6e1D25KvLYT ("ShyTalk: the road to launch", shared with anyone with the link). Launch on it means the App Store and Google Play.
+- Every session's close-out refreshes it: read it with `Artifact action:"read"`, update its figures from the progress command above and its milestones, features and waits from the board, and publish to the same URL.
+- Its wording is public: no "we", no talk of a rebuild, plain language. It never reads or touches the live roadmaps.

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "navigation": [{ "id": "rooms", "route": "rooms", "label": "nav.rooms" }],
+  "tokens": { "color.primary": "#2F6FEB", "radius.card": 12 },
+  "switches": { "rooms.voice": true },
+  "copy": {
+    "en": { "nav.rooms": "Rooms" },
+    "id": { "nav.rooms": "Ruang" },
+    "th": { "nav.rooms": "ห้อง" },
+    "vi": { "nav.rooms": "Phòng" },
+    "zh": { "nav.rooms": "房间" }
+  }
+}

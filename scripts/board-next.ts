@@ -66,9 +66,8 @@ export function nextTicket(items: NextItem[]): ScoredItem | null {
   const scored = open.filter((i): i is ScoredItem => i.priority !== null);
   const unscored = open.filter((i) => i.priority === null);
   if (unscored.length > 0) {
-    throw new Error(
-      `${unscored.length} open tickets have no Priority: ${unscored.map((i) => `#${i.number}`).join(', ')}. Score them on the board first.`,
-    );
+    const numbers = unscored.map((i) => '#' + String(i.number)).join(', ');
+    throw new Error(`${unscored.length} open tickets have no Priority: ${numbers}. Score them on the board first.`);
   }
   for (const i of scored) {
     if (!LEVELS.includes(i.priority)) {
@@ -224,9 +223,8 @@ export function main(args: string[]): number {
   if (id === undefined || title === undefined) {
     throw new Error('usage: node scripts/board-next.ts <board-node-id> "<board title>"');
   }
-  const out = execFileSync('gh', ['api', 'graphql', '--paginate', '--slurp', '-f', `query=${QUERY}`, '-f', `id=${id}`], {
-    encoding: 'utf8',
-  });
+  const query = ['api', 'graphql', '--paginate', '--slurp', '-f', `query=${QUERY}`, '-f', `id=${id}`];
+  const out = execFileSync('gh', query, { encoding: 'utf8' }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
   const pages = JSON.parse(out) as RawPage[];
   if (assertWholeRead(pages, title) === 0) {
     process.stdout.write(`Next: nothing to pick; ${emptyBoardNote(title)}.\n`);
@@ -236,17 +234,19 @@ export function main(args: string[]): number {
   for (const note of offBoardBlockers(items)) {
     process.stderr.write(`Note: ${note}.\n`);
   }
-  const next = nextTicket(items);
-  process.stdout.write(
-    next === null
-      ? items.some((i) => i.state === 'OPEN' && i.status === PARKED)
-        ? `Next: nothing before the release; the rest is in "${PARKED}".\n`
-        : 'Next: nothing is open.\n'
-      : `Next: #${next.number} ${next.title} (${next.priority}, ${next.status ?? 'no status'}${
-          next.blockedBy.length > 0 ? `, blocked by ${next.blockedBy.map((b) => label(b, next.repo)).join(', ')}` : ''
-        }).\n`,
-  );
+  process.stdout.write(nextLine(items, nextTicket(items)));
   return 0;
+}
+
+/** The line naming `next`, or saying why there is none. */
+function nextLine(items: NextItem[], next: ScoredItem | null): string {
+  if (next === null) {
+    const parked = items.some((i) => i.state === 'OPEN' && i.status === PARKED);
+    return parked ? `Next: nothing before the release; the rest is in "${PARKED}".\n` : 'Next: nothing is open.\n';
+  }
+  const blockers = next.blockedBy.map((b) => label(b, next.repo)).join(', ');
+  const blocked = next.blockedBy.length > 0 ? `, blocked by ${blockers}` : '';
+  return `Next: #${next.number} ${next.title} (${next.priority}, ${next.status ?? 'no status'}${blocked}).\n`;
 }
 
 await runIfEntry(import.meta.url, main);

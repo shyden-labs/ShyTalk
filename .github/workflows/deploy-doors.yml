@@ -30,6 +30,7 @@ jobs:
     # on another branch skip before asking for approval.
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-26.04
+    timeout-minutes: 15
     environment: production
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,7 +60,7 @@ jobs:
             echo "::error title=DOOR_SECRET_DEV missing::Set DOOR_SECRET_DEV in the production environment (decision 216)."
             exit 1
           fi
-          npx wrangler deploy --env test || { echo "::error title=deploy-doors failed::the test door did not deploy"; exit 1; }
-          printf '%s' "$DOOR_SECRET_TEST" | npx wrangler secret put DOOR_SECRET --env test || { echo "::error title=deploy-doors failed::the test door secret was not set"; exit 1; }
-          npx wrangler deploy --env dev || { echo "::error title=deploy-doors failed::the dev door did not deploy"; exit 1; }
-          printf '%s' "$DOOR_SECRET_DEV" | npx wrangler secret put DOOR_SECRET --env dev || { echo "::error title=deploy-doors failed::the dev door secret was not set"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --env test || { echo "::error title=deploy-doors failed::the test door did not deploy"; exit 1; }
+          printf '%s' "$DOOR_SECRET_TEST" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put DOOR_SECRET --env test || { echo "::error title=deploy-doors failed::the test door secret was not set"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --env dev || { echo "::error title=deploy-doors failed::the dev door did not deploy"; exit 1; }
+          printf '%s' "$DOOR_SECRET_DEV" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put DOOR_SECRET --env dev || { echo "::error title=deploy-doors failed::the dev door secret was not set"; exit 1; }

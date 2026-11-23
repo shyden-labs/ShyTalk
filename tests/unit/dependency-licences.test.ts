@@ -15,8 +15,9 @@ import { licenceProblems, type Exception, type Lockfile } from './licences.ts';
  * unknown licence or a missing one is refused everywhere, each package named.
  *
  * Licences are SPDX expressions: one is allowed when one `OR` choice has
- * every `AND` part allowed. An expression with brackets is refused rather
- * than parsed; none is installed today, and one would be read by hand.
+ * every `AND` part allowed. One pair of brackets around the whole expression
+ * changes nothing (@zone-eu/mailsplit, via imapflow); any other bracket is
+ * refused rather than parsed, to be read by hand.
  */
 
 const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as Lockfile;
@@ -86,11 +87,21 @@ describe('dependency licences', () => {
     ]);
   });
 
-  it('refuses an expression with brackets', () => {
-    expect(licenceProblems(lockOf({ 'node_modules/a': { license: '(MIT OR ISC)' } }), [])).toEqual([
-      'node_modules/a: (MIT OR ISC) has brackets; read it by hand',
+  it('reads an expression wholly inside one pair of brackets as the same expression without them', () => {
+    expect(licenceProblems(lockOf({ 'node_modules/a': { license: '(MIT OR EUPL-1.1+)' } }), [])).toEqual([]);
+    expect(licenceProblems(lockOf({ 'node_modules/a': { license: '(GPL-3.0-only OR EUPL-1.1+)' } }), [])).toEqual([
+      'node_modules/a: (GPL-3.0-only OR EUPL-1.1+) is not permissive and has no exception',
     ]);
   });
+
+  it.each(['(MIT OR ISC) AND GPL-3.0-only', 'MIT AND (ISC OR GPL-3.0-only)', '(MIT) OR (ISC)', '((MIT OR ISC))'])(
+    'refuses %s, whose brackets do not wrap the whole expression once, to be read by hand',
+    (licence) => {
+      expect(licenceProblems(lockOf({ 'node_modules/a': { license: licence } }), [])).toEqual([
+        `node_modules/a: ${licence} has brackets; read it by hand`,
+      ]);
+    },
+  );
 
   it('names every refused package', () => {
     expect(

@@ -1,29 +1,50 @@
 ---
 import Menu from '../components/Menu.astro';
 import Footer from '../components/Footer.astro';
-import { t, type Locale } from '../i18n/t.ts';
+import { langTag, t, type Locale } from '../i18n/t.ts';
+import { PREVIEW_HEIGHT, PREVIEW_WIDTH, previewImageUrl, sharedUrl, siteOrigin } from '../preview.ts';
+import wrangler from '../../../../workers/web/wrangler.json';
 
 interface Props {
   locale: Locale;
   title: string;
+  /** No menu or footer: the holding page, whose links lead nowhere yet (shyden-labs/ShyTalk#261). */
+  bare?: boolean;
 }
-const { locale, title } = Astro.props;
+const { locale, title, bare = false } = Astro.props;
+const pageTitle = title === t(locale, 'site.name') ? title : `${title} · ${t(locale, 'site.name')}`;
+// Link previews (shyden-labs/ShyTalk#198): addresses on the origin of the environment this build is for.
+const origin = siteOrigin(process.env.SITE_ENVIRONMENT, wrangler);
+const path = Astro.url.pathname;
 ---
 
 <!doctype html>
-<html lang={locale === 'zh' ? 'zh-Hans' : locale}>
+<html lang={langTag(locale)}>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title === t(locale, 'site.name') ? title : `${title} · ${t(locale, 'site.name')}`}</title>
+    <!-- The on-screen keyboard resizes the page instead of panning over it (Android Chrome), so a form's next control
+         stays reachable (shyden-labs/ShyTalk#189). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
+    <title>{pageTitle}</title>
     <meta name="description" content={t(locale, 'site.tagline')} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={t(locale, 'site.tagline')} />
+    <meta property="og:image" content={previewImageUrl(origin, path)} />
+    <meta property="og:image:width" content={String(PREVIEW_WIDTH)} />
+    <meta property="og:image:height" content={String(PREVIEW_HEIGHT)} />
+    <meta property="og:image:alt" content={t(locale, 'site.previewAlt')} />
+    <meta property="og:url" content={sharedUrl(origin, path)} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="/styles/site.css" />
   </head>
   <body>
-    <Menu locale={locale} />
+    {!bare && <Menu locale={locale} />}
     <main id="main">
       <slot />
     </main>
-    <Footer locale={locale} />
+    {!bare && <Footer locale={locale} />}
   </body>
 </html>

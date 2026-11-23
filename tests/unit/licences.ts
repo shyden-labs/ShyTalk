@@ -17,7 +17,20 @@ export interface Exception {
 
 // Python-2.0 (argparse, via Astro's js-yaml) is the PSF licence: permissive, BSD-style.
 // 0BSD (tslib) and CC0-1.0 (@speed-highlight/core, via wrangler's miniflare) are public-domain-equivalent: no conditions at all.
-const PERMISSIVE = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'BlueOak-1.0.0', '0BSD', 'CC0-1.0', 'Python-2.0']);
+// OFL-1.1 (the @fontsource brand fonts, shyden-labs/ShyTalk#273) lets the fonts be bundled with any software, the
+// site included, so long as the fonts are not sold alone; it puts no terms on our own code.
+const PERMISSIVE = new Set([
+  'MIT',
+  'Apache-2.0',
+  'BSD-2-Clause',
+  'BSD-3-Clause',
+  'ISC',
+  'BlueOak-1.0.0',
+  '0BSD',
+  'CC0-1.0',
+  'Python-2.0',
+  'OFL-1.1',
+]);
 
 const WEAK_COPYLEFT = new Set(['MPL-2.0', 'LGPL-2.1-only', 'LGPL-2.1-or-later', 'LGPL-3.0-only', 'LGPL-3.0-or-later']);
 
@@ -60,13 +73,17 @@ export function licenceProblems(lock: Lockfile, exceptions: Exception[] = EXCEPT
     const excepted = exceptions.some((exception) => exception.name.test(packageName(path)));
     if (typeof licence !== 'string' || licence.trim() === '') {
       problems.push(`${path}: no licence recorded`);
-    } else if (/[()]/.test(licence)) {
+      continue;
+    }
+    // One pair of brackets around the whole expression changes nothing.
+    const bare = /^\(([^()]*)\)$/.exec(licence)?.[1] ?? licence;
+    if (/[()]/.test(bare)) {
       problems.push(`${path}: ${licence} has brackets; read it by hand`);
-    } else if (allowed(licence, [PERMISSIVE])) {
+    } else if (allowed(bare, [PERMISSIVE])) {
       continue;
     } else if (!excepted) {
       problems.push(`${path}: ${licence} is not permissive and has no exception`);
-    } else if (!allowed(licence, [PERMISSIVE, WEAK_COPYLEFT])) {
+    } else if (!allowed(bare, [PERMISSIVE, WEAK_COPYLEFT])) {
       problems.push(`${path}: ${licence} is not allowed, even with an exception`);
     }
   }

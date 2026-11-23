@@ -24,3 +24,9 @@ export function t(locale: Locale, key: string): string {
 
 /** A site path in a language: English unprefixed, the others under `/<locale>`. */
 export const localePath = (locale: Locale, path: string): string => (locale === 'en' ? path : `/${locale}${path}`);
+
+/** Each language's name in itself, for the language switch (shyden-labs/ShyTalk#273); never translated. */
+export const LANGUAGE_NAMES: Record<Locale, string> = { en: 'English', id: 'Bahasa Indonesia', th: 'ไทย', vi: 'Tiếng Việt', zh: '中文' };
+
+/** Each language's BCP 47 tag, as `<html lang>`, `lang` and `hreflang` carry it: Chinese is written in simplified script. */
+export const langTag = (locale: Locale): string => (locale === 'zh' ? 'zh-Hans' : locale);

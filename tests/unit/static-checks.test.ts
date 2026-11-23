@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, statSync } from 'node:fs';
 import { withoutCommentLines, withoutYamlComments, withoutYamlQuotes, yamlBlock } from './source-text.ts';
+import { SMOKE_TARGETS } from '../smoke/targets.ts';
 
 /**
  * The static checks (issue shyden-labs/repo-template#61): typecheck, lint and format-check run as
@@ -11,6 +12,8 @@ import { withoutCommentLines, withoutYamlComments, withoutYamlQuotes, yamlBlock 
 
 const json = (file: string): unknown => JSON.parse(readFileSync(file, 'utf8'));
 const scripts = (json('package.json') as { scripts: Record<string, string> }).scripts;
+const lock = json('package-lock.json') as { packages: Record<string, { version?: string }> };
+const playwrightVersion = lock.packages['node_modules/playwright']?.version ?? '';
 const ci = withoutYamlQuotes(withoutYamlComments(readFileSync('.github/workflows/ci.yml', 'utf8')));
 
 /** Each step of a job as its name and run line ('' where it has none). */
@@ -29,7 +32,7 @@ const CODE = 'steps.classify.outputs.scope != docs-only';
 
 describe('package.json', () => {
   it.each([
-    ['typecheck', 'tsc --noEmit -p . && tsc --noEmit -p tests/smoke'],
+    ['typecheck', 'tsc --noEmit -p . && tsc --noEmit -p tests/smoke && tsc --noEmit -p apps/web/scripts'],
     ['build:web', 'astro build --root apps/web'],
     ['test:smoke', 'playwright test -c tests/smoke'],
     ['lint', 'eslint --max-warnings 0 .'],
@@ -52,7 +55,7 @@ describe('ci.yml', () => {
       { name: '', run: '', if: '' },
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
-      { name: 'Audit', run: 'npm audit --audit-level=low', if: '' },
+      { name: 'Audit', run: 'node scripts/audit.ts', if: '' },
       { name: 'Typecheck', run: 'npm run typecheck', if: CODE },
       { name: 'Lint', run: 'npm run lint', if: CODE },
       { name: 'Format', run: 'npm run format:check', if: '' },
@@ -73,21 +76,81 @@ describe('ci.yml', () => {
     ]);
   });
 
-  it('builds the site, installs Chromium and runs the smoke in web-smoke, skipping all three for docs', () => {
+  // shyden-labs/ShyTalk#109: every target the site supports runs the same suite, and their totals are compared.
+  it('builds the site for dev and runs the smoke against that build, so a preview’s addresses are checked (shyden-labs/ShyTalk#198)', () => {
+    expect(yamlBlock(ci, 'web-smoke', '  ').split('\n').slice(0, 7)).toEqual([
+      '  web-smoke:',
+      '    runs-on: ubuntu-26.04',
+      '    timeout-minutes: 20',
+      '    container:',
+      `      image: mcr.microsoft.com/playwright:v${playwrightVersion}-resolute`,
+      '    env:',
+      '      SITE_ENVIRONMENT: dev',
+    ]);
+  });
+
+  // shyden-labs/ShyTalk#281: the browsers and their system libraries come in Microsoft's image for the exact Playwright
+  // in the lockfile, so no run waits on the runner's apt mirror.
+  it('runs web-smoke in the Playwright image of the lockfile’s Playwright version', () => {
+    expect(playwrightVersion).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(yamlBlock(ci, 'web-smoke', '  ')).toContain(`image: mcr.microsoft.com/playwright:v${playwrightVersion}-resolute\n`);
+  });
+
+  // shyden-labs/ShyTalk#239: the desktop browsers and the one-suite checks come from the shared package
+  // @shyden-labs/playwright-devices; Edge is not in Microsoft's image, so it is installed per run.
+  // Root (for Edge's install) with the runner's HOME, which belongs to another user, stops Firefox from launching; the
+  // runner sets HOME for every step after the container's own env, so the Smoke step gives root its own.
+  it('gives the Smoke step root’s own HOME, so Firefox launches as root', () => {
+    const smoke = yamlBlock(ci, 'web-smoke', '  ')
+      .split(/\n(?= {6}- )/)
+      .find((step) => step.includes('name: Smoke'));
+    expect(smoke).toMatch(/^ {8}env:\n(?: {10}.*\n)* {10}HOME: \/root$/m);
+  });
+
+  it('runs the smoke on Chromium, Firefox, WebKit and Edge', () => {
+    expect(SMOKE_TARGETS).toEqual(['chromium', 'firefox', 'webkit', 'msedge']);
+  });
+
+  it('builds the site, runs the smoke and checks it is one suite in web-smoke, skipping them for docs', () => {
     expect(steps(yamlBlock(ci, 'web-smoke', '  '))).toEqual([
+      { name: '', run: '', if: '' },
+      // As root, git refuses the runner user's checkout until it is marked safe (shyden-labs/ShyTalk#239).
+      { name: '', run: 'git config --global --add safe.directory $GITHUB_WORKSPACE', if: '' },
+      { name: '', run: '|', if: '' },
+      { name: '', run: '', if: '' },
+      { name: '', run: 'node scripts/change-scope.ts', if: '' },
+      { name: '', run: 'node scripts/npm-ci.ts', if: '' },
+      { name: 'Install Microsoft Edge', run: 'node_modules/.bin/playwright install --with-deps msedge', if: CODE },
+      { name: 'Build the site', run: 'npm run build:web', if: CODE },
+      { name: 'Smoke', run: '|', if: CODE },
+      {
+        name: 'List the tests each browser should run',
+        run: 'SMOKE_DOOR_SECRET=list SMOKE_SITE_PASSWORD=list node_modules/.bin/playwright test -c tests/smoke --list --reporter=json > test-results/smoke-list.json',
+        if: `\${{ !cancelled() && ${CODE} }}`,
+      },
+      {
+        name: 'One-suite checks over the desktop browsers',
+        run: `node_modules/.bin/one-suite --group desktop=${SMOKE_TARGETS.join(',')} --list test-results/smoke-list.json --report test-results/smoke-report.json --assertions test-results/smoke-assertions.json`,
+        if: `\${{ !cancelled() && ${CODE} }}`,
+      },
+    ]);
+  });
+
+  // shyden-labs/ShyTalk#59: the first integration suite, on Cloudflare's local
+  // engines (vitest.integration.config.ts); a required check (decision 230).
+  it('runs the integration suite in its own job, skipping it for docs', () => {
+    expect(steps(yamlBlock(ci, 'integration', '  '))).toEqual([
       { name: '', run: '', if: '' },
       { name: '', run: '|', if: '' },
       { name: '', run: '', if: '' },
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
-      { name: 'Build the site', run: 'npm run build:web', if: CODE },
-      { name: 'Install Chromium', run: 'npx playwright install --with-deps chromium', if: CODE },
-      { name: 'Smoke', run: '|', if: CODE },
+      { name: 'Integration', run: 'npm run test:integration', if: CODE },
     ]);
   });
 
-  it('fetches the parent commit in all three jobs, so the classifier can diff it', () => {
-    expect(ci.match(/^ {10}fetch-depth: 2$/gm)).toHaveLength(3);
+  it('fetches the parent commit in all four jobs, so the classifier can diff it', () => {
+    expect(ci.match(/^ {10}fetch-depth: 2$/gm)).toHaveLength(4);
   });
 });
 

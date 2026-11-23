@@ -18,7 +18,7 @@ export interface FoundConfig {
 
 /** Each binding list a config can hold, the kind it is listed under, and the keys holding an id. */
 const BINDINGS = [
-  { list: 'd1_databases', kind: 'd1', keys: ['database_id', 'preview_database_id'] },
+  { list: 'd1_databases', kind: 'd1', keys: ['database_name', 'database_id', 'preview_database_id'] },
   { list: 'kv_namespaces', kind: 'kv', keys: ['id', 'preview_id'] },
   { list: 'r2_buckets', kind: 'r2', keys: ['bucket_name', 'preview_bucket_name'] },
 ] as const;
@@ -77,10 +77,12 @@ export function environmentProblems(configs: FoundConfig[], listed: Environments
             problems.push(`${where} ${list} holds an entry that is not a binding object`);
             continue;
           }
+          const name = typeof entry['binding'] === 'string' ? entry['binding'] : '(unnamed)';
+          // Wrangler provisions a D1 binding naming no database by itself (plan 4 Task 2).
+          if (kind === 'd1' && entry['database_name'] === undefined) problems.push(`${where} d1 ${name} names no database_name`);
           for (const key of keys) {
             const id = entry[key];
             if (id === undefined) continue;
-            const name = typeof entry['binding'] === 'string' ? entry['binding'] : '(unnamed)';
             if (typeof id !== 'string') {
               problems.push(`${where} ${kind} ${name} ${key} is not a string`);
               continue;

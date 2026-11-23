@@ -32,6 +32,14 @@ a {
   color: var(--accent);
 }
 
+/* Every button sets its own colours: iPhone Safari's default (white on #0091ff) reads at 3.23:1 (shyden-labs/ShyTalk#186). */
+button {
+  color: var(--paper);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 0.25rem;
+}
+
 .site-header,
 .site-footer,
 main {
@@ -67,4 +75,297 @@ main {
 .site-footer {
   color: var(--muted);
   border-top: 1px solid currentcolor;
+}
+
+.closed-testing-form input[type='email'] {
+  display: block;
+  width: 100%;
+  max-width: 24rem;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0.5rem;
+}
+
+.closed-testing-form button,
+#confirm-button {
+  font: inherit;
+  padding: 0.5rem 1rem;
+}
+
+/* The holding page in ShyTalk's brand (shyden-labs/ShyTalk#273; brand/README.md has the tokens). Night in both
+   colour schemes, as the brand is. */
+body:has(.holding) {
+  background: #16123a;
+  color-scheme: dark;
+}
+
+main:has(.holding) {
+  max-width: none;
+  padding: 0;
+}
+
+.holding {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  color: #ffffff;
+  font-family: Outfit, system-ui, sans-serif;
+  font-weight: 500;
+  overflow-x: clip;
+}
+
+.holding-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+}
+
+.holding-top ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.holding-top a {
+  display: inline-block;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #3a3270;
+  border-radius: 999px;
+  color: #ddd8ff;
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.holding-top a[aria-current='page'] {
+  border-color: #a78bfa;
+  color: #ffffff;
+}
+
+.holding-stage {
+  flex: 1;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 0.75rem;
+  padding: 1.625rem 1.25rem 2.125rem;
+  text-align: center;
+}
+
+.brand-icon {
+  width: 96px;
+  height: 96px;
+  filter: drop-shadow(0 10px 24px rgb(124 92 255 / 45%));
+}
+
+.wordmark {
+  margin: 0;
+  font-size: 4rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.wordmark span {
+  color: #a78bfa;
+}
+
+.badge {
+  margin: 0;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: #ffb020;
+  color: #2a1600;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Spaced capitals suit Latin script only: spacing splits Thai and Chinese words apart. */
+:lang(th) .badge,
+:lang(zh-Hans) .badge {
+  letter-spacing: normal;
+}
+
+.tagline {
+  max-width: 34ch;
+  margin: 0;
+  color: #ddd8ff;
+  font-size: 1.125rem;
+}
+
+/* The bubbles sit in a stage tall enough that a float of 8px keeps each inside it. */
+.hellos {
+  position: relative;
+  width: 100%;
+  max-width: 40rem;
+  height: 13rem;
+  margin: 0.375rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hellos li {
+  position: absolute;
+  padding: 0.5625rem 1.125rem;
+  border-radius: 999px;
+  font:
+    800 1.125rem / 1.5 'Noto Sans',
+    'Noto Sans SC',
+    'Noto Sans Thai',
+    sans-serif;
+  white-space: nowrap;
+  animation: float 6s ease-in-out infinite;
+}
+
+.hellos li::after {
+  content: '';
+  position: absolute;
+  bottom: -7px;
+  left: 18px;
+  border: 8px solid transparent;
+  border-top-color: inherit;
+  border-bottom: 0;
+}
+
+/* hello, こんにちは, halo, xin chào, สวัสดี, 你好, hola: colours from brand.ts's HELLOS, places from the approved mockup. */
+.hellos li:nth-child(1) {
+  left: 2%;
+  top: 10%;
+  background: #ffb020;
+  border-color: #ffb020;
+  color: #2a1600;
+}
+
+.hellos li:nth-child(2) {
+  left: 22%;
+  top: 44%;
+  background: #ff5c8a;
+  border-color: #ff5c8a;
+  color: #2a0614;
+  animation-delay: -1s;
+}
+
+.hellos li:nth-child(3) {
+  left: 46%;
+  top: 6%;
+  background: #20c4b0;
+  border-color: #20c4b0;
+  color: #08332e;
+  animation-delay: -2s;
+}
+
+.hellos li:nth-child(4) {
+  left: 68%;
+  top: 46%;
+  background: #a78bfa;
+  border-color: #a78bfa;
+  color: #16123a;
+  animation-delay: -3s;
+}
+
+.hellos li:nth-child(5) {
+  left: 6%;
+  top: 72%;
+  background: #60a5fa;
+  border-color: #60a5fa;
+  color: #0b2244;
+  animation-delay: -4s;
+}
+
+.hellos li:nth-child(6) {
+  left: 50%;
+  top: 72%;
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #2a1600;
+  animation-delay: -5s;
+}
+
+.hellos li:nth-child(7) {
+  left: 76%;
+  top: 10%;
+  background: #34d399;
+  border-color: #34d399;
+  color: #06281c;
+  animation-delay: -2.5s;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hellos li {
+    animation: none;
+  }
+}
+
+/* A phone: five bubbles, in a column of their own places. */
+@media (max-width: 600px) {
+  .wordmark {
+    font-size: 2.75rem;
+  }
+
+  .tagline {
+    font-size: 1rem;
+  }
+
+  .hellos {
+    height: 15rem;
+  }
+
+  .hellos li:nth-child(n + 6) {
+    display: none;
+  }
+
+  .hellos li:nth-child(1) {
+    left: 2%;
+    top: 4%;
+  }
+
+  .hellos li:nth-child(2) {
+    left: 34%;
+    top: 22%;
+  }
+
+  .hellos li:nth-child(3) {
+    left: 6%;
+    top: 40%;
+  }
+
+  .hellos li:nth-child(4) {
+    left: 40%;
+    top: 58%;
+  }
+
+  .hellos li:nth-child(5) {
+    left: 4%;
+    top: 76%;
+  }
+}
+
+.holding-contact {
+  margin: 0;
+  padding: 1rem 1.25rem 1.375rem;
+  border-top: 1px solid #2a2458;
+  text-align: center;
+  font-size: 0.8125rem;
+}
+
+.holding-contact a {
+  color: #a78bfa;
 }

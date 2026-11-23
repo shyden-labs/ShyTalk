@@ -4,18 +4,39 @@ import { failOnWarnings } from './tests/setup/warnings.ts';
 
 // The unit suite: tests under tests/unit, 1 s per test and hook, no process or
 // connection (tests/setup/unit-refusal.ts). `npm run test:coverage` runs the
-// same suite with V8 coverage over the TypeScript under scripts/, workers/*/src/ and packages/, held to one
+// same suite with V8 coverage over every source file (shyden-labs/ShyTalk#258), held to one
 // overall threshold (shyden-labs/repo-template#149). A type-only import: `defineConfig` only types the object.
 export default {
   plugins: [failOnWarnings],
   test: {
     include: ['tests/unit/**/*.test.ts'],
+    globalSetup: ['tests/setup/id-token-keys.ts'],
     setupFiles: UNIT_SETUP,
     testTimeout: 1_000,
     hookTimeout: 1_000,
     coverage: {
       provider: 'v8',
-      include: ['scripts/**/*.ts', 'workers/*/src/**/*.ts', 'packages/**/*.ts', 'apps/web/src/**/*.ts'],
+      // Every source file (shyden-labs/ShyTalk#258), so a new folder is measured from its first line; what is left out
+      // is named, with its reason, in tests/unit/coverage-scope.test.ts.
+      include: ['**/*.{ts,mts,cts,js,mjs,cjs}'],
+      exclude: [
+        // Test helpers are measured (shyden-labs/ShyTalk#211); the tests themselves, Playwright's configuration and the
+        // integration suite, which no unit test runs, are not.
+        'tests/unit/**',
+        '**/*.{test,spec}.ts',
+        'tests/smoke/*.config.ts',
+        'tests/integration/**',
+        '**/*.d.ts',
+        'vitest.*.config.ts',
+        'eslint.config.js',
+        'apps/web/astro.config.mjs',
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/.astro/**',
+        'coverage/**',
+        '.superpowers/**',
+        '**/.wrangler/**',
+      ],
       reporter: ['text-summary', 'lcov'],
       thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },
     },

@@ -39,6 +39,7 @@ jobs:
     # the last step is filled in.
     if: ${{ github.repository != 'shyden-labs/repo-template' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-26.04
+    timeout-minutes: 15
     # The dev credential lives in `dev`, which must let only `develop` deploy
     # (shyden-labs/repo-template#117), never as a repository secret. A pull request rehearses in
     # `dev-rehearsal`, which GitHub creates on first use and which holds nothing.
@@ -77,29 +78,129 @@ jobs:
           cache: 'npm'
       - run: node scripts/npm-ci.ts
       # ShyTalk's dev deploy (shyden-labs/ShyTalk#44; decisions 216, 217): the
-      # dev origin Worker on the Non-Prod account, only when its files changed.
-      # Today that is the throwaway echo Worker of the door spike
-      # (shyden-labs/ShyTalk#31). A rehearsal only bundles it, with no
-      # credential. Doors never deploy from here: they live in the production
-      # account and deploy only through `production`, with Shyden's approval.
+      # dev origin Worker `shytalk-dev` on the Non-Prod account, the website's
+      # front door (workers/web, plan 3 Task 1, shyden-labs/ShyTalk#51), only
+      # when the site, its Worker, the migrations, the environment package, the
+      # UI document or its publisher, the lockfile or this file changed. It replaces the door spike's echo Worker, deleted in
+      # shyden-labs/ShyTalk#31. The origin refuses every request without the
+      # door secret, so the deploy sets it from the dev environment (decision
+      # 216). A rehearsal only bundles it, with no credential. Doors never
+      # deploy from here: they live in the production account and deploy only
+      # through `production`, with Shyden's approval.
       - name: Deploy the changed areas to dev
+        id: deploy
         env:
           DEPLOY_REHEARSAL: ${{ github.event_name == 'pull_request' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+          DEV_PASS_SECRET: ${{ secrets.DEV_PASS_SECRET }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          TOTP_KEY: ${{ secrets.TOTP_KEY }}
         run: |
-          if ! grep -qE '^(workers/echo/|packages/environment/)' changed-files.txt; then
+          if ! grep -qE '^(apps/web/|workers/web/|migrations/|packages/environment/|packages/mail/|packages/ui-document/|manifests/|scripts/publish-ui\.ts$|scripts/announce-ui\.ts$|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
             echo "Nothing deployable changed, so dev deploys nothing."
             exit 0
           fi
-          cd workers/echo
+          SITE_ENVIRONMENT=dev npm run build:web || { echo "::error title=deploy-dev failed::the website did not build"; exit 1; }
+          cd workers/web
           if [ "$DEPLOY_REHEARSAL" = true ]; then
-            npx wrangler deploy --dry-run --env dev --outdir "$RUNNER_TEMP/echo" || { echo "::error title=deploy-dev failed::workers/echo did not bundle"; exit 1; }
+            "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --dry-run --env dev --outdir "$RUNNER_TEMP/web" || { echo "::error title=deploy-dev failed::workers/web did not bundle"; exit 1; }
             exit 0
           fi
-          npx wrangler deploy --env dev || { echo "::error title=deploy-dev failed::workers/echo did not deploy"; exit 1; }
+          # Plan 4 Task 2 (shyden-labs/ShyTalk#75, decisions 219, 220): the
+          # database exists, is migrated and is marked `dev` before the Worker
+          # deploys, or the site answers 503 to everyone. Only Wrangler's
+          # not-found message (the same in 4.157.0 and 4.161.0, #232) creates
+          # it; any other error stops the job, with no retry.
+          info=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 info shytalk-dev --env dev 2>&1) || {
+            printf '%s\n' "$info"
+            case "$info" in
+              *"Couldn't find a D1 DB named 'shytalk-dev'"*) "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 create shytalk-dev --location apac || { echo "::error title=deploy-dev failed::shytalk-dev was not created"; exit 1; } ;;
+              *) echo "::error title=deploy-dev failed::d1 info shytalk-dev failed"; exit 1 ;;
+            esac
+          }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 migrations apply DB --remote --env dev || { echo "::error title=deploy-dev failed::the shytalk-dev migrations did not apply"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 execute DB --remote --env dev --command "CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT 'dev' WHERE NOT EXISTS (SELECT 1 FROM environment_marker);" || { echo "::error title=deploy-dev failed::the shytalk-dev marker was not written"; exit 1; }
+          marker=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 execute DB --remote --env dev --json --command "SELECT name FROM environment_marker") || { echo "::error title=deploy-dev failed::the shytalk-dev marker could not be read back"; exit 1; }
+          if [ "$(printf '%s' "$marker" | jq -c '[.[0].results[].name]')" != '["dev"]' ]; then
+            printf '%s\n' "$marker"
+            echo "::error title=deploy-dev failed::shytalk-dev must hold exactly one marker row, dev"
+            exit 1
+          fi
+          echo "Read back: shytalk-dev is marked dev."
+          # Plan 4 Task 6 (shyden-labs/ShyTalk#79): the app's UI document
+          # (manifests/ui.json) is published to the migrated database before the
+          # Worker that serves it deploys, through a Wrangler remote binding to
+          # the database by id (Shyden, 2026-11-06). It publishes nothing when
+          # dev already serves that document.
+          ui_db=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 info shytalk-dev --env dev --json | jq -er '.uuid') || { echo "::error title=deploy-dev failed::the shytalk-dev id could not be read"; exit 1; }
+          (cd "$GITHUB_WORKSPACE" && UI_ENVIRONMENT=dev UI_DATABASE_NAME=shytalk-dev UI_DATABASE_ID="$ui_db" UI_PUBLISHED_BY=ci:deploy-dev node scripts/publish-ui.ts) || { echo "::error title=deploy-dev failed::the UI document was not published"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --env dev || { echo "::error title=deploy-dev failed::workers/web did not deploy"; exit 1; }
           if [ -z "$DOOR_SECRET" ]; then
             echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the dev environment (decision 216); until then the dev origin refuses every request."
             exit 1
           fi
-          printf '%s' "$DOOR_SECRET" | npx wrangler secret put DOOR_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev door secret was not set"; exit 1; }
+          printf '%s' "$DOOR_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put DOOR_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev door secret was not set"; exit 1; }
+          # shyden-labs/ShyTalk#262: dev asks for this password with the
+          # browser's own box; without it the Worker refuses every request.
+          if [ -z "$SITE_PASSWORD" ]; then
+            echo "::error title=SITE_PASSWORD missing::Set SITE_PASSWORD in the dev environment (shyden-labs/ShyTalk#262); until then dev refuses every request."
+            exit 1
+          fi
+          printf '%s' "$SITE_PASSWORD" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put SITE_PASSWORD --env dev || { echo "::error title=deploy-dev failed::the dev site password was not set"; exit 1; }
+          # shyden-labs/ShyTalk#263: the partner site's link opens dev with a
+          # one-use pass signed with this key; without it no pass is taken.
+          if [ -z "$DEV_PASS_SECRET" ]; then
+            echo "::error title=DEV_PASS_SECRET missing::Set DEV_PASS_SECRET in the dev environment (shyden-labs/ShyTalk#263); until then dev takes no pass."
+            exit 1
+          fi
+          printf '%s' "$DEV_PASS_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put DEV_PASS_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev pass key was not set"; exit 1; }
+          # shyden-labs/ShyTalk#76: dev app sign-in answers 503 until the
+          # Worker holds Better Auth's secret.
+          if [ -z "$BETTER_AUTH_SECRET" ]; then
+            echo "::error title=BETTER_AUTH_SECRET missing::Set BETTER_AUTH_SECRET in the dev environment (shyden-labs/ShyTalk#76); until then dev app sign-in answers 503."
+            exit 1
+          fi
+          printf '%s' "$BETTER_AUTH_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put BETTER_AUTH_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev Better Auth secret was not set"; exit 1; }
+          # shyden-labs/ShyTalk#134: authenticator-app sign-in answers 503 until
+          # the Worker holds TOTP_KEY. It seals stored secrets, so it is kept in
+          # the dev environment, never made fresh here.
+          if [ -z "$TOTP_KEY" ]; then
+            echo "::error title=TOTP_KEY missing::Set TOTP_KEY in the dev environment (shyden-labs/ShyTalk#134); until then dev authenticator-app sign-in answers 503."
+            exit 1
+          fi
+          printf '%s' "$TOTP_KEY" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put TOTP_KEY --env dev || { echo "::error title=deploy-dev failed::the dev authenticator key was not set"; exit 1; }
+          # Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07): last,
+          # every open app hears the newest UI version. Each deploy makes a
+          # fresh announce secret, puts it in the Worker and calls the Worker
+          # with it, so nothing is stored.
+          announce_secret=$(openssl rand -hex 32) || { echo "::error title=deploy-dev failed::no announce secret was made"; exit 1; }
+          echo "::add-mask::$announce_secret"
+          printf '%s' "$announce_secret" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put ANNOUNCE_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev announce secret was not set"; exit 1; }
+          (cd "$GITHUB_WORKSPACE" && ANNOUNCE_ENVIRONMENT=dev ANNOUNCE_SECRET="$announce_secret" node scripts/announce-ui.ts) || { echo "::error title=deploy-dev failed::open apps were not told the UI version"; exit 1; }
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+      # shyden-labs/ShyTalk#88: the Oracle mail secrets are in no other step's
+      # environment; this last step runs only after the step above deployed,
+      # and runs nothing but `wrangler secret put`. It is not a hard boundary:
+      # earlier steps share this runner (files, GITHUB_ENV, GITHUB_PATH), and
+      # they hold the Cloudflare token, which could reach Worker secrets
+      # anyway, so a separate job would cost a runner and protect no more.
+      - name: Put the Oracle mail secrets
+        if: steps.deploy.outputs.deployed == 'true'
+        working-directory: workers/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_COMPARTMENT: ${{ secrets.OCI_COMPARTMENT }}
+        run: |
+          for name in OCI_TENANCY OCI_USER OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_COMPARTMENT; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=$name missing::Set $name in the dev environment (shyden-labs/ShyTalk#88); until then dev sends no mail."
+              exit 1
+            fi
+            printf '%s' "${!name}" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put "$name" --env dev || { echo "::error title=deploy-dev failed::the dev $name was not set"; exit 1; }
+          done

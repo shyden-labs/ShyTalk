@@ -35,6 +35,7 @@ function item(over: Partial<BoardItem> & { number: number | null }): BoardItem {
     state: 'OPEN',
     createdAt: '2026-09-01T00:00:00Z',
     closedAt: null,
+    stateReason: null,
     estimate: 3,
     labels: [],
     ...over,
@@ -61,12 +62,38 @@ describe('inScope', () => {
   it('keeps an ordinary story', () => {
     expect(inScope(item({ number: 3 }))).toBe(true);
   });
+
+  it('leaves out a story closed as not planned, which is dropped work, not finished work', () => {
+    expect(inScope({ ...closedOn(4, '2026-10-03'), stateReason: 'NOT_PLANNED' })).toBe(false);
+  });
+
+  it('leaves out a story closed as a duplicate', () => {
+    expect(inScope({ ...closedOn(5, '2026-10-03'), stateReason: 'DUPLICATE' })).toBe(false);
+  });
+
+  it('keeps a story closed as completed', () => {
+    expect(inScope({ ...closedOn(6, '2026-10-03'), stateReason: 'COMPLETED' })).toBe(true);
+  });
+
+  it('keeps a closed story with no close reason, as completed', () => {
+    expect(inScope(closedOn(7, '2026-10-03'))).toBe(true);
+  });
 });
 
 describe('progress by tickets', () => {
   it('counts closed of all in-scope stories', () => {
     const p = progress([closedOn(1, '2026-10-03'), item({ number: 2 }), item({ number: 3 }), item({ number: 4, title: 'Epic M2' })], TODAY);
     expect(p.tickets).toMatchObject({ closed: 1, total: 3 });
+  });
+
+  it('counts a story closed as not planned in neither the closed, the total nor the pace', () => {
+    const p = progress(
+      [closedOn(1, '2026-10-03'), { ...closedOn(2, '2026-10-03'), stateReason: 'NOT_PLANNED' }, item({ number: 3 })],
+      TODAY,
+    );
+    expect(p.tickets).toMatchObject({ closed: 1, total: 2 });
+    expect(p.tickets.pace).toEqual([0, 0, 0, 0, 0, 1, 0]);
+    expect(p.effort).toMatchObject({ closedPoints: 3, pace: [0, 0, 0, 0, 0, 3, 0] });
   });
 
   it('counts closures per UTC day over the 7 days ending today, oldest first', () => {
@@ -271,6 +298,7 @@ describe('parseItems', () => {
               state: 'CLOSED',
               createdAt: '2026-10-01T00:00:00Z',
               closedAt: '2026-10-03T01:02:03Z',
+              stateReason: 'NOT_PLANNED',
               labels: { nodes: [{ name: 'post-launch' }] },
             },
           },
@@ -283,6 +311,7 @@ describe('parseItems', () => {
         state: 'CLOSED',
         createdAt: '2026-10-01T00:00:00Z',
         closedAt: '2026-10-03T01:02:03Z',
+        stateReason: 'NOT_PLANNED',
         estimate: 5,
         labels: ['post-launch'],
       },
@@ -334,6 +363,7 @@ describe('parseItems', () => {
           state: 'OPEN',
           createdAt: '2026-10-02T00:00:00Z',
           closedAt: null,
+          stateReason: null,
           estimate: 5,
           labels: [],
         },
@@ -392,6 +422,14 @@ describe('parseItems', () => {
 
   it('collects what it left out from every page', () => {
     expect(parseItems([page([pullRequest(100)]), page([pullRequest(101)])]).pullRequests).toEqual([100, 101]);
+  });
+
+  it('reads an issue with no close reason as null', () => {
+    expect(parseItems([page([issue(9)])]).items[0]?.stateReason).toBeNull();
+  });
+
+  it('asks the board for each issue’s close reason', () => {
+    expect(QUERY).toMatch(/\.\.\. on Issue \{ number title state stateReason createdAt closedAt /);
   });
 
   it('asks the board for each pull request card by number', () => {

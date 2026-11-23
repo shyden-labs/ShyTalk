@@ -38,7 +38,7 @@ describe('web config', () => {
     expect(block['account_id']).toBe(account);
     expect(block['workers_dev']).toBe(true);
     expect(block['routes']).toBeUndefined();
-    expect(block['vars']).toEqual({ ENVIRONMENT_NAME: name });
+    expect((block['vars'] as Config)['ENVIRONMENT_NAME']).toBe(name);
   });
 
   it('prod answers shytalk.app from the production account, with no workers.dev address', () => {
@@ -46,11 +46,86 @@ describe('web config', () => {
     expect(block['name']).toBe('shytalk-web');
     expect(block['account_id']).toBe(PROD);
     expect(block['workers_dev']).toBe(false);
-    expect(block['routes']).toEqual([{ pattern: 'shytalk.app', custom_domain: true }]);
-    expect(block['vars']).toEqual({ ENVIRONMENT_NAME: 'prod' });
+    // The bare address and www, which the holding Worker sends to the bare one (shyden-labs/ShyTalk#261).
+    expect(block['routes']).toEqual([
+      { pattern: 'shytalk.app', custom_domain: true },
+      { pattern: 'www.shytalk.app', custom_domain: true },
+    ]);
+    expect((block['vars'] as Config)['ENVIRONMENT_NAME']).toBe('prod');
   });
 
   it('has no top-level account, so no deploy can fall back to one', () => {
     expect(config()['account_id']).toBeUndefined();
+  });
+});
+
+// App sign-in's settings (plan 4 Task 3, shyden-labs/ShyTalk#76). Client IDs
+// are public, so they are vars; GOOGLE_CLIENT_IDS stays empty (sign-in answers
+// 503) until the Google clients exist.
+describe('app sign-in config', () => {
+  // TEST's and DEV's origins are their doors, read from the door's own config:
+  // no test names a door host (environments.test.ts).
+  const door = JSON.parse(readFileSync('workers/door/wrangler.json', 'utf8')) as { env: Record<string, { routes: { pattern: string }[] }> };
+  const doorOrigin = (name: string): string => `https://${door.env[name]?.routes[0]?.pattern ?? 'no-door-route'}`;
+  const ORIGINS = { prod: 'https://shytalk.app', test: doorOrigin('test'), dev: doorOrigin('dev') };
+
+  // shyden-labs/ShyTalk#88: live mails from Singapore as no-reply@shytalk.app;
+  // dev and test from London as no-reply@ the dev door's host, whose email
+  // domain and approved sender exist in Oracle's London region only.
+  const DEV_SENDER = `no-reply@${door.env['dev']?.routes[0]?.pattern ?? 'no-door-route'}`;
+  const MAIL = {
+    prod: { region: 'ap-singapore-1', from: 'no-reply@shytalk.app' },
+    test: { region: 'uk-london-1', from: DEV_SENDER },
+    dev: { region: 'uk-london-1', from: DEV_SENDER },
+  };
+
+  // The audiences Google signs app tokens for, from project `shytalk-app`
+  // (made 2026-11-05): Android tokens name the web client, iOS tokens the iOS
+  // client. The three Android clients only bind the package to its keys.
+  const GOOGLE_WEB = '415977447751-nu1hom2nn6dlg15gdh02de1kl3rm3onj.apps.googleusercontent.com';
+  const GOOGLE_IOS = '415977447751-s5v065q1pv58mjqp12bmosknv2g96ak1.apps.googleusercontent.com';
+
+  it.each(Object.entries(ORIGINS))(
+    '%s holds its origin, the client IDs, the bundle ID and its mail region and sender as vars',
+    (name, origin) => {
+      expect(environment(name)['vars']).toEqual({
+        ENVIRONMENT_NAME: name,
+        SITE_ORIGIN: origin,
+        GOOGLE_CLIENT_IDS: `${GOOGLE_WEB},${GOOGLE_IOS}`,
+        APPLE_AUDIENCES: 'com.shyden.shytalk',
+        MAIL_REGION: MAIL[name as keyof typeof MAIL].region,
+        MAIL_FROM: MAIL[name as keyof typeof MAIL].from,
+        // Production holds until the full release; dev and test never do (shyden-labs/ShyTalk#261).
+        ...(name === 'prod' ? { HOLDING: 'true' } : {}),
+      });
+    },
+  );
+
+  it.each(Object.keys(ORIGINS))('%s holds no Oracle setting as a var: those are secrets', (name) => {
+    expect(Object.keys(environment(name)['vars'] as Config).filter((key) => key.startsWith('OCI_'))).toEqual([]);
+  });
+
+  it.each(Object.keys(ORIGINS))('%s limits sign-in to 10 a minute and closed-testing applications to 5', (name) => {
+    const [signIn, apply, ...others] = environment(name)['ratelimits'] as Config[];
+    expect(others).toEqual([]);
+    expect(signIn).toMatchObject({ name: 'SIGN_IN_LIMIT', simple: { limit: 10, period: 60 } });
+    expect(apply).toMatchObject({ name: 'APPLY_LIMIT', simple: { limit: 5, period: 60 } });
+  });
+
+  it('gives each environment its own counter: dev and test share an account, so they must not share a namespace', () => {
+    const ids = Object.keys(ORIGINS).flatMap((name) => (environment(name)['ratelimits'] as Config[]).map((limit) => limit['namespace_id']));
+    expect(new Set(ids).size).toBe(6);
+    for (const id of ids) expect(id).toMatch(/^[1-9][0-9]*$/);
+  });
+
+  // The live announcement (plan 4 Task 8, shyden-labs/ShyTalk#81). Durable
+  // Object bindings are not inherited, so each environment names its own;
+  // the Free plan runs only SQLite-backed objects.
+  it.each(Object.keys(ORIGINS))('%s binds ANNOUNCER to the Announcer class and nothing else', (name) => {
+    expect(environment(name)['durable_objects']).toEqual({ bindings: [{ name: 'ANNOUNCER', class_name: 'Announcer' }] });
+  });
+
+  it('creates the Announcer as a SQLite-backed class in its first migration', () => {
+    expect(config()['migrations']).toEqual([{ tag: 'v1', new_sqlite_classes: ['Announcer'] }]);
   });
 });

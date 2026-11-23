@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs';
 import { t } from '../../apps/web/src/i18n/t.ts';
 
 /**
- * The site's words (plan 3 Task 3, shyden-labs/ShyTalk#53). ShyTalk is not a
- * dating app (CLAUDE.md guardrail), and to the public the app is still being
- * built, never rebuilt (decision 212). The English and Google's English
+ * The site's words (plan 3 Task 3, shyden-labs/ShyTalk#53). To the public the
+ * app is still being built, never rebuilt (decision 212). There is no dating
+ * word list: any word is fine in the right context (Shyden 2026-11-05,
+ * shyden-labs/ShyTalk#104). The English and Google's English
  * read-back of every other language are checked, so a translation that drifts
  * is caught in the words a reviewer can read.
  */
@@ -17,7 +18,7 @@ import { t } from '../../apps/web/src/i18n/t.ts';
  */
 const FIRST_PERSON = /\b(we|we're|we've|we'll|us|our|ours|I|I'm|I've|me|my|the team|solo|just me|one-person|small team)\b/i;
 
-const REFUSED = /\b(partners?|match(es|ing)?|dat(e|es|ing)|couples?|soulmates?|meet someone|rebuild|rebuilt|relaunch(ed)?)\b/i;
+const REFUSED = /\b(rebuild|rebuilt|relaunch(ed)?)\b/i;
 
 const englishLines = (): string[] => {
   const lines: string[] = [];
@@ -37,6 +38,32 @@ const googleColumn = (locale: string): string[] =>
     .map((row) => row.split(' | ').at(-1)?.replace(/ \|$/, '') ?? '');
 
 describe('the copy guard', () => {
+  it('finds neither first person nor refused words in the legal English', () => {
+    const lines: string[] = [];
+    const walk = (node: unknown): void => {
+      if (typeof node === 'string') lines.push(node);
+      else if (node && typeof node === 'object') Object.values(node).forEach(walk);
+    };
+    walk(JSON.parse(readFileSync('apps/web/src/legal/en.json', 'utf8')));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line, line).not.toMatch(FIRST_PERSON);
+      expect(line, line).not.toMatch(REFUSED);
+    }
+  });
+
+  it('finds neither first person nor refused words in the legal Indonesian read-back', () => {
+    const rows = readFileSync('apps/web/src/legal/read-back-id.md', 'utf8')
+      .split('\n')
+      .filter((row) => row.startsWith('| ') && !row.startsWith('| Key ') && !row.startsWith('| ---'))
+      .map((row) => row.split(' | ').at(-1)?.replace(/ \|$/, '') ?? '');
+    expect(rows.length).toBeGreaterThan(0);
+    for (const line of rows) {
+      expect(line, line).not.toMatch(FIRST_PERSON);
+      expect(line, line).not.toMatch(REFUSED);
+    }
+  });
+
   it('finds none of the refused words in the English', () => {
     for (const line of englishLines()) expect(line, line).not.toMatch(REFUSED);
   });
@@ -62,15 +89,15 @@ describe('the copy guard', () => {
 
   it.each(['id', 'th', 'vi', 'zh'])('finds none of the refused words in the %s read-back, which covers every line', (locale) => {
     const read = googleColumn(locale);
-    expect(read.length).toBe(englishLines().length);
+    expect(read).toHaveLength(englishLines().length);
     for (const line of read) expect(line, line).not.toMatch(REFUSED);
   });
 
-  it.each(['a dating app', 'find a partner', 'the app is rebuilt', 'We relaunched'])('refuses "%s"', (line) => {
+  it.each(['the app is rebuilt', 'We relaunched', 'a rebuild is coming'])('refuses "%s"', (line) => {
     expect(line).toMatch(REFUSED);
   });
 
-  it.each(['update your app', 'candidates welcome', 'mismatched socks'])('lets "%s" through', (line) => {
+  it.each(['update your app', 'find a language partner', 'the date of the festival', 'a matching pair'])('lets "%s" through', (line) => {
     expect(line).not.toMatch(REFUSED);
   });
 });

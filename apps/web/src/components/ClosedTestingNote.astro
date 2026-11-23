@@ -1,0 +1,24 @@
+---
+import Base from '../layouts/Base.astro';
+import { localePath, t, type Locale } from '../i18n/t.ts';
+
+interface Props {
+  locale: Locale;
+  /** Where a confirm ended: confirmed, or a link that was used or too old. */
+  kind: 'confirmed' | 'expired';
+}
+const { locale, kind } = Astro.props;
+const line = (key: string): string => t(locale, `closedTesting.${key}`);
+---
+
+<Base locale={locale} title={line(`${kind}Heading`)}>
+  <h1>{line(`${kind}Heading`)}</h1>
+  <p>{line(`${kind}Body`)}</p>
+  {
+    kind === 'expired' && (
+      <p>
+        <a href={localePath(locale, '/closed-testing')}>{line('expiredApply')}</a>
+      </p>
+    )
+  }
+</Base>

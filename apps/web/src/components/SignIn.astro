@@ -1,0 +1,110 @@
+---
+import Base from '../layouts/Base.astro';
+import { localePath, t, type Locale } from '../i18n/t.ts';
+
+/**
+ * Signing in on the website (plan 7 Task 7, shyden-labs/ShyTalk#134): a
+ * passkey, an authenticator app's code, or a recovery code. Every refusal
+ * reads the same; a success's answer sets the session cookie and the page
+ * goes on to the account.
+ */
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const line = (key: string): string => t(locale, `account.${key}`);
+---
+
+<Base locale={locale} title={line('signInTitle')}>
+  <h1>{line('signInTitle')}</h1>
+  <noscript><p>{line('noScript')}</p></noscript>
+  <div
+    id="sign-in"
+    data-account={localePath(locale, '/account/')}
+    data-sign-in-refused={line('signInRefused')}
+    data-too-many={line('tooMany')}
+    data-failed={line('failed')}
+    data-codes-left={line('codesLeftAfterSignIn')}
+  >
+    <p><button id="passkey-sign-in" type="button">{line('signInWithPasskey')}</button></p>
+    <h2>{line('orAuthenticator')}</h2>
+    <form id="signin-form">
+      <p>
+        <label for="signin-email">{line('emailLabel')}</label>
+        <input id="signin-email" name="email" type="email" autocomplete="username" required />
+      </p>
+      <p id="totp-field">
+        <label for="signin-code">{line('authenticatorCodeLabel')}</label>
+        <input id="signin-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" />
+      </p>
+      <p id="recovery-field" hidden>
+        <label for="signin-recovery-code">{line('recoveryCodeLabel')}</label>
+        <input id="signin-recovery-code" name="recoveryCode" autocomplete="off" />
+      </p>
+      <p><button id="signin-submit" type="submit">{line('signInWithAuthenticator')}</button></p>
+      <p><button id="signin-recovery-submit" type="submit" hidden>{line('signInWithRecoveryCode')}</button></p>
+    </form>
+    <p><button id="use-recovery-code" type="button">{line('useRecoveryCode')}</button></p>
+    <p id="signin-answer" role="status" hidden></p>
+    <p id="signin-continue" hidden><a href={localePath(locale, '/account/')}>{line('accountTitle')}</a></p>
+  </div>
+</Base>
+
+<script>
+  import { startAuthentication, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
+  import { signInMessage } from '../account/answers.ts';
+  import { call, type Answer } from '../account/api.ts';
+
+  const root = document.querySelector<HTMLElement>('#sign-in');
+  const form = document.querySelector<HTMLFormElement>('#signin-form');
+  const answer = document.querySelector<HTMLElement>('#signin-answer');
+
+  const say = (text: string): void => {
+    if (!answer) return;
+    answer.textContent = text;
+    answer.hidden = false;
+  };
+  const field = (name: string): string => (form ? String(new FormData(form).get(name) ?? '').trim() : '');
+
+  /** Goes on to the account, or says why not; a recovery code's sign-in first says how many are left. */
+  function settle({ status, body }: Answer): void {
+    if (!root) return;
+    const message = signInMessage(status);
+    if (message !== null) return say(root.dataset[message] ?? '');
+    const left = (body as { left?: unknown } | null)?.left;
+    if (typeof left !== 'number') return location.assign(root.dataset['account'] ?? '/');
+    say((root.dataset['codesLeft'] ?? '').replace('{count}', String(left)));
+    const onward = document.querySelector<HTMLElement>('#signin-continue');
+    if (onward) onward.hidden = false;
+  }
+
+  if (root && form && answer) {
+    let withRecoveryCode = false;
+    document.querySelector('#use-recovery-code')?.addEventListener('click', (event) => {
+      withRecoveryCode = true;
+      for (const id of ['#totp-field', '#signin-submit']) document.querySelector<HTMLElement>(id)?.toggleAttribute('hidden', true);
+      for (const id of ['#recovery-field', '#signin-recovery-submit']) document.querySelector<HTMLElement>(id)?.toggleAttribute('hidden', false);
+      (event.currentTarget as HTMLElement).hidden = true;
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const email = field('email');
+      const request = withRecoveryCode ? call('sign-in/recovery-code', { email, code: field('recoveryCode') }) : call('sign-in/totp', { email, code: field('code') });
+      void request.then(settle);
+    });
+
+    document.querySelector('#passkey-sign-in')?.addEventListener('click', () => {
+      void (async () => {
+        const options = await call('passkey/sign-in/options', {});
+        if (options.status !== 200) return settle(options);
+        try {
+          const response = await startAuthentication({ optionsJSON: options.body as PublicKeyCredentialRequestOptionsJSON });
+          settle(await call('passkey/sign-in/verify', { response }));
+        } catch {
+          settle({ status: 401, body: null });
+        }
+      })();
+    });
+  }
+</script>

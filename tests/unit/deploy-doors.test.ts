@@ -38,19 +38,21 @@ describe('deploy-doors', () => {
     const text = jobs().join('\n');
     expect(text).toContain(`DOOR_SECRET_${upper}: \${{ secrets.DOOR_SECRET_${upper} }}`);
     expect(text).toContain(`if [ -z $DOOR_SECRET_${upper} ]; then`);
-    expect(text).toContain(`npx wrangler deploy --env ${name} ||`);
-    expect(text).toContain(`printf %s $DOOR_SECRET_${upper} | npx wrangler secret put DOOR_SECRET --env ${name} ||`);
+    expect(text).toContain(`$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env ${name} ||`);
+    expect(text).toContain(
+      `printf %s $DOOR_SECRET_${upper} | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put DOOR_SECRET --env ${name} ||`,
+    );
   });
 
   it('checks both secrets before deploying either door', () => {
     const text = jobs().join('\n');
     const lastCheck = Math.max(text.indexOf('if [ -z $DOOR_SECRET_TEST ]'), text.indexOf('if [ -z $DOOR_SECRET_DEV ]'));
     expect(lastCheck).toBeGreaterThan(-1);
-    expect(text.indexOf('npx wrangler deploy')).toBeGreaterThan(lastCheck);
+    expect(text.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy')).toBeGreaterThan(lastCheck);
   });
 
   it('deploys from the door folder and nothing else', () => {
     expect(jobs()).toContain('        working-directory: workers/door');
-    expect(workflow()).not.toContain('workers/echo');
+    expect(workflow()).not.toContain('workers/web');
   });
 });

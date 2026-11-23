@@ -48,8 +48,8 @@ export interface ReleaseCutFacts {
   mainCommits: MainCommit[];
 }
 
-const SHA = /^[0-9a-f]{40}$/;
-const PULL_NUMBER = /^[1-9][0-9]*$/;
+const SHA = /^[\da-f]{40}$/;
+const PULL_NUMBER = /^[1-9]\d*$/;
 /** Where the pull request's merge commit is fetched to. */
 export const MERGE_REF = 'refs/remotes/pull/merge';
 /** GitHub refuses a commit status description longer than this. */
@@ -127,7 +127,7 @@ export function parseRemoteHead(lsRemote: string, ref: string, question: string)
 }
 
 function git(args: string[]): string {
-  return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
 }
 
 /** Whether `sha` is on develop. git answers 0 (yes) or 1 (no); anything else is an error, never a no. */

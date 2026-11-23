@@ -1,0 +1,163 @@
+# TEST and PROD deploy the website from a release cut (shyden-labs/ShyTalk#116).
+# A push to `release/*` deploys TEST through `test`, which allows only
+# `release/*` and holds the Non-Prod test token. A push to `main` (the cut
+# merged by Shyden) deploys PROD through `production`, which allows only `main`
+# and waits for his approval. Neither environment's credential reaches the
+# other, and dev can never deploy either (decision 214, one token per account).
+# A pull request changing this file rehearses it in `release-rehearsal`, which
+# holds nothing, so its lines run before a release depends on them.
+#
+# Third-party actions are pinned to full SHAs with a `# vX.Y.Z` comment, as in
+# ci.yml.
+name: deploy-release
+on:
+  push:
+    branches: ['release/**', main]
+  pull_request:
+    paths: ['.github/workflows/deploy-release.yml']
+  workflow_dispatch:
+
+# A deploy stopped halfway leaves an environment undefined, so a newer run
+# waits for the running one. Each ref queues alone, so TEST never waits on
+# PROD's approval, and each pull request rehearses in its own group.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('deploy-release-rehearsal-{0}', github.event.pull_request.number) || format('deploy-release-{0}', github.ref) }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-release:
+    # A hand-started run on any other branch skips before asking for approval.
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/') }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    environment: ${{ github.event_name == 'pull_request' && 'release-rehearsal' || github.ref == 'refs/heads/main' && 'production' || 'test' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The exact Node, from the one file Dependabot bumps (shyden-labs/repo-template#143), as in ci.yml.
+      - id: node
+        run: |
+          version=$(sed -nE 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' .github/node/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: 'npm'
+      - run: node scripts/npm-ci.ts
+      # The same steps as deploy-dev, for the Worker environment TARGET (test
+      # or prod): the database exists, is migrated and is marked TARGET before
+      # the Worker deploys, or the site answers 503 to everyone (#75, decisions
+      # 219, 220). A rehearsal only bundles both environments, with no
+      # credential.
+      - name: Deploy the website
+        id: deploy
+        env:
+          DEPLOY_REHEARSAL: ${{ github.event_name == 'pull_request' }}
+          TARGET: ${{ github.ref == 'refs/heads/main' && 'prod' || 'test' }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          TOTP_KEY: ${{ secrets.TOTP_KEY }}
+        run: |
+          SITE_ENVIRONMENT=$TARGET npm run build:web || { echo "::error title=deploy-release failed::the website did not build"; exit 1; }
+          cd workers/web
+          if [ "$DEPLOY_REHEARSAL" = true ]; then
+            "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --dry-run --env test --outdir "$RUNNER_TEMP/test" || { echo "::error title=deploy-release failed::workers/web did not bundle for test"; exit 1; }
+            "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --dry-run --env prod --outdir "$RUNNER_TEMP/prod" || { echo "::error title=deploy-release failed::workers/web did not bundle for prod"; exit 1; }
+            exit 0
+          fi
+          info=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 info "shytalk-$TARGET" --env "$TARGET" 2>&1) || {
+            printf '%s\n' "$info"
+            case "$info" in
+              *"Couldn't find a D1 DB named 'shytalk-$TARGET'"*) "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 create "shytalk-$TARGET" --location apac || { echo "::error title=deploy-release failed::shytalk-$TARGET was not created"; exit 1; } ;;
+              *) echo "::error title=deploy-release failed::d1 info shytalk-$TARGET failed"; exit 1 ;;
+            esac
+          }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 migrations apply DB --remote --env "$TARGET" || { echo "::error title=deploy-release failed::the shytalk-$TARGET migrations did not apply"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 execute DB --remote --env "$TARGET" --command "CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT '$TARGET' WHERE NOT EXISTS (SELECT 1 FROM environment_marker);" || { echo "::error title=deploy-release failed::the shytalk-$TARGET marker was not written"; exit 1; }
+          marker=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 execute DB --remote --env "$TARGET" --json --command "SELECT name FROM environment_marker") || { echo "::error title=deploy-release failed::the shytalk-$TARGET marker could not be read back"; exit 1; }
+          if [ "$(printf '%s' "$marker" | jq --arg t "$TARGET" '[.[0].results[].name] == [$t]')" != true ]; then
+            printf '%s\n' "$marker"
+            echo "::error title=deploy-release failed::shytalk-$TARGET must hold exactly one marker row, $TARGET"
+            exit 1
+          fi
+          echo "Read back: shytalk-$TARGET is marked $TARGET."
+          # Plan 4 Task 6 (shyden-labs/ShyTalk#79): the app's UI document
+          # (manifests/ui.json) is published to the migrated database before the
+          # Worker that serves it deploys, through a Wrangler remote binding to
+          # the database by id (Shyden, 2026-11-06): TEST from a release cut,
+          # PROD only from main in the approved `production` run. It publishes
+          # nothing when the target already serves that document.
+          ui_db=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 info "shytalk-$TARGET" --env "$TARGET" --json | jq -er '.uuid') || { echo "::error title=deploy-release failed::the shytalk-$TARGET id could not be read"; exit 1; }
+          (cd "$GITHUB_WORKSPACE" && UI_ENVIRONMENT="$TARGET" UI_DATABASE_NAME="shytalk-$TARGET" UI_DATABASE_ID="$ui_db" UI_PUBLISHED_BY=ci:deploy-release node scripts/publish-ui.ts) || { echo "::error title=deploy-release failed::the UI document was not published to $TARGET"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --env "$TARGET" || { echo "::error title=deploy-release failed::workers/web did not deploy to $TARGET"; exit 1; }
+          # App sign-in answers 503 until the Worker holds Better Auth's
+          # secret (shyden-labs/ShyTalk#110); test and production each hold
+          # their own value.
+          if [ -z "$BETTER_AUTH_SECRET" ]; then
+            echo "::error title=BETTER_AUTH_SECRET missing::Set BETTER_AUTH_SECRET in this run's GitHub environment (shyden-labs/ShyTalk#110); until then $TARGET app sign-in answers 503."
+            exit 1
+          fi
+          printf '%s' "$BETTER_AUTH_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put BETTER_AUTH_SECRET --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET Better Auth secret was not set"; exit 1; }
+          # Authenticator-app sign-in answers 503 until the Worker holds TOTP_KEY
+          # (shyden-labs/ShyTalk#134); it seals stored secrets, so test and
+          # production each keep their own value, never made fresh here.
+          if [ -z "$TOTP_KEY" ]; then
+            echo "::error title=TOTP_KEY missing::Set TOTP_KEY in this run's GitHub environment (shyden-labs/ShyTalk#134); until then $TARGET authenticator-app sign-in answers 503."
+            exit 1
+          fi
+          printf '%s' "$TOTP_KEY" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put TOTP_KEY --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET authenticator key was not set"; exit 1; }
+          # The TEST origin refuses every request without its door secret
+          # (decision 216) and its site password (shyden-labs/ShyTalk#262); PROD has neither.
+          if [ "$TARGET" = test ]; then
+            if [ -z "$DOOR_SECRET" ]; then
+              echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the test environment (decision 216); until then the TEST origin refuses every request."
+              exit 1
+            fi
+            printf '%s' "$DOOR_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put DOOR_SECRET --env test || { echo "::error title=deploy-release failed::the test door secret was not set"; exit 1; }
+            # shyden-labs/ShyTalk#262: TEST asks for this password with the
+            # browser's own box; PROD never does.
+            if [ -z "$SITE_PASSWORD" ]; then
+              echo "::error title=SITE_PASSWORD missing::Set SITE_PASSWORD in the test environment (shyden-labs/ShyTalk#262); until then TEST refuses every request."
+              exit 1
+            fi
+            printf '%s' "$SITE_PASSWORD" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put SITE_PASSWORD --env test || { echo "::error title=deploy-release failed::the test site password was not set"; exit 1; }
+          fi
+          # Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07): last,
+          # every open app hears the newest UI version. Each deploy makes a
+          # fresh announce secret, puts it in the Worker and calls the Worker
+          # with it, so nothing is stored.
+          announce_secret=$(openssl rand -hex 32) || { echo "::error title=deploy-release failed::no announce secret was made"; exit 1; }
+          echo "::add-mask::$announce_secret"
+          printf '%s' "$announce_secret" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put ANNOUNCE_SECRET --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET announce secret was not set"; exit 1; }
+          (cd "$GITHUB_WORKSPACE" && ANNOUNCE_ENVIRONMENT="$TARGET" ANNOUNCE_SECRET="$announce_secret" node scripts/announce-ui.ts) || { echo "::error title=deploy-release failed::open apps on $TARGET were not told the UI version"; exit 1; }
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+      # shyden-labs/ShyTalk#88: the Oracle mail secrets are in no other step's
+      # environment; this last step runs only after the step above deployed,
+      # and runs nothing but `wrangler secret put`. It is not a hard boundary:
+      # earlier steps share this runner (files, GITHUB_ENV, GITHUB_PATH), and
+      # they hold the Cloudflare token, which could reach Worker secrets
+      # anyway, so a separate job would cost a runner and protect no more.
+      - name: Put the Oracle mail secrets
+        if: steps.deploy.outputs.deployed == 'true'
+        working-directory: workers/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TARGET: ${{ github.ref == 'refs/heads/main' && 'prod' || 'test' }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_COMPARTMENT: ${{ secrets.OCI_COMPARTMENT }}
+        run: |
+          for name in OCI_TENANCY OCI_USER OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_COMPARTMENT; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=$name missing::Set $name in this run's GitHub environment (shyden-labs/ShyTalk#88); until then $TARGET sends no mail."
+              exit 1
+            fi
+            printf '%s' "${!name}" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put "$name" --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET $name was not set"; exit 1; }
+          done
