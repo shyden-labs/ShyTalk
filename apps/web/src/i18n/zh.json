@@ -38,7 +38,7 @@
     "intro": "封闭测试让一小部分人在 ShyTalk 应用发布前抢先试用。",
     "noAccess": "提交此表单并不代表获得封闭测试资格。",
     "moreDetails": "如果您通过初步筛选，将需要提供更多信息。",
-    "safeList": "请将 support@shytalk.app 加入安全发件人名单，以确保能收到邮件。",
+    "safeList": "请将 shytalk.app 加入安全发件人名单，以确保能收到邮件。",
     "removed": "如果您未入选，您的信息将被删除。",
     "retention": "您的信息仅保留到封闭测试结束。",
     "emailLabel": "电子邮箱地址",

@@ -34,7 +34,7 @@
 | closedTesting.intro | Closed testing lets a small group try the ShyTalk app before it launches. | การทดสอบแบบปิดเปิดโอกาสให้คนกลุ่มเล็ก ๆ ได้ลองใช้แอป ShyTalk ก่อนเปิดตัว | The closed beta test gave a small group of people the opportunity to try out the ShyTalk app before its official launch. |
 | closedTesting.noAccess | Sending this form does not give access to closed testing. | การส่งแบบฟอร์มนี้ไม่ได้ให้สิทธิ์เข้าร่วมการทดสอบแบบปิด | Submitting this form does not grant access to the closed test. |
 | closedTesting.moreDetails | If you are preliminarily selected, you will be asked for more details. | หากคุณผ่านการคัดเลือกเบื้องต้น คุณจะถูกขอข้อมูลเพิ่มเติม | If you pass the initial screening, you will be asked to provide additional information. |
-| closedTesting.safeList | Add support@shytalk.app to your safe list so that messages reach you. | เพิ่ม support@shytalk.app ลงในรายชื่อผู้ส่งที่ปลอดภัยของคุณ เพื่อให้ข้อความส่งถึงคุณ | Add support@shytalk.app to your safe senders list so messages can be sent to you. |
+| closedTesting.safeList | Add shytalk.app to your list of safe senders so that messages reach you. | เพิ่ม shytalk.app ลงในรายชื่อผู้ส่งที่ปลอดภัยของคุณ เพื่อให้ข้อความส่งถึงคุณ | Add shytalk.app to your safe senders list so messages can be sent to you. |
 | closedTesting.removed | If you are not selected, your details are removed. | หากคุณไม่ได้รับการคัดเลือก ข้อมูลของคุณจะถูกลบ | If you are not selected, your information will be deleted. |
 | closedTesting.retention | Your details are kept only until closed testing ends. | ข้อมูลของคุณจะถูกเก็บไว้จนกว่าการทดสอบแบบปิดจะสิ้นสุดเท่านั้น | Your data will only be stored until the closed test is complete. |
 | closedTesting.emailLabel | Email address | ที่อยู่อีเมล | Email address |

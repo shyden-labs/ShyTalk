@@ -1,7 +1,7 @@
 ---
 /**
  * The holding page production answers with until the full release (shyden-labs/ShyTalk#261), in ShyTalk's brand
- * (#273): a language switch, the icon, the name, "Coming soon", the tagline, the floating hellos and the contact. No
+ * (#273): a language switch, the icon, the name, "Coming soon", the tagline, and the floating hellos (no contact address, shyden-labs/ShyTalk#333). No
  * menu or footer, as nothing they would link to is released. The fonts are bundled from @fontsource and served from
  * the site itself, as the content security policy allows only the site's own address.
  */
@@ -13,7 +13,6 @@ import '@fontsource/noto-sans-thai/800.css';
 import Base from '../layouts/Base.astro';
 import Hellos from './Hellos.astro';
 import { LANGUAGE_NAMES, LOCALES, langTag, t, type Locale } from '../i18n/t.ts';
-import { SUPPORT_EMAIL } from '../site.ts';
 
 interface Props {
   locale: Locale;
@@ -46,6 +45,5 @@ const { locale } = Astro.props;
       <p class="tagline">{t(locale, 'site.tagline')}</p>
       <Hellos />
     </div>
-    <p class="holding-contact"><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></p>
   </div>
 </Base>
