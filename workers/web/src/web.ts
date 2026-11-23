@@ -16,6 +16,7 @@ import { json } from './http.ts';
 import type { RateLimit } from './app/sign-in.ts';
 import type { AnnouncerNamespace } from './app/announcer.ts';
 import { HOOK_PATH, handleGithubHook, type HookEnv } from './roadmap/hook-route.ts';
+import { handleRoadmapApi, isRoadmapApi } from './roadmap/routes.ts';
 
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
@@ -186,6 +187,7 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   const wrongStore = await markerGuard(env.ENVIRONMENT_NAME, env.DB).assertEnvironmentMarkers();
   if (wrongStore) return wrongStore;
   const { pathname } = new URL(request.url);
+  if (isRoadmapApi(pathname)) return handleRoadmapApi(request, env);
   if (isAppApi(pathname)) return handleAppApi(request, env);
   if (pathname.startsWith('/api/')) return handleApi(request, env);
   return env.ASSETS.fetch(request);
