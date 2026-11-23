@@ -15,6 +15,7 @@ import { devPassGate } from './dev-pass-gate.ts';
 import { json } from './http.ts';
 import type { RateLimit } from './app/sign-in.ts';
 import type { AnnouncerNamespace } from './app/announcer.ts';
+import { HOOK_PATH, handleGithubHook, type HookEnv } from './roadmap/hook-route.ts';
 
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
@@ -47,7 +48,7 @@ function policyFor(pathname: string, shydeskOrigin: string | undefined): string 
   return shydeskOrigin !== undefined && SUPPORT_PATH.test(pathname) ? supportPolicy(shydeskOrigin) : CONTENT_SECURITY_POLICY;
 }
 
-export interface WebEnv {
+export interface WebEnv extends HookEnv {
   /** Which environment this Worker is (a var): only TEST and DEV sit behind a door. */
   ENVIRONMENT_NAME: 'prod' | 'test' | 'dev';
   /** The environment's door secret (a Wrangler secret, TEST and DEV only). */
@@ -167,6 +168,10 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   if (env.ENVIRONMENT_NAME !== 'prod') {
     const refused = await requireDoorSecret(request, env.DOOR_SECRET);
     if (refused) return refused;
+  }
+  // The webhook comes from GitHub, which has no password or DEV pass to give; its signature guards it (shyden-labs/ShyTalk#321).
+  if (new URL(request.url).pathname === HOOK_PATH) return handleGithubHook(request, env);
+  if (env.ENVIRONMENT_NAME !== 'prod') {
     const now = Math.floor(Date.now() / 1000);
     const passed = await devPassGate(request, { ...env, DB: hasFullD1(env) ? env.DB : undefined }, now);
     if (passed) return passed;
