@@ -142,12 +142,19 @@ export function holdingAnswer(pathname: string, languages: string | null): { pag
   return { page: holdingPath(languages), status: pathname === '/' ? 200 : 404 };
 }
 
+/**
+ * The legal pages, which answer while production holds (shyden-labs/ShyTalk#317, Shyden 2026-11-22): in English and
+ * Indonesian, the only languages they are written in, as ShyDesk's support form links to them.
+ */
+const HOLDING_LEGAL = /^\/(?:id\/)?(?:privacy|terms|guidelines)\/?$/u;
+
 /** What the holding page itself loads, served as built: its stylesheet, icons, fonts and link-preview picture. */
 const HOLDING_ASSETS = ['/styles/', '/previews/', '/icons/', '/_astro/'];
 
 /**
  * Production while it holds: the www address sends the visitor to the bare one; its homes answer the holding page
- * (holdingAnswer); what the page loads is served; every other address answers the holding page as a 404.
+ * (holdingAnswer); what the page loads, and the legal pages, are served; every other address answers the holding page
+ * as a 404.
  */
 async function holding(request: Request, env: WebEnv): Promise<Response> {
   const url = new URL(request.url);
@@ -156,6 +163,7 @@ async function holding(request: Request, env: WebEnv): Promise<Response> {
     return Response.redirect(url.toString(), 301);
   }
   if (HOLDING_ASSETS.some((prefix) => url.pathname.startsWith(prefix))) return env.ASSETS.fetch(request);
+  if (HOLDING_LEGAL.test(url.pathname)) return env.ASSETS.fetch(request);
   const { page: path, status } = holdingAnswer(url.pathname, request.headers.get('accept-language'));
   const page = await env.ASSETS.fetch(new Request(new URL(path, url)));
   const answer = new Response(page.body, { status, headers: page.headers });
