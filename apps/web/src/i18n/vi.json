@@ -15,7 +15,7 @@
     "terms": "Điều khoản sử dụng",
     "privacy": "Quyền riêng tư",
     "guidelines": "Nguyên tắc cộng đồng",
-    "contact": "Liên hệ",
+    "contact": "Liên hệ hỗ trợ",
     "englishOnly": "Trang này chỉ có bằng tiếng Anh."
   },
   "home": {
@@ -145,5 +145,12 @@
     "building": "Ứng dụng ShyTalk đang được xây dựng.",
     "comingSoon": "Sắp ra mắt",
     "languages": "Ngôn ngữ"
+  },
+  "support": {
+    "title": "Hỗ trợ",
+    "intro": "Đặt câu hỏi hoặc báo cáo sự cố. Câu trả lời sẽ được gửi qua email.",
+    "englishForm": "Hiện tại biểu mẫu chỉ có bằng tiếng Anh.",
+    "ticketTitle": "Yêu cầu hỗ trợ bạn đã gửi",
+    "noScript": "Biểu mẫu hỗ trợ cần JavaScript. Hãy bật JavaScript để gửi yêu cầu."
   }
 }

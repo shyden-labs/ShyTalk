@@ -15,7 +15,7 @@
     "terms": "Terms",
     "privacy": "Privacy",
     "guidelines": "Community guidelines",
-    "contact": "Contact",
+    "contact": "Contact support",
     "englishOnly": "This page is available in English only."
   },
   "home": {
@@ -145,5 +145,12 @@
     "building": "The ShyTalk app is being built now.",
     "comingSoon": "Coming soon",
     "languages": "Language"
+  },
+  "support": {
+    "title": "Support",
+    "intro": "Ask a question or report a problem. The reply comes by email.",
+    "englishForm": "The form is in English for now.",
+    "ticketTitle": "Your support request",
+    "noScript": "The support form needs JavaScript. Turn it on to send a request."
   }
 }

@@ -116,6 +116,13 @@ export async function main(
 ): Promise<number> {
   if (args.length > 0) throw new Error('usage: node scripts/announce-ui.ts (no arguments; the deploy sets ANNOUNCE_* in the environment)');
   const { environment, headers } = announceSettings(env);
+  // shyden-labs/ShyTalk#331 (Shyden 2026-11-23): while the environment holds, every address answers the holding
+  // page, the announce included, and no app can be open, so there is nothing to tell and the release carries on.
+  const site = JSON.parse(read(SITE_CONFIG)) as { env?: Record<string, { vars?: Record<string, unknown> }> };
+  if (site.env?.[environment]?.vars?.['HOLDING'] === 'true') {
+    print('production holds: no app can be open, so nothing to tell');
+    return 0;
+  }
   const url = `${announceOrigin(read, environment)}/api/app/live/announce`;
   const ask = (): Promise<Response> => send(url, { method: 'POST', headers });
 

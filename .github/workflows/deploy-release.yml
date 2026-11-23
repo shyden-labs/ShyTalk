@@ -46,6 +46,26 @@ jobs:
         with:
           node-version: ${{ steps.node.outputs.version }}
           cache: 'npm'
+      # shyden-labs/ShyTalk#330 (Shyden 2026-11-23): before any install or
+      # deploy, the environment holds every secret this release reads, listed in
+      # .github/release-secrets.json, each passed by name (test's list holds
+      # production's); a missing one fails here, by name only.
+      # The rehearsal holds no secrets, so it skips this.
+      - name: Every secret this release reads is set
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          RELEASE_ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'test' }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DOOR_SECRET: ${{ secrets.DOOR_SECRET }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          TOTP_KEY: ${{ secrets.TOTP_KEY }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_COMPARTMENT: ${{ secrets.OCI_COMPARTMENT }}
+        run: node scripts/check-release-secrets.ts
       - run: node scripts/npm-ci.ts
       # The same steps as deploy-dev, for the Worker environment TARGET (test
       # or prod): the database exists, is migrated and is marked TARGET before

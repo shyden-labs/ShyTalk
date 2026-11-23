@@ -13,7 +13,7 @@
 | footer.terms | Terms | ข้อกำหนดและเงื่อนไข | Terms and Conditions |
 | footer.privacy | Privacy | ความเป็นส่วนตัว | privacy |
 | footer.guidelines | Community guidelines | หลักเกณฑ์ของชุมชน | Community guidelines |
-| footer.contact | Contact | ติดต่อ | contact |
+| footer.contact | Contact support | ติดต่อฝ่ายช่วยเหลือ | Contact support. |
 | home.title | ShyTalk | ShyTalk | ShyTalk |
 | home.heading | Learn languages and cultures by talking | เรียนภาษาและวัฒนธรรมด้วยการพูดคุย | Learn language and culture through conversation. |
 | home.intro | ShyTalk is a friendly place to practise a language out loud and discover the cultures behind it. | ShyTalk เป็นพื้นที่ที่เป็นมิตรสำหรับฝึกพูดภาษาออกมาดัง ๆ และค้นพบวัฒนธรรมที่อยู่เบื้องหลังภาษานั้น | ShyTalk is a friendly space for practicing speaking a language aloud and discovering the culture behind it. |
@@ -131,3 +131,8 @@
 | holding.building | The ShyTalk app is being built now. | แอป ShyTalk กำลังอยู่ระหว่างการสร้าง | The ShyTalk app is currently under development. |
 | holding.comingSoon | Coming soon | เปิดตัวเร็ว ๆ นี้ | Launching soon. |
 | holding.languages | Language | ภาษา | language |
+| support.title | Support | ฝ่ายช่วยเหลือ | Support team |
+| support.intro | Ask a question or report a problem. The reply comes by email. | ถามคำถามหรือแจ้งปัญหา คำตอบจะส่งถึงคุณทางอีเมล | Ask a question or report a problem; the answer will be sent to you via email. |
+| support.englishForm | The form is in English for now. | ขณะนี้แบบฟอร์มมีเฉพาะภาษาอังกฤษ | Currently, the form is only available in English. |
+| support.ticketTitle | Your support request | คำขอความช่วยเหลือของคุณ | Your request for help. |
+| support.noScript | The support form needs JavaScript. Turn it on to send a request. | แบบฟอร์มขอความช่วยเหลือต้องใช้ JavaScript โปรดเปิดใช้งานเพื่อส่งคำขอ | The help form requires JavaScript. Please enable it to submit requests. |
