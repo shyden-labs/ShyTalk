@@ -137,6 +137,15 @@ describe('ShyDesk punishments on D1', () => {
     expect.soft(await count('session WHERE "userId" = ?', user)).toBe(0);
     expect.soft(await signIn('punished@example.test', 'g-punished')).toEqual({ status: 403, body: { error: 'member_blocked' } });
     expect.soft(await count('session WHERE "userId" = ?', user)).toBe(0);
+    // Nor can a session row land while the block holds, even past the sign-in check: a sign-in checked just before the
+    // ban arrived cannot write its session after the ban ended the others (the database refuses the row itself).
+    const late = local.DB.prepare(
+      'INSERT INTO "session" ("id", "expiresAt", "token", "createdAt", "updatedAt", "userId") VALUES (\'s-late\', 0, \'t-late\', 0, 0, ?)',
+    )
+      .bind(user)
+      .run();
+    await expect.soft(late).rejects.toThrow(/member_blocked/u);
+    expect.soft(await count('session WHERE "userId" = ?', user)).toBe(0);
     expect
       .soft(await delivery({ id: 'p-sus', user, key: 'suspend-7d', seconds: 604_800 }))
       .toEqual({ status: 200, body: { applied: true } });
