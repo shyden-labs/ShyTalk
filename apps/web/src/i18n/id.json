@@ -151,6 +151,8 @@
     "intro": "Ajukan pertanyaan atau laporkan masalah. Balasan akan dikirim lewat email.",
     "englishForm": "Untuk sementara, formulir ini hanya tersedia dalam bahasa Inggris.",
     "ticketTitle": "Permintaan bantuan Anda",
+    "appealTitle": "Ajukan banding atas keputusan",
+    "appealIntro": "Jika Anda merasa keputusan moderasi pada akun Anda keliru, jelaskan alasannya di sini.",
     "noScript": "Formulir bantuan memerlukan JavaScript. Aktifkan JavaScript untuk mengirim permintaan."
   }
 }

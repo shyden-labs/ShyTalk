@@ -151,6 +151,8 @@
     "intro": "提出问题或报告故障，回复将通过电子邮件发送。",
     "englishForm": "表单目前仅提供英文版本。",
     "ticketTitle": "您的支持请求",
+    "appealTitle": "对处理决定提出申诉",
+    "appealIntro": "如果您认为针对您账户的审核决定有误，请在此说明理由。",
     "noScript": "客服表单需要 JavaScript。请启用后再发送请求。"
   }
 }

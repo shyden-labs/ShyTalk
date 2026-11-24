@@ -135,4 +135,6 @@
 | support.intro | Ask a question or report a problem. The reply comes by email. | 提出问题或报告故障，回复将通过电子邮件发送。 | Ask a question or report a problem, and a response will be sent via email. |
 | support.englishForm | The form is in English for now. | 表单目前仅提供英文版本。 | The form is currently only available in English. |
 | support.ticketTitle | Your support request | 您的支持请求 | Your support request |
+| support.appealTitle | Appeal a decision | 对处理决定提出申诉 | Appeals against the decision |
+| support.appealIntro | If you think a moderation decision on your account was wrong, explain why here. | 如果您认为针对您账户的审核决定有误，请在此说明理由。 | If you believe the review decision regarding your account was incorrect, please explain your reasoning here. |
 | support.noScript | The support form needs JavaScript. Turn it on to send a request. | 客服表单需要 JavaScript。请启用后再发送请求。 | The customer service form requires JavaScript. Please enable it before sending a request. |

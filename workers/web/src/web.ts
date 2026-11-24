@@ -25,8 +25,11 @@ export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; fra
 /** Where ShyDesk's support piece runs its human check: Cloudflare Turnstile. */
 const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
 
-/** The support page in every language and its one ticket page, the only pages that embed ShyDesk (shyden-labs/ShyTalk#37). */
-const SUPPORT_PATH = /^\/(?:(?:id|th|vi|zh)\/)?support(?:\/ticket|\/)?$/u;
+/**
+ * The support page in every language, its one ticket page and the appeal page, the only pages that embed ShyDesk
+ * (shyden-labs/ShyTalk#37, #310).
+ */
+const SUPPORT_PATH = /^\/(?:(?:id|th|vi|zh)\/)?(?:support(?:\/ticket|\/)?|appeal)$/u;
 
 /**
  * The support pages' policy: the site's own plus only what ShyDesk's piece needs, its scripts and API on the

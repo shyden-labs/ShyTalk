@@ -135,4 +135,6 @@
 | support.intro | Ask a question or report a problem. The reply comes by email. | Đặt câu hỏi hoặc báo cáo sự cố. Câu trả lời sẽ được gửi qua email. | Ask a question or report a problem. The answer will be sent via email. |
 | support.englishForm | The form is in English for now. | Hiện tại biểu mẫu chỉ có bằng tiếng Anh. | Currently, the form is only available in English. |
 | support.ticketTitle | Your support request | Yêu cầu hỗ trợ bạn đã gửi | The support request you submitted |
+| support.appealTitle | Appeal a decision | Kháng nghị quyết định | Appeal against the decision |
+| support.appealIntro | If you think a moderation decision on your account was wrong, explain why here. | Nếu bạn cho rằng quyết định kiểm duyệt đối với tài khoản của bạn là sai, hãy giải thích lý do tại đây. | If you believe the decision to moderate your account was wrong, please explain why here. |
 | support.noScript | The support form needs JavaScript. Turn it on to send a request. | Biểu mẫu hỗ trợ cần JavaScript. Hãy bật JavaScript để gửi yêu cầu. | The support form requires JavaScript. Please enable JavaScript to submit requests. |
