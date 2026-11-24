@@ -1,0 +1,61 @@
+---
+/**
+ * The one language menu (shyden-labs/ShyTalk#332), as on shyden.co.uk: a `<details>` whose button shows the page's
+ * flag and language (the short name below 720px), opening a list of every language. The current one is ticked and
+ * links nowhere; each other leads to the same page in that language (`menuHref`). Every language but English is
+ * machine-translated, so it carries BETA, said in full to a screen reader in the page's language. No script: the
+ * browser's own `<details>` opens and shuts it, by click, tap, Enter or Space.
+ */
+import { LANGUAGE_NAMES, LOCALES, langTag, t, type Locale } from '../i18n/t.ts';
+import { SHORT_NAMES, menuHref } from '../i18n/language-menu.ts';
+import Flag from './Flag.astro';
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const path = Astro.url.pathname;
+const pageLang = langTag(locale);
+const betaWords = ` — ${t(locale, 'language.beta')}`;
+---
+
+<details class="lang-switch">
+  <summary aria-label={t(locale, 'language.label')}>
+    <Flag locale={locale} />
+    <span class="name full">{LANGUAGE_NAMES[locale]}</span>
+    <span class="name short">{SHORT_NAMES[locale]}</span>
+    {
+      locale !== 'en' && (
+        <span class="beta">BETA<span class="visually-hidden" lang={pageLang}>{betaWords}</span></span>
+      )
+    }
+    <span class="caret" aria-hidden="true"></span>
+  </summary>
+  <ul>
+    {
+      LOCALES.map((other) => {
+        const beta = other !== 'en' && (
+          <span class="beta">BETA<span class="visually-hidden" lang={pageLang}>{betaWords}</span></span>
+        );
+        return other === locale ? (
+          <li aria-current="true">
+            <span class="entry">
+              <Flag locale={other} />
+              <span class="name">{LANGUAGE_NAMES[other]}</span>
+              {beta}
+              <span class="tick" aria-hidden="true">✓</span>
+            </span>
+          </li>
+        ) : (
+          <li>
+            <a class="entry" href={menuHref(path, other)} hreflang={langTag(other)} lang={langTag(other)} rel="alternate">
+              <Flag locale={other} />
+              <span class="name">{LANGUAGE_NAMES[other]}</span>
+              {beta}
+            </a>
+          </li>
+        );
+      })
+    }
+  </ul>
+</details>

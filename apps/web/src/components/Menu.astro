@@ -1,6 +1,7 @@
 ---
 import { localePath, t, type Locale } from '../i18n/t.ts';
 import { SHOW_ROADMAP, SHOW_SIGN_IN } from '../site.ts';
+import LanguageMenu from './LanguageMenu.astro';
 
 interface Props {
   locale: Locale;
@@ -27,4 +28,5 @@ const items = [
       }
     </ul>
   </nav>
+  <LanguageMenu locale={locale} />
 </header>
