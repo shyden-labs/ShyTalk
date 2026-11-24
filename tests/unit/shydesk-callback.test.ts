@@ -62,7 +62,7 @@ describe('ShyDesk’s punishment callback', () => {
       subject_user_id: 'probe-310-member',
       punishment: { key: 'warning', label: 'Warning', duration_seconds: null },
       report_ticket_id: '373d7e44-60fb-4c0c-801f-98b790225e2a',
-      appeal_url: 'https://dev.shytalk.app/appeal#appeal=t',
+      appeal_url: 'https://site.example.test/appeal#appeal=t',
       issued_at: 1_795_399_990_000,
     };
     const result = await check(delivery(warning));
