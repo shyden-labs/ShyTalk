@@ -159,7 +159,7 @@ const HOLDING_ASSETS = ['/styles/', '/previews/', '/icons/', '/_astro/'];
 
 /**
  * Production while it holds: the www address sends the visitor to the bare one; its homes answer the holding page
- * (holdingAnswer); what the page loads, and the legal pages, are served; every other address answers the holding page
+ * (holdingAnswer); what the page loads, the legal pages and the support pages are served; every other address answers the holding page
  * as a 404.
  */
 async function holding(request: Request, env: WebEnv): Promise<Response> {
@@ -170,6 +170,8 @@ async function holding(request: Request, env: WebEnv): Promise<Response> {
   }
   if (HOLDING_ASSETS.some((prefix) => url.pathname.startsWith(prefix))) return env.ASSETS.fetch(request);
   if (HOLDING_LEGAL.test(url.pathname)) return env.ASSETS.fetch(request);
+  // The support and appeal pages answer too, so a request or an appeal can still be sent (shyden-labs/ShyTalk#322).
+  if (SUPPORT_PATH.test(url.pathname)) return env.ASSETS.fetch(request);
   const { page: path, status } = holdingAnswer(url.pathname, request.headers.get('accept-language'));
   const page = await env.ASSETS.fetch(new Request(new URL(path, url)));
   const answer = new Response(page.body, { status, headers: page.headers });
