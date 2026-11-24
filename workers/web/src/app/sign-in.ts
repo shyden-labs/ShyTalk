@@ -18,7 +18,7 @@ import { APIError } from 'better-auth/api';
 import { serializeCookie } from 'better-call';
 import { audit, type AuditDatabase } from '../audit.ts';
 import { json } from '../http.ts';
-import { listOf, type AuthEnv, type ShyTalkAuth } from '../auth/better-auth.ts';
+import { MEMBER_BLOCKED, listOf, type AuthEnv, type ShyTalkAuth } from '../auth/better-auth.ts';
 import { appSession, signedOut } from './session.ts';
 
 /** The Workers rate-limiting binding (wrangler.json `ratelimits`). */
@@ -76,6 +76,8 @@ export async function handleSignIn(request: Request, env: SignInEnv, auth: ShyTa
     if (!('token' in answer)) throw new Error('Better Auth answered an ID-token sign-in without a session');
     signedIn = answer;
   } catch (error) {
+    if (error instanceof APIError && (error.body as { code?: unknown } | undefined)?.code === MEMBER_BLOCKED)
+      return json(403, { error: 'member_blocked' });
     if (error instanceof APIError) return json(401, { error: 'sign_in_refused' });
     throw error;
   }
