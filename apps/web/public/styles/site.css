@@ -433,6 +433,10 @@ shydesk-support {
   transform: translateY(2px) rotate(-135deg);
 }
 
+.lang-switch:not([open]) > ul {
+  display: none;
+}
+
 .lang-switch > ul {
   position: absolute;
   z-index: 10;
