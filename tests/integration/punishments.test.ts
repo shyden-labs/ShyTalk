@@ -73,7 +73,7 @@ async function delivery({ type = 'punishment.apply', id, user, key = 'ban', seco
     punishment: { key, label: `Label for ${key}`, duration_seconds: seconds },
     report_ticket_id: 'tkt-1',
     ...(type === 'punishment.apply' ? { appeal_url: 'https://site.example.test/appeal#appeal=t' } : {}),
-    issued_at: '2026-11-23T15:00:00Z',
+    issued_at: 1_795_399_990_000,
   });
   const timestamp = String(Math.floor(Date.now() / 1000) + skew);
   const request = new Request('https://site.example.test/api/shydesk/callback', {
