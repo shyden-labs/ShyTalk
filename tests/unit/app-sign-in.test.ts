@@ -39,6 +39,8 @@ interface World {
   /** Fails, whole, every batch holding an audit row for one of `actions`. */
   setAuditFailsOn(actions: string[]): void;
   setLimited(limited: boolean): void;
+  /** Members a blocking ShyDesk punishment holds (shyden-labs/ShyTalk#310). */
+  blocked: Set<string>;
 }
 
 function world(): World {
@@ -47,6 +49,7 @@ function world(): World {
   let auditFails = false;
   let failingActions: string[] = [];
   let overLimit = false;
+  const blocked = new Set<string>();
   const store: Record<string, Record<string, unknown>[]> = { user: [], session: [], account: [], verification: [] };
   const env: SignInEnv = {
     ENVIRONMENT_NAME: 'dev',
@@ -78,10 +81,16 @@ function world(): World {
     },
   };
   const authEnv: AuthEnv = env;
-  const auth = createAuth(authEnv, { database: memoryAdapter(store), googleKeys: jwks, appleKeys: jwks });
+  const auth = createAuth(authEnv, {
+    database: memoryAdapter(store),
+    googleKeys: jwks,
+    appleKeys: jwks,
+    blocked: (userId) => Promise.resolve(blocked.has(userId)),
+  });
   return {
     env,
     auth,
+    blocked,
     store,
     audits,
     limited,
@@ -321,6 +330,18 @@ describe('POST /api/app/sign-in/google', () => {
     const bare = new Request('https://site.example.test/api/app/sign-in/google', { method: 'POST', body: '{}' });
     await handleSignIn(bare, w.env, w.auth, 'google');
     expect(w.limited).toEqual(['198.51.100.9', 'unknown']);
+  });
+
+  it('refuses a member a ShyDesk punishment blocks with 403 member_blocked, making no session, and lets them back once it ends', async () => {
+    const { userId } = (await (await google(w, await idToken())).json()) as { userId: string };
+    w.blocked.add(userId);
+    const refused = await google(w, await idToken());
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toEqual({ error: 'member_blocked' });
+    expect(w.store['session']).toHaveLength(1);
+    expect(w.audits.filter((row) => row.values.includes('session.start'))).toHaveLength(1);
+    w.blocked.delete(userId);
+    expect((await google(w, await idToken())).status).toBe(200);
   });
 
   it('answers 503 when no Google client IDs are configured, creating nothing', async () => {

@@ -13,6 +13,7 @@ import { handleClosedTesting, isClosedTesting, type ClosedTestingEnv } from './a
 import { handleAppApi, isAppApi } from './app/router.ts';
 import { devPassGate } from './dev-pass-gate.ts';
 import { json } from './http.ts';
+import { SHYDESK_CALLBACK_PATH, handleShyDeskCallback, type ShyDeskCallbackEnv } from './moderation/callback-route.ts';
 import type { RateLimit } from './app/sign-in.ts';
 import type { AnnouncerNamespace } from './app/announcer.ts';
 import { HOOK_PATH, handleGithubHook, type HookEnv } from './roadmap/hook-route.ts';
@@ -58,6 +59,8 @@ export interface WebEnv extends HookEnv {
   SITE_PASSWORD?: string;
   /** The key the partner site signs dev passes with (a Wrangler secret, DEV only; shyden-labs/ShyTalk#263). */
   DEV_PASS_SECRET?: string;
+  /** The secret ShyDesk signs punishment deliveries with (a Wrangler secret; shyden-labs/ShyTalk#310). */
+  SHYDESK_CALLBACK_SECRET?: string;
   /** The ShyDesk whose support piece this environment's support pages embed (a var; shyden-labs/ShyTalk#37). */
   SHYDESK_ORIGIN?: string;
   /** The environment's own D1 database, `shytalk-<env>`, marked with its name; absent only in a Worker deployed without it, which serves nothing. */
@@ -171,6 +174,18 @@ async function holding(request: Request, env: WebEnv): Promise<Response> {
   return answer;
 }
 
+/**
+ * ShyDesk's punishment callback (shyden-labs/ShyTalk#310): a server with no password or DEV pass, so it is reached
+ * before them, holding included; it still needs this environment's own database, as every other address does.
+ */
+async function shydeskCallback(request: Request, env: WebEnv): Promise<Response> {
+  if (!hasFullD1(env)) return new Response('Service Unavailable', { status: 503 });
+  const wrongStore = await markerGuard(env.ENVIRONMENT_NAME, env.DB).assertEnvironmentMarkers();
+  if (wrongStore) return wrongStore;
+  // The Worker's D1 binding answers every batch with its rows, which ClosedTestingEnv's narrower type leaves out.
+  return handleShyDeskCallback(request, { ...env, DB: env.DB as unknown as ShyDeskCallbackEnv['DB'] });
+}
+
 async function route(request: Request, env: WebEnv): Promise<Response> {
   // An unnamed environment cannot know whether it needs a door, so it serves nothing.
   if (!ENVIRONMENTS.has(env.ENVIRONMENT_NAME)) return new Response('Service Unavailable', { status: 503 });
@@ -180,6 +195,7 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   }
   // The webhook comes from GitHub, which has no password or DEV pass to give; its signature guards it (shyden-labs/ShyTalk#321).
   if (new URL(request.url).pathname === HOOK_PATH) return handleGithubHook(request, env);
+  if (new URL(request.url).pathname === SHYDESK_CALLBACK_PATH) return shydeskCallback(request, env);
   if (env.ENVIRONMENT_NAME !== 'prod') {
     const now = Math.floor(Date.now() / 1000);
     const passed = await devPassGate(request, { ...env, DB: hasFullD1(env) ? env.DB : undefined }, now);

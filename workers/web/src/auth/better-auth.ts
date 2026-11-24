@@ -10,6 +10,7 @@ import { APIError } from 'better-auth/api';
 import { bearer } from 'better-auth/plugins';
 import { passkey } from '@better-auth/passkey';
 import type { JWTVerifyGetKey } from 'jose';
+import { blockedOn } from '../moderation/punishments.ts';
 import { APPLE_ISSUERS, APPLE_KEYS, GOOGLE_ISSUERS, GOOGLE_KEYS, verifyIdToken } from './id-token.ts';
 
 export interface AuthEnv {
@@ -53,7 +54,15 @@ export interface AuthDeps {
   database: BetterAuthOptions['database'];
   googleKeys: JWTVerifyGetKey;
   appleKeys: JWTVerifyGetKey;
+  /**
+   * Whether a ShyDesk punishment blocks the member now (shyden-labs/ShyTalk#310); defaults to asking `database` when it
+   * is D1. A blocked member is given no session by any sign-in.
+   */
+  blocked?: (userId: string) => Promise<boolean>;
 }
+
+/** The error a sign-in meets when a ShyDesk punishment blocks the member; app sign-in answers it 403 member_blocked. */
+export const MEMBER_BLOCKED = 'MEMBER_BLOCKED';
 
 /** The website session cookie's life: Better Auth's ceiling of 400 days (shyden-labs/ShyTalk#134). */
 export const SESSION_COOKIE_SECONDS = 34_560_000;
@@ -71,6 +80,7 @@ export const listOf = (value: string): string[] =>
 export function createAuth(env: AuthEnv, deps: AuthDeps) {
   const googleIds = listOf(env.GOOGLE_CLIENT_IDS);
   const appleIds = listOf(env.APPLE_AUDIENCES);
+  const blocked = deps.blocked ?? blockedOn(deps.database);
   return betterAuth({
     appName: 'ShyTalk',
     baseURL: env.SITE_ORIGIN,
@@ -110,7 +120,12 @@ export function createAuth(env: AuthEnv, deps: AuthDeps) {
       },
       session: {
         create: {
-          before: (session) => Promise.resolve({ data: { ...session, expiresAt: new Date(Date.now() + SESSION_ROW_MS) } }),
+          // No session while a ShyDesk suspension or ban holds the member (shyden-labs/ShyTalk#310 AC2), whichever way they sign in.
+          before: async (session) => {
+            if ((await blocked?.(session.userId)) === true)
+              throw new APIError('FORBIDDEN', { code: MEMBER_BLOCKED, message: 'A ShyDesk punishment blocks this member' });
+            return { data: { ...session, expiresAt: new Date(Date.now() + SESSION_ROW_MS) } };
+          },
         },
       },
     },

@@ -9,6 +9,7 @@ import {
   LIFT_SQL,
   PUNISHMENT_EFFECTS,
   applyPunishment,
+  blockedOn,
   effectOf,
   isBlocked,
   liftPunishment,
@@ -191,5 +192,20 @@ describe('isBlocked', () => {
   it('is false when no such punishment is found', async () => {
     const { env } = stand([], null);
     expect(await isBlocked(env, 'user_1', NOW)).toBe(false);
+  });
+});
+
+describe('blockedOn', () => {
+  it("asks a D1 database whether the member is blocked at the clock's time", async () => {
+    const { env, firsts } = stand([], { found: 1 });
+    const blocked = blockedOn(env.DB, () => NOW);
+    expect(await blocked?.('user_1')).toBe(true);
+    expect(firsts).toEqual([{ sql: ACTIVE_BLOCK_SQL, values: ['user_1', NOW] }]);
+  });
+
+  it('gives nothing for a database that is not D1, such as a test adapter or none', () => {
+    expect(blockedOn(() => ({}))).toBeUndefined();
+    expect(blockedOn(undefined)).toBeUndefined();
+    expect(blockedOn({ prepare: () => ({}) })).toBeUndefined();
   });
 });

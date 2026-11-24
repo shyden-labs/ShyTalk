@@ -18,8 +18,10 @@ export const PUNISHMENT_EFFECTS: Readonly<Record<string, Effect>> = Object.freez
   ban: 'block',
 });
 
-/** The effect of `key`, or null for a key ShyTalk does not use (an own property only, never `toString`). */
-export const effectOf = (key: string): Effect | null => (Object.hasOwn(PUNISHMENT_EFFECTS, key) ? (PUNISHMENT_EFFECTS[key] ?? null) : null);
+const EFFECTS: ReadonlyMap<string, Effect> = new Map(Object.entries(PUNISHMENT_EFFECTS));
+
+/** The effect of `key`, or null for a key ShyTalk does not use (a listed key only, never `toString`). */
+export const effectOf = (key: string): Effect | null => EFFECTS.get(key) ?? null;
 
 /** The part of D1 the store uses; `Statement` is D1's prepared statement. */
 export interface PunishmentEnv<Statement> {
@@ -101,7 +103,8 @@ export async function liftPunishment<Statement>(
     }),
     DB.prepare(FIND_SQL).bind(event.punishmentId),
   ]);
-  return (answers[2]?.results.length ?? 0) > 0 ? APPLIED : { status: 404, body: { error: 'unknown_punishment' } };
+  // The batch's last answer is the find's: a row means the punishment was stored.
+  return answers.slice(-1).some(({ results }) => results.length > 0) ? APPLIED : { status: 404, body: { error: 'unknown_punishment' } };
 }
 
 /** Whether the member has a blocking punishment at `now` that is not lifted and has no end or one still ahead. */
@@ -111,4 +114,15 @@ export async function isBlocked<Statement extends { first(): Promise<unknown> }>
   now: number,
 ): Promise<boolean> {
   return (await env.DB.prepare(ACTIVE_BLOCK_SQL).bind(userId, now).first()) !== null;
+}
+
+/**
+ * Whether a member is blocked, asked of `database` when it is a D1 binding (it can `prepare` and `batch`), at `clock`'s
+ * time; nothing for any other database, such as Better Auth's memory adapter in unit tests, which pass their own.
+ */
+export function blockedOn(database: unknown, clock: () => number = Date.now): ((userId: string) => Promise<boolean>) | undefined {
+  const d1 = database as Partial<PunishmentEnv<{ first(): Promise<unknown> }>['DB']> | null | undefined;
+  if (typeof d1?.prepare !== 'function' || typeof d1.batch !== 'function') return undefined;
+  const env = { DB: d1 } as PunishmentEnv<{ first(): Promise<unknown> }>;
+  return (userId) => isBlocked(env, userId, clock());
 }
