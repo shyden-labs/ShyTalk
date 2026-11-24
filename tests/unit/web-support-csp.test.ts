@@ -50,7 +50,7 @@ describe('the support policy', () => {
     );
   });
 
-  it.each(['/support', '/support/', '/id/support', '/zh/support', '/support/ticket', '/th/support/ticket'])(
+  it.each(['/support', '/support/', '/id/support', '/zh/support', '/support/ticket', '/th/support/ticket', '/appeal', '/vi/appeal'])(
     '%s carries the support policy for the environment’s ShyDesk',
     async (path) => {
       expect(await policyAt(path)).toBe(supportPolicy(LIVE_SHYDESK));
@@ -58,9 +58,12 @@ describe('the support policy', () => {
     },
   );
 
-  it.each(['/', '/supportive', '/api/support', '/sign-in', '/fr/support', '/id/support-x'])('%s keeps the site policy', async (path) => {
-    expect(await policyAt(path)).toBe(CONTENT_SECURITY_POLICY);
-  });
+  it.each(['/', '/supportive', '/api/support', '/sign-in', '/fr/support', '/id/support-x', '/appeals', '/fr/appeal', '/appeal/x'])(
+    '%s keeps the site policy',
+    async (path) => {
+      expect(await policyAt(path)).toBe(CONTENT_SECURITY_POLICY);
+    },
+  );
 
   it('a Worker naming no ShyDesk keeps the site policy on the support pages too', async () => {
     expect(await policyAt('/support', null)).toBe(CONTENT_SECURITY_POLICY);

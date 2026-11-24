@@ -8,8 +8,8 @@
  */
 import assert from 'node:assert/strict';
 import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
-import { SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
-import { SMOKE_TICKET_TOKEN, builtShydeskOrigin } from '../support/support-page.ts';
+import { APPEAL_PATH, SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
+import { SMOKE_APPEAL_TOKEN, SMOKE_TICKET_TOKEN, builtShydeskOrigin } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
 import { LEGAL_DOCS, legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
@@ -350,6 +350,33 @@ const TICKET_PAGE: IphoneCase = counted(
 );
 
 /**
+ * The one appeal page a punishment notice links to (tests/smoke/site.spec.ts, shyden-labs/ShyTalk#310 AC4): it lands on
+ * the appeal page of the language it shows, the notice's token still in the fragment, with the piece's appeal view.
+ */
+const APPEAL_PAGE: IphoneCase = counted(
+  'the appeal page opens the appeal view in the browser’s language, keeping the notice’s token, passes axe, with no CSP refusal',
+  async (page, check) => {
+    check.equal(await page.goto(`${APPEAL_PATH}#appeal=${SMOKE_APPEAL_TOKEN}`), 200);
+    check.equal(await page.count('shydesk-support[view="appeal"]'), 1);
+    const shown = await page.attribute('html', 'lang');
+    const locale = LOCALES.find((each) => langTag(each) === shown) ?? 'en';
+    const address = new URL(await page.url());
+    check.equal(`${address.pathname}${address.hash}`, `${localePath(locale, APPEAL_PATH)}#appeal=${SMOKE_APPEAL_TOKEN}`);
+    check.equal(await page.text(H1), t(locale, 'support.appealTitle'));
+    for (const line of ['appealIntro', 'englishForm']) {
+      const selector = `[data-line="${line}"]`;
+      check.ok(await page.isVisible(selector), `${line} is not visible`);
+      check.equal(await page.text(selector), t(locale, `support.${line}`));
+    }
+    check.equal(await page.attribute('shydesk-support', 'product'), 'shytalk');
+    check.equal(await page.attribute('shydesk-support', 'lang'), locale);
+    check.equal(await page.attribute('script[src$="/embed.js"]', 'src'), `${builtShydeskOrigin()}/embed.js`);
+    check.deepEqual(await page.axeViolations(), []);
+    check.deepEqual(await page.cspRefusals(), []);
+  },
+);
+
+/**
  * The closed-testing journey, in English, once (tests/smoke/site.spec.ts's last
  * test, shyden-labs/ShyTalk#150): its mail goes out for real, to the test
  * mailbox's plus-address for this run. The confirmed page's own heading stands
@@ -562,6 +589,7 @@ const RECOVERY_PAGES: IphoneCase = counted(
 export const IPHONE_CASES: IphoneCase[] = [
   ...LANGUAGES.flatMap(({ lang, locale, prefix }) => casesFor(lang, locale, prefix)),
   TICKET_PAGE,
+  APPEAL_PAGE,
   JOURNEY,
   SIGN_UP_JOURNEY,
   RECOVERY_PAGES,

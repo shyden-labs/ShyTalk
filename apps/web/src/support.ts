@@ -7,6 +7,8 @@ import { LOCALES, type Locale } from './i18n/t.ts';
  */
 export const SUPPORT_PATH = '/support';
 export const TICKET_PATH = '/support/ticket';
+/** The one language-free appeal page a ShyDesk punishment notice links to, with `#appeal=<token>` (shyden-labs/ShyTalk#310). */
+export const APPEAL_PATH = '/appeal';
 
 /** The part of workers/web/wrangler.json read here. */
 export interface WranglerShydesk {

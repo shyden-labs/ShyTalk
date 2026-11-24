@@ -151,6 +151,8 @@
     "intro": "Ask a question or report a problem. The reply comes by email.",
     "englishForm": "The form is in English for now.",
     "ticketTitle": "Your support request",
+    "appealTitle": "Appeal a decision",
+    "appealIntro": "If you think a moderation decision on your account was wrong, explain why here.",
     "noScript": "The support form needs JavaScript. Turn it on to send a request."
   }
 }

@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
 import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
-import { SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
-import { SMOKE_TICKET_TOKEN } from '../support/support-page.ts';
+import { APPEAL_PATH, SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
+import { SMOKE_APPEAL_TOKEN, SMOKE_TICKET_TOKEN } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
 import { wantedFacts } from '../support/holding-facts.ts';
 import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
@@ -113,7 +113,12 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
                 ? ((
                     {
                       product: 'shytalk',
-                      view: visited.at(-1)?.includes('/ticket') === true ? 'ticket' : 'contact',
+                      view:
+                        visited.at(-1)?.includes('/ticket') === true
+                          ? 'ticket'
+                          : visited.at(-1)?.includes('/appeal') === true
+                            ? 'appeal'
+                            : 'contact',
                       lang: locale,
                     } as Record<string, string>
                   )[name] ?? null)
@@ -125,11 +130,10 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     text: (selector) => {
       const at = visited.at(-1) ?? '';
       if (selector === 'footer a[data-support]') return Promise.resolve(t(locale, 'footer.contact'));
-      if (at.includes('/support')) {
+      if (at.includes('/support') || at.includes('/appeal')) {
         const line = /data-line="(\w+)"/.exec(selector)?.[1];
-        return Promise.resolve(
-          t(locale, line === undefined ? (at.includes('/ticket') ? 'support.ticketTitle' : 'support.title') : `support.${line}`),
-        );
+        const title = at.includes('/ticket') ? 'support.ticketTitle' : at.includes('/appeal') ? 'support.appealTitle' : 'support.title';
+        return Promise.resolve(t(locale, line === undefined ? title : `support.${line}`));
       }
       return Promise.resolve(selectorText(locale, selector, at.endsWith('/holding')));
     },
@@ -151,7 +155,12 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     visibleLinks: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     count: (selector) =>
-      Promise.resolve(selector === 'shydesk-support[view="ticket"]' && visited.at(-1)?.includes('/ticket') === true ? 1 : 0),
+      Promise.resolve(
+        (selector === 'shydesk-support[view="ticket"]' && visited.at(-1)?.includes('/ticket') === true) ||
+          (selector === 'shydesk-support[view="appeal"]' && visited.at(-1)?.includes('/appeal') === true)
+          ? 1
+          : 0,
+      ),
     axeViolations: () => Promise.resolve([]),
     previewFacts: (path) => Promise.resolve(wantedPreview(DEV, locale, lang, path, `${path} · ShyTalk`)),
     ...broken,
@@ -186,7 +195,8 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
   },
   // Two per page: its title is not empty, and its preview is as wanted (shyden-labs/ShyTalk#198).
   // Four more each for the support and ticket pages (#37), to be confirmed on CI's smoke-totals.
-  'every page carries its link preview': { en: 34, id: 34, th: 28, vi: 28, 'zh-Hans': 28 },
+  // Two more each for the appeal page (#310 AC4), to be confirmed on CI's smoke-totals.
+  'every page carries its link preview': { en: 36, id: 36, th: 30, vi: 30, 'zh-Hans': 30 },
 };
 
 describe('the iPhone cases', () => {
@@ -1219,5 +1229,56 @@ describe('the ticket page (shyden-labs/ShyTalk#37 AC1)', () => {
   it('fails when the page shows one language but sits at another language’s address', async () => {
     const page = safari('th', { url: () => Promise.resolve(`${DEV}${TOKEN_ADDRESS}`) });
     await expect(ticket?.run(page)).rejects.toThrow(`/th${TICKET_PATH}`);
+  });
+});
+
+describe('the appeal page (shyden-labs/ShyTalk#310 AC4)', () => {
+  const title = 'the appeal page opens the appeal view in the browser’s language, keeping the notice’s token';
+  const appeal = IPHONE_CASES.find((c) => c.title.startsWith(title));
+  const TOKEN_ADDRESS = `${APPEAL_PATH}#appeal=${SMOKE_APPEAL_TOKEN}`;
+  beforeEach(() => {
+    vi.stubEnv('SITE_ENVIRONMENT', 'dev');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('is in the suite once', () => {
+    expect(IPHONE_CASES.filter((c) => c.title.startsWith(title))).toHaveLength(1);
+  });
+
+  it('passes on the site as it should be, running the 13 checks its twin runs on CI', async () => {
+    const page = safari('en');
+    const check = countingCheck();
+    await expect(appeal?.run(page, check)).resolves.toBeUndefined();
+    expect(page.visited).toEqual([TOKEN_ADDRESS]);
+    expect(check.count).toBe(13);
+  });
+
+  it('reads a page language the site does not have as English, the language-free page staying where it is', async () => {
+    const page = safari('fr');
+    const check = countingCheck();
+    await expect(appeal?.run(page, check)).resolves.toBeUndefined();
+    expect(check.count).toBe(13);
+  });
+
+  it('fails naming the address when the page loses the notice’s token', async () => {
+    const page = safari('en', { url: () => Promise.resolve(`${DEV}${APPEAL_PATH}`) });
+    await expect(appeal?.run(page)).rejects.toThrow(APPEAL_PATH);
+  });
+
+  it('fails when the page shows one language but sits at another language’s address', async () => {
+    const page = safari('th', { url: () => Promise.resolve(`${DEV}${TOKEN_ADDRESS}`) });
+    await expect(appeal?.run(page)).rejects.toThrow(`/th${APPEAL_PATH}`);
+  });
+
+  it('fails naming the line when an appeal line is not visible', async () => {
+    const page = safari('en', { isVisible: (selector) => Promise.resolve(selector !== '[data-line="appealIntro"]') });
+    await expect(appeal?.run(page)).rejects.toThrow('appealIntro is not visible');
+  });
+
+  it('fails when the page embeds a view other than the appeal view', async () => {
+    const page = safari('en', { count: () => Promise.resolve(0) });
+    await expect(appeal?.run(page)).rejects.toThrow();
   });
 });

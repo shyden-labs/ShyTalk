@@ -1,5 +1,6 @@
 ---
 import Support from '../../components/Support.astro';
+import { TICKET_PATH } from '../../support.ts';
 ---
 
-<Support locale="en" view="ticket" pickLanguage />
+<Support locale="en" view="ticket" pickLanguage={TICKET_PATH} />

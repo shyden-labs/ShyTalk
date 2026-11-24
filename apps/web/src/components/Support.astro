@@ -6,33 +6,48 @@ import wrangler from '../../../../workers/web/wrangler.json';
 
 interface Props {
   locale: Locale;
-  /** `contact` asks for help; `ticket` opens the thread ShyDesk's emailed link names (`#t=<token>`). */
-  view: 'contact' | 'ticket';
-  /** The language-free ticket page, which moves to the visitor's language, keeping the address's query and fragment. */
-  pickLanguage?: boolean;
+  /**
+   * `contact` asks for help; `ticket` opens the thread ShyDesk's emailed link names (`#t=<token>`); `appeal` opens the
+   * appeal a punishment notice links to (`#appeal=<token>`, shyden-labs/ShyTalk#310).
+   */
+  view: 'contact' | 'ticket' | 'appeal';
+  /**
+   * On a language-free page, its path: the page moves to the visitor's language of that path, keeping the address's
+   * query and fragment.
+   */
+  pickLanguage?: string;
 }
-const { locale, view, pickLanguage = false } = Astro.props;
+const { locale, view, pickLanguage } = Astro.props;
 const line = (key: string): string => t(locale, `support.${key}`);
+const TITLES = { contact: 'title', ticket: 'ticketTitle', appeal: 'appealTitle' } as const;
+const INTROS = { contact: 'intro', ticket: undefined, appeal: 'appealIntro' } as const;
+const intro = INTROS[view];
 // The ShyDesk of the environment this build is for, as the Worker's support policy names it (shyden-labs/ShyTalk#37).
 const shydesk = shydeskOrigin(process.env.SITE_ENVIRONMENT, wrangler);
 ---
 
-<Base locale={locale} title={line(view === 'contact' ? 'title' : 'ticketTitle')}>
-  <h1>{line(view === 'contact' ? 'title' : 'ticketTitle')}</h1>
-  {view === 'contact' && <p data-line="intro">{line('intro')}</p>}
+<Base locale={locale} title={line(TITLES[view])}>
+  <h1>{line(TITLES[view])}</h1>
+  {intro !== undefined && <p data-line={intro}>{line(intro)}</p>}
   <p data-line="englishForm">{line('englishForm')}</p>
   <noscript><p>{line('noScript')}</p></noscript>
-  <shydesk-support product="shytalk" view={view} lang={locale} data-pick-language={pickLanguage ? '' : undefined}></shydesk-support>
+  <shydesk-support
+    product="shytalk"
+    view={view}
+    lang={locale}
+    data-pick-language={pickLanguage}></shydesk-support>
   <script is:inline src={`${shydesk}/embed.js`} defer></script>
 </Base>
 
 <script>
   import { localePath } from '../i18n/t.ts';
-  import { TICKET_PATH, browserLocale } from '../support.ts';
+  import { browserLocale } from '../support.ts';
 
-  // The emailed link names one language-free address: move to the visitor's language, keeping its query and token.
-  if (document.querySelector('shydesk-support[data-pick-language]') !== null) {
+  // An emailed or notice link names one language-free address: move to the visitor's language, keeping its query and token.
+  const piece = document.querySelector<HTMLElement>('shydesk-support[data-pick-language]');
+  const path = piece?.dataset['pickLanguage'];
+  if (path !== undefined) {
     const locale = browserLocale(navigator.languages);
-    if (locale !== 'en') location.replace(`${localePath(locale, TICKET_PATH)}${location.search}${location.hash}`);
+    if (locale !== 'en') location.replace(`${localePath(locale, path)}${location.search}${location.hash}`);
   }
 </script>

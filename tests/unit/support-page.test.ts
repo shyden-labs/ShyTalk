@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { browserLocale, shydeskOrigin, SUPPORT_PATH, TICKET_PATH, type WranglerShydesk } from '../../apps/web/src/support.ts';
+import { APPEAL_PATH, browserLocale, shydeskOrigin, SUPPORT_PATH, TICKET_PATH, type WranglerShydesk } from '../../apps/web/src/support.ts';
 
 /**
  * The support pages (shyden-labs/ShyTalk#37): built for one environment, each
@@ -34,6 +34,10 @@ describe('the ShyDesk a build embeds', () => {
 describe('the pages’ paths', () => {
   it('are /support and the language-free /support/ticket ShyDesk’s settings name', () => {
     expect([SUPPORT_PATH, TICKET_PATH]).toEqual(['/support', '/support/ticket']);
+  });
+
+  it('include the language-free /appeal a punishment notice links to (shyden-labs/ShyTalk#310 AC4)', () => {
+    expect(APPEAL_PATH).toBe('/appeal');
   });
 });
 
