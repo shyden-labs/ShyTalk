@@ -4,7 +4,7 @@ import { checkCallback, SKEW_SECONDS } from '../../workers/web/src/moderation/sh
 
 /**
  * ShyDesk's punishment callback (shyden-labs/ShyTalk#310 AC1; contract: shyden-labs/shydesk openapi/shydesk.v1.yaml,
- * sent 2026-11-22): a POST signed `ShyDesk-Signature: v1=<hex HMAC-SHA256 of timestamp + "." + raw body>` with
+ * schema PunishmentCallback, sent 2026-11-22; its body as ShyDesk's src/punishments/send.ts builds it, #349): a POST signed `ShyDesk-Signature: v1=<hex HMAC-SHA256 of timestamp + "." + raw body>` with
  * `ShyDesk-Timestamp` in unix seconds. Only a signed, fresh delivery of a known type for ShyTalk is believed; each
  * refusal names its error code.
  */
@@ -20,8 +20,10 @@ const apply = {
   punishment: { key: 'suspend_7d', label: 'Suspended for 7 days', duration_seconds: 604_800 },
   report_ticket_id: 'tkt_9',
   appeal_url: 'https://shytalk.app/appeal#appeal=abc',
-  issued_at: '2026-11-23T07:00:00Z',
+  // Unix milliseconds, a JSON number, as ShyDesk sends it (#349).
+  issued_at: 1_795_399_990_000,
 };
+const ISSUED_AT = '2026-11-23T02:13:10.000Z';
 
 const sign = (timestamp: string, body: string, secret = SECRET) =>
   `v1=${createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex')}`;
@@ -46,9 +48,31 @@ describe('ShyDesk’s punishment callback', () => {
         punishment: { key: 'suspend_7d', label: 'Suspended for 7 days', durationSeconds: 604_800 },
         reportTicketId: 'tkt_9',
         appealUrl: 'https://shytalk.app/appeal#appeal=abc',
-        issuedAt: '2026-11-23T07:00:00Z',
+        issuedAt: ISSUED_AT,
       },
     });
+  });
+
+  // shyden-labs/ShyTalk#349: the warning ShyDesk sent on 2026-11-24, field for field as its send.ts builds it.
+  it('believes the body ShyDesk sends for a warning with no end, its issue time in Unix milliseconds', async () => {
+    const warning = {
+      type: 'punishment.apply',
+      punishment_id: '0b6f2c1e-0000-4000-8000-000000000349',
+      product: 'shytalk',
+      subject_user_id: 'probe-310-member',
+      punishment: { key: 'warning', label: 'Warning', duration_seconds: null },
+      report_ticket_id: '373d7e44-60fb-4c0c-801f-98b790225e2a',
+      appeal_url: 'https://site.example.test/appeal#appeal=t',
+      issued_at: 1_795_399_990_000,
+    };
+    const result = await check(delivery(warning));
+    expect(result.ok && result.event.issuedAt).toBe(ISSUED_AT);
+    expect(result.ok && result.event.punishment).toEqual({ key: 'warning', label: 'Warning', durationSeconds: null });
+  });
+
+  it('believes an apply with no appeal address, which ShyDesk leaves out when the product has no appeal page', async () => {
+    const result = await check(delivery({ ...apply, appeal_url: undefined }));
+    expect(result.ok && result.event.appealUrl).toBeNull();
   });
 
   it('believes a punishment.lift, which carries no appeal address, and a ban with no end', async () => {
@@ -116,8 +140,12 @@ describe('ShyDesk’s punishment callback', () => {
     ['no punishment key', { punishment: { label: 'x', duration_seconds: 1 } }],
     ['a punishment that is only a word', { punishment: 'ban' }],
     ['a negative duration', { punishment: { key: 'k', label: 'x', duration_seconds: -1 } }],
-    ['an apply with no appeal address', { appeal_url: undefined }],
-    ['no issue time', { issued_at: 5 }],
+    ['an empty appeal address', { appeal_url: '' }],
+    ['no issue time', { issued_at: undefined }],
+    ['an issue time as text', { issued_at: '2026-11-23T07:00:00Z' }],
+    ['a negative issue time', { issued_at: -1 }],
+    ['an issue time that is not whole milliseconds', { issued_at: 1.5 }],
+    ['an issue time past what a date can hold', { issued_at: 9e15 }],
     ['no report ticket', { report_ticket_id: null }],
   ])('refuses %s with 400 bad_payload', async (_name, change) => {
     expect(await check(delivery({ ...apply, ...change }))).toEqual({ ok: false, status: 400, error: 'bad_payload' });

@@ -48,7 +48,7 @@ const body = (type = 'punishment.apply', key = 'ban'): string =>
     punishment: { key, label: 'Banned', duration_seconds: null },
     report_ticket_id: 'tkt-1',
     ...(type === 'punishment.apply' ? { appeal_url: 'https://site.example.test/appeal' } : {}),
-    issued_at: '2026-11-23T15:00:00Z',
+    issued_at: 1_795_399_990_000,
   });
 
 function delivery(text: string, options: { secret?: string; door?: boolean; method?: string; path?: string } = {}): Request {

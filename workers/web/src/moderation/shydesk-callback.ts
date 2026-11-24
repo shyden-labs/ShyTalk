@@ -52,6 +52,22 @@ function durationOf(value: unknown): number | null | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
 }
 
+/**
+ * ShyDesk's issue time, a whole number of Unix milliseconds (its PunishmentCallback schema, shyden-labs/ShyTalk#349),
+ * as the ISO time stored; null when it is anything else or past what a date can hold.
+ */
+function issuedAtOf(value: unknown): string | null {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+/** On an apply, the appeal page ShyDesk names, which it leaves out when the product has none; an empty one is refused. */
+function appealUrlOf(type: PunishmentEvent['type'], value: unknown): string | null | undefined {
+  if (type !== 'punishment.apply' || value === undefined) return null;
+  return word(value) ?? undefined;
+}
+
 function eventOf(type: PunishmentEvent['type'], body: Record<string, unknown>): PunishmentEvent | null {
   const punishment = objectOf(body['punishment']);
   const punishmentId = word(body['punishment_id']);
@@ -60,10 +76,10 @@ function eventOf(type: PunishmentEvent['type'], body: Record<string, unknown>): 
   const label = word(punishment?.['label']);
   const durationSeconds = durationOf(punishment?.['duration_seconds']);
   const reportTicketId = word(body['report_ticket_id']);
-  const issuedAt = word(body['issued_at']);
-  const appealUrl = type === 'punishment.apply' ? word(body['appeal_url']) : null;
+  const issuedAt = issuedAtOf(body['issued_at']);
+  const appealUrl = appealUrlOf(type, body['appeal_url']);
   if (punishmentId === null || subjectUserId === null || key === null || label === null || durationSeconds === undefined) return null;
-  if (reportTicketId === null || issuedAt === null || (type === 'punishment.apply' && appealUrl === null)) return null;
+  if (reportTicketId === null || issuedAt === null || appealUrl === undefined) return null;
   return { type, punishmentId, subjectUserId, punishment: { key, label, durationSeconds }, reportTicketId, appealUrl, issuedAt };
 }
 
