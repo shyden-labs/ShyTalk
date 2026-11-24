@@ -47,6 +47,9 @@ export interface MenuEntry {
 export interface MenuStructure {
   /** How many menus the page holds: one. The rest is read only when there is one. */
   count: number;
+  /** The button's own aria-label: none, so its accessible name holds the language it shows (WCAG 2.5.3, axe). */
+  ariaLabel?: string | null;
+  /** The visually hidden word that names the button for a screen reader, before the language it shows. */
   label?: string | null;
   flag?: string | null;
   full?: string | null;
@@ -72,7 +75,7 @@ export const MENU_STRUCTURE = `(doc) => {
     return { shown: element.firstChild === null ? '' : element.firstChild.textContent, hidden: text(hidden), lang: hidden === null ? null : hidden.getAttribute('lang') };
   };
   const summary = menu.querySelector(':scope > summary');
-  if (summary === null) return { count: 1, label: null };
+  if (summary === null) return { count: 1, ariaLabel: null, label: null };
   const caret = summary.querySelector('.caret');
   const entries = [...menu.querySelectorAll(':scope > ul > li')].map((li) => {
     const link = li.querySelector(':scope > a.entry');
@@ -88,7 +91,8 @@ export const MENU_STRUCTURE = `(doc) => {
   });
   return {
     count: 1,
-    label: summary.getAttribute('aria-label'),
+    ariaLabel: summary.getAttribute('aria-label'),
+    label: text(summary.querySelector(':scope > .label.visually-hidden')),
     flag: flag(summary.querySelector(':scope > svg.flag')),
     full: text(summary.querySelector(':scope > .name.full')),
     short: text(summary.querySelector(':scope > .name.short')),
@@ -107,6 +111,7 @@ function betaOf(locale: Locale, page: Locale): MenuBeta | null {
 export function wantedMenu(locale: Locale, href: (other: Locale) => string): MenuStructure {
   return {
     count: 1,
+    ariaLabel: null,
     label: t(locale, 'language.label'),
     flag: flag(locale),
     full: LANGUAGE_NAMES[locale],
