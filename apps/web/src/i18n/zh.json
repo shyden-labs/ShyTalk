@@ -143,8 +143,7 @@
   },
   "holding": {
     "building": "ShyTalk 应用正在开发中。",
-    "comingSoon": "即将推出",
-    "languages": "语言"
+    "comingSoon": "即将推出"
   },
   "support": {
     "title": "帮助与支持",
@@ -154,5 +153,9 @@
     "appealTitle": "对处理决定提出申诉",
     "appealIntro": "如果您认为针对您账户的审核决定有误，请在此说明理由。",
     "noScript": "客服表单需要 JavaScript。请启用后再发送请求。"
+  },
+  "language": {
+    "label": "语言",
+    "beta": "测试版翻译"
   }
 }

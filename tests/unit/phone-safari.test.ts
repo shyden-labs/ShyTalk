@@ -5,6 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { safariPage, type WebDriverCall } from '../phones/safari.ts';
 import { PREVIEW_FACTS, PREVIEW_TAGS } from '../support/link-preview.ts';
 import { BRAND_FONTS, HOLDING_FACTS, wantedFacts } from '../support/holding-facts.ts';
+import { MENU_LIVE } from '../support/language-menu.ts';
 
 /**
  * Safari on the iPhone Air, driven through Appium's WebDriver API
@@ -237,6 +238,22 @@ describe('safariPage: reading the page', () => {
     await expect(safariPage(fake.call, 's1', BASE).count('[data-testid="devices"] li')).resolves.toBe(3);
     expect(lastScript(fake).args).toEqual(['[data-testid="devices"] li']);
     expect(lastScript(fake).script).toContain('querySelectorAll(arguments[0]).length');
+  });
+
+  it('reads the language menu as it is drawn with the smoke’s own in-page check, and answers what it found (shyden-labs/ShyTalk#332)', async () => {
+    const live = {
+      open: false,
+      listShown: false,
+      names: ['EN'],
+      flagShown: true,
+      summaryTall: true,
+      entriesTall: null,
+      noSideScroll: true,
+      width: 390,
+    };
+    const fake = appium({}, [live]);
+    await expect(safariPage(fake.call, 's1', BASE).menuLive()).resolves.toEqual(live);
+    expect(lastScript(fake).script).toBe(`return (${MENU_LIVE})();`);
   });
 
   it('fails naming the selector when nothing matches it', async () => {

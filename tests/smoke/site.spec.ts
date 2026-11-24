@@ -11,7 +11,8 @@ import { test, expect } from './fixture.ts';
 import { codeIn, MAIL_CEILING_MS } from '../phones/test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import AxeBuilder from '@axe-core/playwright';
-import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t } from '../../apps/web/src/i18n/t.ts';
+import { LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { FULL_NAME_WIDTH, MENU_LIVE, nextLocale, wantedLive, type MenuLive } from '../support/language-menu.ts';
 import { APPEAL_PATH, SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
 import { SMOKE_APPEAL_TOKEN, SMOKE_TICKET_TOKEN, builtShydeskOrigin } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
@@ -42,6 +43,44 @@ async function holdingFacts(page: Page): Promise<HoldingFacts> {
   return page.evaluate<HoldingFacts>(`(${HOLDING_FACTS})(${JSON.stringify(BRAND_FONTS)})`);
 }
 
+/** The language menu as the page draws it (shyden-labs/ShyTalk#332). */
+async function menuLive(page: Page): Promise<MenuLive> {
+  return page.evaluate<MenuLive>(`(${MENU_LIVE})()`);
+}
+
+const MENU_BUTTON = 'details.lang-switch > summary';
+
+/**
+ * The language menu shut, opened by a click (passing axe while open) and shut again by the keyboard's Enter
+ * (shyden-labs/ShyTalk#332): its iPhone copy taps where this presses Enter, as the phone has no keyboard.
+ */
+async function menuOpensAndShuts(page: Page, locale: Locale): Promise<void> {
+  let now = await menuLive(page);
+  expect.soft(now, 'the menu, shut').toEqual(wantedLive(locale, now.width, false));
+  await page.locator(MENU_BUTTON).click();
+  now = await menuLive(page);
+  expect.soft(now, 'the menu, opened by a click').toEqual(wantedLive(locale, now.width, true));
+  const { violations } = await new AxeBuilder({ page }).analyze();
+  expect
+    .soft(
+      violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`),
+      'axe, the menu open',
+    )
+    .toEqual([]);
+  await page.locator(MENU_BUTTON).press('Enter');
+  now = await menuLive(page);
+  expect.soft(now, 'the menu, shut by Enter').toEqual(wantedLive(locale, now.width, false));
+}
+
+/** The next language picked from the menu by clicks opens `href`, in that language (shyden-labs/ShyTalk#332). */
+async function menuPicks(page: Page, locale: Locale, href: string): Promise<void> {
+  const next = langTag(nextLocale(locale));
+  await page.locator(MENU_BUTTON).click();
+  await page.locator(`details.lang-switch a.entry[hreflang="${next}"]`).click();
+  await expect.soft(page, "the picked language's page").toHaveURL((url) => `${url.pathname}${url.search}` === href);
+  await expect.soft(page.locator('html')).toHaveAttribute('lang', next);
+}
+
 /** Every console line the browser writes about the CSP refusing something. */
 function cspRefusals(page: Page): string[] {
   const refusals: string[] = [];
@@ -56,7 +95,7 @@ for (const { lang, locale, prefix } of LANGUAGES) {
   // The home page, then each footer legal link from it (shyden-labs/ShyTalk#56 AC4; #180: one journey, as both opened
   // the home page first). A legal page in a language without its own text is the English page with an English footer,
   // so the next link in this language is found back on the home page.
-  test(`${lang}: the home page answers 200 in ${lang}, shows its heading and no roadmap button, passes axe, and each footer legal link opens the right page, with its note if any, passing axe, with no CSP refusal`, async ({
+  test(`${lang}: the home page answers 200 in ${lang}, shows its heading and no roadmap button, passes axe, each footer legal link opens the right page, with its note if any, passing axe, and its language menu opens, shuts and changes the language, with no CSP refusal`, async ({
     page,
   }) => {
     const refusals = cspRefusals(page);
@@ -110,6 +149,18 @@ for (const { lang, locale, prefix } of LANGUAGES) {
       expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
       if (doc !== LEGAL_DOCS.at(-1)) await page.goto(`${prefix}/`, { waitUntil: 'load' });
     }
+    // The language menu (shyden-labs/ShyTalk#332): opened and shut, at a phone's width too (set here where the
+    // browser can take a width, measured as it stands on a phone), then the next language picked from it.
+    await page.goto(`${prefix}/`, { waitUntil: 'load' });
+    await menuOpensAndShuts(page, locale);
+    if ((await menuLive(page)).width >= FULL_NAME_WIDTH) {
+      await page.setViewportSize({ width: NARROW_WIDTH, height: 740 });
+      await page.reload({ waitUntil: 'load' });
+    }
+    const narrow = await menuLive(page);
+    expect.soft(narrow.width).toBeLessThan(FULL_NAME_WIDTH);
+    expect.soft(narrow, "the menu at a phone's width").toEqual(wantedLive(locale, narrow.width, false));
+    await menuPicks(page, locale, localePath(nextLocale(locale), '/'));
     expect.soft(refusals).toEqual([]);
   });
 
@@ -127,29 +178,14 @@ for (const { lang, locale, prefix } of LANGUAGES) {
   // shyden-labs/ShyTalk#333). The
   // hellos keep still for reduced motion, and a phone's width shows five, inside the page; set here where the browser
   // can take a width, measured as it is on a phone.
-  test(`${lang}: the holding page shows ShyTalk's brand, the language switch and the hellos, in ${lang}, passing axe, keeping still for reduced motion and fitting a phone, with no CSP refusal`, async ({
+  test(`${lang}: the holding page shows ShyTalk's brand, the language menu and the hellos, in ${lang}, passing axe, keeping still for reduced motion and fitting a phone, its menu opening, shutting and changing the language, with no CSP refusal`, async ({
     page,
   }) => {
     const refusals = cspRefusals(page);
     const response = await page.goto(`${prefix}/holding`, { waitUntil: 'load' });
     expect.soft(response?.status()).toBe(200);
     await expect.soft(page.locator('html')).toHaveAttribute('lang', lang);
-    const languages = page.getByRole('navigation', { name: t(locale, 'holding.languages'), exact: true });
-    await expect.soft(languages).toBeVisible();
-    expect
-      .soft(
-        await languages
-          .getByRole('link')
-          .evaluateAll((links) =>
-            links.map((link) => [
-              link.getAttribute('href'),
-              link.getAttribute('hreflang'),
-              link.textContent.trim(),
-              link.getAttribute('aria-current'),
-            ]),
-          ),
-      )
-      .toEqual(LOCALES.map((other) => [`/${other}/`, langTag(other), LANGUAGE_NAMES[other], other === locale ? 'page' : null]));
+    await menuOpensAndShuts(page, locale);
     const heading = page.getByRole('heading', { level: 1 });
     await expect.soft(heading).toBeVisible();
     await expect.soft(heading).toHaveText('ShyTalk');
@@ -181,6 +217,9 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     const phone = await holdingFacts(page);
     expect.soft(phone.width).toBeLessThanOrEqual(PHONE_WIDTH);
     expect.soft(phone).toEqual(wantedFacts(phone.width, phone.reducedMotion));
+    const narrow = await menuLive(page);
+    expect.soft(narrow, "the menu at a phone's width").toEqual(wantedLive(locale, narrow.width, false));
+    await menuPicks(page, locale, `/${nextLocale(locale)}/`);
     expect(refusals).toEqual([]);
   });
 
@@ -249,7 +288,7 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     expect(refusals).toEqual([]);
   });
 
-  test(`${lang}: every page carries its link preview in ${lang}, each preview picture is 1200 by 630 and not one flat colour, and no page offers an email address`, async ({
+  test(`${lang}: every page carries its link preview and its language menu in ${lang}, each preview picture is 1200 by 630 and not one flat colour, and no page offers an email address`, async ({
     page,
   }) => {
     const origin = builtSiteOrigin();

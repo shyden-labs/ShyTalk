@@ -143,8 +143,7 @@
   },
   "holding": {
     "building": "The ShyTalk app is being built now.",
-    "comingSoon": "Coming soon",
-    "languages": "Language"
+    "comingSoon": "Coming soon"
   },
   "support": {
     "title": "Support",
@@ -154,5 +153,9 @@
     "appealTitle": "Appeal a decision",
     "appealIntro": "If you think a moderation decision on your account was wrong, explain why here.",
     "noScript": "The support form needs JavaScript. Turn it on to send a request."
+  },
+  "language": {
+    "label": "Language",
+    "beta": "beta translation"
   }
 }

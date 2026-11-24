@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
-import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { nextLocale, wantedLive } from '../support/language-menu.ts';
 import { APPEAL_PATH, SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
 import { SMOKE_APPEAL_TOKEN, SMOKE_TICKET_TOKEN } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
@@ -90,21 +91,29 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
   const locale = LOCALE[lang] ?? 'en';
   const visited: string[] = [];
   let onLegalPage = false;
+  // The language menu (shyden-labs/ShyTalk#332): a tap on its button opens or shuts it, a tap on a language opens the
+  // same page in that language, which the address and `<html lang>` then show.
+  let menuOpen = false;
+  let picked: { path: string; lang: string } | null = null;
   return {
     visited,
     goto: (path) => {
       visited.push(path);
+      menuOpen = false;
+      picked = null;
       return Promise.resolve(path.endsWith('/no-such-page') ? 404 : 200);
     },
     freshStart: () => Promise.resolve(),
-    url: () => Promise.resolve(`${DEV}${visited.at(-1) ?? '/'}`),
+    url: () => Promise.resolve(`${DEV}${picked?.path ?? visited.at(-1) ?? '/'}`),
     cspRefusals: () => Promise.resolve([]),
     attribute: (selector, name) =>
       Promise.resolve(
         selector === 'html' && name === 'lang'
-          ? onLegalPage
-            ? legalLocale(locale)
-            : lang
+          ? picked !== null
+            ? picked.lang
+            : onLegalPage
+              ? legalLocale(locale)
+              : lang
           : selector === VIEWPORT_TAG && name === 'content'
             ? VIEWPORT
             : selector === 'footer a[data-support]' && name === 'href'
@@ -137,17 +146,20 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
       }
       return Promise.resolve(selectorText(locale, selector, at.endsWith('/holding')));
     },
-    rows: (selector) =>
-      Promise.resolve(
-        selector.startsWith('nav[aria-label=')
-          ? LOCALES.map((other) => [`/${other}/`, langTag(other), other === locale ? 'page' : null, LANGUAGE_NAMES[other]])
-          : selector === 'ul.hellos > li'
-            ? HELLOS.map(({ lang: helloLang, word }) => [helloLang, word])
-            : [],
-      ),
+    rows: (selector) => Promise.resolve(selector === 'ul.hellos > li' ? HELLOS.map(({ lang: helloLang, word }) => [helloLang, word]) : []),
     holdingFacts: () => Promise.resolve(wantedFacts(420, false)),
-    tap: () => {
-      onLegalPage = true;
+    menuLive: () => Promise.resolve(wantedLive(locale, 420, menuOpen)),
+    tap: (selector) => {
+      if (selector === 'details.lang-switch > summary') {
+        menuOpen = !menuOpen;
+      } else if (selector.startsWith('details.lang-switch a.entry')) {
+        const next = nextLocale(locale);
+        const holding = visited.at(-1)?.endsWith('/holding') === true;
+        if (menuOpen) picked = { path: holding ? `/${next}/` : localePath(next, '/'), lang: langTag(next) };
+        menuOpen = false;
+      } else {
+        onLegalPage = true;
+      }
       return Promise.resolve();
     },
     type: () => Promise.resolve(),
@@ -179,24 +191,28 @@ const cases = (start: string) => IPHONE_CASES.filter(({ title }) => kind(title).
  */
 const CI_ASSERTIONS: Record<string, Record<string, number>> = {
   // Two more for the footer's support link (shyden-labs/ShyTalk#37 AC3): counted, to be confirmed on CI's smoke-totals.
-  'the home page answers 200': { en: 52, id: 52, th: 55, vi: 55, 'zh-Hans': 55 },
+  // Eight more for the language menu (shyden-labs/ShyTalk#332): shut, opened, axe, shut, the width and the menu at a
+  // phone's width, the picked page and its language; counted from its Playwright twin, to be confirmed on CI.
+  'the home page answers 200': { en: 60, id: 60, th: 63, vi: 63, 'zh-Hans': 63 },
   // The support page (#37 AC1): counted from its Playwright twin, to be confirmed on CI's smoke-totals.
   "the support page shows its heading and lines, and embeds ShyDesk's contact piece": { en: 13, id: 13, th: 13, vi: 13, 'zh-Hans': 13 },
   'an unknown page answers 404': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
   'the closed-testing page shows the form and every statement': { en: 17, id: 17, th: 17, vi: 17, 'zh-Hans': 17 },
   'the confirm page passes axe, and its button with a dead link shows link-expired': { en: 4, id: 4, th: 4, vi: 4, 'zh-Hans': 4 },
   // Counted from its Playwright twin's 18 checks (shyden-labs/ShyTalk#273, less the contact's two, #333); confirmed against CI's smoke-totals.
-  "the holding page shows ShyTalk's brand, the language switch and the hellos,": {
-    en: 18,
-    id: 18,
-    th: 18,
-    vi: 18,
-    'zh-Hans': 18,
+  // The language menu (shyden-labs/ShyTalk#332) replaces the switch's two with seven: shut, opened, axe, shut, at a
+  // phone's width, the picked page and its language; to be confirmed on CI.
+  "the holding page shows ShyTalk's brand, the language menu and the hellos,": {
+    en: 23,
+    id: 23,
+    th: 23,
+    vi: 23,
+    'zh-Hans': 23,
   },
   // Two per page: its title is not empty, and its preview is as wanted (shyden-labs/ShyTalk#198).
   // Four more each for the support and ticket pages (#37), to be confirmed on CI's smoke-totals.
   // Two more each for the appeal page (#310 AC4), to be confirmed on CI's smoke-totals.
-  'every page carries its link preview': { en: 36, id: 36, th: 30, vi: 30, 'zh-Hans': 30 },
+  'every page carries its link preview and its language menu': { en: 36, id: 36, th: 30, vi: 30, 'zh-Hans': 30 },
 };
 
 describe('the iPhone cases', () => {
@@ -278,7 +294,8 @@ describe('the iPhone cases', () => {
       const page = safari(lang);
       await c.run(page);
       const home = `${PREFIX[lang] ?? '?'}/`;
-      expect(page.visited).toEqual([home, home, home]);
+      // Then once more for the language menu, which picks the next language with taps (shyden-labs/ShyTalk#332).
+      expect(page.visited).toEqual([home, home, home, home]);
       const broken = c.run(safari(lang, { goto: () => Promise.resolve(500), axeViolations: () => Promise.resolve(['color-contrast: 1']) }));
       await expect(broken).rejects.toThrow(/500[\s\S]*color-contrast: 1/);
     },
@@ -313,6 +330,8 @@ describe('the iPhone cases', () => {
           if (taps === 1) logged = ['Refused to load x'];
         },
         attribute: (selector, name) => site.attribute(selector, name),
+        menuLive: () => site.menuLive(),
+        url: () => site.url(),
         cspRefusals: () => Promise.resolve(logged),
       });
       await expect(c.run(page)).rejects.toThrow('Refused to load x');
@@ -415,23 +434,31 @@ describe('the iPhone cases', () => {
       const tapped: string[] = [];
       const waited: string[] = [];
       let axe = 0;
+      // The site's own menu answers its taps (shyden-labs/ShyTalk#332).
+      const site = safari(lang);
+      const next = langTag(nextLocale(locale));
       await c.run(
         safari(lang, {
-          // The home page is in this language; a legal page, once a link was tapped, in its legal language.
+          // The home page is in this language; a legal page, once a link was tapped, in its legal language; the picked
+          // page in the language picked.
           attribute: (selector) =>
             Promise.resolve(
               selector === VIEWPORT_TAG
                 ? VIEWPORT
                 : selector === SUPPORT_LINK
                   ? localePath(locale, SUPPORT_PATH)
-                  : tapped.length === 0
-                    ? lang
-                    : legalLocale(locale),
+                  : tapped.at(-1)?.startsWith('details.lang-switch a') === true
+                    ? next
+                    : tapped.length === 0
+                      ? lang
+                      : legalLocale(locale),
             ),
           tap: (selector) => {
             tapped.push(selector);
-            return Promise.resolve();
+            return site.tap(selector);
           },
+          menuLive: () => site.menuLive(),
+          url: () => site.url(),
           waitForText: (_selector, text) => {
             waited.push(text);
             return Promise.resolve();
@@ -442,9 +469,17 @@ describe('the iPhone cases', () => {
           },
         }),
       );
-      expect(tapped).toEqual(['privacy', 'terms', 'guidelines'].map((doc) => `footer a[data-legal="${doc}"]`));
+      const button = 'details.lang-switch > summary';
+      expect(tapped).toEqual([
+        ...['privacy', 'terms', 'guidelines'].map((doc) => `footer a[data-legal="${doc}"]`),
+        button,
+        button,
+        button,
+        `details.lang-switch a.entry[hreflang="${next}"]`,
+      ]);
       expect(waited).toEqual([words.privacy.title, words.terms.title, words.guidelines.title]);
-      expect(axe).toBe(4);
+      // Home, each legal page, and home with the menu open.
+      expect(axe).toBe(5);
     },
   );
 
@@ -1044,7 +1079,7 @@ describe('the English-only note on a legal page (shyden-labs/ShyTalk#190)', () =
   it('waits for the note the page reveals after it loads, as Playwright’s toBeVisible() waits', async () => {
     const check = countingCheck();
     await run(delayedNote(1_000), check);
-    expect(check.count).toBe(55);
+    expect(check.count).toBe(63);
   });
 
   it('fails naming the note when it is not shown within 15 s', async () => {
@@ -1070,17 +1105,24 @@ describe('the iPhone holding-page cases (shyden-labs/ShyTalk#261, #273)', () => 
     await expect(c.run(safari(langOf(title), { goto: () => Promise.resolve(404) }))).rejects.toThrow();
   });
 
-  it.each(holding)('%s: fails when the language switch is hidden or its links are wrong', async (title, c) => {
-    await expect(
-      c.run(safari(langOf(title), { isVisible: (selector) => Promise.resolve(!selector.startsWith('nav[aria-label=')) })),
-    ).rejects.toThrow('no visible language switch');
-    await expect(
-      c.run(
-        safari(langOf(title), {
-          rows: (selector) => Promise.resolve(selector.startsWith('nav') ? [['/en/', 'en', 'page', 'English']] : []),
-        }),
-      ),
-    ).rejects.toThrow();
+  it.each(holding)('%s: fails when the language menu does not open, or its pick leads elsewhere', async (title, c) => {
+    const locale = localeOf(title);
+    await expect(c.run(safari(langOf(title), { menuLive: () => Promise.resolve(wantedLive(locale, 420, false)) }))).rejects.toThrow(
+      'the menu, opened by a tap',
+    );
+    // The address is looked at every quarter second up to 15 s: the clock is stood in, so the wait takes no time.
+    vi.useFakeTimers({ now: 1700000000000 });
+    try {
+      const state = { settled: false };
+      const running = c.run(safari(langOf(title), { url: () => Promise.resolve(`${DEV}/elsewhere/`) })).finally(() => {
+        state.settled = true;
+      });
+      running.catch(() => undefined);
+      for (let step = 0; step < 100 && !state.settled; step += 1) await vi.advanceTimersByTimeAsync(250);
+      await expect(running).rejects.toThrow("the picked language's page");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each(holding)('%s: fails naming a line that is hidden or holds other words', async (title, c) => {

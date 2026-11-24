@@ -1,7 +1,7 @@
 ---
 /**
  * The holding page production answers with until the full release (shyden-labs/ShyTalk#261), in ShyTalk's brand
- * (#273): a language switch, the icon, the name, "Coming soon", the tagline, and the floating hellos (no contact address, shyden-labs/ShyTalk#333). No
+ * (#273): the language menu (#332), the icon, the name, "Coming soon", the tagline, and the floating hellos (no contact address, shyden-labs/ShyTalk#333). No
  * menu or footer, as nothing they would link to is released. The fonts are bundled from @fontsource and served from
  * the site itself, as the content security policy allows only the site's own address.
  */
@@ -12,7 +12,8 @@ import '@fontsource/noto-sans-sc/800.css';
 import '@fontsource/noto-sans-thai/800.css';
 import Base from '../layouts/Base.astro';
 import Hellos from './Hellos.astro';
-import { LANGUAGE_NAMES, LOCALES, langTag, t, type Locale } from '../i18n/t.ts';
+import LanguageMenu from './LanguageMenu.astro';
+import { t, type Locale } from '../i18n/t.ts';
 
 interface Props {
   locale: Locale;
@@ -24,19 +25,7 @@ const { locale } = Astro.props;
   <div class="holding">
     <header class="holding-top">
       <img class="holding-mark" src="/icons/icon-192.png" width="34" height="34" alt="" />
-      <nav aria-label={t(locale, 'holding.languages')}>
-        <ul>
-          {
-            LOCALES.map((other) => (
-              <li>
-                <a href={`/${other}/`} hreflang={langTag(other)} lang={langTag(other)} aria-current={other === locale ? 'page' : undefined}>
-                  {LANGUAGE_NAMES[other]}
-                </a>
-              </li>
-            ))
-          }
-        </ul>
-      </nav>
+      <LanguageMenu locale={locale} />
     </header>
     <div class="holding-stage">
       <img class="brand-icon" src="/icons/icon-192.png" width="96" height="96" alt="" />

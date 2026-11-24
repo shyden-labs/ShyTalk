@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import type { SafariPage } from './iphone-cases.ts';
 import { PREVIEW_FACTS, PREVIEW_TAGS, type PreviewFacts } from '../support/link-preview.ts';
 import { BRAND_FONTS, HOLDING_FACTS, type HoldingFacts } from '../support/holding-facts.ts';
+import { MENU_LIVE, type MenuLive } from '../support/language-menu.ts';
 
 /** One WebDriver request to Appium, answering the response's `value`. */
 export type WebDriverCall = (method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown) => Promise<unknown>;
@@ -261,6 +262,9 @@ export function safariPage(
         HoldingFacts | { failed: string };
       if ('failed' in answer) throw new Error(`the holding-page check failed: ${answer.failed}`);
       return answer;
+    },
+    async menuLive() {
+      return (await run(`return (${MENU_LIVE})();`)) as MenuLive;
     },
     async count(selector) {
       return (await run(COUNT, selector)) as number;

@@ -130,7 +130,8 @@
 | account.codesLeftAfterSignIn | Signed in. Recovery codes left: {count}. | Berhasil masuk. Sisa kode pemulihan: {count}. | Signed in successfully. Remaining recovery codes: {count} . |
 | holding.building | The ShyTalk app is being built now. | Aplikasi ShyTalk sedang dibangun saat ini. | The ShyTalk app is currently under construction. |
 | holding.comingSoon | Coming soon | Segera hadir | Coming soon |
-| holding.languages | Language | Bahasa | Language |
+| language.label | Language | Bahasa | Language |
+| language.beta | beta translation | terjemahan beta | beta translation |
 | support.title | Support | Bantuan | Help |
 | support.intro | Ask a question or report a problem. The reply comes by email. | Ajukan pertanyaan atau laporkan masalah. Balasan akan dikirim lewat email. | Ask a question or report a problem. A reply will be sent via email. |
 | support.englishForm | The form is in English for now. | Untuk sementara, formulir ini hanya tersedia dalam bahasa Inggris. | For the time being, this form is only available in English. |

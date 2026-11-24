@@ -143,8 +143,7 @@
   },
   "holding": {
     "building": "Aplikasi ShyTalk sedang dibangun saat ini.",
-    "comingSoon": "Segera hadir",
-    "languages": "Bahasa"
+    "comingSoon": "Segera hadir"
   },
   "support": {
     "title": "Bantuan",
@@ -154,5 +153,9 @@
     "appealTitle": "Ajukan banding atas keputusan",
     "appealIntro": "Jika Anda merasa keputusan moderasi pada akun Anda keliru, jelaskan alasannya di sini.",
     "noScript": "Formulir bantuan memerlukan JavaScript. Aktifkan JavaScript untuk mengirim permintaan."
+  },
+  "language": {
+    "label": "Bahasa",
+    "beta": "terjemahan beta"
   }
 }

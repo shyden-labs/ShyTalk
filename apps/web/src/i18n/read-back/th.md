@@ -130,7 +130,8 @@
 | account.codesLeftAfterSignIn | Signed in. Recovery codes left: {count}. | เข้าสู่ระบบแล้ว รหัสกู้คืนที่เหลือ: {count} | Logged in. Remaining recovery codes: {count} |
 | holding.building | The ShyTalk app is being built now. | แอป ShyTalk กำลังอยู่ระหว่างการสร้าง | The ShyTalk app is currently under development. |
 | holding.comingSoon | Coming soon | เปิดตัวเร็ว ๆ นี้ | Launching soon. |
-| holding.languages | Language | ภาษา | language |
+| language.label | Language | ภาษา | language |
+| language.beta | beta translation | คำแปลเวอร์ชันเบต้า | Beta version translation |
 | support.title | Support | ฝ่ายช่วยเหลือ | Support team |
 | support.intro | Ask a question or report a problem. The reply comes by email. | ถามคำถามหรือแจ้งปัญหา คำตอบจะส่งถึงคุณทางอีเมล | Ask a question or report a problem; the answer will be sent to you via email. |
 | support.englishForm | The form is in English for now. | ขณะนี้แบบฟอร์มมีเฉพาะภาษาอังกฤษ | Currently, the form is only available in English. |
