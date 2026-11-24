@@ -98,6 +98,7 @@ jobs:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
           ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}
+          ROADMAP_WEBHOOK_SECRET: ${{ secrets.ROADMAP_WEBHOOK_SECRET }}
         run: |
           if ! grep -qE '^(apps/web/|workers/web/|migrations/|packages/environment/|packages/mail/|packages/ui-document/|manifests/|scripts/publish-ui\.ts$|scripts/announce-ui\.ts$|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
             echo "Nothing deployable changed, so dev deploys nothing."
@@ -179,6 +180,13 @@ jobs:
             exit 1
           fi
           printf '%s' "$ROADMAP_APP_KEY" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put ROADMAP_APP_KEY --env dev || { echo "::error title=deploy-dev failed::the dev roadmap App key was not set"; exit 1; }
+          # shyden-labs/ShyTalk#320: the roadmap believes only a webhook
+          # delivery signed with this secret, kept in the dev environment.
+          if [ -z "$ROADMAP_WEBHOOK_SECRET" ]; then
+            echo "::error title=ROADMAP_WEBHOOK_SECRET missing::Set ROADMAP_WEBHOOK_SECRET in the dev environment (shyden-labs/ShyTalk#320); until then the dev roadmap believes no webhook delivery."
+            exit 1
+          fi
+          printf '%s' "$ROADMAP_WEBHOOK_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put ROADMAP_WEBHOOK_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev roadmap webhook secret was not set"; exit 1; }
           # Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07): last,
           # every open app hears the newest UI version. Each deploy makes a
           # fresh announce secret, puts it in the Worker and calls the Worker

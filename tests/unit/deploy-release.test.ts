@@ -219,6 +219,23 @@ describe('deploy-release', () => {
     expect(onlyTest === -1 || put < onlyTest).toBe(true);
   });
 
+  // The roadmap believes only a webhook delivery signed with its secret
+  // (shyden-labs/ShyTalk#320); a missing one fails the job-start check (#330).
+  it('puts the roadmap webhook secret on TEST and PROD after the App key', () => {
+    const step = deployStep();
+    const appKey = step.indexOf(
+      'printf %s $ROADMAP_APP_KEY | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put ROADMAP_APP_KEY --env $TARGET ||',
+    );
+    const put = step.indexOf(
+      'printf %s $ROADMAP_WEBHOOK_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put ROADMAP_WEBHOOK_SECRET --env $TARGET || { echo ::error title=deploy-release failed::the $TARGET roadmap webhook secret was not set; exit 1; }',
+    );
+    expect(appKey).toBeGreaterThan(-1);
+    expect(put).toBeGreaterThan(appKey);
+    expect(step).toContain('ROADMAP_WEBHOOK_SECRET: ${{ secrets.ROADMAP_WEBHOOK_SECRET }}');
+    const onlyTest = step.indexOf('if [ $TARGET = test ]; then');
+    expect(onlyTest === -1 || put < onlyTest).toBe(true);
+  });
+
   // Authenticator-app sign-in answers 503 until the Worker holds TOTP_KEY
   // (shyden-labs/ShyTalk#134); it seals stored secrets, so TEST and PROD each
   // keep their own in their GitHub environment.
