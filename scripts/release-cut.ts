@@ -24,6 +24,7 @@
  *   node scripts/release-cut.ts <head repository> <head ref> <40-hex head sha> <pull request number>
  */
 import { execFileSync } from 'node:child_process';
+import { commandPath } from './command-path.ts';
 import { RELEASE_CUT } from './branch-rules-setup.ts';
 import { runIfEntry } from './cli.ts';
 
@@ -127,7 +128,7 @@ export function parseRemoteHead(lsRemote: string, ref: string, question: string)
 }
 
 function git(args: string[]): string {
-  return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
+  return execFileSync(commandPath('git'), args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 /** Whether `sha` is on develop. git answers 0 (yes) or 1 (no); anything else is an error, never a no. */

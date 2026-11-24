@@ -16,6 +16,7 @@
  * card the token cannot read could be open work, so it stops the read.
  */
 import { execFileSync } from 'node:child_process';
+import { commandPath } from './command-path.ts';
 import { runIfEntry } from './cli.ts';
 
 export interface BoardItem {
@@ -332,7 +333,7 @@ export function main(args: string[]): number {
     throw new Error('usage: node scripts/board-progress.ts <board-node-id> "<board title>"');
   }
   const query = ['api', 'graphql', '--paginate', '--slurp', '-f', `query=${QUERY}`, '-f', `id=${id}`];
-  const out = execFileSync('gh', query, { encoding: 'utf8' }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
+  const out = execFileSync(commandPath('gh'), query, { encoding: 'utf8' });
   const pages = JSON.parse(out) as RawPage[];
   if (assertWholeRead(pages, title) === 0) {
     process.stdout.write(`${emptyBoardNote(title)}: no progress to report.\n`);

@@ -86,11 +86,13 @@ async function awaitNewSecret(
   print(
     `announce-ui: ${environment} answered 401: waiting for the new announce secret to go live, for up to ${String(SECRET_CEILING_MS / 1000)} s`,
   );
-  let response = refused;
-  while (response.status === 401 && now() - started < SECRET_CEILING_MS) {
-    await wait(SECRET_LOOK_MS); // NOSONAR: a poll, each look waits for the one before, and a stated ceiling fails naming the cause (#245)
-    response = await ask(); // NOSONAR: a poll, each look waits for the one before, and a stated ceiling fails naming the cause (#245)
-  }
+  // A poll: each look waits for the one before, and the stated ceiling fails naming the cause (#245).
+  const lookAgain = async (answer: Response): Promise<Response> => {
+    if (answer.status !== 401 || now() - started >= SECRET_CEILING_MS) return answer;
+    await wait(SECRET_LOOK_MS);
+    return lookAgain(await ask());
+  };
+  const response = await lookAgain(refused);
   if (response.status === 401) {
     const last = await body(response);
     const error = typeof last?.['error'] === 'string' ? ` ${last['error']}` : '';

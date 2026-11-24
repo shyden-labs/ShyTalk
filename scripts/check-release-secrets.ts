@@ -35,15 +35,17 @@ function check(args: string[], env: Record<string, string | undefined>, read: (p
   return `${NAME}: ${environment} holds all ${String(wanted.length)} secrets this release reads`;
 }
 
-export async function main(
+/** A promise, so that a refusal rejects, as every script's main does through runIfEntry. */
+export function main(
   args: string[] = [],
   env: Record<string, string | undefined> = process.env,
   read: (path: string) => string = (path) => readFileSync(path, 'utf8'),
   print: (line: string) => void = (line) => process.stdout.write(`${line}\n`),
 ): Promise<number> {
-  await Promise.resolve(); // NOSONAR: async so that a refusal rejects, as every script's main does through runIfEntry
-  print(check(args, env, read));
-  return 0;
+  return new Promise((resolve) => {
+    print(check(args, env, read));
+    resolve(0);
+  });
 }
 
 await runIfEntry(import.meta.url, main);

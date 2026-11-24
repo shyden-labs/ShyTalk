@@ -117,7 +117,7 @@ export function handleApi(request: Request, env: WebEnv): Promise<Response> {
 }
 
 /** The site's languages other than English, each with its own holding page under its own folder. */
-const HOLDING_LANGUAGES = ['id', 'th', 'vi', 'zh'];
+const HOLDING_LANGUAGES = new Set(['id', 'th', 'vi', 'zh']);
 
 /**
  * The holding page for a visitor's `Accept-Language`: the most wanted of the site's languages (a `zh-*` tag is
@@ -131,7 +131,7 @@ export function holdingPath(languages: string | null): string {
     const q = parameters.map((parameter) => parameter.trim()).find((parameter) => parameter.startsWith('q='));
     const weight = q === undefined ? 1 : Number(q.slice(2));
     const wanted = Number.isNaN(weight) ? 1 : weight;
-    if ((language === 'en' || HOLDING_LANGUAGES.includes(language)) && wanted > best.weight) best = { language, weight: wanted };
+    if ((language === 'en' || HOLDING_LANGUAGES.has(language)) && wanted > best.weight) best = { language, weight: wanted };
   }
   return best.language === 'en' ? '/holding' : `/${best.language}/holding`;
 }
@@ -144,7 +144,7 @@ export function holdingPath(languages: string | null): string {
 export function holdingAnswer(pathname: string, languages: string | null): { page: string; status: 200 | 404 } {
   const home = /^\/([a-z]+)\/?$/.exec(pathname)?.[1];
   if (home === 'en') return { page: '/holding', status: 200 };
-  if (home !== undefined && HOLDING_LANGUAGES.includes(home)) return { page: `/${home}/holding`, status: 200 };
+  if (home !== undefined && HOLDING_LANGUAGES.has(home)) return { page: `/${home}/holding`, status: 200 };
   return { page: holdingPath(languages), status: pathname === '/' ? 200 : 404 };
 }
 
@@ -191,26 +191,18 @@ async function shydeskCallback(request: Request, env: WebEnv): Promise<Response>
   return handleShyDeskCallback(request, { ...env, DB: env.DB as unknown as ShyDeskCallbackEnv['DB'] });
 }
 
-async function route(request: Request, env: WebEnv): Promise<Response> {
-  // An unnamed environment cannot know whether it needs a door, so it serves nothing.
-  if (!ENVIRONMENTS.has(env.ENVIRONMENT_NAME)) return new Response('Service Unavailable', { status: 503 });
-  if (env.ENVIRONMENT_NAME !== 'prod') {
-    const refused = await requireDoorSecret(request, env.DOOR_SECRET);
-    if (refused) return refused;
-  }
-  // The webhook comes from GitHub, which has no password or DEV pass to give; its signature guards it (shyden-labs/ShyTalk#321).
-  if (new URL(request.url).pathname === HOOK_PATH) return handleGithubHook(request, env);
-  if (new URL(request.url).pathname === SHYDESK_CALLBACK_PATH) return shydeskCallback(request, env);
-  if (env.ENVIRONMENT_NAME !== 'prod') {
-    const now = Math.floor(Date.now() / 1000);
-    const passed = await devPassGate(request, { ...env, DB: hasFullD1(env) ? env.DB : undefined }, now);
-    if (passed) return passed;
-    const pass = env.ENVIRONMENT_NAME === 'dev' ? { key: env.DEV_PASS_SECRET, now } : undefined;
-    const asked = await requireSitePassword(request, env.SITE_PASSWORD, `ShyTalk ${env.ENVIRONMENT_NAME}`, pass);
-    if (asked) return asked;
-  }
-  // Holding, nothing behind the page is reached, so no database is needed.
-  if (env.HOLDING === 'true') return holding(request, env);
+/** Outside production, the DEV pass or the site password, whichever the visitor brings; null once one is given. */
+async function passRefusal(request: Request, env: WebEnv): Promise<Response | null> {
+  if (env.ENVIRONMENT_NAME === 'prod') return null;
+  const now = Math.floor(Date.now() / 1000);
+  const passed = await devPassGate(request, { ...env, DB: hasFullD1(env) ? env.DB : undefined }, now);
+  if (passed) return passed;
+  const pass = env.ENVIRONMENT_NAME === 'dev' ? { key: env.DEV_PASS_SECRET, now } : undefined;
+  return requireSitePassword(request, env.SITE_PASSWORD, `ShyTalk ${env.ENVIRONMENT_NAME}`, pass);
+}
+
+/** Everything behind the gates, once the database proves it is this environment's own. */
+async function served(request: Request, env: WebEnv): Promise<Response> {
   // A Worker deployed without its database cannot prove whose data it serves.
   if (!env.DB) return new Response('Service Unavailable', { status: 503 });
   const wrongStore = await markerGuard(env.ENVIRONMENT_NAME, env.DB).assertEnvironmentMarkers();
@@ -220,6 +212,22 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   if (isAppApi(pathname)) return handleAppApi(request, env);
   if (pathname.startsWith('/api/')) return handleApi(request, env);
   return env.ASSETS.fetch(request);
+}
+
+async function route(request: Request, env: WebEnv): Promise<Response> {
+  // An unnamed environment cannot know whether it needs a door, so it serves nothing.
+  if (!ENVIRONMENTS.has(env.ENVIRONMENT_NAME)) return new Response('Service Unavailable', { status: 503 });
+  const refused = env.ENVIRONMENT_NAME === 'prod' ? null : await requireDoorSecret(request, env.DOOR_SECRET);
+  if (refused) return refused;
+  const { pathname } = new URL(request.url);
+  // The webhook comes from GitHub, which has no password or DEV pass to give; its signature guards it (shyden-labs/ShyTalk#321).
+  if (pathname === HOOK_PATH) return handleGithubHook(request, env);
+  if (pathname === SHYDESK_CALLBACK_PATH) return shydeskCallback(request, env);
+  const asked = await passRefusal(request, env);
+  if (asked) return asked;
+  // Holding, nothing behind the page is reached, so no database is needed.
+  if (env.HOLDING === 'true') return holding(request, env);
+  return served(request, env);
 }
 
 /** Routes the request and puts the security headers on whatever answers. */

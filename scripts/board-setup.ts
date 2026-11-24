@@ -10,6 +10,7 @@
  * each field only if it is missing, and reads both back.
  */
 import { execFileSync } from 'node:child_process';
+import { commandPath } from './command-path.ts';
 import { assertTitle } from './board-progress.ts';
 import { runIfEntry } from './cli.ts';
 
@@ -77,7 +78,7 @@ export function planPriorityField(fields: Field[]): 'create' | 'exists' {
 function gql(query: string, vars: Record<string, string>): unknown {
   const args = ['api', 'graphql', '-f', `query=${query}`];
   for (const [k, v] of Object.entries(vars)) args.push('-f', `${k}=${v}`);
-  return JSON.parse(execFileSync('gh', args, { encoding: 'utf8' })); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
+  return JSON.parse(execFileSync(commandPath('gh'), args, { encoding: 'utf8' }));
 }
 
 interface Board {

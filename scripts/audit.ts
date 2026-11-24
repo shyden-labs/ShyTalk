@@ -10,6 +10,7 @@
  * immediately if so, then remove the exception".
  */
 import { spawnSync } from 'node:child_process';
+import { commandPath } from './command-path.ts';
 import { readFileSync } from 'node:fs';
 import { runIfEntry } from './cli.ts';
 
@@ -110,7 +111,7 @@ export function main(args: string[]): number | Promise<number> {
       return 0;
     });
   }
-  const run = spawnSync('npm', ['audit', '--json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
+  const run = spawnSync(commandPath('npm'), ['audit', '--json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   let report: AuditReport;
   try {
     report = JSON.parse(run.stdout) as AuditReport;

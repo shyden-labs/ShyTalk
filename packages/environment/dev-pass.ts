@@ -16,17 +16,17 @@ export interface DevPass {
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 
 const toBase64url = (bytes: Uint8Array): string =>
-  btoa(String.fromCharCode(...bytes))
+  btoa(String.fromCodePoint(...bytes))
     .replaceAll('+', '-')
     .replaceAll('/', '_')
-    .replace(/=+$/, '');
+    .replaceAll('=', '');
 
 /** The bytes `text` encodes, or null unless it is their one canonical unpadded base64url form. */
 function fromBase64url(text: string): Uint8Array<ArrayBuffer> | null {
   if (!BASE64URL.test(text)) return null;
   let bytes: Uint8Array<ArrayBuffer>;
   try {
-    bytes = Uint8Array.from(atob(text.replaceAll('-', '+').replaceAll('_', '/')), (c) => c.charCodeAt(0));
+    bytes = Uint8Array.from(atob(text.replaceAll('-', '+').replaceAll('_', '/')), (c) => Number(c.codePointAt(0)));
   } catch {
     // A length no bytes encode (one character over a multiple of four).
     return null;

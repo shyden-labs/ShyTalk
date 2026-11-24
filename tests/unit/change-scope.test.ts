@@ -5,6 +5,8 @@ import { changeScope, main } from '../../scripts/change-scope.ts';
 
 // git and the output file are stood in: a unit test starts no process and writes nothing.
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
+// Each command runs by its full path (shyden-labs/ShyTalk#353), stood in here as /resolved/<name>.
+vi.mock('../../scripts/command-path.ts', () => ({ commandPath: (name: string) => `/resolved/${name}` }));
 vi.mock('node:fs', () => ({ appendFileSync: vi.fn() }));
 const git = vi.mocked(execFileSync);
 const write = vi.mocked(appendFileSync);
@@ -54,7 +56,7 @@ describe('main', () => {
   it('writes docs-only for a docs pull request, read from the merge commit’s first parent, a rename listed as both its paths', () => {
     git.mockReturnValueOnce('README.md\ndocs/a.md\n');
     expect(main()).toBe(0);
-    expect(git).toHaveBeenCalledWith('git', ['diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD'], { encoding: 'utf8' });
+    expect(git).toHaveBeenCalledWith('/resolved/git', ['diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD'], { encoding: 'utf8' });
     expect(write).toHaveBeenCalledWith('/out', 'scope=docs-only\n');
   });
 

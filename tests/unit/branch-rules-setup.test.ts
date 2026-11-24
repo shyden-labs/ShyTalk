@@ -14,6 +14,8 @@ import {
 
 // `gh` is stood in: a unit test starts no process. Each test queues gh's replies in call order.
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
+// Each command runs by its full path (shyden-labs/ShyTalk#353), stood in here as /resolved/<name>.
+vi.mock('../../scripts/command-path.ts', () => ({ commandPath: (name: string) => `/resolved/${name}` }));
 const gh = vi.mocked(execFileSync);
 
 /**
@@ -374,7 +376,11 @@ describe('main', () => {
     out = [];
     vi.spyOn(process.stdout, 'write').mockImplementation((t) => (out.push(String(t)), true));
   });
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    // Every call runs gh by its full path (shyden-labs/ShyTalk#353).
+    expect(gh.mock.calls.filter(([file]) => file !== '/resolved/gh')).toEqual([]);
+    vi.restoreAllMocks();
+  });
 
   it.each([[[]], [['not-a-repo', 'build-and-test']], [[REPO]]])('refuses the arguments %j', (args) => {
     expect(() => main(args)).toThrow('usage: node scripts/branch-rules-setup.ts <owner/repo> <required check>...');

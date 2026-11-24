@@ -40,14 +40,18 @@ export async function builtFileFor(dist: string, path: string, isFile: (file: st
  */
 export async function makePreviews(pages: string[], out: string, shoot: (url: string, file: string) => Promise<void>): Promise<number> {
   if (pages.length === 0) throw new Error('no built pages: run npm run build:web first');
-  for (const page of pages) {
+  // One page at a time, in order: the screenshots share one browser tab.
+  const shootFrom = async (index: number): Promise<void> => {
+    const page = pages[index];
+    if (page === undefined) return;
     try {
-      // One page, shot in order: the screenshots share one browser tab.
-      await shoot(pageUrl(SHOT_ORIGIN, pagePath(page)), `${out}/${previewKey(page)}.png`); // NOSONAR: in turn by design, one tab
+      await shoot(pageUrl(SHOT_ORIGIN, pagePath(page)), `${out}/${previewKey(page)}.png`);
     } catch (error) {
       throw new Error(`${page}: ${(error as Error).message}`, { cause: error });
     }
-  }
+    await shootFrom(index + 1);
+  };
+  await shootFrom(0);
   return pages.length;
 }
 

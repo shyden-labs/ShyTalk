@@ -24,7 +24,7 @@ const base64Url = (bytes: Uint8Array): string =>
   btoa(String.fromCodePoint(...bytes))
     .replaceAll('+', '-')
     .replaceAll('/', '_')
-    .replace(/=+$/u, '');
+    .replaceAll('=', '');
 const textBase64Url = (text: string): string => base64Url(new TextEncoder().encode(text));
 
 /** A DER length: short form under 128, else the long form. */
@@ -47,7 +47,7 @@ function pkcs8OfPkcs1(pkcs1: Uint8Array): Uint8Array<ArrayBuffer> {
 function pkcs8Of(pem: string): Uint8Array<ArrayBuffer> {
   const match = /-----BEGIN (RSA )?PRIVATE KEY-----([A-Za-z0-9+/=\s]+)-----END (?:RSA )?PRIVATE KEY-----/u.exec(pem);
   if (match === null) throw new Error('roadmap: ROADMAP_APP_KEY is not a PEM private key');
-  const bytes = new Uint8Array(Array.from(atob(String(match[2]).replaceAll(/\s/gu, '')), (char) => char.charCodeAt(0)));
+  const bytes = new Uint8Array(Array.from(atob(String(match[2]).replaceAll(/\s/gu, '')), (char) => Number(char.codePointAt(0))));
   return match[1] === undefined ? bytes : pkcs8OfPkcs1(bytes);
 }
 
@@ -104,13 +104,13 @@ async function boardPage(app: RoadmapApp, send: GithubFetch, token: string, endC
 /** Every item on the App's board, read page by page as the close-out reads it. */
 export async function readRoadmapBoard(app: RoadmapApp, send: GithubFetch, now: number): Promise<RoadmapItem[]> {
   const token = await installationToken(app, send, now);
-  const pages: Page[] = [];
-  let endCursor: string | null = null;
-  do {
-    const page = await boardPage(app, send, token, endCursor);
-    pages.push(page);
-    const info = page.data?.node?.items.pageInfo;
-    endCursor = info?.hasNextPage === true ? info.endCursor : null;
-  } while (endCursor !== null);
-  return parseRoadmapItems(pages);
+  return parseRoadmapItems(await pagesFrom(app, send, token, null));
+}
+
+/** The board's pages from `endCursor` on: each page names the next, so they are read one after another. */
+async function pagesFrom(app: RoadmapApp, send: GithubFetch, token: string, endCursor: string | null): Promise<Page[]> {
+  const page = await boardPage(app, send, token, endCursor);
+  const info = page.data?.node?.items.pageInfo;
+  if (info?.hasNextPage !== true || info.endCursor === null) return [page];
+  return [page, ...(await pagesFrom(app, send, token, info.endCursor))];
 }

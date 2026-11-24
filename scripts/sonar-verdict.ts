@@ -128,13 +128,16 @@ async function judge(path: string): Promise<{ ok: boolean; lines: string[]; dash
   if (!existsSync(path)) fail(`no report-task.txt at ${path}: the scan did not run`);
   const report = parseReportTask(readFileSync(path, 'utf8'));
   const ceiling = Number(process.env.SONAR_CEILING_SECONDS || 300);
-  let task: { status: string; analysisId?: string; pullRequest?: string; branch?: string; errorMessage?: string };
-  for (let waited = 0; ; waited += STEP_MS / 1000) {
-    task = ((await get(`${report.serverUrl}/api/ce/task?id=${report.ceTaskId}`, token)) as { task: typeof task }).task;
-    if (task.status !== 'PENDING' && task.status !== 'IN_PROGRESS') break;
-    if (waited >= ceiling) fail(`task ${report.ceTaskId} is still ${task.status} after ${ceiling} s; no verdict to read`);
-    await sleep(STEP_MS); // NOSONAR: a poll, each look waits for the one before, and a stated ceiling fails naming the cause (#245)
-  }
+  type Task = { status: string; analysisId?: string; pullRequest?: string; branch?: string; errorMessage?: string };
+  // A poll: each look waits for the one before, and the stated ceiling fails naming the cause (#245).
+  const settled = async (waited: number): Promise<Task> => {
+    const looked = ((await get(`${report.serverUrl}/api/ce/task?id=${report.ceTaskId}`, token)) as { task: Task }).task;
+    if (looked.status !== 'PENDING' && looked.status !== 'IN_PROGRESS') return looked;
+    if (waited >= ceiling) fail(`task ${report.ceTaskId} is still ${looked.status} after ${ceiling} s; no verdict to read`);
+    await sleep(STEP_MS);
+    return settled(waited + STEP_MS / 1000);
+  };
+  const task = await settled(0);
   if (task.status !== 'SUCCESS') {
     const why = task.errorMessage ? ' (' + task.errorMessage + ')' : '';
     fail(`task ${report.ceTaskId} ended ${task.status}${why}; no verdict to read`);

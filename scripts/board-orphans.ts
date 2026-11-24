@@ -13,6 +13,7 @@
  * setting its Status back, or push its branch.
  */
 import { execFileSync } from 'node:child_process';
+import { commandPath } from './command-path.ts';
 import { assertWholeRead, emptyBoardNote } from './board-progress.ts';
 import { runIfEntry } from './cli.ts';
 
@@ -79,7 +80,7 @@ export const QUERY = `query($id: ID!, $endCursor: String) {
 const PR_LIMIT = 500;
 
 function gh(args: string[]): unknown {
-  return JSON.parse(execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64e6 })); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
+  return JSON.parse(execFileSync(commandPath('gh'), args, { encoding: 'utf8', maxBuffer: 64e6 }));
 }
 
 export function main(args: string[]): number {
