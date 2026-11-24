@@ -135,4 +135,6 @@
 | support.intro | Ask a question or report a problem. The reply comes by email. | Ajukan pertanyaan atau laporkan masalah. Balasan akan dikirim lewat email. | Ask a question or report a problem. A reply will be sent via email. |
 | support.englishForm | The form is in English for now. | Untuk sementara, formulir ini hanya tersedia dalam bahasa Inggris. | For the time being, this form is only available in English. |
 | support.ticketTitle | Your support request | Permintaan bantuan Anda | Your request for help |
+| support.appealTitle | Appeal a decision | Ajukan banding atas keputusan | Appeal the decision |
+| support.appealIntro | If you think a moderation decision on your account was wrong, explain why here. | Jika Anda merasa keputusan moderasi pada akun Anda keliru, jelaskan alasannya di sini. | If you feel a moderation decision on your account was wrong, please explain why here. |
 | support.noScript | The support form needs JavaScript. Turn it on to send a request. | Formulir bantuan memerlukan JavaScript. Aktifkan JavaScript untuk mengirim permintaan. | The help form requires JavaScript. Please enable JavaScript to submit requests. |

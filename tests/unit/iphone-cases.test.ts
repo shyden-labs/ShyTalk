@@ -1236,6 +1236,12 @@ describe('the appeal page (shyden-labs/ShyTalk#310 AC4)', () => {
   const title = 'the appeal page opens the appeal view in the browser’s language, keeping the notice’s token';
   const appeal = IPHONE_CASES.find((c) => c.title.startsWith(title));
   const TOKEN_ADDRESS = `${APPEAL_PATH}#appeal=${SMOKE_APPEAL_TOKEN}`;
+  beforeEach(() => {
+    vi.stubEnv('SITE_ENVIRONMENT', 'dev');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
 
   it('is in the suite once', () => {
     expect(IPHONE_CASES.filter((c) => c.title.startsWith(title))).toHaveLength(1);

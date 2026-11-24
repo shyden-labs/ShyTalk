@@ -135,4 +135,6 @@
 | support.intro | Ask a question or report a problem. The reply comes by email. | ถามคำถามหรือแจ้งปัญหา คำตอบจะส่งถึงคุณทางอีเมล | Ask a question or report a problem; the answer will be sent to you via email. |
 | support.englishForm | The form is in English for now. | ขณะนี้แบบฟอร์มมีเฉพาะภาษาอังกฤษ | Currently, the form is only available in English. |
 | support.ticketTitle | Your support request | คำขอความช่วยเหลือของคุณ | Your request for help. |
+| support.appealTitle | Appeal a decision | อุทธรณ์คำตัดสิน | Appeal the decision. |
+| support.appealIntro | If you think a moderation decision on your account was wrong, explain why here. | หากคุณคิดว่าคำตัดสินของผู้ดูแลเกี่ยวกับบัญชีของคุณไม่ถูกต้อง โปรดอธิบายเหตุผลที่นี่ | If you believe the administrator's decision regarding your account is incorrect, please explain why here. |
 | support.noScript | The support form needs JavaScript. Turn it on to send a request. | แบบฟอร์มขอความช่วยเหลือต้องใช้ JavaScript โปรดเปิดใช้งานเพื่อส่งคำขอ | The help form requires JavaScript. Please enable it to submit requests. |
