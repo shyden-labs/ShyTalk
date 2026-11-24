@@ -102,17 +102,18 @@ export async function takeLock(files: LedgerFiles, path: string, me: Holder, clo
   };
   const began = clock.now();
   let announced = false;
-  for (;;) {
+  // A poll: each look waits for the one before, and the stated ceiling fails naming the holder (#245).
+  const look = async (): Promise<() => void> => {
     if (files.create(path, mine)) return release;
     const text = files.read(path);
     // Released between the two calls: take it on the next pass.
-    if (text === undefined) continue;
+    if (text === undefined) return look();
     const holder = holderOf(text);
     if (!holder) throw new Error(`the read-back lock ${path} does not name its holder; remove it by hand once no read-back runs`);
     if (!clock.alive(holder.pid)) {
       clock.say(`taking over the lock left by ${holderText(holder)}, which is no longer running`);
       files.remove(path);
-      continue;
+      return look();
     }
     if (clock.now() - began >= LOCK_CEILING_MS) {
       throw new Error(`another read-back still holds ${path} after ${LOCK_CEILING_MS / 60_000} minutes: ${holderText(holder)}`);
@@ -121,8 +122,10 @@ export async function takeLock(files: LedgerFiles, path: string, me: Holder, clo
       clock.say(`waiting for the read-back held by ${holderText(holder)} (up to ${LOCK_CEILING_MS / 60_000} minutes)`);
       announced = true;
     }
-    await clock.wait(LOCK_POLL_MS); // NOSONAR: a poll, each look waits for the one before, and a stated ceiling fails naming the cause (#245)
-  }
+    await clock.wait(LOCK_POLL_MS);
+    return look();
+  };
+  return look();
 }
 
 /** The ledger as it is on disk now; no file is an empty ledger. */

@@ -116,11 +116,11 @@ export class Roadmap {
     return this.reading;
   }
 
+  /** One read, then one more if a change arrived while it ran, and so on until a read ends with none waiting. */
   private async readUntilQuiet(): Promise<void> {
-    do {
-      this.again = false;
-      await this.readOnce();
-    } while (this.askedAgain());
+    this.again = false;
+    await this.readOnce();
+    if (this.askedAgain()) await this.readUntilQuiet();
   }
 
   /** Whether a change arrived during the read just done (set by `read`, so the compiler cannot see it change). */

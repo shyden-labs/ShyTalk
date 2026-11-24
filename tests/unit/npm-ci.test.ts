@@ -6,6 +6,8 @@ import { withoutYamlComments } from './source-text.ts';
 
 // npm is stood in: a unit test starts no process.
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }));
+// Each command runs by its full path (shyden-labs/ShyTalk#353), stood in here as /resolved/<name>.
+vi.mock('../../scripts/command-path.ts', () => ({ commandPath: (name: string) => `/resolved/${name}` }));
 const spawn = vi.mocked(spawnSync);
 
 /**
@@ -62,7 +64,7 @@ describe('main', () => {
   it('runs npm ci with its output captured, and passes a clean install', () => {
     spawn.mockReturnValue(result({ stdout: 'added 212 packages\n' }));
     expect(main()).toBe(0);
-    expect(spawn).toHaveBeenCalledWith('npm', ['ci'], { encoding: 'utf8', stdio: ['inherit', 'pipe', 'pipe'] });
+    expect(spawn).toHaveBeenCalledWith('/resolved/npm', ['ci'], { encoding: 'utf8', stdio: ['inherit', 'pipe', 'pipe'] });
     expect(out).toHaveBeenCalledWith('added 212 packages\n');
   });
 

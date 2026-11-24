@@ -61,10 +61,10 @@ export const SITE_PASS_COOKIE = 'shytalk_site_pass';
 export const SITE_PASS_SECONDS = 12 * 60 * 60;
 
 const base64url = (bytes: Uint8Array): string =>
-  btoa(String.fromCharCode(...bytes))
+  btoa(String.fromCodePoint(...bytes))
     .replaceAll('+', '-')
     .replaceAll('/', '_')
-    .replace(/=+$/, '');
+    .replaceAll('=', '');
 
 /**
  * The site pass cookie's value, good until `exp` (unix seconds):
@@ -104,7 +104,7 @@ function basicPassword(authorization: string | null): string {
   if (scheme.toLowerCase() !== 'basic' || encoded === '') return '';
   let credentials: string;
   try {
-    credentials = new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)));
+    credentials = new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => Number(c.codePointAt(0))));
   } catch {
     return '';
   }

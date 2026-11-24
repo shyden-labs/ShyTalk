@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { excusedLine, fixCheck, main, unexcused, type AuditException, type AuditReport } from '../../scripts/audit.ts';
 
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }));
+// Each command runs by its full path (shyden-labs/ShyTalk#353), stood in here as /resolved/<name>.
+vi.mock('../../scripts/command-path.ts', () => ({ commandPath: (name: string) => `/resolved/${name}` }));
 
 /**
  * CI's dependency audit (shyden-labs/ShyTalk#260): every finding fails it unless it comes wholly from an advisory
@@ -103,7 +105,7 @@ describe('main', () => {
     audited(JSON.stringify({ vulnerabilities: {} }), 0);
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     expect(main([])).toBe(0);
-    expect(spawnSync).toHaveBeenCalledWith('npm', ['audit', '--json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    expect(spawnSync).toHaveBeenCalledWith('/resolved/npm', ['audit', '--json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
     expect(log).toHaveBeenCalledWith('audit: no unexcused finding; excused nothing');
   });
 

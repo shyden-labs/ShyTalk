@@ -20,6 +20,7 @@
  * that back too (issue shyden-labs/repo-template#117).
  */
 import { execFileSync } from 'node:child_process';
+import { commandPath } from './command-path.ts';
 import { runIfEntry } from './cli.ts';
 
 export interface Rule {
@@ -233,7 +234,7 @@ export function auditDevEnvironment(env: DevEnvironment | undefined, policies: B
 
 /** gh's JSON answer; an empty one (a DELETE's 204) reads as nothing. */
 function gh(args: string[], input?: string): unknown {
-  const answer = execFileSync('gh', args, { encoding: 'utf8', input }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
+  const answer = execFileSync(commandPath('gh'), args, { encoding: 'utf8', input });
   return answer.trim() === '' ? undefined : JSON.parse(answer);
 }
 

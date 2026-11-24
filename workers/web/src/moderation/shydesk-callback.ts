@@ -100,7 +100,7 @@ export async function checkCallback(
   body: string,
   now: number,
 ): Promise<CallbackCheck> {
-  if (timestamp === null || !/^[0-9]+$/u.test(timestamp)) return refuse({ status: 400, error: 'bad_timestamp' });
+  if (timestamp === null || !/^\d+$/u.test(timestamp)) return refuse({ status: 400, error: 'bad_timestamp' });
   if (!(await isSigned(secret, timestamp, body, signature))) return refuse({ status: 401, error: 'bad_signature' });
   if (Math.abs(now - Number(timestamp)) > SKEW_SECONDS) return refuse({ status: 401, error: 'stale_timestamp' });
   const payload = payloadOf(body);

@@ -13,6 +13,8 @@ import { boardFields, main, parseStory, type Story } from '../../scripts/file-st
  */
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
+// Each command runs by its full path (shyden-labs/ShyTalk#353), stood in here as /resolved/<name>.
+vi.mock('../../scripts/command-path.ts', () => ({ commandPath: (name: string) => `/resolved/${name}` }));
 const gh = vi.mocked(execFileSync);
 
 const BODY = ['## Story', 'x', '## Context', 'x', '## Acceptance criteria', '1. x', '## Announce', 'x', '## Definition of done', 'x'].join(
@@ -141,6 +143,8 @@ describe('main', () => {
     vi.spyOn(process.stdout, 'write').mockImplementation((t) => (out.push(String(t)), true));
   });
   afterEach(() => {
+    // Every call runs gh by its full path (shyden-labs/ShyTalk#353).
+    expect(gh.mock.calls.filter(([file]) => file !== '/resolved/gh')).toEqual([]);
     vi.restoreAllMocks();
     rmSync(dir, { recursive: true, force: true });
   });

@@ -13,7 +13,7 @@ const HEX = /^[0-9a-f]{64}$/u;
  * delivery, so a Worker deployed without its secret believes nothing.
  */
 export async function verifySignature(secret: string, body: string, header: string | null): Promise<boolean> {
-  if (secret === '' || header === null || !header.startsWith(PREFIX)) return false;
+  if (secret === '' || !header?.startsWith(PREFIX)) return false;
   const given = header.slice(PREFIX.length);
   if (!HEX.test(given)) return false;
   const signature = Uint8Array.from({ length: given.length / 2 }, (_, index) => Number.parseInt(given.slice(index * 2, index * 2 + 2), 16));

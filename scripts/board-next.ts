@@ -20,6 +20,7 @@
  * scored and still counts as a blocker.
  */
 import { execFileSync } from 'node:child_process';
+import { commandPath } from './command-path.ts';
 import { assertWholeRead, emptyBoardNote } from './board-progress.ts';
 import { PRIORITY_OPTIONS } from './board-setup.ts';
 import { runIfEntry } from './cli.ts';
@@ -224,7 +225,7 @@ export function main(args: string[]): number {
     throw new Error('usage: node scripts/board-next.ts <board-node-id> "<board title>"');
   }
   const query = ['api', 'graphql', '--paginate', '--slurp', '-f', `query=${QUERY}`, '-f', `id=${id}`];
-  const out = execFileSync('gh', query, { encoding: 'utf8' }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
+  const out = execFileSync(commandPath('gh'), query, { encoding: 'utf8' });
   const pages = JSON.parse(out) as RawPage[];
   if (assertWholeRead(pages, title) === 0) {
     process.stdout.write(`Next: nothing to pick; ${emptyBoardNote(title)}.\n`);

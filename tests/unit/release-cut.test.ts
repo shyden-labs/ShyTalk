@@ -7,6 +7,8 @@ import { auditReleaseCut, gatherFacts, main, MERGE_REF, parseParents, statusFor,
 
 // git is stood in: a unit test starts no process. Each test answers git by its arguments.
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
+// Each command runs by its full path (shyden-labs/ShyTalk#353), stood in here as /resolved/<name>.
+vi.mock('../../scripts/command-path.ts', () => ({ commandPath: (name: string) => `/resolved/${name}` }));
 const git = vi.mocked(execFileSync);
 
 /**
@@ -198,14 +200,14 @@ describe('gatherFacts', () => {
     answer(repoReplies());
     expect(gatherFacts('release/2026-10-23', HEAD, 7)).toEqual(good);
     expect(git.mock.calls.map((c) => [c[0], (c[1] as string[]).join(' ')])).toEqual([
-      ['git', FETCH],
-      ['git', LS_REMOTE],
-      ['git', ancestor(HEAD)],
-      ['git', 'rev-list --parents -n 1 refs/remotes/pull/merge'],
-      ['git', 'rev-parse refs/remotes/pull/merge^{tree}'],
-      ['git', `rev-parse ${HEAD}^{tree}`],
-      ['git', 'rev-list --parents origin/develop..origin/main'],
-      ['git', ancestor(OLD_CUT)],
+      ['/resolved/git', FETCH],
+      ['/resolved/git', LS_REMOTE],
+      ['/resolved/git', ancestor(HEAD)],
+      ['/resolved/git', 'rev-list --parents -n 1 refs/remotes/pull/merge'],
+      ['/resolved/git', 'rev-parse refs/remotes/pull/merge^{tree}'],
+      ['/resolved/git', `rev-parse ${HEAD}^{tree}`],
+      ['/resolved/git', 'rev-list --parents origin/develop..origin/main'],
+      ['/resolved/git', ancestor(OLD_CUT)],
     ]);
   });
 

@@ -5,6 +5,8 @@ import { inProgressIssues, findOrphanIssues, main, QUERY, type OpenPullRequest }
 
 // `gh` is stood in: a unit test starts no process. Each test queues gh's replies in call order.
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
+// Each command runs by its full path (shyden-labs/ShyTalk#353), stood in here as /resolved/<name>.
+vi.mock('../../scripts/command-path.ts', () => ({ commandPath: (name: string) => `/resolved/${name}` }));
 const gh = vi.mocked(execFileSync);
 const reply = (...values: unknown[]) => {
   for (const value of values) gh.mockReturnValueOnce(JSON.stringify(value));
@@ -162,9 +164,9 @@ describe('main', () => {
     reply([board], [], [[{ name: 'main' }]]);
     main(ARGS);
     expect(gh.mock.calls.map((c) => [c[0], (c[1] as string[]).filter((a) => !a.startsWith('query='))])).toEqual([
-      ['gh', ['api', 'graphql', '--paginate', '--slurp', '-f', '-f', 'id=PVT_1']],
+      ['/resolved/gh', ['api', 'graphql', '--paginate', '--slurp', '-f', '-f', 'id=PVT_1']],
       [
-        'gh',
+        '/resolved/gh',
         [
           'pr',
           'list',
@@ -178,7 +180,7 @@ describe('main', () => {
           'title,body,headRefName,closingIssuesReferences',
         ],
       ],
-      ['gh', ['api', '--paginate', '--slurp', 'repos/shyden-labs/repo/branches?per_page=100']],
+      ['/resolved/gh', ['api', '--paginate', '--slurp', 'repos/shyden-labs/repo/branches?per_page=100']],
     ]);
   });
 

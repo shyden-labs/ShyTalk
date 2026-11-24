@@ -162,6 +162,8 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     expect.soft(narrow, "the menu at a phone's width").toEqual(wantedLive(locale, narrow.width, false));
     await menuPicks(page, locale, localePath(nextLocale(locale), '/'));
     expect.soft(refusals).toEqual([]);
+    // Every soft check above held (shyden-labs/ShyTalk#353: one hard assertion SonarCloud counts, S2699).
+    expect(test.info().errors).toEqual([]);
   });
 
   test(`${lang}: an unknown page answers 404 in ${lang}, with no CSP refusal`, async ({ page }) => {
@@ -301,6 +303,8 @@ for (const { lang, locale, prefix } of LANGUAGES) {
       expect.soft(facts.title, file).not.toBe('');
       expect.soft(facts, file).toEqual(wantedPreview(origin, locale, lang, path, facts.title));
     }
+    // Every soft check above held (shyden-labs/ShyTalk#353: one hard assertion SonarCloud counts, S2699).
+    expect(test.info().errors).toEqual([]);
   });
 }
 

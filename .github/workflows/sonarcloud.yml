@@ -80,9 +80,6 @@ jobs:
             -Dsonar.exclusions=tests/**
             -Dsonar.coverage.exclusions=eslint.config.js,vitest.unit.config.ts
             -Dsonar.plsql.file.suffixes=.plsql
-            -Dsonar.issue.ignore.multicriteria=softChecks
-            -Dsonar.issue.ignore.multicriteria.softChecks.ruleKey=typescript:S2699
-            -Dsonar.issue.ignore.multicriteria.softChecks.resourceKey=tests/smoke/site.spec.ts
       # A pull request's analysis counts only the files it changed, so the verdict is given
       # that list to judge whether no source lines means the scan read none (issue #240).
       - name: Read the quality gate of this scan

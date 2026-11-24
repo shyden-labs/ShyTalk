@@ -12,6 +12,7 @@
  * first parent is the base.
  */
 import { execFileSync } from 'node:child_process';
+import { commandPath } from './command-path.ts';
 import { appendFileSync } from 'node:fs';
 import { runIfEntry } from './cli.ts';
 
@@ -35,7 +36,7 @@ export function main(): number {
   if (output === '') throw new Error('GITHUB_OUTPUT is not set: run this as a workflow step');
   let scope: Scope;
   try {
-    const diff = execFileSync('git', ['diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD'], { encoding: 'utf8' }); // NOSONAR: found on PATH by design; gh reaches the App router on the Mac, and the folders differ on the Mac and in CI (#243)
+    const diff = execFileSync(commandPath('git'), ['diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD'], { encoding: 'utf8' });
     scope = changeScope(
       process.env.GITHUB_EVENT_NAME || '',
       diff.split('\n').filter((p) => p !== ''),

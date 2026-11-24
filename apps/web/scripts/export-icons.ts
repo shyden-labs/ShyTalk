@@ -51,29 +51,35 @@ export function fontFile(modules: string, pathname: string): string | undefined 
   return path.startsWith('/@fontsource/') ? join(modules, path) : undefined;
 }
 
+type Browser = Awaited<ReturnType<typeof chromium.launch>>;
+
+/** One icon, in its own page: the fonts served from the modules, checked to draw, then the picture. */
+async function exportIcon(browser: Browser, svg: string, { file, size, square }: (typeof ICON_SIZES)[number]): Promise<void> {
+  try {
+    const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
+    await page.route(`${ICON_ORIGIN}/**`, async (route) => {
+      const path = fontFile(MODULES, new URL(route.request().url()).pathname);
+      await route.fulfill(path === undefined ? { status: 404 } : { path });
+    });
+    await page.setContent(iconPage(svg, square), { waitUntil: 'networkidle' });
+    // A font missing would draw the word in a fallback face, or as boxes: each word must find its own face.
+    const loaded = await page.evaluate(async (words) => {
+      const found = await Promise.all(words.map(([font, text]) => document.fonts.load(font, text)));
+      return found.every((faces) => faces.length > 0);
+    }, WORDS);
+    if (!loaded) throw new Error('the bubble fonts did not load');
+    await page.screenshot({ path: join(ROOT, file), omitBackground: !square });
+  } catch (error) {
+    throw new Error(`${file}: ${(error as Error).message}`, { cause: error });
+  }
+}
+
 export async function main(): Promise<number> {
   const svg = await readFile(join(ROOT, 'brand/icon.svg'), 'utf8');
   const browser = await chromium.launch();
   try {
-    for (const { file, size, square } of ICON_SIZES) {
-      try {
-        const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
-        await page.route(`${ICON_ORIGIN}/**`, async (route) => {
-          const path = fontFile(MODULES, new URL(route.request().url()).pathname);
-          await route.fulfill(path === undefined ? { status: 404 } : { path });
-        });
-        await page.setContent(iconPage(svg, square), { waitUntil: 'networkidle' });
-        // A font missing would draw the word in a fallback face, or as boxes: each word must find its own face.
-        const loaded = await page.evaluate(async (words) => {
-          const found = await Promise.all(words.map(([font, text]) => document.fonts.load(font, text)));
-          return found.every((faces) => faces.length > 0);
-        }, WORDS);
-        if (!loaded) throw new Error('the bubble fonts did not load');
-        await page.screenshot({ path: join(ROOT, file), omitBackground: !square });
-      } catch (error) {
-        throw new Error(`${file}: ${(error as Error).message}`, { cause: error });
-      }
-    }
+    // Each icon has its own page, so they are made side by side.
+    await Promise.all(ICON_SIZES.map((icon) => exportIcon(browser, svg, icon)));
     console.log(`export-icons: ${String(ICON_SIZES.length)} icons`);
     return 0;
   } finally {
