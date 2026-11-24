@@ -16,3 +16,15 @@ CREATE TABLE punishment (
   issued_at TEXT NOT NULL
 );
 CREATE INDEX punishment_user_id ON punishment (user_id);
+-- No session row lands while a block holds (shyden-labs/ShyTalk#310): D1 runs writes one at a time, so a sign-in that
+-- passed its check just before a ban arrived either wrote its session first (and the ban's delete ends it) or meets
+-- this refusal. "Now" is unix milliseconds, as the Worker writes `ends_at`.
+CREATE TRIGGER session_refused_while_blocked BEFORE INSERT ON "session"
+WHEN EXISTS (
+  SELECT 1 FROM punishment
+  WHERE user_id = NEW."userId" AND blocks = 1 AND lifted_at IS NULL
+    AND (ends_at IS NULL OR ends_at > CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER))
+)
+BEGIN
+  SELECT RAISE(ABORT, 'member_blocked');
+END;
