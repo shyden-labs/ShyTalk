@@ -13,3 +13,6 @@ export function builtShydeskOrigin(): string {
 
 /** The token the smoke's ticket link carries, standing for the one ShyDesk mails. */
 export const SMOKE_TICKET_TOKEN = 'smoke-token';
+
+/** The token the smoke's appeal link carries, standing for the one a punishment notice links with (#310 AC4). */
+export const SMOKE_APPEAL_TOKEN = 'smoke-appeal-token';

@@ -12,8 +12,8 @@ import { codeIn, MAIL_CEILING_MS } from '../phones/test-mailbox.ts';
 import { base32, totpAt } from '../support/totp.ts';
 import AxeBuilder from '@axe-core/playwright';
 import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t } from '../../apps/web/src/i18n/t.ts';
-import { SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
-import { SMOKE_TICKET_TOKEN, builtShydeskOrigin } from '../support/support-page.ts';
+import { APPEAL_PATH, SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
+import { SMOKE_APPEAL_TOKEN, SMOKE_TICKET_TOKEN, builtShydeskOrigin } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
 import { HOLDING_FACTS, BRAND_FONTS, NARROW_WIDTH, PHONE_WIDTH, wantedFacts, type HoldingFacts } from '../support/holding-facts.ts';
 import { LEGAL_DOCS, legalLines, legalLocale, legalPath } from '../../apps/web/src/legal/legal.ts';
@@ -292,6 +292,36 @@ test('the ticket page opens the ticket view in the browser’s language, keeping
   await expect.soft(page.getByRole('heading', { level: 1 })).toHaveText(t(locale, 'support.ticketTitle'));
   await expect.soft(piece).toHaveAttribute('product', 'shytalk');
   await expect.soft(piece).toHaveAttribute('lang', locale);
+  const { violations } = await new AxeBuilder({ page }).analyze();
+  expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+  expect(refusals).toEqual([]);
+});
+
+/**
+ * The one appeal page a punishment notice links to (shyden-labs/ShyTalk#310 AC4): it lands on the appeal page of the
+ * language it shows, with the notice's token still in the fragment, and opens the piece's appeal view in that language.
+ */
+test('the appeal page opens the appeal view in the browser’s language, keeping the notice’s token, passes axe, with no CSP refusal', async ({
+  page,
+}) => {
+  const refusals = cspRefusals(page);
+  const response = await page.goto(`${APPEAL_PATH}#appeal=${SMOKE_APPEAL_TOKEN}`, { waitUntil: 'load' });
+  expect.soft(response?.status()).toBe(200);
+  const piece = page.locator('shydesk-support[view="appeal"]');
+  await expect.soft(piece).toHaveCount(1);
+  const shown = await page.locator('html').getAttribute('lang');
+  const locale = LOCALES.find((each) => langTag(each) === shown) ?? 'en';
+  const address = new URL(page.url());
+  expect.soft(`${address.pathname}${address.hash}`).toBe(`${localePath(locale, APPEAL_PATH)}#appeal=${SMOKE_APPEAL_TOKEN}`);
+  await expect.soft(page.getByRole('heading', { level: 1 })).toHaveText(t(locale, 'support.appealTitle'));
+  for (const line of ['appealIntro', 'englishForm']) {
+    const statement = page.locator(`[data-line="${line}"]`);
+    await expect.soft(statement).toBeVisible();
+    await expect.soft(statement).toHaveText(t(locale, `support.${line}`));
+  }
+  await expect.soft(piece).toHaveAttribute('product', 'shytalk');
+  await expect.soft(piece).toHaveAttribute('lang', locale);
+  await expect.soft(page.locator('script[src$="/embed.js"]')).toHaveAttribute('src', `${builtShydeskOrigin()}/embed.js`);
   const { violations } = await new AxeBuilder({ page }).analyze();
   expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
   expect(refusals).toEqual([]);
