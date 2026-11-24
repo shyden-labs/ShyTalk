@@ -7,6 +7,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { PREVIEW_HEIGHT, PREVIEW_WIDTH, previewImageUrl, sharedUrl, siteOrigin, type WranglerOrigins } from '../../apps/web/src/preview.ts';
+import { MENU_STRUCTURE, samePageIn, wantedMenu, type MenuStructure } from './language-menu.ts';
 
 /** Every page file the site is built from, as `readdirSync(…, { recursive: true })` lists them. */
 export const PAGE_FILES: string[] = readdirSync(fileURLToPath(new URL('../../apps/web/src/pages', import.meta.url)), {
@@ -48,6 +49,8 @@ export interface PreviewFacts {
    * through the support form, so no page shows one (shyden-labs/ShyTalk#333; Shyden 2026-11-23, decisions 226-227).
    */
   addresses: string[];
+  /** The page's language menu, from its markup (shyden-labs/ShyTalk#332). */
+  menu: MenuStructure;
 }
 
 /**
@@ -92,7 +95,8 @@ export const PREVIEW_FACTS = `async (path, keys, authorization) => {
     if (link.getAttribute('href').trim().toLowerCase().startsWith('mailto:')) addresses.push(link.getAttribute('href'));
   }
   for (const found of (html.body ? html.body.textContent : '').match(/[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+/g) || []) addresses.push(found);
-  return { lang: html.documentElement.getAttribute('lang'), title: html.title, tags, picture, addresses };
+  const menu = (${MENU_STRUCTURE})(html);
+  return { lang: html.documentElement.getAttribute('lang'), title: html.title, tags, picture, addresses, menu };
 }`;
 
 /**
@@ -116,5 +120,6 @@ export function wantedPreview(origin: string, locale: Locale, lang: string, path
     },
     picture: { loaded: true, width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT, manyColours: true },
     addresses: [],
+    menu: wantedMenu(locale, (other) => samePageIn(path, other)),
   };
 }

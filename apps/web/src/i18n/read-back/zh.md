@@ -130,7 +130,8 @@
 | account.codesLeftAfterSignIn | Signed in. Recovery codes left: {count}. | 已登录。剩余恢复码：{count}。 | Logged in. Remaining recovery codes: {count} . |
 | holding.building | The ShyTalk app is being built now. | ShyTalk 应用正在开发中。 | The ShyTalk app is under development. |
 | holding.comingSoon | Coming soon | 即将推出 | coming soon |
-| holding.languages | Language | 语言 | language |
+| language.label | Language | 语言 | language |
+| language.beta | beta translation | 测试版翻译 | beta translation |
 | support.title | Support | 帮助与支持 | Help and support |
 | support.intro | Ask a question or report a problem. The reply comes by email. | 提出问题或报告故障，回复将通过电子邮件发送。 | Ask a question or report a problem, and a response will be sent via email. |
 | support.englishForm | The form is in English for now. | 表单目前仅提供英文版本。 | The form is currently only available in English. |

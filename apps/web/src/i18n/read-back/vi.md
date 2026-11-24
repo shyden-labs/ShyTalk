@@ -130,7 +130,8 @@
 | account.codesLeftAfterSignIn | Signed in. Recovery codes left: {count}. | Đã đăng nhập. Số mã khôi phục còn lại: {count}. | Logged in. Remaining recovery codes: {count} . |
 | holding.building | The ShyTalk app is being built now. | Ứng dụng ShyTalk đang được xây dựng. | The ShyTalk app is currently under development. |
 | holding.comingSoon | Coming soon | Sắp ra mắt | Coming soon |
-| holding.languages | Language | Ngôn ngữ | Language |
+| language.label | Language | Ngôn ngữ | Language |
+| language.beta | beta translation | bản dịch beta | beta translation |
 | support.title | Support | Hỗ trợ | Support |
 | support.intro | Ask a question or report a problem. The reply comes by email. | Đặt câu hỏi hoặc báo cáo sự cố. Câu trả lời sẽ được gửi qua email. | Ask a question or report a problem. The answer will be sent via email. |
 | support.englishForm | The form is in English for now. | Hiện tại biểu mẫu chỉ có bằng tiếng Anh. | Currently, the form is only available in English. |

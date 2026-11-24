@@ -24,7 +24,7 @@ const { locale } = Astro.props;
   <div class="holding">
     <header class="holding-top">
       <img class="holding-mark" src="/icons/icon-192.png" width="34" height="34" alt="" />
-      <nav aria-label={t(locale, 'holding.languages')}>
+      <nav aria-label={t(locale, 'language.label')}>
         <ul>
           {
             LOCALES.map((other) => (

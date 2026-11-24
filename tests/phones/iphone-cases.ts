@@ -7,7 +7,7 @@
  * case checks what its Playwright twin checks.
  */
 import assert from 'node:assert/strict';
-import { LANGUAGE_NAMES, LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { APPEAL_PATH, SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
 import { SMOKE_APPEAL_TOKEN, SMOKE_TICKET_TOKEN, builtShydeskOrigin } from '../support/support-page.ts';
 import { HELLOS } from '../../apps/web/src/brand.ts';
@@ -19,6 +19,7 @@ import { countingCheck, type Check } from './check.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 import { PHONE_WIDTH, wantedFacts, type HoldingFacts } from '../support/holding-facts.ts';
+import { FULL_NAME_WIDTH, nextLocale, wantedLive, type MenuLive } from '../support/language-menu.ts';
 
 /** What a case can ask of Safari; tests/phones/safari.ts drives it through Appium. */
 export interface SafariPage {
@@ -41,6 +42,8 @@ export interface SafariPage {
   rows(selector: string, attributes: string[]): Promise<(string | null)[][]>;
   /** The holding page's look, by the smoke's own in-page check (shyden-labs/ShyTalk#273). */
   holdingFacts(): Promise<HoldingFacts>;
+  /** The language menu as the page draws it, by the smoke's own in-page check (shyden-labs/ShyTalk#332). */
+  menuLive(): Promise<MenuLive>;
   /** The elements `selector` matches: Playwright's `toHaveCount`. */
   count(selector: string): Promise<number>;
   /** axe's violations on the current page, as `id: node count`. */
@@ -121,13 +124,40 @@ async function softly(checks: (() => Promise<void>)[]): Promise<void> {
   if (failures.length > 0) throw new assert.AssertionError({ message: failures.join('\n') });
 }
 
+const MENU_BUTTON = 'details.lang-switch > summary';
+
+/**
+ * The language menu shut, opened by a tap (passing axe while open) and shut again (shyden-labs/ShyTalk#332), as the
+ * smoke's menuOpensAndShuts: where it presses Enter, the phone, having no keyboard, taps, its real equivalent.
+ */
+async function menuOpensAndShuts(page: SafariPage, check: Check, locale: Locale): Promise<void> {
+  let now = await page.menuLive();
+  check.deepEqual(now, wantedLive(locale, now.width, false), 'the menu, shut');
+  await page.tap(MENU_BUTTON);
+  now = await page.menuLive();
+  check.deepEqual(now, wantedLive(locale, now.width, true), 'the menu, opened by a tap');
+  check.deepEqual(await page.axeViolations(), [], 'axe, the menu open');
+  await page.tap(MENU_BUTTON);
+  now = await page.menuLive();
+  check.deepEqual(now, wantedLive(locale, now.width, false), 'the menu, shut by a tap');
+}
+
+/** The next language picked from the menu by taps opens `href`, in that language, as the smoke's menuPicks. */
+async function menuPicks(page: SafariPage, check: Check, locale: Locale, href: string): Promise<void> {
+  const next = langTag(nextLocale(locale));
+  await page.tap(MENU_BUTTON);
+  await page.tap(`details.lang-switch a.entry[hreflang="${next}"]`);
+  check.equal(await pathWithin(page, href), href, "the picked language's page");
+  check.equal(await page.attribute('html', 'lang'), next);
+}
+
 /** Every page's viewport tag: the keyboard resizes the page, never pans over it (shyden-labs/ShyTalk#189). */
 const VIEWPORT = 'width=device-width, initial-scale=1, interactive-widget=resizes-content';
 
 function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
   return [
     counted(
-      `${lang}: the home page answers 200 in ${lang}, shows its heading and no roadmap button, passes axe, and each footer legal link opens the right page, with its note if any, passing axe, with no CSP refusal`,
+      `${lang}: the home page answers 200 in ${lang}, shows its heading and no roadmap button, passes axe, each footer legal link opens the right page, with its note if any, passing axe, and its language menu opens, shuts and changes the language, with no CSP refusal`,
       async (page, check) => {
         // Each goto starts the console afresh, so the refusals are gathered before each, and checked once at the end,
         // as Playwright checks the whole test's once.
@@ -199,6 +229,14 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
             await page.goto(`${prefix}/`);
           }
         }
+        // The language menu (shyden-labs/ShyTalk#332), as the smoke: the phone's own width is its phone width.
+        refusals.push(...(await page.cspRefusals()));
+        await page.goto(`${prefix}/`);
+        await softly([() => menuOpensAndShuts(page, check, locale)]);
+        const narrow = await page.menuLive();
+        check.ok(narrow.width < FULL_NAME_WIDTH, `the page is ${String(narrow.width)} wide, not under ${String(FULL_NAME_WIDTH)}`);
+        check.deepEqual(narrow, wantedLive(locale, narrow.width, false), "the menu at a phone's width");
+        await menuPicks(page, check, locale, localePath(nextLocale(locale), '/'));
         refusals.push(...(await page.cspRefusals()));
         check.deepEqual(refusals, []);
       },
@@ -208,17 +246,11 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       await inLanguageWithoutRefusal(page, check, lang);
     }),
     counted(
-      `${lang}: the holding page shows ShyTalk's brand, the language switch and the hellos, in ${lang}, passing axe, keeping still for reduced motion and fitting a phone, with no CSP refusal`,
+      `${lang}: the holding page shows ShyTalk's brand, the language menu and the hellos, in ${lang}, passing axe, keeping still for reduced motion and fitting a phone, its menu opening, shutting and changing the language, with no CSP refusal`,
       async (page, check) => {
         check.equal(await page.goto(`${prefix}/holding`), 200);
         check.equal(await page.attribute('html', 'lang'), lang);
-        // Playwright's getByRole('navigation', { name, exact: true }) seen, then its links in order.
-        const languages = `nav[aria-label="${t(locale, 'holding.languages')}"]`;
-        check.ok(await page.isVisible(languages), 'no visible language switch');
-        check.deepEqual(
-          await page.rows(`${languages} a`, ['href', 'hreflang', 'aria-current']),
-          LOCALES.map((other) => [`/${other}/`, langTag(other), other === locale ? 'page' : null, LANGUAGE_NAMES[other]]),
-        );
+        await menuOpensAndShuts(page, check, locale);
         check.ok(await page.isVisible(H1), 'no visible top heading');
         check.equal(await page.text(H1), 'ShyTalk');
         check.equal(await page.text('h1 span'), 'Talk');
@@ -242,6 +274,10 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
         const phone = await page.holdingFacts();
         check.ok(phone.width <= PHONE_WIDTH, `the page is ${String(phone.width)} wide, not a phone's`);
         check.deepEqual(phone, wantedFacts(phone.width, phone.reducedMotion));
+        const narrow = await page.menuLive();
+        check.deepEqual(narrow, wantedLive(locale, narrow.width, false), "the menu at a phone's width");
+        // A tap's navigation keeps the console's refusals since the last goto, so this reads the picked page's too.
+        await menuPicks(page, check, locale, `/${nextLocale(locale)}/`);
         check.deepEqual(await page.cspRefusals(), []);
       },
     ),
@@ -303,7 +339,7 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       },
     ),
     counted(
-      `${lang}: every page carries its link preview in ${lang}, each preview picture is 1200 by 630 and not one flat colour, and no page offers an email address`,
+      `${lang}: every page carries its link preview and its language menu in ${lang}, each preview picture is 1200 by 630 and not one flat colour, and no page offers an email address`,
       async (page, check) => {
         const origin = builtSiteOrigin();
         await page.goto(`${prefix}/`);
@@ -550,6 +586,17 @@ async function visibleWithin(page: SafariPage, selector: string): Promise<boolea
   for (;;) {
     if (await page.isVisible(selector)) return true;
     if (Date.now() - started >= SHOWN_CEILING_MS) return false;
+    await new Promise<void>((done) => setTimeout(done, SHOWN_EVERY_MS));
+  }
+}
+
+/** The page's path and query once they read `href`, looked at every quarter second up to the ceiling; else the last read. */
+async function pathWithin(page: SafariPage, href: string): Promise<string> {
+  const started = Date.now();
+  for (;;) {
+    const url = new URL(await page.url());
+    const path = `${url.pathname}${url.search}`;
+    if (path === href || Date.now() - started >= SHOWN_CEILING_MS) return path;
     await new Promise<void>((done) => setTimeout(done, SHOWN_EVERY_MS));
   }
 }

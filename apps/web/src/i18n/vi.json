@@ -143,8 +143,7 @@
   },
   "holding": {
     "building": "Ứng dụng ShyTalk đang được xây dựng.",
-    "comingSoon": "Sắp ra mắt",
-    "languages": "Ngôn ngữ"
+    "comingSoon": "Sắp ra mắt"
   },
   "support": {
     "title": "Hỗ trợ",
@@ -154,5 +153,9 @@
     "appealTitle": "Kháng nghị quyết định",
     "appealIntro": "Nếu bạn cho rằng quyết định kiểm duyệt đối với tài khoản của bạn là sai, hãy giải thích lý do tại đây.",
     "noScript": "Biểu mẫu hỗ trợ cần JavaScript. Hãy bật JavaScript để gửi yêu cầu."
+  },
+  "language": {
+    "label": "Ngôn ngữ",
+    "beta": "bản dịch beta"
   }
 }
