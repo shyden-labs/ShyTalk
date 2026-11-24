@@ -62,6 +62,7 @@ jobs:
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
           ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}
           ROADMAP_WEBHOOK_SECRET: ${{ secrets.ROADMAP_WEBHOOK_SECRET }}
+          SHYDESK_CALLBACK_SECRET: ${{ secrets.SHYDESK_CALLBACK_SECRET }}
           OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
           OCI_USER: ${{ secrets.OCI_USER }}
           OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
@@ -86,6 +87,7 @@ jobs:
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
           ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}
           ROADMAP_WEBHOOK_SECRET: ${{ secrets.ROADMAP_WEBHOOK_SECRET }}
+          SHYDESK_CALLBACK_SECRET: ${{ secrets.SHYDESK_CALLBACK_SECRET }}
         run: |
           SITE_ENVIRONMENT=$TARGET npm run build:web || { echo "::error title=deploy-release failed::the website did not build"; exit 1; }
           cd workers/web
@@ -141,6 +143,9 @@ jobs:
           # shyden-labs/ShyTalk#320: the roadmap believes only a webhook delivery
           # signed with this secret; a missing one fails the job-start check (#330).
           printf '%s' "$ROADMAP_WEBHOOK_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put ROADMAP_WEBHOOK_SECRET --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET roadmap webhook secret was not set"; exit 1; }
+          # shyden-labs/ShyTalk#310: ShyTalk believes only a ShyDesk punishment delivery
+          # signed with this secret; a missing one fails the job-start check (#330).
+          printf '%s' "$SHYDESK_CALLBACK_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put SHYDESK_CALLBACK_SECRET --env "$TARGET" || { echo "::error title=deploy-release failed::the $TARGET ShyDesk callback secret was not set"; exit 1; }
           # The TEST origin refuses every request without its door secret
           # (decision 216) and its site password (shyden-labs/ShyTalk#262); PROD has neither.
           if [ "$TARGET" = test ]; then

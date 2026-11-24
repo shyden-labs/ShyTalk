@@ -56,7 +56,7 @@ describe('check-release-secrets', () => {
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const secrets = Object.fromEntries((list['production'] ?? []).map((name) => [name, 'set']));
     expect(await main([], { RELEASE_ENVIRONMENT: 'production', ...secrets })).toBe(0);
-    expect(write).toHaveBeenCalledWith('check-release-secrets: production holds all 10 secrets this release reads\n');
+    expect(write).toHaveBeenCalledWith('check-release-secrets: production holds all 11 secrets this release reads\n');
     write.mockRestore();
   });
 
@@ -81,6 +81,7 @@ describe('check-release-secrets', () => {
       'OCI_USER',
       'ROADMAP_APP_KEY',
       'ROADMAP_WEBHOOK_SECRET',
+      'SHYDESK_CALLBACK_SECRET',
       'TOTP_KEY',
     ]);
     expect([...(list['test'] ?? [])].sort()).toEqual([...(list['production'] ?? []), 'DOOR_SECRET', 'SITE_PASSWORD'].sort());

@@ -99,6 +99,7 @@ jobs:
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
           ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}
           ROADMAP_WEBHOOK_SECRET: ${{ secrets.ROADMAP_WEBHOOK_SECRET }}
+          SHYDESK_CALLBACK_SECRET: ${{ secrets.SHYDESK_CALLBACK_SECRET }}
         run: |
           if ! grep -qE '^(apps/web/|workers/web/|migrations/|packages/environment/|packages/mail/|packages/ui-document/|manifests/|scripts/publish-ui\.ts$|scripts/announce-ui\.ts$|package-lock\.json$|\.github/workflows/deploy-dev\.yml$)' changed-files.txt; then
             echo "Nothing deployable changed, so dev deploys nothing."
@@ -187,6 +188,13 @@ jobs:
             exit 1
           fi
           printf '%s' "$ROADMAP_WEBHOOK_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put ROADMAP_WEBHOOK_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev roadmap webhook secret was not set"; exit 1; }
+          # shyden-labs/ShyTalk#310: ShyTalk believes only a ShyDesk punishment
+          # delivery signed with this secret, kept in the dev environment.
+          if [ -z "$SHYDESK_CALLBACK_SECRET" ]; then
+            echo "::error title=SHYDESK_CALLBACK_SECRET missing::Set SHYDESK_CALLBACK_SECRET in the dev environment (shyden-labs/ShyTalk#310); until then dev believes no ShyDesk punishment."
+            exit 1
+          fi
+          printf '%s' "$SHYDESK_CALLBACK_SECRET" | "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" secret put SHYDESK_CALLBACK_SECRET --env dev || { echo "::error title=deploy-dev failed::the dev ShyDesk callback secret was not set"; exit 1; }
           # Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07): last,
           # every open app hears the newest UI version. Each deploy makes a
           # fresh announce secret, puts it in the Worker and calls the Worker

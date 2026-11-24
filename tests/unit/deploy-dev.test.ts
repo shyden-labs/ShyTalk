@@ -237,6 +237,27 @@ describe('deploy-dev', () => {
     expect(step).toContain('ROADMAP_WEBHOOK_SECRET: ${{ secrets.ROADMAP_WEBHOOK_SECRET }}');
   });
 
+  // shyden-labs/ShyTalk#310 AC3: ShyTalk believes only a ShyDesk punishment
+  // delivery signed with SHYDESK_CALLBACK_SECRET, kept in the dev environment.
+  it('puts the ShyDesk callback secret after the webhook secret, and stops naming it when the environment lacks it', () => {
+    const step = deployStep().join('\n');
+    const webhook = step.indexOf(
+      'printf %s $ROADMAP_WEBHOOK_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put ROADMAP_WEBHOOK_SECRET --env dev ||',
+    );
+    const missing = step.indexOf('if [ -z $SHYDESK_CALLBACK_SECRET ]; then');
+    const named = step.indexOf(
+      'echo ::error title=SHYDESK_CALLBACK_SECRET missing::Set SHYDESK_CALLBACK_SECRET in the dev environment (shyden-labs/ShyTalk#310); until then dev believes no ShyDesk punishment.',
+    );
+    const put = step.indexOf(
+      'printf %s $SHYDESK_CALLBACK_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put SHYDESK_CALLBACK_SECRET --env dev || { echo ::error title=deploy-dev failed::the dev ShyDesk callback secret was not set; exit 1; }',
+    );
+    expect(webhook).toBeGreaterThan(-1);
+    expect(missing).toBeGreaterThan(webhook);
+    expect(named).toBeGreaterThan(missing);
+    expect(put).toBeGreaterThan(named);
+    expect(step).toContain('SHYDESK_CALLBACK_SECRET: ${{ secrets.SHYDESK_CALLBACK_SECRET }}');
+  });
+
   // shyden-labs/ShyTalk#88: the five Oracle secrets reach only a last step of
   // their own, which runs nothing but `wrangler secret put`, and only after the
   // deploy step deployed (it records `deployed=true` last). The build and the

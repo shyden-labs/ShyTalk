@@ -236,6 +236,23 @@ describe('deploy-release', () => {
     expect(onlyTest === -1 || put < onlyTest).toBe(true);
   });
 
+  // ShyTalk believes only a ShyDesk punishment delivery signed with its secret
+  // (shyden-labs/ShyTalk#310); a missing one fails the job-start check (#330).
+  it('puts the ShyDesk callback secret on TEST and PROD after the webhook secret', () => {
+    const step = deployStep();
+    const webhook = step.indexOf(
+      'printf %s $ROADMAP_WEBHOOK_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put ROADMAP_WEBHOOK_SECRET --env $TARGET ||',
+    );
+    const put = step.indexOf(
+      'printf %s $SHYDESK_CALLBACK_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put SHYDESK_CALLBACK_SECRET --env $TARGET || { echo ::error title=deploy-release failed::the $TARGET ShyDesk callback secret was not set; exit 1; }',
+    );
+    expect(webhook).toBeGreaterThan(-1);
+    expect(put).toBeGreaterThan(webhook);
+    expect(step).toContain('SHYDESK_CALLBACK_SECRET: ${{ secrets.SHYDESK_CALLBACK_SECRET }}');
+    const onlyTest = step.indexOf('if [ $TARGET = test ]; then');
+    expect(onlyTest === -1 || put < onlyTest).toBe(true);
+  });
+
   // Authenticator-app sign-in answers 503 until the Worker holds TOTP_KEY
   // (shyden-labs/ShyTalk#134); it seals stored secrets, so TEST and PROD each
   // keep their own in their GitHub environment.
