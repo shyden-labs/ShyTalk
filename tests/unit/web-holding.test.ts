@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { handle, holdingAnswer, holdingPath, type WebEnv } from '../../workers/web/src/web.ts';
+import { CONTENT_SECURITY_POLICY, handle, holdingAnswer, holdingPath, supportPolicy, type WebEnv } from '../../workers/web/src/web.ts';
 
 /**
  * The holding page (shyden-labs/ShyTalk#261; Shyden 2026-11-17: "Holding page first"): while production holds,
@@ -9,11 +9,13 @@ import { handle, holdingAnswer, holdingPath, type WebEnv } from '../../workers/w
  */
 
 interface Settings {
-  vars?: { SITE_ORIGIN?: string };
+  vars?: { SITE_ORIGIN?: string; SHYDESK_ORIGIN?: string };
 }
 const WORKER = JSON.parse(readFileSync('workers/web/wrangler.json', 'utf8')) as { env: Record<string, Settings> };
 /** Production's own address, from the Worker's settings: tests never name a door host. */
 const PROD = new URL(WORKER.env.prod?.vars?.SITE_ORIGIN ?? 'https://missing.invalid');
+/** Production's ShyDesk, from the same settings. */
+const WORKER_SHYDESK = WORKER.env.prod?.vars?.SHYDESK_ORIGIN ?? 'https://missing.invalid';
 
 /** Production holding, with no database: ASSETS records each path and answers it. */
 function holding(): { env: WebEnv; asked: string[] } {
@@ -117,6 +119,43 @@ describe('a holding production', () => {
       expect(response.status).toBe(200);
       expect(await response.text()).toBe(`page ${path}`);
       expect(asked).toEqual([path]);
+    },
+  );
+
+  // shyden-labs/ShyTalk#322: while production holds, the support pages answer too, in every language, so a support
+  // request can be sent; and the appeal pages a punishment notice links to (#310).
+  it.each([
+    '/support',
+    '/support/',
+    '/id/support',
+    '/th/support',
+    '/vi/support',
+    '/zh/support',
+    '/support/ticket',
+    '/zh/support/ticket',
+    '/appeal',
+    '/id/appeal',
+    '/th/appeal',
+    '/vi/appeal',
+    '/zh/appeal',
+  ])('serves the support page %s as built, 200, with ShyDesk in its policy', async (path) => {
+    const { env, asked } = holding();
+    const shydesk = WORKER_SHYDESK;
+    const response = await handle(visit(`${path}#t=x`, { headers: { 'accept-language': 'vi' } }), { ...env, SHYDESK_ORIGIN: shydesk });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(`page ${path}`);
+    expect(asked).toEqual([path]);
+    expect(response.headers.get('content-security-policy')).toBe(supportPolicy(shydesk));
+  });
+
+  it.each(['/supportive', '/fr/support', '/support/x', '/appeal/x', '/appeals', '/en/appeal'])(
+    'answers %s, which is no support page, with the holding page as a 404 and the site policy',
+    async (path) => {
+      const { env, asked } = holding();
+      const response = await handle(visit(path, { headers: { 'accept-language': 'vi' } }), { ...env, SHYDESK_ORIGIN: WORKER_SHYDESK });
+      expect(response.status).toBe(404);
+      expect(asked).toEqual(['/vi/holding']);
+      expect(response.headers.get('content-security-policy')).toBe(CONTENT_SECURITY_POLICY);
     },
   );
 
