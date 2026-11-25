@@ -11,7 +11,7 @@
 import { createMarkerGuard, requireDoorSecret, requireSitePassword, type D1Like } from '../../../packages/environment/index.ts';
 import { handleClosedTesting, isClosedTesting, type ClosedTestingEnv } from './api/closed-testing.ts';
 import { handleAppApi, isAppApi } from './app/router.ts';
-import { devPassGate } from './dev-pass-gate.ts';
+import { boxAnsweredCookie, devPassGate } from './dev-pass-gate.ts';
 import { json } from './http.ts';
 import { SHYDESK_CALLBACK_PATH, handleShyDeskCallback, type ShyDeskCallbackEnv } from './moderation/callback-route.ts';
 import type { RateLimit } from './app/sign-in.ts';
@@ -230,8 +230,13 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   const asked = await passRefusal(request, env);
   if (asked) return asked;
   // Holding, nothing behind the page is reached, so no database is needed.
-  if (env.HOLDING === 'true') return holding(request, env);
-  return served(request, env);
+  const answer = env.HOLDING === 'true' ? await holding(request, env) : await served(request, env);
+  const cookie = await boxAnsweredCookie(request, env, Math.floor(Date.now() / 1000));
+  // A WebSocket upgrade's 101 cannot be copied; the page that opened the socket was given the cookie already.
+  if (cookie === null || answer.status === 101) return answer;
+  const withCookie = new Response(answer.body, answer);
+  withCookie.headers.append('set-cookie', cookie);
+  return withCookie;
 }
 
 /** Routes the request and puts the security headers on whatever answers. */

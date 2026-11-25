@@ -307,6 +307,54 @@ describe('the dev pass', () => {
     const withCookie = await handle(new Request('https://site.example.test/', { headers: { [DOOR_SECRET_HEADER]: SECRET, cookie } }), e);
     expect(withCookie.status).toBe(401);
   });
+
+  // WebKit sends no box answer on a WebSocket upgrade, so the roadmap's live socket needs the cookie (shyden-labs/ShyTalk#321).
+  it('dev answering the box sets the site pass cookie, which alone then passes the gate', async () => {
+    const { env: e, asked } = passEnv('dev');
+    const answered = await handle(request('/'), e);
+    expect(answered.status).toBe(200);
+    const line = answered.headers.get('set-cookie') ?? '';
+    expect(line).toMatch(/^shytalk_site_pass=\d+\.[\w-]+; Path=\/; Max-Age=43200; Secure; HttpOnly; SameSite=Lax$/u);
+    const [cookie = ''] = line.split(';');
+    const page = await handle(new Request('https://site.example.test/', { headers: { [DOOR_SECRET_HEADER]: SECRET, cookie } }), e);
+    expect(page.status).toBe(200);
+    expect(page.headers.get('set-cookie')).toBeNull();
+    expect(asked).toEqual(['/', '/']);
+  });
+
+  it('dev sets no cookie on a refused box, nor without its pass key', async () => {
+    const { env: e } = passEnv('dev');
+    const refused = await handle(request('/', SECRET, 'a-wrong-password'), e);
+    expect(refused.status).toBe(401);
+    expect(refused.headers.get('set-cookie')).toBeNull();
+    const keyless = await handle(request('/'), (({ DEV_PASS_SECRET: _key, ...rest }) => rest)(e));
+    expect(keyless.status).toBe(200);
+    expect(keyless.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('dev mints no new cookie for a request let through on its cookie, whatever else it carries', async () => {
+    const { env: e } = passEnv('dev');
+    const [cookie = ''] = ((await handle(request('/'), e)).headers.get('set-cookie') ?? '').split(';');
+    for (const extra of [
+      { authorization: 'Bearer a-token' },
+      { authorization: BOX('a-wrong-password') },
+      { [SITE_PASSWORD_HEADER]: 'wrong' },
+    ]) {
+      const page = await handle(
+        new Request('https://site.example.test/', { headers: { [DOOR_SECRET_HEADER]: SECRET, cookie, ...extra } }),
+        e,
+      );
+      expect(page.status).toBe(200);
+      expect(page.headers.get('set-cookie')).toBeNull();
+    }
+  });
+
+  it('test answering the box sets no cookie', async () => {
+    const { env: e } = passEnv('test');
+    const answered = await handle(request('/'), e);
+    expect(answered.status).toBe(200);
+    expect(answered.headers.get('set-cookie')).toBeNull();
+  });
 });
 
 // Plan 4 Task 2 (shyden-labs/ShyTalk#75): after the door, every request checks

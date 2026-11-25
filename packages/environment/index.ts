@@ -113,6 +113,15 @@ function basicPassword(authorization: string | null): string {
 }
 
 /**
+ * Whether `request` gives the site password `configured` itself: in `x-shytalk-site-password`, which wins when
+ * present, or in the browser's box. A cookie standing in for it does not count. Unset or empty `configured`: never.
+ */
+export async function givesSitePassword(request: Request, configured: string | undefined): Promise<boolean> {
+  const given = request.headers.get(SITE_PASSWORD_HEADER) ?? basicPassword(request.headers.get('authorization'));
+  return matches(given, configured);
+}
+
+/**
  * The dev and test sites' password (shyden-labs/ShyTalk#262): `null` when the
  * request gives `configured`, either in the browser's box (`Authorization:
  * Basic`, with any user name, a blank one included) or, for a caller whose `Authorization` carries a
@@ -130,9 +139,7 @@ export async function requireSitePassword(
 ): Promise<Response | null> {
   const cookie = cookieValue(request, SITE_PASS_COOKIE);
   if (cookie !== '' && configured && pass?.key && (await sitePassHolds(cookie, configured, pass.key, pass.now))) return null;
-  const header = request.headers.get(SITE_PASSWORD_HEADER);
-  const given = header ?? basicPassword(request.headers.get('authorization'));
-  if (await matches(given, configured)) return null;
+  if (await givesSitePassword(request, configured)) return null;
   return new Response('Unauthorized', {
     status: 401,
     headers: {

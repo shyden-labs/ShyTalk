@@ -85,6 +85,12 @@ const ROADMAP_VARS = [
   .map((value) => `--var "${value}"`)
   .join(' ');
 
+/**
+ * DEV's pass key, a throwaway one each run, as DEV has one: with it, the box's answer earns the site pass cookie, which
+ * WebKit's WebSocket upgrade carries where it gives no box answer (shyden-labs/ShyTalk#321).
+ */
+const PASS_VARS = `--var DEV_PASS_SECRET:${randomBytes(32).toString('base64url')}`;
+
 export default defineConfig({
   testDir: '.',
   forbidOnly: true,
@@ -131,7 +137,7 @@ export default defineConfig({
       command: [
         `npx wrangler d1 migrations apply DB ${LOCAL_D1}`,
         `npx wrangler d1 execute DB ${LOCAL_D1} --command "${MARKER_SQL}"`,
-        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --local-protocol https --var DOOR_SECRET:${secret} --var SITE_PASSWORD:${password} ${MAIL_VARS} ${ROADMAP_VARS}`,
+        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --local-protocol https --var DOOR_SECRET:${secret} --var SITE_PASSWORD:${password} ${MAIL_VARS} ${ROADMAP_VARS} ${PASS_VARS}`,
       ].join(' && '),
       // Playwright counts a 403 as up: the door answers before the secret is sent (and a 401 for the password after it).
       url: `${SITE}/`,
