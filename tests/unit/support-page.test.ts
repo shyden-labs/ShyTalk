@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { APPEAL_PATH, browserLocale, shydeskOrigin, SUPPORT_PATH, TICKET_PATH, type WranglerShydesk } from '../../apps/web/src/support.ts';
+import {
+  APPEAL_PATH,
+  arrivedFromSite,
+  browserLocale,
+  shydeskOrigin,
+  SUPPORT_PATH,
+  TICKET_PATH,
+  type WranglerShydesk,
+} from '../../apps/web/src/support.ts';
 
 /**
  * The support pages (shyden-labs/ShyTalk#37): built for one environment, each
@@ -52,5 +60,27 @@ describe('the ticket page’s language, from the browser', () => {
     [['constructor'], 'en'],
   ] as const)('%j reads as %s', (languages, locale) => {
     expect(browserLocale(languages)).toBe(locale);
+  });
+});
+
+// shyden-labs/ShyTalk#352: a visitor who came from the site's own language menu chose the page's language; an emailed or
+// notice link, from a mail app or another site or none, is moved to the browser's language.
+describe('whether the visitor came from the site itself', () => {
+  const SITE = 'https://site.example.test';
+
+  it('is true for a page of the same site, whatever its path', () => {
+    expect(arrivedFromSite(`${SITE}/th/support/ticket`, SITE)).toBe(true);
+    expect(arrivedFromSite(`${SITE}/`, SITE)).toBe(true);
+  });
+
+  it.each([
+    ['no referrer', ''],
+    ['another site', 'https://mail.example.com/inbox'],
+    ['the same host on another scheme', 'http://site.example.test/'],
+    ['another port', 'https://site.example.test:8443/'],
+    ['a subdomain', 'https://evil.site.example.test/'],
+    ['what is not an address', 'not a url'],
+  ])('is false for %s', (_, referrer) => {
+    expect(arrivedFromSite(referrer, SITE)).toBe(false);
   });
 });
