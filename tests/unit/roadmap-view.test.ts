@@ -10,6 +10,7 @@ import {
   panelHtml,
   reconnectDelay,
   stateLabel,
+  typingPlace,
   updatedLine,
   zoneName,
   type Milestone,
@@ -156,8 +157,11 @@ describe('mapSvg', () => {
   it('marks every line said and puts the typing bubble past the last bubble when every milestone is done', () => {
     const drawn = mapSvg([done, done], WORDS, null);
     expect(drawn.match(/class="line[^"]*"/g)).toEqual(['class="line said"', 'class="line said"']);
-    // The second bubble sits at 255,95: the typing bubble sits 70 past it and 20 below.
-    expect(drawn).toContain('class="typing" transform="translate(325.0,115.0)"');
+    // The second bubble sits at 255,95 and ends at 307: the typing bubble's pill (52 wide) starts past it, on or beside
+    // its row (shyden-labs/ShyTalk#362: 70 past and 20 below had it over the bubble's edge).
+    const at = /class="typing" transform="translate\((-?[\d.]+),(-?[\d.]+)\)"/.exec(drawn);
+    expect(Number(at?.[1]) - 26).toBeGreaterThanOrEqual(307);
+    expect(Math.abs(Number(at?.[2]) - 95)).toBeLessThanOrEqual(40);
   });
 
   it('draws an empty board as the field alone, with no bubble, line or typing bubble', () => {
@@ -265,5 +269,106 @@ describe('isNewer', () => {
 describe('reconnectDelay', () => {
   it('waits a second, then doubles each time, up to a minute', () => {
     expect([0, 1, 2, 5, 6, 7, 20].map(reconnectDelay)).toEqual([1000, 2000, 4000, 32_000, 60_000, 60_000, 60_000]);
+  });
+});
+
+/**
+ * The typing bubble never covers a bubble or a label (shyden-labs/ShyTalk#362): Shyden saw its dots over
+ * "Groundwork · 77%" on DEV. Boxes are read back from the drawing itself: each bubble's body and tail, each label, and
+ * the typing bubble's pill.
+ */
+describe('the typing bubble keeps clear', () => {
+  // The board's real public names, in its order (DEV, 2026-11-26).
+  const NAMES = [
+    'Groundwork',
+    'The website',
+    'The app',
+    'Strong foundations',
+    'Voice rooms',
+    'Find a room',
+    'Friends',
+    'Safe spaces',
+    'Kind and safe',
+    'Clear rules',
+    'Launch',
+  ];
+  type Box = { left: number; top: number; right: number; bottom: number };
+  const n = (text: string | undefined): number => Number(text);
+
+  function boxes(svg: string): { typing: Box; others: Box[] } {
+    const others: Box[] = [];
+    for (const [, x, y] of svg.matchAll(/<path class="bubble [^"]*" d="M(-?[\d.]+),(-?[\d.]+)/g)) {
+      const left = n(x) - 16;
+      const top = n(y);
+      others.push({ left, top, right: left + 104, bottom: top + 58 + 14 });
+    }
+    for (const [, x, y, w, h] of svg.matchAll(/<rect class="label" x="(-?[\d.]+)" y="(-?[\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)) {
+      others.push({ left: n(x), top: n(y), right: n(x) + n(w), bottom: n(y) + n(h) });
+    }
+    const at = /class="typing" transform="translate\((-?[\d.]+),(-?[\d.]+)\)"/.exec(svg);
+    if (at === null) throw new Error('no typing bubble');
+    const [x, y] = [n(at[1]), n(at[2])];
+    return { typing: { left: x - 26, top: y - 14, right: x + 26, bottom: y + 14 }, others };
+  }
+  const touches = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const typingAt = (svg: string): [number, number] => {
+    const at = /class="typing" transform="translate\((-?[\d.]+),(-?[\d.]+)\)"/.exec(svg);
+    return [n(at?.[1]), n(at?.[2])];
+  };
+
+  /** The board with the first `open` milestones done and the next `closed` of 20 done. */
+  const board = (open: number, closed: number): Milestone[] =>
+    NAMES.map((name, index) => {
+      if (index < open) return milestone({ name, closed: 20, total: 20, percent: 100, state: 'done' });
+      if (index === open) {
+        const percent = Math.floor((closed / 20) * 100);
+        return milestone({ name, closed, total: 20, percent, state: closed === 0 ? 'not started' : 'started' });
+      }
+      return milestone({ name, closed: 0, total: 5, percent: 0, state: 'not started' });
+    });
+
+  it.each(NAMES.map((name, index) => [name, index] as const))(
+    'with %s the first unfinished milestone, at every share done from 0 to 95%%',
+    (_name, open) => {
+      for (let closed = 0; closed < 20; closed += 1) {
+        const { typing, others } = boxes(mapSvg(board(open, closed), WORDS, null));
+        const hit = others.find((box) => touches(typing, box));
+        expect(hit, `${String(closed)} of 20 done`).toBeUndefined();
+      }
+    },
+  );
+
+  it('with every milestone done', () => {
+    const { typing, others } = boxes(mapSvg(board(NAMES.length, 0), WORDS, null));
+    expect(others.find((box) => touches(typing, box))).toBeUndefined();
+  });
+
+  it.each(NAMES.map((name, index) => [name, index] as const))(
+    'moves no further back along the line into %s as more of it is done',
+    (_name, open) => {
+      const spot = SPOTS[open];
+      if (spot === undefined) throw new Error('no spot');
+      const distances = [1, 5, 10, 15, 19].map((closed) => {
+        const [x, y] = typingAt(mapSvg(board(open, closed), WORDS, null));
+        return Math.hypot(spot.x - x, spot.y - y);
+      });
+      for (let i = 1; i < distances.length; i += 1) expect(distances[i]).toBeLessThanOrEqual(distances[i - 1] ?? 0);
+    },
+  );
+
+  it('sits just below its point on the line when no place is clear', () => {
+    const everything = { left: 0, top: 0, right: 1000, bottom: 440 };
+    expect(typingPlace([100, 100], [300, 200], 0.5, [everything])).toEqual([200, 170]);
+  });
+
+  it('keeps inside the field: as far along as fits, below the line where above would leave it', () => {
+    // Along a line off the right edge, 74% is the furthest a 52-wide pill fits; 40 below would pass the bottom.
+    const [rightX, rightY] = typingPlace([900, 400], [1000, 400], 1, []);
+    expect(rightX).toBeCloseTo(974);
+    expect(rightY).toBeCloseTo(420);
+    // Along the top edge, on the line or above it would leave the field, so it sits 20 below.
+    const [leftX, leftY] = typingPlace([100, 0], [0, 0], 1, []);
+    expect(leftX).toBeCloseTo(26);
+    expect(leftY).toBeCloseTo(20);
   });
 });
