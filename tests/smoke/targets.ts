@@ -15,18 +15,22 @@ export const MAIL_STAND_IN_PORT = 8788;
 export const GITHUB_STAND_IN_PORT = 8790;
 
 /**
- * The roadmap webhook's secret for one smoke run (shyden-labs/ShyTalk#321): made from that run's door secret, so the
- * Worker and every Playwright process, each of which reads this config afresh, agree on it with nothing more to pass.
+ * The roadmap webhook's secret for one CI smoke run (shyden-labs/ShyTalk#321): the run's door secret hashed under its
+ * own label, so the Worker and every Playwright process, each of which reads this file afresh, agree on it with
+ * nothing more to pass.
  */
-export const roadmapWebhookSecret = (doorSecret: string): string =>
-  createHash('sha256').update(`shytalk-smoke-roadmap-webhook:${doorSecret}`).digest('hex');
+export function roadmapWebhookSecret(doorSecret: string): string {
+  return createHash('sha256').update(`shytalk-smoke-roadmap-webhook:${doorSecret}`).digest('hex');
+}
 
 /**
- * The webhook secret the live roadmap test signs with: the phone run's, read from the Keychain into
- * SMOKE_ROADMAP_WEBHOOK_SECRET, else the CI run's, made from its door secret; failing by name with neither.
+ * The secret the live roadmap test signs its delivery with: the phone run's (DEV's own, as SMOKE_ROADMAP_WEBHOOK_SECRET),
+ * else the CI run's, made from its door secret; failing by name when neither is set.
  */
 export function smokeWebhookSecret(env: Record<string, string | undefined> = process.env): string {
-  if ((env.SMOKE_ROADMAP_WEBHOOK_SECRET ?? '') !== '') return env.SMOKE_ROADMAP_WEBHOOK_SECRET as string;
-  if ((env.SMOKE_DOOR_SECRET ?? '') !== '') return roadmapWebhookSecret(env.SMOKE_DOOR_SECRET as string);
+  const given = env.SMOKE_ROADMAP_WEBHOOK_SECRET ?? '';
+  if (given !== '') return given;
+  const door = env.SMOKE_DOOR_SECRET ?? '';
+  if (door !== '') return roadmapWebhookSecret(door);
   throw new Error('neither SMOKE_ROADMAP_WEBHOOK_SECRET nor SMOKE_DOOR_SECRET is set: the live roadmap test cannot sign a delivery');
 }

@@ -263,7 +263,8 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
   // Two per page: its title is not empty, and its preview is as wanted (shyden-labs/ShyTalk#198).
   // Four more each for the support and ticket pages (#37), to be confirmed on CI's smoke-totals.
   // Two more each for the appeal page (#310 AC4), to be confirmed on CI's smoke-totals.
-  'every page carries its link preview and its language menu': { en: 36, id: 36, th: 30, vi: 30, 'zh-Hans': 30 },
+  // Two more each for the roadmap page (#321 AC3), to be confirmed on CI's smoke-totals.
+  'every page carries its link preview and its language menu': { en: 38, id: 38, th: 32, vi: 32, 'zh-Hans': 32 },
   // The roadmap page (shyden-labs/ShyTalk#321 AC3): its Playwright twin's 20 checks, counted from it; to be confirmed on
   // CI's smoke-totals.
   'the roadmap page shows the board at once': { en: 20, id: 20, th: 20, vi: 20, 'zh-Hans': 20 },

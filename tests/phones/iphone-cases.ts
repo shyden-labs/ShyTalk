@@ -20,7 +20,10 @@ import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 import { PHONE_WIDTH, wantedFacts, type HoldingFacts } from '../support/holding-facts.ts';
 import { FULL_NAME_WIDTH, nextLocale, wantedLive, type MenuLive } from '../support/language-menu.ts';
-import type { RoadmapFacts } from '../support/roadmap-page.ts';
+import { MILESTONES, boardDelivery, linePattern, stateEndings, type RoadmapFacts } from '../support/roadmap-page.ts';
+import { smokeWebhookSecret } from '../smoke/targets.ts';
+import { updatedLine } from '../../apps/web/src/roadmap/view.ts';
+import { pageWords } from '../../apps/web/src/roadmap/words.ts';
 
 /** What a case can ask of Safari; tests/phones/safari.ts drives it through Appium. */
 export interface SafariPage {
@@ -127,6 +130,22 @@ async function softly(checks: (() => Promise<void>)[]): Promise<void> {
     }
   }
   if (failures.length > 0) throw new assert.AssertionError({ message: failures.join('\n') });
+}
+
+/**
+ * Runs every check in order, even after one fails, and answers each failure's reason: the case then makes one counted
+ * check that there were none, as its Playwright twin ends with `expect(test.info().errors).toEqual([])`.
+ */
+async function failuresOf(checks: (() => Promise<void>)[]): Promise<string[]> {
+  const failures: string[] = [];
+  for (const each of checks) {
+    try {
+      await each();
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  return failures;
 }
 
 const MENU_BUTTON = 'details.lang-switch > summary';
@@ -366,8 +385,126 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
         await softly(checks);
       },
     ),
+    counted(
+      `${lang}: the roadmap page shows the board at once in ${lang}, its heading, a button named with its state for each milestone, the bar and when it was last read; a press opens that milestone's panel, Close shuts it, and Escape shuts it again; it passes axe and fits a phone's width, with no CSP refusal`,
+      async (page, check) => {
+        // The phone's own width is its phone width; it has no Escape key, so the same button tapped again shuts the
+        // panel, as the page's own code does for a press.
+        let facts: RoadmapFacts | undefined;
+        const failures = await failuresOf([
+          async () => {
+            check.equal(await page.goto(`${prefix}/roadmap`), 200);
+          },
+          async () => {
+            check.equal(await page.attribute('html', 'lang'), lang);
+          },
+          async () => {
+            check.ok(await page.isVisible(H1), 'no visible top heading');
+          },
+          async () => {
+            check.equal(await page.text(H1), t(locale, 'roadmap.heading'));
+          },
+          async () => {
+            check.equal(await page.count(SPOT), MILESTONES);
+          },
+          async () => {
+            facts = await page.roadmapFacts();
+            const endings = stateEndings(locale);
+            check.deepEqual(
+              facts.labels.filter((label) => !endings.some((ending) => label.endsWith(ending))),
+              [],
+            );
+          },
+          async () => {
+            check.match(await page.text('.bar-words'), linePattern(locale, 'roadmap.bar'));
+          },
+          async () => {
+            check.equal(await page.text('#roadmap-updated'), updatedLine(facts?.readAt ?? '', pageWords(locale), locale, facts?.zone));
+          },
+          async () => {
+            await page.tap(SPOT);
+            check.equal(await page.attribute(SPOT, 'aria-expanded'), 'true');
+          },
+          async () => {
+            check.ok(await page.isVisible(PANEL), 'the panel did not open');
+          },
+          async () => {
+            check.equal(await page.text(`${PANEL} h3`), facts?.labels[0]?.split(', ')[0] ?? '(no label)');
+          },
+          async () => {
+            check.equal(await page.text(`${PANEL} h4`), t(locale, 'roadmap.brings'));
+          },
+          async () => {
+            check.deepEqual(await page.axeViolations(), []);
+          },
+          async () => {
+            await page.tap(`${PANEL} button.close`);
+            check.ok(!(await page.isVisible(PANEL)), 'the panel did not shut');
+          },
+          async () => {
+            check.equal(await page.attribute(SPOT, 'aria-expanded'), 'false');
+          },
+          async () => {
+            await page.tap(SPOT);
+            check.ok(await page.isVisible(PANEL), 'the panel did not open again');
+          },
+          async () => {
+            await page.tap(SPOT);
+            check.ok(!(await page.isVisible(PANEL)), 'the panel did not shut again');
+          },
+          async () => {
+            check.ok((await page.roadmapFacts()).fits, "the page does not fit the phone's width");
+          },
+          async () => {
+            check.deepEqual(await page.cspRefusals(), []);
+          },
+        ]);
+        check.deepEqual(failures, []);
+      },
+    ),
   ];
 }
+
+/** The roadmap page's first milestone button, and the one panel each opens (shyden-labs/ShyTalk#321). */
+const SPOT = '.map button.spot';
+const PANEL = '#roadmap-panel';
+
+/** Asks `look` every quarter second for up to 10 s, as Playwright's assertions wait; answers what it last saw. */
+async function within<T>(look: () => Promise<T>, done: (seen: T) => boolean, ends = Date.now() + 10_000): Promise<T> {
+  const seen = await look();
+  if (done(seen) || Date.now() >= ends) return seen;
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  return within(look, done, ends);
+}
+
+/**
+ * The roadmap's live board, once (tests/smoke/site.spec.ts, shyden-labs/ShyTalk#321 AC3): a signed delivery for the
+ * board asks DEV's roadmap for a fresh read, as GitHub's webhook does, and the open page takes it with no reload. The
+ * phone run gives DEV's webhook secret as SMOKE_ROADMAP_WEBHOOK_SECRET.
+ */
+const LIVE_ROADMAP: IphoneCase = counted('the roadmap page takes a fresh board read on its own, with no reload', async (page, check) => {
+  await page.goto('/roadmap');
+  check.equal(
+    await within(
+      async () => (await page.roadmapFacts()).socket,
+      (socket) => socket === 'open',
+    ),
+    'open',
+  );
+  const before = (await page.roadmapFacts()).version;
+  await page.markPage();
+  const { body, headers } = boardDelivery(smokeWebhookSecret());
+  const answer = await fetch(new URL('/hooks/github', process.env.PHONE_BASE_URL), { method: 'POST', body, headers });
+  check.equal(answer.status, 202);
+  check.deepEqual(await answer.json(), { state: 'reading' });
+  const version = await within(
+    async () => (await page.roadmapFacts()).version,
+    (seen) => seen > before,
+  );
+  check.ok(version > before, 'no fresh read reached the page within 10 s');
+  check.ok((await page.roadmapFacts()).marked, 'the page was reloaded');
+  check.equal(await page.count(SPOT), MILESTONES);
+});
 
 /**
  * The one ticket page ShyDesk's emailed link opens (tests/smoke/site.spec.ts, shyden-labs/ShyTalk#37 AC1): it lands on
@@ -640,6 +777,7 @@ const RECOVERY_PAGES: IphoneCase = counted(
 
 export const IPHONE_CASES: IphoneCase[] = [
   ...LANGUAGES.flatMap(({ lang, locale, prefix }) => casesFor(lang, locale, prefix)),
+  LIVE_ROADMAP,
   TICKET_PAGE,
   APPEAL_PAGE,
   JOURNEY,

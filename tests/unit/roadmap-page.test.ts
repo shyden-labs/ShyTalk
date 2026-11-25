@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { handle, type WebEnv } from '../../workers/web/src/web.ts';
 import { fillPage, roadmapLocale, MARKS } from '../../workers/web/src/roadmap/page.ts';
 import { DOOR_SECRET_HEADER, type D1Like } from '../../packages/environment/index.ts';
-import type { Words } from '../../apps/web/src/roadmap/view.ts';
+import type { Milestone, Words } from '../../apps/web/src/roadmap/view.ts';
 
 /**
  * The roadmap page (shyden-labs/ShyTalk#321 AC3): the Worker answers `/roadmap` and `/{locale}/roadmap` with the built
@@ -27,11 +27,27 @@ const WORDS: Words = {
   updated: 'Last updated {date}, {time} {zone}',
 };
 
+const GROUNDWORK: Milestone = {
+  name: 'Groundwork',
+  summary: 'The workshop.',
+  brings: ['Tools'],
+  closed: 18,
+  total: 18,
+  percent: 100,
+  state: 'done',
+};
+const WEBSITE: Milestone = {
+  name: 'The website',
+  summary: 'The site.',
+  brings: ['Help'],
+  closed: 1,
+  total: 4,
+  percent: 25,
+  state: 'started',
+};
+
 const SNAPSHOT = {
-  milestones: [
-    { name: 'Groundwork', summary: 'The workshop.', brings: ['Tools'], closed: 18, total: 18, percent: 100, state: 'done' },
-    { name: 'The website', summary: 'The site.', brings: ['Help'], closed: 1, total: 4, percent: 25, state: 'started' },
-  ],
+  milestones: [GROUNDWORK, WEBSITE],
   progress: ['By tickets: …', 'By effort: …'],
   version: 7,
   readAt: '2026-11-24T23:49:00.000Z',
@@ -85,7 +101,7 @@ describe('fillPage', () => {
   it('hands the browser the snapshot it drew, without the failing flag, and safe inside a script element', () => {
     const json = /<script type="application\/json" id="roadmap-snapshot">(.*?)<\/script>/s.exec(page)?.[1] ?? '';
     expect(JSON.parse(json)).toEqual({ milestones: SNAPSHOT.milestones, version: 7, readAt: SNAPSHOT.readAt });
-    const tricky = fillPage(BUILT, { ...SNAPSHOT, milestones: [{ ...SNAPSHOT.milestones[0], name: '</script><b>' }] }, 'en', WORDS, null);
+    const tricky = fillPage(BUILT, { ...SNAPSHOT, milestones: [{ ...GROUNDWORK, name: '</script><b>' }] }, 'en', WORDS, null);
     expect(tricky).not.toContain('</script><b>');
     expect(tricky).toContain('\\u003c/script>\\u003cb>');
   });

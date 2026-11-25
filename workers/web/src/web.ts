@@ -18,6 +18,7 @@ import type { RateLimit } from './app/sign-in.ts';
 import type { AnnouncerNamespace } from './app/announcer.ts';
 import { HOOK_PATH, handleGithubHook, type HookEnv } from './roadmap/hook-route.ts';
 import { handleRoadmapApi, isRoadmapApi } from './roadmap/routes.ts';
+import { roadmapLocale, serveRoadmapPage } from './roadmap/page.ts';
 
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
@@ -211,6 +212,9 @@ async function served(request: Request, env: WebEnv): Promise<Response> {
   if (isRoadmapApi(pathname)) return handleRoadmapApi(request, env);
   if (isAppApi(pathname)) return handleAppApi(request, env);
   if (pathname.startsWith('/api/')) return handleApi(request, env);
+  // The roadmap page answers with the latest board already drawn in (shyden-labs/ShyTalk#321).
+  const roadmap = roadmapLocale(pathname);
+  if (roadmap !== null) return serveRoadmapPage(request, env, roadmap);
   return env.ASSETS.fetch(request);
 }
 
