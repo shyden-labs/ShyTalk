@@ -381,9 +381,15 @@ test('the roadmap page takes a fresh board read on its own, with no reload', asy
   });
   await page.goto('/roadmap', { waitUntil: 'load' });
   const live = page.locator('#roadmap-live');
-  await expect
-    .poll(async () => ((await live.getAttribute('data-socket')) === 'open' ? 'open' : trouble.join('; ') || 'not open yet'))
-    .toBe('open');
+  // A wait, then one assertion: an expect.poll counts a step per try, so its count would differ by browser speed.
+  const opened = await page
+    .locator('#roadmap-live[data-socket="open"]')
+    .waitFor({ timeout: 5_000 })
+    .then(
+      () => true,
+      () => false,
+    );
+  expect(opened ? 'open' : trouble.join('; ') || 'not open yet').toBe('open');
   const before = Number(await live.getAttribute('data-version'));
   await page.evaluate(() => {
     (window as { notReloaded?: boolean }).notReloaded = true;
@@ -392,7 +398,8 @@ test('the roadmap page takes a fresh board read on its own, with no reload', asy
   const answer = await request.post('/hooks/github', { data: body, headers });
   expect(answer.status()).toBe(202);
   expect(await answer.json()).toEqual({ state: 'reading' });
-  await expect.poll(async () => Number(await live.getAttribute('data-version')), { timeout: 10_000 }).toBeGreaterThan(before);
+  await expect(live).not.toHaveAttribute('data-version', String(before), { timeout: 10_000 });
+  expect(Number(await live.getAttribute('data-version'))).toBeGreaterThan(before);
   expect(await page.evaluate(() => (window as { notReloaded?: boolean }).notReloaded)).toBe(true);
   await expect(page.locator('.map button.spot')).toHaveCount(MILESTONES);
 });
