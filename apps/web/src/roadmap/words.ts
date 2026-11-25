@@ -32,7 +32,10 @@ export function pageWords(locale: Locale): Words {
   return Object.fromEntries(WORD_KEYS.map((key) => [key, t(locale, `roadmap.${key}`)])) as unknown as Words;
 }
 
-const MILESTONES: Record<Exclude<Locale, 'en'>, Record<string, string>> = {
+type MilestoneKey = keyof typeof en.milestones;
+
+/** Typed by English's keys, so a catalogue missing a milestone line fails the typecheck rather than showing English. */
+const MILESTONES: Record<Exclude<Locale, 'en'>, Record<MilestoneKey, string>> = {
   id: id.milestones,
   th: th.milestones,
   vi: vi.milestones,
@@ -43,5 +46,5 @@ const MILESTONES: Record<Exclude<Locale, 'en'>, Record<string, string>> = {
 export function milestoneLines(locale: Locale): Lines {
   if (locale === 'en') return null;
   const own = MILESTONES[locale];
-  return Object.fromEntries(Object.entries(en.milestones).map(([key, english]) => [english, own[key] ?? english]));
+  return Object.fromEntries((Object.entries(en.milestones) as [MilestoneKey, string][]).map(([key, english]) => [english, own[key]]));
 }
