@@ -251,7 +251,8 @@ export function panelHtml(milestone: Milestone, index: number, words: Words, lin
   html += `<p class="state">${escapeHtml(stateLabel(milestone, words))}</p>`;
   if (milestone.summary !== null) html += `<p>${lineHtml(milestone.summary, lines)}</p>`;
   if (milestone.brings.length > 0) {
-    html += `<h3>${escapeHtml(words.brings)}</h3><ul>${milestone.brings.map((line) => `<li>${lineHtml(line, lines)}</li>`).join('')}</ul>`;
+    const items = milestone.brings.map((line) => `<li>${lineHtml(line, lines)}</li>`).join('');
+    html += `<h3>${escapeHtml(words.brings)}</h3><ul>${items}</ul>`;
   }
   return `${html}<button type="button" class="close">${escapeHtml(words.close)}</button>`;
 }

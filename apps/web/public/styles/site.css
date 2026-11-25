@@ -6,6 +6,17 @@
   --muted: #5b6475;
   --error: #b3261e;
   color-scheme: light dark;
+  /* The roadmap's colours (shyden-labs/ShyTalk#321 AC3), used further down. */
+  --roadmap-field: #dfe8fb;
+  --roadmap-faint: #a9bdee;
+  --roadmap-line: #c9962b;
+  --roadmap-bubble: #6d4fd8;
+  --roadmap-on-bubble: #ffffff;
+  --roadmap-surface: #ffffff;
+  --roadmap-edge: #d3dbe8;
+  --roadmap-dashed: #6f7891;
+  --roadmap-done: #1a7f5a;
+  --roadmap-typing: #2a2350;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -489,18 +500,6 @@ shydesk-support {
  * The roadmap (shyden-labs/ShyTalk#321 AC3): the conversation of milestones Shyden approved on #319. The page's policy
  * refuses style attributes, so every place and colour is set here, by class.
  */
-:root {
-  --roadmap-field: #dfe8fb;
-  --roadmap-faint: #a9bdee;
-  --roadmap-line: #c9962b;
-  --roadmap-bubble: #6d4fd8;
-  --roadmap-on-bubble: #ffffff;
-  --roadmap-surface: #ffffff;
-  --roadmap-edge: #d3dbe8;
-  --roadmap-dashed: #6f7891;
-  --roadmap-done: #1a7f5a;
-  --roadmap-typing: #2a2350;
-}
 
 @media (prefers-color-scheme: dark) {
   :root {

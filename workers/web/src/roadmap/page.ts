@@ -47,7 +47,7 @@ export interface ShownBoard {
 }
 
 /** JSON safe inside a script element: no `<` can close it. */
-const scriptJson = (value: unknown): string => JSON.stringify(value).replaceAll('<', '\\u003c');
+const scriptJson = (value: unknown): string => JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
 
 /** The built page with `board` drawn into its marks; the marks simply removed when there is no board. */
 export function fillPage(html: string, board: ShownBoard | null, locale: string, words: Words, lines: Lines): string {
