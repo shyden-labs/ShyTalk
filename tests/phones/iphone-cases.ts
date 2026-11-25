@@ -151,6 +151,25 @@ async function menuPicks(page: SafariPage, check: Check, locale: Locale, href: s
   check.equal(await page.attribute('html', 'lang'), next);
 }
 
+/**
+ * On a page an emailed or notice link opens, as the smoke's menuKeepsToken (shyden-labs/ShyTalk#352): another language
+ * picked by taps keeps the address's fragment; English picked stays English, keeping it, whatever Safari's language.
+ */
+async function menuKeepsToken(page: SafariPage, check: Check, locale: Locale, path: string, hash: string, view: string): Promise<void> {
+  // The language after this one, never English: en, then id, th, vi, zh, and id again.
+  const other = LOCALES[(LOCALES.indexOf(locale) % (LOCALES.length - 1)) + 1] as Locale;
+  await page.tap(MENU_BUTTON);
+  await page.tap(`details.lang-switch a.entry[hreflang="${langTag(other)}"]`);
+  const elsewhere = `${localePath(other, path)}${hash}`;
+  check.equal(await addressWithin(page, elsewhere), elsewhere, 'another language keeps the token');
+  check.equal(await page.attribute(`shydesk-support[view="${view}"]`, 'lang'), other);
+  await page.tap(MENU_BUTTON);
+  await page.tap('details.lang-switch a.entry[hreflang="en"]');
+  check.equal(await countWithin(page, 'shydesk-support[data-language-kept]'), 1, 'the page stays on English');
+  check.equal(await addressWithin(page, `${path}${hash}`), `${path}${hash}`, 'English stays English, keeping the token');
+  check.equal(await page.attribute('html', 'lang'), 'en');
+}
+
 /** Every page's viewport tag: the keyboard resizes the page, never pans over it (shyden-labs/ShyTalk#189). */
 const VIEWPORT = 'width=device-width, initial-scale=1, interactive-widget=resizes-content';
 
@@ -369,7 +388,7 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
  * the ticket page of the language it shows, the emailed token still in the fragment, with the piece's ticket view.
  */
 const TICKET_PAGE: IphoneCase = counted(
-  'the ticket page opens the ticket view in the browser’s language, keeping the emailed token, passes axe, with no CSP refusal',
+  'the ticket page opens the ticket view in the browser’s language, keeping the emailed token, which its language menu keeps, English staying English, passes axe, with no CSP refusal',
   async (page, check) => {
     check.equal(await page.goto(`${TICKET_PATH}#t=${SMOKE_TICKET_TOKEN}`), 200);
     check.equal(await page.count('shydesk-support[view="ticket"]'), 1);
@@ -380,6 +399,7 @@ const TICKET_PAGE: IphoneCase = counted(
     check.equal(await page.text(H1), t(locale, 'support.ticketTitle'));
     check.equal(await page.attribute('shydesk-support', 'product'), 'shytalk');
     check.equal(await page.attribute('shydesk-support', 'lang'), locale);
+    await menuKeepsToken(page, check, locale, TICKET_PATH, `#t=${SMOKE_TICKET_TOKEN}`, 'ticket');
     check.deepEqual(await page.axeViolations(), []);
     check.deepEqual(await page.cspRefusals(), []);
   },
@@ -390,7 +410,7 @@ const TICKET_PAGE: IphoneCase = counted(
  * the appeal page of the language it shows, the notice's token still in the fragment, with the piece's appeal view.
  */
 const APPEAL_PAGE: IphoneCase = counted(
-  'the appeal page opens the appeal view in the browser’s language, keeping the notice’s token, passes axe, with no CSP refusal',
+  'the appeal page opens the appeal view in the browser’s language, keeping the notice’s token, which its language menu keeps, English staying English, passes axe, with no CSP refusal',
   async (page, check) => {
     check.equal(await page.goto(`${APPEAL_PATH}#appeal=${SMOKE_APPEAL_TOKEN}`), 200);
     check.equal(await page.count('shydesk-support[view="appeal"]'), 1);
@@ -407,6 +427,7 @@ const APPEAL_PAGE: IphoneCase = counted(
     check.equal(await page.attribute('shydesk-support', 'product'), 'shytalk');
     check.equal(await page.attribute('shydesk-support', 'lang'), locale);
     check.equal(await page.attribute('script[src$="/embed.js"]', 'src'), `${builtShydeskOrigin()}/embed.js`);
+    await menuKeepsToken(page, check, locale, APPEAL_PATH, `#appeal=${SMOKE_APPEAL_TOKEN}`, 'appeal');
     check.deepEqual(await page.axeViolations(), []);
     check.deepEqual(await page.cspRefusals(), []);
   },
@@ -597,6 +618,17 @@ async function pathWithin(page: SafariPage, href: string): Promise<string> {
     const url = new URL(await page.url());
     const path = `${url.pathname}${url.search}`;
     if (path === href || Date.now() - started >= SHOWN_CEILING_MS) return path;
+    await new Promise<void>((done) => setTimeout(done, SHOWN_EVERY_MS));
+  }
+}
+
+/** The address's path and fragment once it is `want`, looked at every quarter second up to the ceiling; the last seen otherwise. */
+async function addressWithin(page: SafariPage, want: string): Promise<string> {
+  const started = Date.now();
+  for (;;) {
+    const url = new URL(await page.url());
+    const address = `${url.pathname}${url.hash}`;
+    if (address === want || Date.now() - started >= SHOWN_CEILING_MS) return address;
     await new Promise<void>((done) => setTimeout(done, SHOWN_EVERY_MS));
   }
 }

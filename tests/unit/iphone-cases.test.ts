@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
-import { langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { nextLocale, wantedLive } from '../support/language-menu.ts';
 import { APPEAL_PATH, SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
 import { SMOKE_APPEAL_TOKEN, SMOKE_TICKET_TOKEN } from '../support/support-page.ts';
@@ -94,7 +94,7 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
   // The language menu (shyden-labs/ShyTalk#332): a tap on its button opens or shuts it, a tap on a language opens the
   // same page in that language, which the address and `<html lang>` then show.
   let menuOpen = false;
-  let picked: { path: string; lang: string } | null = null;
+  let picked: { path: string; lang: string; locale?: Locale } | null = null;
   return {
     visited,
     goto: (path) => {
@@ -118,22 +118,24 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
             ? VIEWPORT
             : selector === 'footer a[data-support]' && name === 'href'
               ? localePath(locale, SUPPORT_PATH)
-              : selector === 'shydesk-support'
-                ? ((
-                    {
-                      product: 'shytalk',
-                      view:
-                        visited.at(-1)?.includes('/ticket') === true
-                          ? 'ticket'
-                          : visited.at(-1)?.includes('/appeal') === true
-                            ? 'appeal'
-                            : 'contact',
-                      lang: locale,
-                    } as Record<string, string>
-                  )[name] ?? null)
-                : selector === 'script[src$="/embed.js"]' && name === 'src'
-                  ? `${SHYDESK}/embed.js`
-                  : null,
+              : selector.startsWith('shydesk-support[view=') && name === 'lang'
+                ? (picked?.locale ?? locale)
+                : selector === 'shydesk-support'
+                  ? ((
+                      {
+                        product: 'shytalk',
+                        view:
+                          visited.at(-1)?.includes('/ticket') === true
+                            ? 'ticket'
+                            : visited.at(-1)?.includes('/appeal') === true
+                              ? 'appeal'
+                              : 'contact',
+                        lang: locale,
+                      } as Record<string, string>
+                    )[name] ?? null)
+                  : selector === 'script[src$="/embed.js"]' && name === 'src'
+                    ? `${SHYDESK}/embed.js`
+                    : null,
       ),
     isVisible: (selector) => Promise.resolve(selector !== '[data-english-only]:not([hidden])'),
     text: (selector) => {
@@ -152,6 +154,13 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     tap: (selector) => {
       if (selector === 'details.lang-switch > summary') {
         menuOpen = !menuOpen;
+      } else if (selector.startsWith('details.lang-switch a.entry') && (visited.at(-1) ?? '').includes('#')) {
+        // On a page an emailed or notice link opened (shyden-labs/ShyTalk#352): the picked language, keeping the fragment.
+        const tag = /hreflang="([^"]+)"/.exec(selector)?.[1] ?? '';
+        const target = LOCALES.find((each) => langTag(each) === tag) ?? 'en';
+        const [path = '', hash = ''] = (visited.at(-1) ?? '').split('#');
+        if (menuOpen) picked = { path: `${localePath(target, path)}#${hash}`, lang: tag, locale: target };
+        menuOpen = false;
       } else if (selector.startsWith('details.lang-switch a.entry')) {
         const next = nextLocale(locale);
         const holding = visited.at(-1)?.endsWith('/holding') === true;
@@ -168,7 +177,8 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     count: (selector) =>
       Promise.resolve(
-        (selector === 'shydesk-support[view="ticket"]' && visited.at(-1)?.includes('/ticket') === true) ||
+        (selector === 'shydesk-support[data-language-kept]' && picked?.locale === 'en') ||
+          (selector === 'shydesk-support[view="ticket"]' && visited.at(-1)?.includes('/ticket') === true) ||
           (selector === 'shydesk-support[view="appeal"]' && visited.at(-1)?.includes('/appeal') === true)
           ? 1
           : 0,
@@ -1248,19 +1258,19 @@ describe('the ticket page (shyden-labs/ShyTalk#37 AC1)', () => {
     expect(IPHONE_CASES.filter(({ title }) => title.startsWith('the ticket page opens the ticket view'))).toHaveLength(1);
   });
 
-  it('passes on the site as it should be, running the 8 checks its twin runs on CI', async () => {
+  it('passes on the site as it should be, running the 13 checks its twin runs on CI', async () => {
     const page = safari('en');
     const check = countingCheck();
     await expect(ticket?.run(page, check)).resolves.toBeUndefined();
     expect(page.visited).toEqual([TOKEN_ADDRESS]);
-    expect(check.count).toBe(8);
+    expect(check.count).toBe(13);
   });
 
   it('reads a page language the site does not have as English, the language-free page staying where it is', async () => {
     const page = safari('fr');
     const check = countingCheck();
     await expect(ticket?.run(page, check)).resolves.toBeUndefined();
-    expect(check.count).toBe(8);
+    expect(check.count).toBe(13);
   });
 
   it('fails naming the address when the page loses the emailed token', async () => {
@@ -1271,6 +1281,40 @@ describe('the ticket page (shyden-labs/ShyTalk#37 AC1)', () => {
   it('fails when the page shows one language but sits at another language’s address', async () => {
     const page = safari('th', { url: () => Promise.resolve(`${DEV}${TOKEN_ADDRESS}`) });
     await expect(ticket?.run(page)).rejects.toThrow(`/th${TICKET_PATH}`);
+  });
+
+  // shyden-labs/ShyTalk#352: the menu keeps the token, and English picked stays English.
+  it('fails naming it when the menu drops the token', async () => {
+    const page = safari('en');
+    const shown = page.url.bind(page);
+    // The address loses its fragment only on the language picked from the menu.
+    page.url = async () => {
+      const address = await shown();
+      return address.includes('/id/') ? (address.split('#')[0] ?? '') : address;
+    };
+    // The quarter-second looks pass on fake time, up to the ceiling, so the test waits on none.
+    vi.useFakeTimers({ now: 1700000000000 });
+    try {
+      const running = ticket?.run(page).catch((error: unknown) => error as Error);
+      await vi.runAllTimersAsync();
+      expect((await running)?.message).toContain('another language keeps the token');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails naming it when English picked moves to the browser’s language', async () => {
+    const page = safari('en');
+    const counted = page.count.bind(page);
+    page.count = (selector) => (selector === 'shydesk-support[data-language-kept]' ? Promise.resolve(0) : counted(selector));
+    vi.useFakeTimers({ now: 1700000000000 });
+    try {
+      const running = ticket?.run(page).catch((error: unknown) => error as Error);
+      await vi.runAllTimersAsync();
+      expect((await running)?.message).toContain('the page stays on English');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -1289,19 +1333,19 @@ describe('the appeal page (shyden-labs/ShyTalk#310 AC4)', () => {
     expect(IPHONE_CASES.filter((c) => c.title.startsWith(title))).toHaveLength(1);
   });
 
-  it('passes on the site as it should be, running the 13 checks its twin runs on CI', async () => {
+  it('passes on the site as it should be, running the 18 checks its twin runs on CI', async () => {
     const page = safari('en');
     const check = countingCheck();
     await expect(appeal?.run(page, check)).resolves.toBeUndefined();
     expect(page.visited).toEqual([TOKEN_ADDRESS]);
-    expect(check.count).toBe(13);
+    expect(check.count).toBe(18);
   });
 
   it('reads a page language the site does not have as English, the language-free page staying where it is', async () => {
     const page = safari('fr');
     const check = countingCheck();
     await expect(appeal?.run(page, check)).resolves.toBeUndefined();
-    expect(check.count).toBe(13);
+    expect(check.count).toBe(18);
   });
 
   it('fails naming the address when the page loses the notice’s token', async () => {

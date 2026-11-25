@@ -13,7 +13,12 @@ vi.mock('@playwright/test', () => {
     declared.push(title);
   };
   // tests/smoke/fixture.ts adds its fixtures to Playwright's test; the stand-in records titles either way.
-  return { test: Object.assign(test, { extend: () => test }), expect: () => undefined };
+  // An untitled group (shyden-labs/ShyTalk#352) runs its tests in place; its options change no name.
+  const group = (body: () => void) => {
+    body();
+  };
+  Object.assign(test, { extend: () => test, describe: group, use: () => undefined });
+  return { test, expect: () => undefined };
 });
 vi.mock('@axe-core/playwright', () => ({ default: vi.fn() }));
 
