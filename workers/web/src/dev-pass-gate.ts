@@ -8,7 +8,13 @@
  * back to a refused pass. Test and production read no pass.
  */
 import { readDevPass } from '../../../packages/environment/dev-pass.ts';
-import { SITE_PASS_COOKIE, SITE_PASS_SECONDS, requireSitePassword, sitePassCookie } from '../../../packages/environment/index.ts';
+import {
+  givesSitePassword,
+  SITE_PASS_COOKIE,
+  SITE_PASS_SECONDS,
+  requireSitePassword,
+  sitePassCookie,
+} from '../../../packages/environment/index.ts';
 
 const PARAMETER = 'dev_pass';
 
@@ -46,6 +52,27 @@ async function earnedCookie(token: string, env: DevPassEnv, now: number): Promis
   return sitePassCookie(SITE_PASSWORD, DEV_PASS_SECRET, now + SITE_PASS_SECONDS);
 }
 
+/** The `set-cookie` line giving the site pass cookie `value`. */
+const cookieLine = (value: string): string =>
+  `${SITE_PASS_COOKIE}=${value}; Path=/; Max-Age=${SITE_PASS_SECONDS}; Secure; HttpOnly; SameSite=Lax`;
+
+/**
+ * On dev, the `set-cookie` line for a request giving the password itself (the box, or its header), so the browser's
+ * later requests carry the cookie: WebKit gives no box answer on a WebSocket upgrade, and the roadmap's live socket
+ * would be refused (shyden-labs/ShyTalk#321). Null anywhere else, and for a request let through on its cookie, so a
+ * cookie never renews itself. `now` is in unix seconds.
+ */
+export async function boxAnsweredCookie(
+  request: Request,
+  env: Pick<DevPassEnv, 'ENVIRONMENT_NAME' | 'SITE_PASSWORD' | 'DEV_PASS_SECRET'>,
+  now: number,
+): Promise<string | null> {
+  const { SITE_PASSWORD, DEV_PASS_SECRET } = env;
+  if (env.ENVIRONMENT_NAME !== 'dev' || !SITE_PASSWORD || !DEV_PASS_SECRET) return null;
+  if (!(await givesSitePassword(request, SITE_PASSWORD))) return null;
+  return cookieLine(await sitePassCookie(SITE_PASSWORD, DEV_PASS_SECRET, now + SITE_PASS_SECONDS));
+}
+
 /** The answer to a request carrying a pass on dev, or null when the request carries none or this is not dev. `now` is in unix seconds. */
 export async function devPassGate(request: Request, env: DevPassEnv, now: number): Promise<Response | null> {
   const url = new URL(request.url);
@@ -57,7 +84,7 @@ export async function devPassGate(request: Request, env: DevPassEnv, now: number
   const headers = new Headers({ location: `${path}${url.search}`, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' });
   const value = await earnedCookie(token, env, now);
   if (value !== null) {
-    headers.set('set-cookie', `${SITE_PASS_COOKIE}=${value}; Path=/; Max-Age=${SITE_PASS_SECONDS}; Secure; HttpOnly; SameSite=Lax`);
+    headers.set('set-cookie', cookieLine(value));
     return new Response(null, { status: 302, headers });
   }
   const asked = await requireSitePassword(request, env.SITE_PASSWORD, `ShyTalk ${env.ENVIRONMENT_NAME}`, { key: env.DEV_PASS_SECRET, now });

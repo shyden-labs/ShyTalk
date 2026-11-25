@@ -22,6 +22,10 @@ import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, PREVIEW_FACTS, PREVIEW_TAGS, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 import { SITE_USER } from '../../packages/environment/index.ts';
+import { MILESTONES, boardDelivery, linePattern, stateEndings } from '../support/roadmap-page.ts';
+import { smokeWebhookSecret } from './targets.ts';
+import { updatedLine } from '../../apps/web/src/roadmap/view.ts';
+import { pageWords } from '../../apps/web/src/roadmap/words.ts';
 
 /**
  * The site password's box answer (shyden-labs/ShyTalk#262), for the one check that fetches with no cookie and so
@@ -328,7 +332,99 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     // Every soft check above held (shyden-labs/ShyTalk#353: one hard assertion SonarCloud counts, S2699).
     expect(test.info().errors).toEqual([]);
   });
+
+  // The roadmap (shyden-labs/ShyTalk#321 AC3): the board drawn at once, never a loading line, each milestone a button
+  // named with its state that opens its own panel, the one bar, and when the board was read in the visitor's own zone.
+  test(`${lang}: the roadmap page shows the board at once in ${lang}, its heading, a button named with its state for each milestone, the bar and when it was last read; a press opens that milestone's panel, Close shuts it, and Escape shuts it again; it passes axe and fits a phone's width, with no CSP refusal`, async ({
+    page,
+  }) => {
+    const refusals = cspRefusals(page);
+    const response = await page.goto(`${prefix}/roadmap`, { waitUntil: 'load' });
+    expect.soft(response?.status()).toBe(200);
+    await expect.soft(page.locator('html')).toHaveAttribute('lang', lang);
+    const heading = page.getByRole('heading', { level: 1 });
+    await expect.soft(heading).toBeVisible();
+    await expect.soft(heading).toHaveText(t(locale, 'roadmap.heading'));
+    const buttons = page.locator('.map button.spot');
+    await expect.soft(buttons).toHaveCount(MILESTONES);
+    const labels = await buttons.evaluateAll((all) => all.map((button) => button.getAttribute('aria-label') ?? ''));
+    const endings = stateEndings(locale);
+    expect.soft(labels.filter((label) => !endings.some((ending) => label.endsWith(ending)))).toEqual([]);
+    await expect.soft(page.locator('.bar-words')).toHaveText(linePattern(locale, 'roadmap.bar'));
+    // Worded in the browser's own zone, named, as the page's own code words it.
+    const updated = page.locator('#roadmap-updated');
+    const readAt = (await updated.getAttribute('data-read-at')) ?? '';
+    const zone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+    await expect.soft(updated).toHaveText(updatedLine(readAt, pageWords(locale), locale, zone));
+    // A press opens the milestone's own panel; Close shuts it; a press again, then Escape, shuts it too.
+    const first = buttons.first();
+    const panel = page.locator('#roadmap-panel');
+    await first.click();
+    await expect.soft(first).toHaveAttribute('aria-expanded', 'true');
+    await expect.soft(panel).toBeVisible();
+    await expect.soft(panel.getByRole('heading', { level: 2 })).toHaveText(labels[0]?.split(', ')[0] ?? '(no label)');
+    await expect.soft(panel.getByRole('heading', { level: 3 })).toHaveText(t(locale, 'roadmap.brings'));
+    const open = await new AxeBuilder({ page }).analyze();
+    expect.soft(open.violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+    await panel.getByRole('button', { name: t(locale, 'roadmap.close') }).click();
+    await expect.soft(panel).toBeHidden();
+    await expect.soft(first).toHaveAttribute('aria-expanded', 'false');
+    await first.click();
+    await expect.soft(panel).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect.soft(panel).toBeHidden();
+    // A phone's width: set here where the browser can take one, measured as it stands on a phone.
+    if ((await page.evaluate(() => window.innerWidth)) > PHONE_WIDTH) {
+      await page.setViewportSize({ width: NARROW_WIDTH, height: 740 });
+      await page.reload({ waitUntil: 'load' });
+    }
+    const fits = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    expect.soft(fits, "the page fits a phone's width").toBe(true);
+    expect.soft(refusals).toEqual([]);
+    expect(test.info().errors).toEqual([]);
+  });
 }
+
+/**
+ * The roadmap's live board (shyden-labs/ShyTalk#321 AC3), once per browser: an open page takes each fresh board read
+ * as it comes, with no reload. A signed delivery for ShyTalk's board asks for the read, as GitHub's webhook does; on
+ * CI the board is the stand-in's (tests/smoke/github-stand-in.ts), on the phones DEV's own. A real board edit reaching
+ * an open page within 10 s is measured by hand (AC5).
+ */
+test('the roadmap page takes a fresh board read on its own, with no reload', async ({ page, request }) => {
+  // What the browser says of its socket and in its console, so a socket that will not open fails naming why.
+  const trouble: string[] = [];
+  page.on('websocket', (socket) => {
+    socket.on('socketerror', (error) => trouble.push(`socket error: ${error}`));
+    socket.on('close', () => trouble.push('socket closed'));
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error') trouble.push(`console: ${message.text()}`);
+  });
+  await page.goto('/roadmap', { waitUntil: 'load' });
+  const live = page.locator('#roadmap-live');
+  // A wait, then one assertion: an expect.poll counts a step per try, so its count would differ by browser speed.
+  const opened = await page
+    .locator('#roadmap-live[data-socket="open"]')
+    .waitFor({ timeout: 5_000 })
+    .then(
+      () => true,
+      () => false,
+    );
+  expect(opened ? 'open' : trouble.join('; ') || 'not open yet').toBe('open');
+  const before = Number(await live.getAttribute('data-version'));
+  await page.evaluate(() => {
+    (window as { notReloaded?: boolean }).notReloaded = true;
+  });
+  const { body, headers } = boardDelivery(smokeWebhookSecret());
+  const answer = await request.post('/hooks/github', { data: body, headers });
+  expect(answer.status()).toBe(202);
+  expect(await answer.json()).toEqual({ state: 'reading' });
+  await expect(live).not.toHaveAttribute('data-version', String(before), { timeout: 10_000 });
+  expect(Number(await live.getAttribute('data-version'))).toBeGreaterThan(before);
+  expect(await page.evaluate(() => (window as { notReloaded?: boolean }).notReloaded)).toBe(true);
+  await expect(page.locator('.map button.spot')).toHaveCount(MILESTONES);
+});
 
 /**
  * The closed-testing journey, in English, once per browser (shyden-labs/ShyTalk#55
