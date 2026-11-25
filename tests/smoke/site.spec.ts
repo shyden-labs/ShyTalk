@@ -435,9 +435,10 @@ test('the roadmap page takes a fresh board read on its own, with no reload', asy
  */
 /**
  * The two pages ShyDesk's emails and notices link to, in a Thai browser, so that English picked from the menu is a
- * real choice against the browser's language (shyden-labs/ShyTalk#352). Untitled, so the tests keep their own names.
+ * real choice against the browser's language (shyden-labs/ShyTalk#352). Titled, as one-suite reads an untitled group's tests
+ * under a name its counter does not give them.
  */
-test.describe(() => {
+test.describe('in a Thai browser', () => {
   test.use({ locale: 'th-TH' });
 
   /**

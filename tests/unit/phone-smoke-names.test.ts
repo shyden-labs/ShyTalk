@@ -13,8 +13,8 @@ vi.mock('@playwright/test', () => {
     declared.push(title);
   };
   // tests/smoke/fixture.ts adds its fixtures to Playwright's test; the stand-in records titles either way.
-  // An untitled group (shyden-labs/ShyTalk#352) runs its tests in place; its options change no name.
-  const group = (body: () => void) => {
+  // A group (shyden-labs/ShyTalk#352) runs its tests in place: the iPhone copy matches the tests' own names.
+  const group = (_title: string, body: () => void) => {
     body();
   };
   Object.assign(test, { extend: () => test, describe: group, use: () => undefined });
