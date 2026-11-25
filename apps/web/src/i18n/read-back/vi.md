@@ -139,3 +139,66 @@
 | support.appealTitle | Appeal a decision | Kháng nghị quyết định | Appeal against the decision |
 | support.appealIntro | If you think a moderation decision on your account was wrong, explain why here. | Nếu bạn cho rằng quyết định kiểm duyệt đối với tài khoản của bạn là sai, hãy giải thích lý do tại đây. | If you believe the decision to moderate your account was wrong, please explain why here. |
 | support.noScript | The support form needs JavaScript. Turn it on to send a request. | Biểu mẫu hỗ trợ cần JavaScript. Hãy bật JavaScript để gửi yêu cầu. | The support form requires JavaScript. Please enable JavaScript to submit requests. |
+| roadmap.title | Roadmap | Lộ trình phát triển | Development roadmap |
+| roadmap.heading | The road to launch | Chặng đường đến ngày ra mắt | The road to launch |
+| roadmap.intro | ShyTalk's road to launch, drawn as a conversation. Press a speech bubble to see what that part brings. The page keeps itself up to date. | Chặng đường đến ngày ra mắt của ShyTalk, được vẽ như một cuộc trò chuyện. Nhấn vào một bong bóng lời thoại để xem phần đó mang lại điều gì. Trang này tự cập nhật. | The journey to ShyTalk's launch is depicted as a conversation. Tap a speech bubble to see what that section offers. This page updates automatically. |
+| roadmap.launch | Expected launch: shown once every milestone is planned. | Dự kiến ra mắt: sẽ hiển thị khi mọi cột mốc đều đã được lên kế hoạch. | Expected release: will be displayed once all milestones have been planned. |
+| roadmap.done | Done | Đã xong | Done |
+| roadmap.started | Under way, {percent}% done | Đang thực hiện, đã xong {percent}% | In progress, completed {percent} % |
+| roadmap.notStarted | Not started yet | Chưa bắt đầu | Not yet started |
+| roadmap.labelDone | done | đã xong | Done |
+| roadmap.labelStarted | under way | đang thực hiện | currently in progress |
+| roadmap.labelNotStarted | not started | chưa bắt đầu | Not yet started |
+| roadmap.brings | What this brings | Phần này mang lại | This section provides |
+| roadmap.close | Close | Đóng | Close |
+| roadmap.bar | {percent}% of the work to launch is done | Đã hoàn thành {percent}% công việc trước ngày ra mắt | {percent} % of the work has been completed before the launch date. |
+| roadmap.barLabel | {percent} percent done | Đã xong {percent} phần trăm | {percent} percent completed |
+| roadmap.mapLabel | ShyTalk's road to launch drawn as a conversation of {count} speech bubbles | Chặng đường đến ngày ra mắt của ShyTalk được vẽ như một cuộc trò chuyện gồm {count} bong bóng lời thoại | The road to ShyTalk's launch was depicted as a conversation consisting of {count} speech bubbles. |
+| roadmap.unnamed | Milestone {number} | Cột mốc {number} | Milestone {number} |
+| roadmap.updated | Last updated {date}, {time} {zone} | Cập nhật lần cuối {date}, {time} {zone} | Last updated {date} , {time} {zone} |
+| milestones.m7Name | Groundwork | Nền móng | Foundation |
+| milestones.m7Summary | The workshop and safety checks everything is built with. | Xưởng làm việc và các bước kiểm tra an toàn để xây dựng mọi thứ. | The workshop and safety checks are in place to build everything. |
+| milestones.m7Brings1 | Behind the scenes: the tools everything else is built on | Hậu trường: các công cụ để xây dựng mọi thứ khác | Behind the scenes: the tools to build everything else. |
+| milestones.m8Name | The website | Trang web | Website |
+| milestones.m8Summary | ShyTalk's website: read about it, apply to try it, get help, and follow this map. | Trang web của ShyTalk: tìm hiểu, đăng ký dùng thử, nhận trợ giúp và theo dõi bản đồ này. | ShyTalk website: learn more, sign up for a free trial, get help, and follow this map. |
+| milestones.m8Brings1 | ShyTalk explained in five languages | Giới thiệu ShyTalk bằng năm ngôn ngữ | Introducing ShyTalk in five languages. |
+| milestones.m8Brings2 | Apply to try ShyTalk before launch | Đăng ký dùng thử ShyTalk trước ngày ra mắt | Sign up for a ShyTalk trial before launch. |
+| milestones.m8Brings3 | A help page whenever you need it | Trang trợ giúp bất cứ khi nào bạn cần | Help page available whenever you need it. |
+| milestones.m9Name | Strong foundations | Nền tảng vững chắc | Solid foundation |
+| milestones.m9Summary | Safe sign-in and the servers everything runs on. | Đăng nhập an toàn và các máy chủ nơi mọi thứ vận hành. | Secure login and the servers where everything runs. |
+| milestones.m9Brings1 | Sign in with Google, Apple or a passkey | Đăng nhập bằng Google, Apple hoặc khóa truy cập | Sign in using Google, Apple, or your access key. |
+| milestones.m9Brings2 | Improvements arrive without a store update | Cải tiến đến mà không cần cập nhật từ cửa hàng ứng dụng | Improvements are available without needing an app store update. |
+| milestones.m9Brings3 | Behind the scenes: the servers everything runs on | Hậu trường: các máy chủ nơi mọi thứ vận hành | Behind the scenes: the servers where everything runs. |
+| milestones.m10Name | Voice rooms | Phòng trò chuyện thoại | Voice chat room |
+| milestones.m10Summary | Rooms where people meet to talk and listen. | Những căn phòng nơi mọi người gặp nhau để nói và lắng nghe. | These are rooms where people meet to talk and listen. |
+| milestones.m10Brings1 | Live voice rooms | Phòng trò chuyện thoại trực tiếp | Live voice chat room |
+| milestones.m10Brings2 | Take a seat to speak | Ngồi vào ghế để nói | Sit down and speak. |
+| milestones.m10Brings3 | Chat alongside the conversation | Nhắn tin song song với cuộc trò chuyện | Texting alongside a conversation |
+| milestones.m11Name | The app | Ứng dụng | Application |
+| milestones.m11Summary | ShyTalk on your phone, quick to open and easy to use. | ShyTalk trên điện thoại của bạn, mở nhanh và dễ dùng. | ShyTalk on your phone, quick to open and easy to use. |
+| milestones.m11Brings1 | Join and sign in on your phone | Đăng ký và đăng nhập trên điện thoại | Register and log in on your phone. |
+| milestones.m11Brings2 | A profile with your photos | Hồ sơ với ảnh của bạn | Profile with your photo |
+| milestones.m11Brings3 | A home screen that keeps itself fresh | Màn hình chính luôn được làm mới | The home screen is always refreshed. |
+| milestones.m12Name | Find a room | Tìm phòng | Find a room |
+| milestones.m12Summary | Browse rooms and join a conversation in a tap. | Duyệt các phòng và tham gia trò chuyện chỉ với một lần chạm. | Browse rooms and join conversations with just one tap. |
+| milestones.m12Brings1 | Browse rooms by language | Duyệt phòng theo ngôn ngữ | Browse rooms by language |
+| milestones.m12Brings2 | Join a conversation in one tap | Tham gia trò chuyện chỉ với một lần chạm | Join the conversation with just one tap. |
+| milestones.m13Name | Friends | Bạn bè | Friend |
+| milestones.m13Summary | Find language partners and friends, and know when they are around. | Tìm bạn đồng hành học ngôn ngữ và bạn bè, và biết khi nào họ đang trực tuyến. | Find language learning companions and friends, and know when they are online. |
+| milestones.m13Brings1 | Language partners and friends | Bạn đồng hành học ngôn ngữ và bạn bè | Language learning companions and friends |
+| milestones.m13Brings2 | Notifications that matter | Những thông báo quan trọng | Important announcements |
+| milestones.m14Name | Safe spaces | Không gian an toàn | Safe space |
+| milestones.m14Summary | Spaces that fit your age, with a parent's okay where the law asks. | Không gian phù hợp với độ tuổi của bạn, có sự đồng ý của cha mẹ khi luật yêu cầu. | A space that is age-appropriate, with parental consent where required by law. |
+| milestones.m14Brings1 | Separate spaces for younger members | Không gian tách biệt cho người dùng nhỏ tuổi | Separate space for younger users. |
+| milestones.m14Brings2 | Parent consent where it is needed | Sự đồng ý của cha mẹ khi cần | Parental consent when needed |
+| milestones.m15Name | Kind and safe | Thân thiện và an toàn | Friendly and safe |
+| milestones.m15Summary | Reporting and moderation that keep conversations friendly. | Báo cáo và kiểm duyệt giúp các cuộc trò chuyện luôn thân thiện. | Reporting and moderation help keep conversations friendly. |
+| milestones.m15Brings1 | Report a problem in a tap | Báo cáo sự cố chỉ với một lần chạm | Report an incident with just one touch. |
+| milestones.m15Brings2 | A fair way to appeal a decision | Cách công bằng để kháng nghị một quyết định | The fair way to appeal a decision |
+| milestones.m16Name | Clear rules | Quy định rõ ràng | Clear regulations |
+| milestones.m16Summary | Plain privacy and community rules, right for every country. | Quy định về quyền riêng tư và cộng đồng dễ hiểu, phù hợp với mọi quốc gia. | The rules regarding privacy and community are easy to understand and applicable to all countries. |
+| milestones.m16Brings1 | Privacy and terms in plain words | Quyền riêng tư và điều khoản bằng lời lẽ dễ hiểu | Privacy policy and terms in clear and concise language. |
+| milestones.m16Brings2 | The right protections where you live | Sự bảo vệ phù hợp nơi bạn sống | Appropriate protection where you live |
+| milestones.m17Name | Launch | Ra mắt | Launch |
+| milestones.m17Summary | ShyTalk on the App Store and Google Play. | ShyTalk trên App Store và Google Play. | ShyTalk is available on the App Store and Google Play. |
+| milestones.m17Brings1 | Download ShyTalk on iPhone and Android | Tải ShyTalk trên iPhone và Android | Download ShyTalk on iPhone and Android |

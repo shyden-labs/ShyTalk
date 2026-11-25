@@ -15,9 +15,11 @@ export interface RoadmapApp {
   /** The App's private key, PEM, PKCS#1 or PKCS#8 (the `ROADMAP_APP_KEY` secret). */
   key: string;
   board: { id: string; title: string };
+  /** Where GitHub's API answers: GitHub itself unless the CI smoke's stand-in is named (worker.ts checks which). */
+  api?: string;
 }
 
-const API = 'https://api.github.com';
+export const GITHUB_API = 'https://api.github.com';
 const USER_AGENT = 'shytalk-roadmap';
 
 const base64Url = (bytes: Uint8Array): string =>
@@ -62,7 +64,7 @@ export async function appJwt(appId: string, pem: string, now: number): Promise<s
 }
 
 async function installationToken(app: RoadmapApp, send: GithubFetch, now: number): Promise<string> {
-  const answer = await send(`${API}/app/installations/${app.installationId}/access_tokens`, {
+  const answer = await send(`${app.api ?? GITHUB_API}/app/installations/${app.installationId}/access_tokens`, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${await appJwt(app.appId, app.key, now)}`,
@@ -83,7 +85,7 @@ interface Page {
 
 /** One board page, checked: GitHub's status, GraphQL's own errors, a board at all, and its recorded title. */
 async function boardPage(app: RoadmapApp, send: GithubFetch, token: string, endCursor: string | null): Promise<Page> {
-  const answer = await send(`${API}/graphql`, {
+  const answer = await send(`${app.api ?? GITHUB_API}/graphql`, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'user-agent': USER_AGENT },
     body: JSON.stringify({ query: ROADMAP_QUERY, variables: { id: app.board.id, endCursor } }),

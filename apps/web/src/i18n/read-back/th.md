@@ -139,3 +139,66 @@
 | support.appealTitle | Appeal a decision | อุทธรณ์คำตัดสิน | Appeal the decision. |
 | support.appealIntro | If you think a moderation decision on your account was wrong, explain why here. | หากคุณคิดว่าคำตัดสินของผู้ดูแลเกี่ยวกับบัญชีของคุณไม่ถูกต้อง โปรดอธิบายเหตุผลที่นี่ | If you believe the administrator's decision regarding your account is incorrect, please explain why here. |
 | support.noScript | The support form needs JavaScript. Turn it on to send a request. | แบบฟอร์มขอความช่วยเหลือต้องใช้ JavaScript โปรดเปิดใช้งานเพื่อส่งคำขอ | The help form requires JavaScript. Please enable it to submit requests. |
+| roadmap.title | Roadmap | โรดแมป | Roadmap |
+| roadmap.heading | The road to launch | เส้นทางสู่การเปิดตัว | The path to launch. |
+| roadmap.intro | ShyTalk's road to launch, drawn as a conversation. Press a speech bubble to see what that part brings. The page keeps itself up to date. | เส้นทางสู่การเปิดตัวของ ShyTalk วาดเป็นบทสนทนา กดที่ลูกโป่งคำพูดเพื่อดูว่าส่วนนั้นจะมีอะไรบ้าง หน้านี้อัปเดตตัวเองอยู่เสมอ | The path to ShyTalk's launch is outlined in a dialogue. Click on the speech bubble to see what that section will contain. This page updates itself regularly. |
+| roadmap.launch | Expected launch: shown once every milestone is planned. | วันเปิดตัวโดยประมาณ: จะแสดงเมื่อทุกขั้นได้รับการวางแผนแล้ว | Estimated launch date: Will be displayed once all stages have been planned. |
+| roadmap.done | Done | เสร็จแล้ว | finished |
+| roadmap.started | Under way, {percent}% done | กำลังดำเนินการ เสร็จแล้ว {percent}% | In progress. Completed {percent} % |
+| roadmap.notStarted | Not started yet | ยังไม่เริ่ม | It hasn't started yet. |
+| roadmap.labelDone | done | เสร็จแล้ว | finished |
+| roadmap.labelStarted | under way | กำลังดำเนินการ | In progress. |
+| roadmap.labelNotStarted | not started | ยังไม่เริ่ม | It hasn't started yet. |
+| roadmap.brings | What this brings | สิ่งที่ส่วนนี้มอบให้ | What this section provides. |
+| roadmap.close | Close | ปิด | turn off |
+| roadmap.bar | {percent}% of the work to launch is done | งานก่อนเปิดตัวเสร็จแล้ว {percent}% | Pre-launch work is {percent} % complete. |
+| roadmap.barLabel | {percent} percent done | เสร็จแล้ว {percent} เปอร์เซ็นต์ | Finished {percent} percent |
+| roadmap.mapLabel | ShyTalk's road to launch drawn as a conversation of {count} speech bubbles | เส้นทางสู่การเปิดตัวของ ShyTalk วาดเป็นบทสนทนาที่มีลูกโป่งคำพูด {count} อัน | The path to ShyTalk's launch was drawn as a conversation with {count} speech balloons. |
+| roadmap.unnamed | Milestone {number} | ขั้นที่ {number} | Step {number} |
+| roadmap.updated | Last updated {date}, {time} {zone} | อัปเดตล่าสุด {date} เวลา {time} {zone} | Last updated {date} , time {time} {zone} |
+| milestones.m7Name | Groundwork | รากฐาน | foundation |
+| milestones.m7Summary | The workshop and safety checks everything is built with. | เครื่องมือและการตรวจสอบความปลอดภัยที่ใช้สร้างทุกอย่าง | The tools and security checks used to create everything. |
+| milestones.m7Brings1 | Behind the scenes: the tools everything else is built on | เบื้องหลัง: เครื่องมือที่ใช้สร้างทุกอย่าง | Behind the scenes: The tools used to create everything. |
+| milestones.m8Name | The website | เว็บไซต์ | website |
+| milestones.m8Summary | ShyTalk's website: read about it, apply to try it, get help, and follow this map. | เว็บไซต์ของ ShyTalk: อ่านเกี่ยวกับ ShyTalk สมัครทดลองใช้ ขอความช่วยเหลือ และติดตามแผนที่นี้ | ShyTalk website: Read about ShyTalk, sign up for a trial, get help, and follow this map. |
+| milestones.m8Brings1 | ShyTalk explained in five languages | อธิบาย ShyTalk เป็นห้าภาษา | Explain ShyTalk in five languages. |
+| milestones.m8Brings2 | Apply to try ShyTalk before launch | สมัครทดลองใช้ ShyTalk ก่อนเปิดตัว | Sign up for a ShyTalk trial before its launch. |
+| milestones.m8Brings3 | A help page whenever you need it | หน้าความช่วยเหลือเมื่อใดก็ตามที่คุณต้องการ | The help page is available whenever you need it. |
+| milestones.m9Name | Strong foundations | รากฐานที่มั่นคง | A solid foundation |
+| milestones.m9Summary | Safe sign-in and the servers everything runs on. | การเข้าสู่ระบบที่ปลอดภัยและเซิร์ฟเวอร์ที่ทุกอย่างทำงานอยู่ | Secure login and the server where everything runs. |
+| milestones.m9Brings1 | Sign in with Google, Apple or a passkey | เข้าสู่ระบบด้วย Google, Apple หรือพาสคีย์ | Log in with Google, Apple, or a passkey. |
+| milestones.m9Brings2 | Improvements arrive without a store update | การปรับปรุงมาถึงโดยไม่ต้องอัปเดตจากสโตร์ | The improvement arrived without needing an update from the store. |
+| milestones.m9Brings3 | Behind the scenes: the servers everything runs on | เบื้องหลัง: เซิร์ฟเวอร์ที่ทุกอย่างทำงานอยู่ | Behind the scenes: The server where everything is running. |
+| milestones.m10Name | Voice rooms | ห้องสนทนาเสียง | Voice chat room |
+| milestones.m10Summary | Rooms where people meet to talk and listen. | ห้องที่ผู้คนมาพบกันเพื่อพูดคุยและฟัง | A room where people gather to talk and listen. |
+| milestones.m10Brings1 | Live voice rooms | ห้องสนทนาเสียงแบบสด | Live voice chat room |
+| milestones.m10Brings2 | Take a seat to speak | นั่งที่นั่งเพื่อพูด | Take your seat to speak. |
+| milestones.m10Brings3 | Chat alongside the conversation | แชตไปพร้อมกับการสนทนา | Chat while having a conversation. |
+| milestones.m11Name | The app | แอป | app |
+| milestones.m11Summary | ShyTalk on your phone, quick to open and easy to use. | ShyTalk บนโทรศัพท์ของคุณ เปิดได้เร็วและใช้งานง่าย | ShyTalk on your phone is quick and easy to use. |
+| milestones.m11Brings1 | Join and sign in on your phone | สมัครและเข้าสู่ระบบบนโทรศัพท์ของคุณ | Sign up and log in on your phone. |
+| milestones.m11Brings2 | A profile with your photos | โปรไฟล์พร้อมรูปภาพของคุณ | Your profile with a photo. |
+| milestones.m11Brings3 | A home screen that keeps itself fresh | หน้าหลักที่สดใหม่อยู่เสมอ | A homepage that is always fresh. |
+| milestones.m12Name | Find a room | ค้นหาห้อง | Search for a room |
+| milestones.m12Summary | Browse rooms and join a conversation in a tap. | เลือกดูห้องและเข้าร่วมการสนทนาได้ในแตะเดียว | Browse rooms and join conversations with a single tap. |
+| milestones.m12Brings1 | Browse rooms by language | เลือกดูห้องตามภาษา | Browse rooms by language. |
+| milestones.m12Brings2 | Join a conversation in one tap | เข้าร่วมการสนทนาในแตะเดียว | Join a conversation with one tap. |
+| milestones.m13Name | Friends | เพื่อน | friend |
+| milestones.m13Summary | Find language partners and friends, and know when they are around. | ค้นหาคู่ฝึกภาษาและเพื่อน และรู้เมื่อพวกเขาออนไลน์ | Find a language training partner and friend, and know when they're online. |
+| milestones.m13Brings1 | Language partners and friends | คู่ฝึกภาษาและเพื่อน | Language training partner and friend. |
+| milestones.m13Brings2 | Notifications that matter | การแจ้งเตือนที่สำคัญ | Important notification. |
+| milestones.m14Name | Safe spaces | พื้นที่ปลอดภัย | Safe area |
+| milestones.m14Summary | Spaces that fit your age, with a parent's okay where the law asks. | พื้นที่ที่เหมาะกับอายุของคุณ พร้อมความยินยอมจากผู้ปกครองเมื่อกฎหมายกำหนด | Age-appropriate areas, with parental consent where required by law. |
+| milestones.m14Brings1 | Separate spaces for younger members | พื้นที่แยกสำหรับสมาชิกที่อายุน้อยกว่า | A separate area for younger members. |
+| milestones.m14Brings2 | Parent consent where it is needed | ความยินยอมจากผู้ปกครองเมื่อจำเป็น | Parental consent when necessary. |
+| milestones.m15Name | Kind and safe | ใจดีและปลอดภัย | Kind and safe. |
+| milestones.m15Summary | Reporting and moderation that keep conversations friendly. | การรายงานและการกลั่นกรองเนื้อหาที่ทำให้การสนทนาเป็นมิตร | Reporting and moderating content that promotes friendly conversation. |
+| milestones.m15Brings1 | Report a problem in a tap | รายงานปัญหาในแตะเดียว | Report a problem with one tap. |
+| milestones.m15Brings2 | A fair way to appeal a decision | วิธีที่เป็นธรรมในการอุทธรณ์คำตัดสิน | A fair way to appeal a decision. |
+| milestones.m16Name | Clear rules | กฎที่ชัดเจน | Clear rules |
+| milestones.m16Summary | Plain privacy and community rules, right for every country. | กฎความเป็นส่วนตัวและกฎของชุมชนที่เข้าใจง่าย เหมาะกับทุกประเทศ | Easy-to-understand privacy and community guidelines, suitable for all countries. |
+| milestones.m16Brings1 | Privacy and terms in plain words | ความเป็นส่วนตัวและข้อกำหนดด้วยถ้อยคำที่เข้าใจง่าย | Privacy and terms and conditions explained in easy-to-understand language. |
+| milestones.m16Brings2 | The right protections where you live | การคุ้มครองที่เหมาะสมในที่ที่คุณอาศัยอยู่ | Adequate protection where you live. |
+| milestones.m17Name | Launch | เปิดตัว | Launched |
+| milestones.m17Summary | ShyTalk on the App Store and Google Play. | ShyTalk บน App Store และ Google Play | ShyTalk is available on the App Store and Google Play. |
+| milestones.m17Brings1 | Download ShyTalk on iPhone and Android | ดาวน์โหลด ShyTalk บน iPhone และ Android | Download ShyTalk on iPhone and Android. |

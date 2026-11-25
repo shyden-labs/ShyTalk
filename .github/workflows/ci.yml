@@ -139,6 +139,8 @@ jobs:
         env:
           WRANGLER_SEND_METRICS: 'false'
           HOME: /root
+          # Each browser's own output in the log, so a browser that closes mid-test says why (shyden-labs/ShyTalk#321).
+          DEBUG: 'pw:browser'
         run: |
           SMOKE_DOOR_SECRET=$(openssl rand -hex 32)
           export SMOKE_DOOR_SECRET

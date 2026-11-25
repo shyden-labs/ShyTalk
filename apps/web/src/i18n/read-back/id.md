@@ -139,3 +139,66 @@
 | support.appealTitle | Appeal a decision | Ajukan banding atas keputusan | Appeal the decision |
 | support.appealIntro | If you think a moderation decision on your account was wrong, explain why here. | Jika Anda merasa keputusan moderasi pada akun Anda keliru, jelaskan alasannya di sini. | If you feel a moderation decision on your account was wrong, please explain why here. |
 | support.noScript | The support form needs JavaScript. Turn it on to send a request. | Formulir bantuan memerlukan JavaScript. Aktifkan JavaScript untuk mengirim permintaan. | The help form requires JavaScript. Please enable JavaScript to submit requests. |
+| roadmap.title | Roadmap | Peta jalan | Roadmap |
+| roadmap.heading | The road to launch | Jalan menuju peluncuran | Road to launch |
+| roadmap.intro | ShyTalk's road to launch, drawn as a conversation. Press a speech bubble to see what that part brings. The page keeps itself up to date. | Jalan ShyTalk menuju peluncuran, digambarkan sebagai sebuah percakapan. Tekan gelembung percakapan untuk melihat apa yang dibawa bagian itu. Halaman ini memperbarui dirinya sendiri. | ShyTalk's road to launch is depicted as a conversation. Tap the conversation bubble to see what that section brings. This page updates itself. |
+| roadmap.launch | Expected launch: shown once every milestone is planned. | Perkiraan peluncuran: ditampilkan setelah semua tahap direncanakan. | Estimated launch: displayed after all stages are planned. |
+| roadmap.done | Done | Selesai | Finished |
+| roadmap.started | Under way, {percent}% done | Sedang berjalan, {percent}% selesai | In progress, {percent} % complete |
+| roadmap.notStarted | Not started yet | Belum dimulai | Not started yet |
+| roadmap.labelDone | done | selesai | finished |
+| roadmap.labelStarted | under way | sedang berjalan | ongoing |
+| roadmap.labelNotStarted | not started | belum dimulai | not started yet |
+| roadmap.brings | What this brings | Yang dibawa tahap ini | What this stage brings |
+| roadmap.close | Close | Tutup | Closed |
+| roadmap.bar | {percent}% of the work to launch is done | {percent}% pekerjaan menuju peluncuran sudah selesai | {percent} % of work towards launch is complete |
+| roadmap.barLabel | {percent} percent done | {percent} persen selesai | {percent} percent complete |
+| roadmap.mapLabel | ShyTalk's road to launch drawn as a conversation of {count} speech bubbles | Jalan ShyTalk menuju peluncuran, digambarkan sebagai percakapan dengan {count} gelembung percakapan | ShyTalk's road to launch, depicted as a conversation with {count} speech bubbles |
+| roadmap.unnamed | Milestone {number} | Tahap {number} | Stage {number} |
+| roadmap.updated | Last updated {date}, {time} {zone} | Terakhir diperbarui {date}, {time} {zone} | Last updated {date} , {time} {zone} |
+| milestones.m7Name | Groundwork | Fondasi awal | Initial foundation |
+| milestones.m7Summary | The workshop and safety checks everything is built with. | Bengkel kerja dan pemeriksaan keamanan yang dipakai untuk membangun semuanya. | The workshop and safety checks that went into building it all. |
+| milestones.m7Brings1 | Behind the scenes: the tools everything else is built on | Di balik layar: alat-alat yang menjadi dasar semua hal lain | Behind the scenes: the tools that underlie everything else |
+| milestones.m8Name | The website | Situs web | Website |
+| milestones.m8Summary | ShyTalk's website: read about it, apply to try it, get help, and follow this map. | Situs web ShyTalk: baca tentangnya, daftar untuk mencobanya, dapatkan bantuan, dan ikuti peta ini. | ShyTalk website: read about it, sign up to try it, get help, and follow this map. |
+| milestones.m8Brings1 | ShyTalk explained in five languages | ShyTalk dijelaskan dalam lima bahasa | ShyTalk is explained in five languages |
+| milestones.m8Brings2 | Apply to try ShyTalk before launch | Daftar untuk mencoba ShyTalk sebelum peluncuran | Sign up to try ShyTalk before launch |
+| milestones.m8Brings3 | A help page whenever you need it | Halaman bantuan kapan pun kamu membutuhkannya | Help page whenever you need it |
+| milestones.m9Name | Strong foundations | Fondasi yang kokoh | Solid foundation |
+| milestones.m9Summary | Safe sign-in and the servers everything runs on. | Proses masuk yang aman dan server tempat semuanya berjalan. | Secure login process and servers where everything runs. |
+| milestones.m9Brings1 | Sign in with Google, Apple or a passkey | Masuk dengan Google, Apple, atau passkey | Sign in with Google, Apple, or passkey |
+| milestones.m9Brings2 | Improvements arrive without a store update | Peningkatan hadir tanpa pembaruan dari toko aplikasi | The upgrade comes without an update from the app store. |
+| milestones.m9Brings3 | Behind the scenes: the servers everything runs on | Di balik layar: server tempat semuanya berjalan | Behind the scenes: the servers where it all runs |
+| milestones.m10Name | Voice rooms | Ruang obrolan suara | Voice chat room |
+| milestones.m10Summary | Rooms where people meet to talk and listen. | Ruang tempat orang-orang bertemu untuk berbicara dan mendengarkan. | A space where people meet to talk and listen. |
+| milestones.m10Brings1 | Live voice rooms | Ruang obrolan suara langsung | Live voice chat room |
+| milestones.m10Brings2 | Take a seat to speak | Ambil kursi untuk berbicara | Take a seat to speak |
+| milestones.m10Brings3 | Chat alongside the conversation | Obrolan teks di samping percakapan | Text chat next to conversation |
+| milestones.m11Name | The app | Aplikasi | Application |
+| milestones.m11Summary | ShyTalk on your phone, quick to open and easy to use. | ShyTalk di ponselmu, cepat dibuka dan mudah digunakan. | ShyTalk on your phone, quick to open and easy to use. |
+| milestones.m11Brings1 | Join and sign in on your phone | Daftar dan masuk di ponselmu | Register and log in on your mobile |
+| milestones.m11Brings2 | A profile with your photos | Profil dengan foto-fotomu | Profile with your photos |
+| milestones.m11Brings3 | A home screen that keeps itself fresh | Layar beranda yang selalu diperbarui | Always updated home screen |
+| milestones.m12Name | Find a room | Cari ruang obrolan | Search chat rooms |
+| milestones.m12Summary | Browse rooms and join a conversation in a tap. | Jelajahi ruang obrolan dan bergabung dalam percakapan dengan sekali ketuk. | Browse chat rooms and join conversations with a single tap. |
+| milestones.m12Brings1 | Browse rooms by language | Jelajahi ruang obrolan berdasarkan bahasa | Browse chat rooms by language |
+| milestones.m12Brings2 | Join a conversation in one tap | Bergabung dalam percakapan dengan sekali ketuk | Join the conversation with a single tap |
+| milestones.m13Name | Friends | Teman | Friend |
+| milestones.m13Summary | Find language partners and friends, and know when they are around. | Temukan partner bahasa dan teman, dan ketahui saat mereka sedang aktif. | Find language partners and friends, and know when they're active. |
+| milestones.m13Brings1 | Language partners and friends | Partner bahasa dan teman | Language partners and friends |
+| milestones.m13Brings2 | Notifications that matter | Notifikasi yang penting | Important notifications |
+| milestones.m14Name | Safe spaces | Ruang aman | Safe space |
+| milestones.m14Summary | Spaces that fit your age, with a parent's okay where the law asks. | Ruang yang sesuai dengan usiamu, dengan izin orang tua jika diwajibkan hukum. | Age-appropriate spaces, with parental permission if required by law. |
+| milestones.m14Brings1 | Separate spaces for younger members | Area terpisah untuk anggota yang lebih muda | Separate area for younger members |
+| milestones.m14Brings2 | Parent consent where it is needed | Persetujuan orang tua jika diperlukan | Parental consent if required |
+| milestones.m15Name | Kind and safe | Ramah dan aman | Friendly and safe |
+| milestones.m15Summary | Reporting and moderation that keep conversations friendly. | Pelaporan dan moderasi yang menjaga percakapan tetap ramah. | Reporting and moderation that keeps the conversation friendly. |
+| milestones.m15Brings1 | Report a problem in a tap | Laporkan masalah dengan sekali ketuk | Report a problem with a single tap |
+| milestones.m15Brings2 | A fair way to appeal a decision | Cara yang adil untuk mengajukan banding atas keputusan | A fair way to appeal a decision |
+| milestones.m16Name | Clear rules | Aturan yang jelas | Clear rules |
+| milestones.m16Summary | Plain privacy and community rules, right for every country. | Aturan privasi dan komunitas yang mudah dipahami, sesuai untuk setiap negara. | Easy-to-understand privacy and community rules, tailored to every country. |
+| milestones.m16Brings1 | Privacy and terms in plain words | Privasi dan ketentuan dalam bahasa yang sederhana | Privacy and terms in simple language |
+| milestones.m16Brings2 | The right protections where you live | Perlindungan yang tepat di tempat tinggalmu | The right protection where you live |
+| milestones.m17Name | Launch | Peluncuran | Launch |
+| milestones.m17Summary | ShyTalk on the App Store and Google Play. | ShyTalk di App Store dan Google Play. | ShyTalk on the App Store and Google Play. |
+| milestones.m17Brings1 | Download ShyTalk on iPhone and Android | Unduh ShyTalk di iPhone dan Android | Download ShyTalk on iPhone and Android |
