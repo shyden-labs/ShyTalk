@@ -181,11 +181,21 @@ describe('the roadmap page’s address', () => {
     ['answers no snapshot', () => Response.json({ error: 'roadmap_unavailable' }, { status: 503 })],
     ['cannot be reached', () => Promise.reject(new Error('object gone'))],
     ['answers what is not JSON', () => new Response('<html>')],
+    ['answers milestones that are not a list', () => Response.json({ milestones: 'none', version: 1, readAt: '2026-11-25T00:00:00Z' })],
+    ['answers no version', () => Response.json({ milestones: [], readAt: '2026-11-25T00:00:00Z' })],
+    ['answers a read time that is not text', () => Response.json({ milestones: [], version: 1, readAt: 0 })],
   ])('answers the page as built when the object %s', async (_, answer) => {
     const { env } = setup(answer);
     const page = await handle(at('/roadmap'), env);
     expect(page.status).toBe(200);
     expect(await page.text()).toBe('<html><body><h1>The road to launch</h1><p>Intro.</p></body></html>');
+  });
+
+  it('answers as an HTML page when the built page comes with no type', async () => {
+    const { env } = setup();
+    env.ASSETS = { fetch: () => Promise.resolve(new Response(new Blob(['<html><body></body></html>']))) };
+    const answer = await handle(at('/roadmap'), env);
+    expect(answer.headers.get('content-type')).toBe('text/html; charset=utf-8');
   });
 
   it('answers the page as built when no object is bound', async () => {

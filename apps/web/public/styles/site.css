@@ -748,11 +748,20 @@ shydesk-support {
   display: none;
 }
 
+.roadmap .panel h2,
 .roadmap .panel h3,
-.roadmap .panel h4,
 .roadmap .panel p,
 .roadmap .panel ul {
   margin: 0;
+}
+
+/* The panel's headings sit under the page's one h1, at the sizes a card's headings read at. */
+.roadmap .panel h2 {
+  font-size: 1.17em;
+}
+
+.roadmap .panel h3 {
+  font-size: 1em;
 }
 
 .roadmap .panel .state {

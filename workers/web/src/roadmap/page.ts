@@ -10,6 +10,7 @@
 import {
   buttonsHtml,
   escapeHtml,
+  fill,
   mapSvg,
   overallPercent,
   updatedLine,
@@ -44,9 +45,6 @@ export interface ShownBoard {
   version: number;
   readAt: string;
 }
-
-const fill = (template: string, values: Record<string, number>): string =>
-  template.replaceAll(/\{(\w+)\}/gu, (whole, key: string) => (key in values ? String(values[key]) : whole));
 
 /** JSON safe inside a script element: no `<` can close it. */
 const scriptJson = (value: unknown): string => JSON.stringify(value).replaceAll('<', '\\u003c');

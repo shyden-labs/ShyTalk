@@ -116,23 +116,6 @@ async function tapNamed(page: SafariPage, selector: string, name: string): Promi
 }
 
 /**
- * Runs every check in order, even after one fails, then fails once naming
- * each failure: Playwright's `expect.soft`, for node's assert (one journey,
- * all its assertions; Shyden 2026-11-09, shyden-labs/ShyTalk#151).
- */
-async function softly(checks: (() => Promise<void>)[]): Promise<void> {
-  const failures: string[] = [];
-  for (const check of checks) {
-    try {
-      await check();
-    } catch (error) {
-      failures.push(error instanceof Error ? error.message : String(error));
-    }
-  }
-  if (failures.length > 0) throw new assert.AssertionError({ message: failures.join('\n') });
-}
-
-/**
  * Runs every check in order, even after one fails, and answers each failure's reason: the case then makes one counted
  * check that there were none, as its Playwright twin ends with `expect(test.info().errors).toEqual([])`.
  */
@@ -146,6 +129,16 @@ async function failuresOf(checks: (() => Promise<void>)[]): Promise<string[]> {
     }
   }
   return failures;
+}
+
+/**
+ * Runs every check in order, even after one fails, then fails once naming
+ * each failure: Playwright's `expect.soft`, for node's assert (one journey,
+ * all its assertions; Shyden 2026-11-09, shyden-labs/ShyTalk#151).
+ */
+async function softly(checks: (() => Promise<void>)[]): Promise<void> {
+  const failures = await failuresOf(checks);
+  if (failures.length > 0) throw new assert.AssertionError({ message: failures.join('\n') });
 }
 
 const MENU_BUTTON = 'details.lang-switch > summary';
@@ -429,10 +422,10 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
             check.ok(await page.isVisible(PANEL), 'the panel did not open');
           },
           async () => {
-            check.equal(await page.text(`${PANEL} h3`), facts?.labels[0]?.split(', ')[0] ?? '(no label)');
+            check.equal(await page.text(`${PANEL} h2`), facts?.labels[0]?.split(', ')[0] ?? '(no label)');
           },
           async () => {
-            check.equal(await page.text(`${PANEL} h4`), t(locale, 'roadmap.brings'));
+            check.equal(await page.text(`${PANEL} h3`), t(locale, 'roadmap.brings'));
           },
           async () => {
             check.deepEqual(await page.axeViolations(), []);

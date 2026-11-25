@@ -340,8 +340,8 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     await first.click();
     await expect.soft(first).toHaveAttribute('aria-expanded', 'true');
     await expect.soft(panel).toBeVisible();
-    await expect.soft(panel.getByRole('heading', { level: 3 })).toHaveText(labels[0]?.split(', ')[0] ?? '(no label)');
-    await expect.soft(panel.getByRole('heading', { level: 4 })).toHaveText(t(locale, 'roadmap.brings'));
+    await expect.soft(panel.getByRole('heading', { level: 2 })).toHaveText(labels[0]?.split(', ')[0] ?? '(no label)');
+    await expect.soft(panel.getByRole('heading', { level: 3 })).toHaveText(t(locale, 'roadmap.brings'));
     const open = await new AxeBuilder({ page }).analyze();
     expect.soft(open.violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
     await panel.getByRole('button', { name: t(locale, 'roadmap.close') }).click();
@@ -370,9 +370,20 @@ for (const { lang, locale, prefix } of LANGUAGES) {
  * an open page within 10 s is measured by hand (AC5).
  */
 test('the roadmap page takes a fresh board read on its own, with no reload', async ({ page, request }) => {
+  // What the browser says of its socket and in its console, so a socket that will not open fails naming why.
+  const trouble: string[] = [];
+  page.on('websocket', (socket) => {
+    socket.on('socketerror', (error) => trouble.push(`socket error: ${error}`));
+    socket.on('close', () => trouble.push('socket closed'));
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error') trouble.push(`console: ${message.text()}`);
+  });
   await page.goto('/roadmap', { waitUntil: 'load' });
   const live = page.locator('#roadmap-live');
-  await expect(live).toHaveAttribute('data-socket', 'open');
+  await expect
+    .poll(async () => ((await live.getAttribute('data-socket')) === 'open' ? 'open' : trouble.join('; ') || 'not open yet'))
+    .toBe('open');
   const before = Number(await live.getAttribute('data-version'));
   await page.evaluate(() => {
     (window as { notReloaded?: boolean }).notReloaded = true;

@@ -40,26 +40,30 @@ export interface Words {
 /** The milestones' own lines in the visitor's language, keyed by their English; null on an English page. */
 export type Lines = Record<string, string> | null;
 
-/** Each bubble's centre on the 1000 by 440 field: the top row left to right, the bottom row right to left. */
-export const SPOTS: readonly (readonly [number, number])[] = [
-  [95, 120],
-  [255, 95],
-  [415, 125],
-  [575, 95],
-  [735, 125],
-  [900, 110],
-  [880, 320],
-  [705, 345],
-  [530, 315],
-  [355, 345],
-  [175, 320],
+/** One bubble's place: its centre on the 1000 by 440 field, and the hello it says. */
+export interface Spot {
+  x: number;
+  y: number;
+  hello: string;
+}
+
+/** Each bubble's place, the top row left to right, the bottom row right to left, its hello in the approved order. */
+export const SPOTS: readonly Spot[] = [
+  { x: 95, y: 120, hello: 'hello' },
+  { x: 255, y: 95, hello: 'halo' },
+  { x: 415, y: 125, hello: 'สวัสดี' },
+  { x: 575, y: 95, hello: 'xin chào' },
+  { x: 735, y: 125, hello: '你好' },
+  { x: 900, y: 110, hello: 'hola' },
+  { x: 880, y: 320, hello: 'bonjour' },
+  { x: 705, y: 345, hello: 'こんにちは' },
+  { x: 530, y: 315, hello: '안녕하세요' },
+  { x: 355, y: 345, hello: 'merhaba' },
+  { x: 175, y: 320, hello: 'olá' },
 ];
 
 /** Where the conversation starts, on the left edge. */
 const START: readonly [number, number] = [20, 200];
-
-/** The hello in each bubble, in the approved order. */
-const HELLO = ['hello', 'halo', 'สวัสดี', 'xin chào', '你好', 'hola', 'bonjour', 'こんにちは', '안녕하세요', 'merhaba', 'olá'];
 
 /** The faint hellos behind the conversation. */
 const FAINT = [
@@ -81,9 +85,8 @@ const FAINT = [
   'jambo',
 ];
 
-const ENTITIES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-
-export const escapeHtml = (text: string): string => text.replaceAll(/[&<>"']/gu, (char) => ENTITIES[char] ?? char);
+export const escapeHtml = (text: string): string =>
+  text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 
 /** A line in the visitor's language: its own when the table has one, else the English marked as English. */
 export function lineHtml(english: string, lines: Lines): string {
@@ -95,7 +98,8 @@ export function lineHtml(english: string, lines: Lines): string {
 /** A line as plain text, for an attribute: the language's own, else the English. */
 const lineText = (english: string, lines: Lines): string => lines?.[english] ?? english;
 
-const fill = (template: string, values: Record<string, string | number>): string =>
+/** A template's `{key}` places filled from `values`; a place it has no value for stays as written. */
+export const fill = (template: string, values: Record<string, string | number>): string =>
   template.replaceAll(/\{(\w+)\}/gu, (whole, key: string) => (key in values ? String(values[key]) : whole));
 
 /** A milestone's name, or its number in the page's words when it has none yet. */
@@ -107,9 +111,6 @@ export function overallPercent(milestones: readonly Milestone[]): number {
   const total = milestones.reduce((sum, { total: each }) => sum + each, 0);
   return total === 0 ? 0 : Math.floor((closed * 100) / total);
 }
-
-/** The first milestone not yet done; -1 when all are. */
-export const firstOpen = (milestones: readonly Milestone[]): number => milestones.findIndex(({ state }) => state !== 'done');
 
 /** The milestone's state as its panel says it. */
 export function stateLabel(milestone: Milestone, words: Words): string {
@@ -150,12 +151,30 @@ function bubblePath(x: number, y: number, left: boolean): string {
   return `${body} ${tail}`;
 }
 
-function bubble(milestone: Milestone, index: number, words: Words, lines: Lines): string {
-  const [x, y] = SPOTS[index] ?? [0, 0];
+/** A milestone with a spot on the field, and where the line into it starts: the left edge, or the bubble before. */
+interface Stop {
+  milestone: Milestone;
+  index: number;
+  spot: Spot;
+  from: readonly [number, number];
+}
+
+/** The milestones that have a spot, each with its line's start; any past the last spot are not drawn. */
+function stops(milestones: readonly Milestone[]): Stop[] {
+  return milestones.flatMap((milestone, index) => {
+    const spot = SPOTS[index];
+    if (spot === undefined) return [];
+    const before = SPOTS[index - 1];
+    return [{ milestone, index, spot, from: before === undefined ? START : ([before.x, before.y] as const) }];
+  });
+}
+
+function bubble({ milestone, index, spot }: Stop, words: Words, lines: Lines): string {
+  const { x, y } = spot;
   const kind = milestone.state === 'not started' ? 'not-started' : milestone.state;
   const by = y - HEIGHT / 2 - 6;
   let drawn = `<path class="bubble ${kind}" d="${bubblePath(x, y, index % 2 === 0)}"/>`;
-  drawn += `<text class="hello ${kind}" x="${String(x)}" y="${String(by + HEIGHT / 2 + 6)}" text-anchor="middle">${HELLO[index] ?? ''}</text>`;
+  drawn += `<text class="hello ${kind}" x="${String(x)}" y="${String(by + HEIGHT / 2 + 6)}" text-anchor="middle">${spot.hello}</text>`;
   const cx = x + WIDTH / 2 - 4;
   const cy = by + 4;
   if (milestone.state === 'done') {
@@ -176,43 +195,42 @@ function bubble(milestone: Milestone, index: number, words: Words, lines: Lines)
   return drawn;
 }
 
-/** The "typing…" bubble, on the line into the first unfinished milestone, as far along as that milestone is done. */
-function typing(milestones: readonly Milestone[]): string {
-  const open = firstOpen(milestones);
-  const at = open === -1 ? milestones.length - 1 : open;
-  const to = SPOTS[at] ?? START;
-  const from = open === -1 ? to : at === 0 ? START : (SPOTS[at - 1] ?? START);
-  const milestone = milestones[at];
-  const along = open === -1 || milestone === undefined ? 1 : Math.min(0.8, Math.max(0.2, milestone.closed / Math.max(1, milestone.total)));
-  const x = from[0] + (to[0] - from[0]) * along + (open === -1 ? 70 : 0);
-  const y = from[1] + (to[1] - from[1]) * along + 20;
+/**
+ * The "typing…" bubble: on the line into the first unfinished milestone, as far along as that milestone is done; past
+ * the last bubble when every milestone is done.
+ */
+function typing({ milestone, spot, from }: Stop, finished: boolean): string {
+  const along = finished ? 1 : Math.min(0.8, Math.max(0.2, milestone.closed / Math.max(1, milestone.total)));
+  const [fx, fy] = finished ? [spot.x, spot.y] : from;
+  const x = fx + (spot.x - fx) * along + (finished ? 70 : 0);
+  const y = fy + (spot.y - fy) * along + 20;
   const dots = [-11, 0, 11].map((dx, n) => `<circle class="dot dot-${String(n)}" cx="${String(dx)}" cy="0" r="4"/>`).join('');
   return `<g class="typing" transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><rect x="-26" y="-14" width="52" height="28" rx="14"/>${dots}</g>`;
 }
 
 /** The conversation, hidden from screen readers: the buttons over it carry its words. */
 export function mapSvg(milestones: readonly Milestone[], words: Words, lines: Lines): string {
-  const shown = milestones.slice(0, SPOTS.length);
+  const shown = stops(milestones);
   let svg = '<svg viewBox="0 0 1000 440" aria-hidden="true" focusable="false">';
   svg += '<rect class="field" width="1000" height="440"/>';
   const random = steady(7);
-  for (let k = 0; k < 30; k += 1) {
+  for (const word of [...FAINT, ...FAINT].slice(0, 30)) {
     const x = random() * 940 + 30;
     const y = random() * 400 + 25;
     const size = 11 + random() * 6;
-    svg += `<text class="faint" x="${x.toFixed(0)}" y="${y.toFixed(0)}" font-size="${size.toFixed(0)}" text-anchor="middle">${FAINT[k % FAINT.length] ?? ''}</text>`;
+    svg += `<text class="faint" x="${x.toFixed(0)}" y="${y.toFixed(0)}" font-size="${size.toFixed(0)}" text-anchor="middle">${word}</text>`;
   }
-  const open = firstOpen(shown);
-  const legs = [START, ...SPOTS.slice(0, shown.length)];
-  for (let k = 1; k < legs.length; k += 1) {
-    const [ax, ay] = legs[k - 1] ?? START;
-    const [bx, by] = legs[k] ?? START;
-    const said = open === -1 || k - 1 < open;
-    const bend = (ay + by) / 2 + (k % 2 === 1 ? 26 : -26);
-    svg += `<path class="${said ? 'line said' : 'line'}" d="M${String(ax)},${String(ay)} Q${String((ax + bx) / 2)},${String(bend)} ${String(bx)},${String(by)}"/>`;
+  const next = shown.find(({ milestone }) => milestone.state !== 'done');
+  const openAt = next?.index ?? shown.length;
+  for (const { index, spot, from } of shown) {
+    const [ax, ay] = from;
+    const said = index < openAt;
+    const bend = (ay + spot.y) / 2 + (index % 2 === 0 ? 26 : -26);
+    svg += `<path class="${said ? 'line said' : 'line'}" d="M${String(ax)},${String(ay)} Q${String((ax + spot.x) / 2)},${String(bend)} ${String(spot.x)},${String(spot.y)}"/>`;
   }
-  svg += shown.map((milestone, index) => bubble(milestone, index, words, lines)).join('');
-  if (shown.length > 0) svg += typing(shown);
+  svg += shown.map((stop) => bubble(stop, words, lines)).join('');
+  const last = shown.at(-1);
+  if (last !== undefined) svg += typing(next ?? last, next === undefined);
   return `${svg}</svg>`;
 }
 
@@ -229,11 +247,11 @@ export function buttonsHtml(milestones: readonly Milestone[], words: Words, line
 
 /** The panel a milestone's button opens: its name, state, summary and what it brings, with a Close button. */
 export function panelHtml(milestone: Milestone, index: number, words: Words, lines: Lines): string {
-  let html = `<h3>${lineHtml(nameOf(milestone, index, words), milestone.name === null ? null : lines)}</h3>`;
+  let html = `<h2>${lineHtml(nameOf(milestone, index, words), milestone.name === null ? null : lines)}</h2>`;
   html += `<p class="state">${escapeHtml(stateLabel(milestone, words))}</p>`;
   if (milestone.summary !== null) html += `<p>${lineHtml(milestone.summary, lines)}</p>`;
   if (milestone.brings.length > 0) {
-    html += `<h4>${escapeHtml(words.brings)}</h4><ul>${milestone.brings.map((line) => `<li>${lineHtml(line, lines)}</li>`).join('')}</ul>`;
+    html += `<h3>${escapeHtml(words.brings)}</h3><ul>${milestone.brings.map((line) => `<li>${lineHtml(line, lines)}</li>`).join('')}</ul>`;
   }
   return `${html}<button type="button" class="close">${escapeHtml(words.close)}</button>`;
 }
@@ -242,8 +260,11 @@ export function panelHtml(milestone: Milestone, index: number, words: Words, lin
 const ZONE_LOCALES = ['en-ID', 'en-US', 'en-AU', 'en-IN', 'en-GB'];
 
 const shortZone = (locale: string, at: Date, zone: string | undefined): string =>
-  new Intl.DateTimeFormat(locale, { timeZone: zone, timeZoneName: 'short' }).formatToParts(at).find(({ type }) => type === 'timeZoneName')
-    ?.value ?? '';
+  new Intl.DateTimeFormat(locale, { timeZone: zone, timeZoneName: 'short' })
+    .formatToParts(at)
+    .filter(({ type }) => type === 'timeZoneName')
+    .map(({ value }) => value)
+    .join('');
 
 /** The zone's own short name (WIB, EST, AEDT, IST, GMT, UTC), else its offset (GMT+7). */
 export function zoneName(at: Date, zone?: string): string {

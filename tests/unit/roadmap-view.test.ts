@@ -3,7 +3,6 @@ import {
   SPOTS,
   buttonsHtml,
   escapeHtml,
-  firstOpen,
   isNewer,
   lineHtml,
   mapSvg,
@@ -85,16 +84,6 @@ describe('overallPercent', () => {
   });
 });
 
-describe('firstOpen', () => {
-  it('is the first milestone not done', () => {
-    expect(firstOpen([done, milestone(), notStarted])).toBe(1);
-  });
-
-  it('is -1 when every milestone is done', () => {
-    expect(firstOpen([done, done])).toBe(-1);
-  });
-});
-
 describe('stateLabel', () => {
   it('names each state in the page’s words, with the percent under way', () => {
     expect(stateLabel(done, WORDS)).toBe('Done');
@@ -156,6 +145,33 @@ describe('mapSvg', () => {
     expect(mapSvg([notStarted], WORDS, { 'Voice rooms': 'Ruang suara' })).toContain('>Ruang suara</text>');
   });
 
+  it('marks each line said up to the first unfinished milestone, and none after it', () => {
+    expect(mapSvg([done, notStarted, done], WORDS, null).match(/class="line[^"]*"/g)).toEqual([
+      'class="line said"',
+      'class="line"',
+      'class="line"',
+    ]);
+  });
+
+  it('marks every line said and puts the typing bubble past the last bubble when every milestone is done', () => {
+    const drawn = mapSvg([done, done], WORDS, null);
+    expect(drawn.match(/class="line[^"]*"/g)).toEqual(['class="line said"', 'class="line said"']);
+    // The second bubble sits at 255,95: the typing bubble sits 70 past it and 20 below.
+    expect(drawn).toContain('class="typing" transform="translate(325.0,115.0)"');
+  });
+
+  it('draws an empty board as the field alone, with no bubble, line or typing bubble', () => {
+    const drawn = mapSvg([], WORDS, null);
+    expect(drawn).toContain('class="field"');
+    expect(drawn).not.toMatch(/class="(bubble|line|typing)/);
+  });
+
+  it('leaves a placeholder its words do not know as written', () => {
+    expect(mapSvg([milestone({ name: null })], { ...WORDS, unnamed: 'Milestone {number} of {all}' }, null)).toContain(
+      '>Milestone 1 of {all} · 88%</text>',
+    );
+  });
+
   it('draws only as many bubbles as it has spots', () => {
     const many = Array.from({ length: SPOTS.length + 2 }, () => notStarted);
     expect(mapSvg(many, WORDS, null).match(/class="bubble /g)).toHaveLength(SPOTS.length);
@@ -180,8 +196,8 @@ describe('buttonsHtml', () => {
 describe('panelHtml', () => {
   it('shows the name, the state, the summary and what it brings, with a Close button', () => {
     expect(panelHtml(milestone(), 0, WORDS, null)).toBe(
-      '<h3>Groundwork</h3><p class="state">Under way, 88% done</p><p>The workshop and safety checks everything is built with.</p>' +
-        '<h4>What this brings</h4><ul><li>Behind the scenes: the tools everything else is built on</li></ul>' +
+      '<h2>Groundwork</h2><p class="state">Under way, 88% done</p><p>The workshop and safety checks everything is built with.</p>' +
+        '<h3>What this brings</h3><ul><li>Behind the scenes: the tools everything else is built on</li></ul>' +
         '<button type="button" class="close">Close</button>',
     );
   });
@@ -189,17 +205,17 @@ describe('panelHtml', () => {
   it('leaves out a summary and a list it does not have', () => {
     const html = panelHtml(milestone({ summary: null, brings: [] }), 3, WORDS, null);
     expect(html).not.toContain('What this brings');
-    expect(html).toBe('<h3>Groundwork</h3><p class="state">Under way, 88% done</p><button type="button" class="close">Close</button>');
+    expect(html).toBe('<h2>Groundwork</h2><p class="state">Under way, 88% done</p><button type="button" class="close">Close</button>');
   });
 
   it('words every line in the visitor’s language, marking the ones it lacks as English', () => {
     const html = panelHtml(notStarted, 0, WORDS, { 'Voice rooms': 'Ruang suara' });
-    expect(html).toContain('<h3>Ruang suara</h3>');
+    expect(html).toContain('<h2>Ruang suara</h2>');
     expect(html).toContain('<li><span lang="en">Behind the scenes: the tools everything else is built on</span></li>');
   });
 
   it('names an unnamed milestone by its number', () => {
-    expect(panelHtml(milestone({ name: null }), 4, WORDS, null)).toContain('<h3>Milestone 5</h3>');
+    expect(panelHtml(milestone({ name: null }), 4, WORDS, null)).toContain('<h2>Milestone 5</h2>');
   });
 });
 

@@ -110,8 +110,8 @@ const ROADMAP_TEXT: Record<string, (locale: Locale) => string> = {
   'h1, [role="heading"][aria-level="1"]': (locale) => t(locale, 'roadmap.heading'),
   '.bar-words': (locale) => t(locale, 'roadmap.bar').replace('{percent}', '57'),
   '#roadmap-updated': (locale) => updatedLine(READ_AT, pageWords(locale), locale, 'Asia/Jakarta'),
-  '#roadmap-panel h3': () => 'Groundwork',
-  '#roadmap-panel h4': (locale) => t(locale, 'roadmap.brings'),
+  '#roadmap-panel h2': () => 'Groundwork',
+  '#roadmap-panel h3': (locale) => t(locale, 'roadmap.brings'),
 };
 
 /** Safari showing the site as it should be, in `lang`; `broken` replaces one answer. */
@@ -1432,6 +1432,21 @@ describe('the iPhone copy of the roadmap page (shyden-labs/ShyTalk#321 AC3)', ()
     const page = safari(lang, { roadmapFacts: () => Promise.resolve(roadmapFacts(locale, { zone: 'UTC' })) });
     // Worded in UTC where the phone is in Jakarta: the error shows both.
     await expect(c.run(page)).rejects.toThrow('UTC');
+  });
+
+  it.each(roadmap)(
+    '%s roadmap: fails naming the reason when the page’s facts cannot be read, running every other check',
+    async (lang, c) => {
+      const page = safari(lang, { roadmapFacts: () => Promise.reject(new Error('the facts script threw')) });
+      // With no facts, the panel's heading is checked against no label: both failures are named, in order.
+      await expect(c.run(page)).rejects.toThrow(/the facts script threw[\s\S]*\(no label\)/);
+    },
+  );
+
+  it.each(roadmap)('%s roadmap: fails naming no label when the page has no milestone buttons to name', async (lang, c) => {
+    const locale = LOCALE[lang] ?? 'en';
+    const page = safari(lang, { roadmapFacts: () => Promise.resolve(roadmapFacts(locale, { labels: [] })) });
+    await expect(c.run(page)).rejects.toThrow('(no label)');
   });
 
   it.each(roadmap)('%s roadmap: fails when the page does not fit the phone', async (lang, c) => {
