@@ -20,6 +20,7 @@ import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 import { PHONE_WIDTH, wantedFacts, type HoldingFacts } from '../support/holding-facts.ts';
 import { FULL_NAME_WIDTH, nextLocale, wantedLive, type MenuLive } from '../support/language-menu.ts';
+import type { RoadmapFacts } from '../support/roadmap-page.ts';
 
 /** What a case can ask of Safari; tests/phones/safari.ts drives it through Appium. */
 export interface SafariPage {
@@ -56,6 +57,10 @@ export interface SafariPage {
   waitForText(selector: string, text: string): Promise<void>;
   /** The page at `path` as a link preview reads it, by the smoke's own in-page check (shyden-labs/ShyTalk#198). */
   previewFacts(path: string): Promise<PreviewFacts>;
+  /** The roadmap page as the smoke reads it, by an in-page check (shyden-labs/ShyTalk#321). */
+  roadmapFacts(): Promise<RoadmapFacts>;
+  /** Marks the page, so a reload since shows as the mark gone (shyden-labs/ShyTalk#321). */
+  markPage(): Promise<void>;
 }
 
 export interface IphoneCase {

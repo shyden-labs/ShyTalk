@@ -16,6 +16,8 @@ export interface RoadmapEnv {
   ROADMAP_APP_ID?: string;
   ROADMAP_INSTALLATION_ID?: string;
   ROADMAP_APP_KEY?: string;
+  /** Where GitHub's API answers: GitHub itself unless the CI smoke names its stand-in on this machine. */
+  ROADMAP_GITHUB_API?: string;
 }
 
 /** The App the env names, or throws naming the first setting it lacks. */
