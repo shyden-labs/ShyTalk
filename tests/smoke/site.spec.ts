@@ -336,7 +336,7 @@ for (const { lang, locale, prefix } of LANGUAGES) {
 
   // The roadmap (shyden-labs/ShyTalk#321 AC3): the board drawn at once, never a loading line, each milestone a button
   // named with its state that opens its own panel, the one bar, and when the board was read in the visitor's own zone.
-  test(`${lang}: the roadmap page shows the board at once in ${lang}, its heading, a button named with its state for each milestone, the bar and when it was last read; a press opens that milestone's panel, Close shuts it, and Escape shuts it again; it passes axe and fits a phone's width, with no CSP refusal`, async ({
+  test(`${lang}: the roadmap page shows the board at once in ${lang}, its heading, a button named with its state for each milestone, the bar and when it was last read; a press opens that milestone's panel and Close shuts it; it passes axe and fits a phone's width, with no CSP refusal`, async ({
     page,
   }) => {
     const refusals = cspRefusals(page);
@@ -357,7 +357,7 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     const readAt = (await updated.getAttribute('data-read-at')) ?? '';
     const zone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
     await expect.soft(updated).toHaveText(updatedLine(readAt, pageWords(locale), locale, zone));
-    // A press opens the milestone's own panel; Close shuts it; a press again, then Escape, shuts it too.
+    // A press opens the milestone's own panel; Close shuts it, as a phone user shuts it (no Escape key: #381).
     const first = buttons.first();
     const panel = page.locator('#roadmap-panel');
     await first.click();
@@ -370,10 +370,6 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     await panel.getByRole('button', { name: t(locale, 'roadmap.close') }).click();
     await expect.soft(panel).toBeHidden();
     await expect.soft(first).toHaveAttribute('aria-expanded', 'false');
-    await first.click();
-    await expect.soft(panel).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect.soft(panel).toBeHidden();
     // In each colour mode (global rule 2026-11-25; shyden-labs/ShyTalk#362, #364): nothing lies over a bubble or a
     // label, no bubble lets what is under it show through, and every hello and label reads at 4.5:1 or more.
     for (const scheme of ['light', 'dark'] as const) {
@@ -395,6 +391,27 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     expect(test.info().errors).toEqual([]);
   });
 }
+
+/**
+ * Escape shuts the roadmap's open panel (shyden-labs/ShyTalk#381 AC2), checked where a keyboard has an Escape key:
+ * the desktop browsers. The shared roadmap test above shuts the panel by its Close button, as a phone user does.
+ */
+test(
+  'Escape shuts the roadmap page’s open milestone panel',
+  { tag: '@desktop', annotation: { type: 'group-only', description: 'phones have no Escape key' } },
+  async ({ page }) => {
+    await page.goto('/roadmap', { waitUntil: 'load' });
+    const first = page.locator('.map button.spot').first();
+    const panel = page.locator('#roadmap-panel');
+    await first.click();
+    await expect.soft(panel).toBeVisible();
+    await expect.soft(first).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Escape');
+    await expect.soft(panel).toBeHidden();
+    await expect.soft(first).toHaveAttribute('aria-expanded', 'false');
+    expect(test.info().errors).toEqual([]);
+  },
+);
 
 /**
  * The roadmap's live board (shyden-labs/ShyTalk#321 AC3), once per browser: an open page takes each fresh board read

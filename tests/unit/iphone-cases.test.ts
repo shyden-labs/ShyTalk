@@ -285,9 +285,9 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
   // Two more each for the appeal page (#310 AC4), to be confirmed on CI's smoke-totals.
   // Two more each for the roadmap page (#321 AC3), to be confirmed on CI's smoke-totals.
   'every page carries its link preview and its language menu': { en: 38, id: 38, th: 32, vi: 32, 'zh-Hans': 32 },
-  // The roadmap page (shyden-labs/ShyTalk#321 AC3): its Playwright twin's 20 checks, plus 4 per colour mode (#364),
+  // The roadmap page (shyden-labs/ShyTalk#321 AC3): its Playwright twin's 18 checks (two fewer once Escape left it, #381), plus 4 per colour mode (#364),
   // counted from it; to be confirmed on CI's smoke-totals.
-  'the roadmap page shows the board at once': { en: 28, id: 28, th: 28, vi: 28, 'zh-Hans': 28 },
+  'the roadmap page shows the board at once': { en: 26, id: 26, th: 26, vi: 26, 'zh-Hans': 26 },
 };
 
 describe('the iPhone cases', () => {
@@ -1601,7 +1601,7 @@ describe('the iPhone copy of the roadmap page (shyden-labs/ShyTalk#321 AC3)', ()
     const error = await c.run(page, check).catch((caught: unknown) => caught);
     expect(String(error)).toContain('refused');
     expect(String(error)).toContain('label: 1');
-    expect(check.count).toBe(28);
+    expect(check.count).toBe(26);
   });
 });
 
