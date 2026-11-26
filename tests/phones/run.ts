@@ -36,6 +36,8 @@ export interface PhoneDeps {
   mailboxPassword(): Promise<string>;
   /** An environment's site password, from this Mac's Keychain (service shytalk-<environment>-site-password). */
   sitePassword(environment: string): Promise<string>;
+  /** One of DEV's own secrets, from this Mac's Keychain (service shytalk-dev-<name>-secret, shyden-labs/ShyTalk#379). */
+  devSecret(name: DevSecret): Promise<string>;
   /** Forwards Chrome's DevTools socket on the OnePlus; answers the endpoint. */
   forward(): Promise<string>;
   unforward(): Promise<void>;
@@ -55,6 +57,29 @@ export interface PhoneDeps {
 }
 
 export const PHONES = ['oneplus', 'iphone-air'] as const;
+
+/**
+ * DEV's secrets the phones sign deliveries with, each given as the variable tests/smoke/targets.ts reads: the live
+ * roadmap's board delivery and the ShyDesk suspension of the sign-in journey (shyden-labs/ShyTalk#379).
+ */
+export const DEV_SECRETS = {
+  'roadmap-webhook': 'SMOKE_ROADMAP_WEBHOOK_SECRET',
+  'shydesk-callback': 'SMOKE_SHYDESK_CALLBACK_SECRET',
+} as const;
+export type DevSecret = keyof typeof DEV_SECRETS;
+
+/** Sets each of DEV's secrets from the Keychain, or fails naming every one missing, never a value. */
+async function giveDevSecrets(d: PhoneDeps): Promise<void> {
+  const missing: string[] = [];
+  for (const [name, variable] of Object.entries(DEV_SECRETS) as [DevSecret, string][]) {
+    try {
+      process.env[variable] = await d.devSecret(name);
+    } catch {
+      missing.push(`shytalk-dev-${name}-secret (${variable})`);
+    }
+  }
+  if (missing.length > 0) throw new Error(`DEV's secrets are missing from this Mac's Keychain: ${missing.join(', ')}`);
+}
 
 /** Appium's full log, at debug level, for each run: the console keeps only its warnings (shyden-labs/ShyTalk#221). */
 export const APPIUM_LOG = 'test-results/appium.log';
@@ -158,6 +183,8 @@ export async function runPhones(address: string, d: PhoneDeps): Promise<number> 
     // Playwright answers it from this environment. Production asks for none. The iPhone gets no password: Safari
     // opened no page given it in the address (2026-11-20), so it waits for the shared device runner (Shyden's ruling).
     if (environment !== 'prod') process.env.SMOKE_SITE_PASSWORD = await d.sitePassword(environment);
+    // On DEV the phones sign a board delivery and a ShyDesk suspension with DEV's own secrets (shyden-labs/ShyTalk#379).
+    if (environment === 'dev') await giveDevSecrets(d);
     const endpoint = await d.forward();
     let code: number;
     try {

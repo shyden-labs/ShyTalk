@@ -99,6 +99,12 @@ describe('the real phone steps', () => {
     expect(ran).toEqual([['security', 'find-generic-password', '-s', 'shytalk-dev-site-password', '-a', 'shytalk', '-w']]);
   });
 
+  it('read one of DEV’s secrets from the Keychain, alone, without its line end (shyden-labs/ShyTalk#379)', async () => {
+    printed = { security: 'the-webhook-secret\n' };
+    expect(await realDeps().devSecret('roadmap-webhook')).toBe('the-webhook-secret');
+    expect(ran).toEqual([['security', 'find-generic-password', '-s', 'shytalk-dev-roadmap-webhook-secret', '-a', 'shytalk', '-w']]);
+  });
+
   it('start a fresh Chrome on the OnePlus with no leftover command line, forward its DevTools socket to 9333, and later remove the forward', async () => {
     printed = { adb: '' };
     const deps = realDeps();

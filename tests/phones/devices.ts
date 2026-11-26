@@ -187,6 +187,11 @@ export function realDeps(): PhoneDeps {
       ]);
       return stdout.trim();
     },
+    async devSecret(name) {
+      // Copies of DEV's GitHub environment secrets, kept on this Mac only (shyden-labs/ShyTalk#379).
+      const { stdout } = await exec('security', ['find-generic-password', '-s', `shytalk-dev-${name}-secret`, '-a', SITE_USER, '-w']);
+      return stdout.trim();
+    },
     async forward() {
       // An unfinished Playwright launch (another project's, on this shared phone) leaves a command-line file that
       // renames Chrome's DevTools socket; removing it and restarting Chrome as the debug app brings the usual socket
