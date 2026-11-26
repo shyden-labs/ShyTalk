@@ -10,7 +10,7 @@ import { desktopProjects } from '@shyden-labs/playwright-devices/desktop';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { DOOR_SECRET_HEADER, SITE_USER } from '../../packages/environment/index.ts';
-import { GITHUB_STAND_IN_PORT, MAIL_STAND_IN_PORT, SMOKE_TARGETS, roadmapWebhookSecret } from './targets.ts';
+import { GITHUB_STAND_IN_PORT, MAIL_STAND_IN_PORT, SMOKE_TARGETS, roadmapWebhookSecret, shydeskCallbackSecret } from './targets.ts';
 
 const PORT = 8787;
 /**
@@ -81,6 +81,8 @@ const ROADMAP_VARS = [
   `ROADMAP_GITHUB_API:http://127.0.0.1:${String(GITHUB_STAND_IN_PORT)}`,
   `ROADMAP_APP_KEY:${roadmapKey.trim().replace(/\n/g, ' ')}`,
   `ROADMAP_WEBHOOK_SECRET:${roadmapWebhookSecret(secret)}`,
+  // ShyDesk's callback, so the sign-in journey can suspend its member (shyden-labs/ShyTalk#343 AC2).
+  `SHYDESK_CALLBACK_SECRET:${shydeskCallbackSecret(secret)}`,
 ]
   .map((value) => `--var "${value}"`)
   .join(' ');

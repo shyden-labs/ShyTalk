@@ -139,6 +139,7 @@
     "recoveryCodeLabel": "恢复码",
     "signInWithRecoveryCode": "使用恢复码登录",
     "signInRefused": "未成功。请检查地址和验证码，然后重试。",
+    "memberBlocked": "此账号因管理员的审核决定已被停用，因此无法登录。",
     "codesLeftAfterSignIn": "已登录。剩余恢复码：{count}。"
   },
   "holding": {

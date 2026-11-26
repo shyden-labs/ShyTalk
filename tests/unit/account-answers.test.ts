@@ -38,6 +38,7 @@ describe('signInMessage', () => {
     [429, 'tooMany'],
     [400, 'signInRefused'],
     [401, 'signInRefused'],
+    [403, 'memberBlocked'],
     [500, 'failed'],
     [503, 'failed'],
     [0, 'failed'],

@@ -23,7 +23,8 @@ import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, PREVIEW_FACTS, PREVIEW_TAGS, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 import { SITE_USER } from '../../packages/environment/index.ts';
 import { MILESTONES, ROADMAP_DRAWING, boardDelivery, linePattern, stateEndings, type RoadmapDrawing } from '../support/roadmap-page.ts';
-import { smokeWebhookSecret } from './targets.ts';
+import { smokeShydeskSecret, smokeWebhookSecret } from './targets.ts';
+import { suspensionDelivery } from '../support/shydesk-delivery.ts';
 import { updatedLine } from '../../apps/web/src/roadmap/view.ts';
 import { pageWords } from '../../apps/web/src/roadmap/words.ts';
 
@@ -570,6 +571,8 @@ test('joining with the mailed code and an authenticator app, then signing back i
   await expect(codes).toHaveCount(10);
   await expect(codes.first()).toHaveText(/^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
   const savedCode = (await codes.first().textContent()) ?? '';
+  const appCode = (await codes.nth(1).textContent()) ?? '';
+  const blockedCode = (await codes.nth(2).textContent()) ?? '';
   await page.getByRole('button', { name: t('en', 'account.codesSaved') }).click();
 
   await page.waitForURL('**/account/');
@@ -632,6 +635,26 @@ test('joining with the mailed code and an authenticator app, then signing back i
   await expect(page.getByTestId('recovery-pending-text')).toHaveText(filled(t('en', 'account.recoveryPending'), '{startedAt}'));
   await page.getByRole('button', { name: t('en', 'account.cancelButton'), exact: true }).click();
   await expect(pending).toBeHidden();
+
+  // A ShyDesk suspension blocks the member (#343 AC2): the app's sign-in names the member, ShyDesk's signed delivery
+  // suspends them and ends their sessions, and the sign-in page then says the account is blocked and links the appeal page.
+  const viaApp = await page.request.post('/api/app/sign-in/recovery-code', { data: { email: mailbox.address, code: appCode } });
+  expect(viaApp.status()).toBe(200);
+  const { userId } = (await viaApp.json()) as { userId: string };
+  const suspension = suspensionDelivery(smokeShydeskSecret(), userId, Math.floor(Date.now() / 1000));
+  const delivered = await page.request.post('/api/shydesk/callback', { data: suspension.body, headers: suspension.headers });
+  expect(delivered.status()).toBe(200);
+  await page.goto('/sign-in', { waitUntil: 'load' });
+  await page.getByRole('button', { name: t('en', 'account.useRecoveryCode'), exact: true }).click();
+  await emailField.pressSequentially(mailbox.address);
+  await page.getByLabel(t('en', 'account.recoveryCodeLabel')).pressSequentially(blockedCode);
+  await page.getByRole('button', { name: t('en', 'account.signInWithRecoveryCode'), exact: true }).click();
+  await expect(answer).toHaveText(t('en', 'account.memberBlocked'));
+  await page
+    .locator('#signin-appeal')
+    .getByRole('link', { name: t('en', 'support.appealTitle'), exact: true })
+    .click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(t('en', 'support.appealTitle'));
 });
 
 /** Matches `line` with its one `placeholder` filled by any text. */

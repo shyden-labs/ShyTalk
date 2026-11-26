@@ -34,3 +34,23 @@ export function smokeWebhookSecret(env: Record<string, string | undefined> = pro
   if (door !== '') return roadmapWebhookSecret(door);
   throw new Error('neither SMOKE_ROADMAP_WEBHOOK_SECRET nor SMOKE_DOOR_SECRET is set: the live roadmap test cannot sign a delivery');
 }
+
+/**
+ * ShyDesk's callback secret for one CI smoke run (shyden-labs/ShyTalk#343): the run's door secret hashed under its own
+ * label, as the roadmap webhook's is, so the Worker and every Playwright process agree on it.
+ */
+export function shydeskCallbackSecret(doorSecret: string): string {
+  return createHash('sha256').update(`shytalk-smoke-shydesk-callback:${doorSecret}`).digest('hex');
+}
+
+/**
+ * The secret the sign-in journeys sign their suspension with: the phone run's (DEV's own, as
+ * SMOKE_SHYDESK_CALLBACK_SECRET), else the CI run's, made from its door secret; failing by name when neither is set.
+ */
+export function smokeShydeskSecret(env: Record<string, string | undefined> = process.env): string {
+  const given = env.SMOKE_SHYDESK_CALLBACK_SECRET ?? '';
+  if (given !== '') return given;
+  const door = env.SMOKE_DOOR_SECRET ?? '';
+  if (door !== '') return shydeskCallbackSecret(door);
+  throw new Error('neither SMOKE_SHYDESK_CALLBACK_SECRET nor SMOKE_DOOR_SECRET is set: the sign-in journey cannot sign a suspension');
+}

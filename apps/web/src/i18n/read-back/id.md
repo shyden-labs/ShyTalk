@@ -127,6 +127,7 @@
 | account.recoveryCodeLabel | Recovery code | Kode pemulihan | Recovery code |
 | account.signInWithRecoveryCode | Sign in with the code | Masuk dengan kode | Sign in with code |
 | account.signInRefused | That did not work. Check the address and the code, and try again. | Tidak berhasil. Periksa alamat dan kodenya, lalu coba lagi. | Unsuccessful. Check the address and code, then try again. |
+| account.memberBlocked | A moderation decision has blocked this account, so it cannot sign in. | Akun ini diblokir karena keputusan moderasi, sehingga tidak bisa masuk. | This account is blocked due to moderation decisions, so it cannot be logged in. |
 | account.codesLeftAfterSignIn | Signed in. Recovery codes left: {count}. | Berhasil masuk. Sisa kode pemulihan: {count}. | Signed in successfully. Remaining recovery codes: {count} . |
 | holding.building | The ShyTalk app is being built now. | Aplikasi ShyTalk sedang dibangun saat ini. | The ShyTalk app is currently under construction. |
 | holding.comingSoon | Coming soon | Segera hadir | Coming soon |

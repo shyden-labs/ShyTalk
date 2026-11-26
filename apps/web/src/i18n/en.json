@@ -139,6 +139,7 @@
     "recoveryCodeLabel": "Recovery code",
     "signInWithRecoveryCode": "Sign in with the code",
     "signInRefused": "That did not work. Check the address and the code, and try again.",
+    "memberBlocked": "A moderation decision has blocked this account, so it cannot sign in.",
     "codesLeftAfterSignIn": "Signed in. Recovery codes left: {count}."
   },
   "holding": {

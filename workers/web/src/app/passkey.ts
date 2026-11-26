@@ -11,7 +11,7 @@
  */
 import { APIError } from 'better-auth/api';
 import { audit } from '../audit.ts';
-import type { ShyTalkAuth } from '../auth/better-auth.ts';
+import { isMemberBlocked, type ShyTalkAuth } from '../auth/better-auth.ts';
 import { json } from '../http.ts';
 import { tokenHash } from './email-code.ts';
 import { objectBody } from './email-routes.ts';
@@ -51,6 +51,7 @@ function withCookies(body: unknown, headers: Headers): Response {
 
 /** The plugin's refusal as ours: 401 for anything about who or what was sent, 500 for the rest. */
 function fromPlugin(error: unknown): Response {
+  if (isMemberBlocked(error)) return json(403, { error: 'member_blocked' });
   if (error instanceof APIError) return error.statusCode < 500 ? refused() : json(500, { error: 'setup_failed' });
   throw error;
 }
