@@ -6,6 +6,7 @@
  * sooner than `START_ANSWER_FLOOR_MS`, as the closed-testing form does. No
  * address or code is stored plain.
  */
+import { SIGN_UPS_CLOSED, signUpsOpen, type SignUpsEnv } from './signups.ts';
 import { LOCALES, localePath, t, type Locale } from '../../../../apps/web/src/i18n/t.ts';
 import type { MailMessage, MailResult } from '../../../../packages/mail/index.ts';
 import type { AuthEnv } from '../auth/better-auth.ts';
@@ -36,7 +37,7 @@ interface D1Answer {
   results: unknown[];
 }
 
-export interface EmailEnv extends MailEnv, AuthEnv {
+export interface EmailEnv extends MailEnv, AuthEnv, SignUpsEnv {
   DB: AuditDatabase<unknown> & { batch(statements: unknown[]): Promise<D1Answer[]> };
   SIGN_IN_LIMIT: RateLimit;
 }
@@ -127,6 +128,8 @@ export async function handleEmailStart(request: Request, env: EmailEnv, deps: Em
   if (!success) return json(429, { error: 'slow_down' });
   const start = startFrom(await objectBody(request));
   if (start === null) return badRequest();
+  // A closed sign-up is refused before anything is read or sent (shyden-labs/ShyTalk#314).
+  if (start.purpose === 'sign-up' && !signUpsOpen(env)) return json(403, SIGN_UPS_CLOSED);
 
   const { now } = deps;
   const started = now();

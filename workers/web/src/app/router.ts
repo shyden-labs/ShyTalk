@@ -60,12 +60,13 @@ const isUnder = (pathname: string, area: string): boolean =>
 const isD1 = (db: NonNullable<WebEnv['DB']>): db is NonNullable<WebEnv['DB']> & ReadyEnv['DB'] => 'batch' in db && 'exec' in db;
 
 /** `env` when it holds everything sign-in needs: its settings, the rate limit and a D1 database. */
-function readyForSignIn(env: WebEnv): ReadyEnv | null {
-  const { ENVIRONMENT_NAME, DB, SITE_ORIGIN, BETTER_AUTH_SECRET, GOOGLE_CLIENT_IDS, APPLE_AUDIENCES, SIGN_IN_LIMIT } = env;
+/** The sign-in settings, the sign-up switch among them (shyden-labs/ShyTalk#314), or null when any is missing. */
+export function readyForSignIn(env: WebEnv): ReadyEnv | null {
+  const { ENVIRONMENT_NAME, DB, SITE_ORIGIN, BETTER_AUTH_SECRET, GOOGLE_CLIENT_IDS, APPLE_AUDIENCES, SIGN_IN_LIMIT, SIGNUPS_OPEN } = env;
   if (SITE_ORIGIN === undefined || BETTER_AUTH_SECRET === undefined || GOOGLE_CLIENT_IDS === undefined || APPLE_AUDIENCES === undefined)
     return null;
   if (SIGN_IN_LIMIT === undefined || DB === undefined || !isD1(DB)) return null;
-  return { ENVIRONMENT_NAME, DB, SITE_ORIGIN, BETTER_AUTH_SECRET, GOOGLE_CLIENT_IDS, APPLE_AUDIENCES, SIGN_IN_LIMIT };
+  return { ENVIRONMENT_NAME, DB, SITE_ORIGIN, BETTER_AUTH_SECRET, GOOGLE_CLIENT_IDS, APPLE_AUDIENCES, SIGN_IN_LIMIT, SIGNUPS_OPEN };
 }
 
 type Route = (request: Request, env: WebEnv) => Promise<Response>;

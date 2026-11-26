@@ -96,6 +96,7 @@
     "codeRefused": "Kode itu salah atau sudah kedaluwarsa. Minta kode baru jika perlu.",
     "failed": "Terjadi kesalahan. Silakan coba lagi nanti.",
     "signUpConfirmed": "Alamat email kamu sudah dikonfirmasi.",
+    "signUpsClosed": "Pendaftaran baru sedang ditutup. Jika kamu sudah punya akun, kamu tetap bisa masuk.",
     "recoveryStarted": "Pemulihan telah dimulai. Mulai {completesAt}, cara masuk baru dapat ditambahkan di perangkat ini.",
     "cancelTitle": "Batalkan pemulihan",
     "cancelIntro": "Tekan tombol untuk membatalkan pemulihan akun ShyTalk kamu.",

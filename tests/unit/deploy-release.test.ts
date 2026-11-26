@@ -105,7 +105,7 @@ describe('deploy-release', () => {
       'INSERT INTO environment_marker (name) SELECT $TARGET WHERE NOT EXISTS',
       'marker=$($GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 execute DB --remote --env $TARGET --json --command SELECT name FROM environment_marker) ||',
       'if [ $(printf %s $marker | jq --arg t $TARGET [.[0].results[].name] == [$t]) != true ]; then',
-      '$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env $TARGET ||',
+      '$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env $TARGET --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||',
     ].map((line) => step.indexOf(line));
     expect(order.every((at) => at > -1)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
@@ -130,14 +130,16 @@ describe('deploy-release', () => {
     expect(marker).toBeGreaterThan(-1);
     expect(id).toBeGreaterThan(marker);
     expect(publish).toBeGreaterThan(id);
-    expect(step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env $TARGET ||')).toBeGreaterThan(publish);
+    expect(
+      step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env $TARGET --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||'),
+    ).toBeGreaterThan(publish);
   });
 
   // The TEST origin refuses every request without its door secret (decision
   // 216); PROD has no door (workers/web/src/web.ts).
   it('puts the door secret on TEST only, after the deploy, failing by name when test lacks it', () => {
     const step = deployStep();
-    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env $TARGET ||');
+    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env $TARGET --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||');
     const onlyTest = step.indexOf('if [ $TARGET = test ]; then');
     const missing = step.indexOf('if [ -z $DOOR_SECRET ]; then');
     const put = step.indexOf('printf %s $DOOR_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put DOOR_SECRET --env test ||');
@@ -279,7 +281,7 @@ describe('deploy-release', () => {
   // (shyden-labs/ShyTalk#110); TEST and PROD each need their own.
   it('puts the Better Auth secret on TEST and PROD, after the deploy, failing by name when the environment lacks it', () => {
     const step = deployStep();
-    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env $TARGET ||');
+    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env $TARGET --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||');
     const missing = step.indexOf('if [ -z $BETTER_AUTH_SECRET ]; then');
     const named = step.indexOf(
       'echo ::error title=BETTER_AUTH_SECRET missing::Set BETTER_AUTH_SECRET in this runs GitHub environment (shyden-labs/ShyTalk#110); until then $TARGET app sign-in answers 503.',
@@ -351,6 +353,23 @@ describe('deploy-release', () => {
       '            printf %s ${!name} | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put $name --env $TARGET || { echo ::error title=deploy-release failed::the $TARGET $name was not set; exit 1; }',
       '          done',
     ]);
+  });
+
+  // The sign-up switch (shyden-labs/ShyTalk#314; Shyden 2026-11-27): TEST's and PROD's SIGNUPS_OPEN variable, from
+  // the environment the release runs in, reaches the Worker as a var; a release without true or false fails naming it.
+  it('passes SIGNUPS_OPEN from the target environment variables to the Worker', () => {
+    const step = deployStep();
+    expect(step).toContain('          SIGNUPS_OPEN: ${{ vars.SIGNUPS_OPEN }}');
+    expect(step).toContain('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env $TARGET --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||');
+  });
+
+  it('fails naming SIGNUPS_OPEN, before deploying, unless it is exactly true or false', () => {
+    const step = deployStep();
+    const check = step.indexOf(
+      'case $SIGNUPS_OPEN in true|false) ;; *) echo ::error title=SIGNUPS_OPEN missing::Set SIGNUPS_OPEN to true or false in the $TARGET environment variables (shyden-labs/ShyTalk#314).; exit 1 ;; esac',
+    );
+    expect(check).toBeGreaterThan(-1);
+    expect(step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env $TARGET --var')).toBeGreaterThan(check);
   });
 
   it('never deploys a door', () => {

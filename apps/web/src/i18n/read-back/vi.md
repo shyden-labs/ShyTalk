@@ -84,6 +84,7 @@
 | account.codeRefused | That code is not right, or it has expired. Ask for a new one if needed. | Mã không đúng hoặc đã hết hạn. Hãy yêu cầu mã mới nếu cần. | The code is incorrect or has expired. Please request a new code if needed. |
 | account.failed | Something went wrong. Please try again later. | Đã xảy ra lỗi. Vui lòng thử lại sau. | An error has occurred. Please try again later. |
 | account.signUpConfirmed | Your email address is confirmed. | Địa chỉ email của bạn đã được xác nhận. | Your email address has been verified. |
+| account.signUpsClosed | New sign-ups are closed right now. If you already have an account, you can still sign in. | Hiện đang tạm ngừng nhận đăng ký mới. Nếu bạn đã có tài khoản, bạn vẫn có thể đăng nhập. | New registrations are currently temporarily closed. If you already have an account, you can still log in. |
 | account.recoveryStarted | The recovery has started. From {completesAt}, a new way to sign in can be added on this device. | Quá trình khôi phục đã bắt đầu. Từ {completesAt}, có thể thêm một cách đăng nhập mới trên thiết bị này. | The recovery process has begun. From {completesAt} , it is possible to add a new login method to this device. |
 | account.cancelTitle | Cancel a recovery | Hủy việc khôi phục | Cancel restoration |
 | account.cancelIntro | Press the button to cancel the recovery of your ShyTalk account. | Nhấn nút để hủy việc khôi phục tài khoản ShyTalk của bạn. | Press the button to cancel the restoration of your ShyTalk account. |

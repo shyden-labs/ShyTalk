@@ -44,7 +44,7 @@ function setting(rows: Rows) {
       );
     },
   };
-  const env = { ENVIRONMENT_NAME: 'dev', DB } as unknown as SetupEnv;
+  const env = { ENVIRONMENT_NAME: 'dev', DB, SIGNUPS_OPEN: 'true' } as unknown as SetupEnv;
   return { env, all: () => batches.flat() };
 }
 

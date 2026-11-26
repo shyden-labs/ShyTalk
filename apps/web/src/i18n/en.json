@@ -96,6 +96,7 @@
     "codeRefused": "That code is not right, or it has expired. Ask for a new one if needed.",
     "failed": "Something went wrong. Please try again later.",
     "signUpConfirmed": "Your email address is confirmed.",
+    "signUpsClosed": "New sign-ups are closed right now. If you already have an account, you can still sign in.",
     "recoveryStarted": "The recovery has started. From {completesAt}, a new way to sign in can be added on this device.",
     "cancelTitle": "Cancel a recovery",
     "cancelIntro": "Press the button to cancel the recovery of your ShyTalk account.",

@@ -66,6 +66,7 @@ function setting(rows: Rows) {
     ENVIRONMENT_NAME: 'dev',
     SITE_ORIGIN: ORIGIN,
     BETTER_AUTH_SECRET: SECRET,
+    SIGNUPS_OPEN: 'true',
     GOOGLE_CLIENT_IDS: 'g',
     APPLE_AUDIENCES: 'a',
     DB,

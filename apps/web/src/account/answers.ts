@@ -4,6 +4,8 @@
  * `applyMessage`; only a 200 may say a code was accepted or a recovery
  * cancelled, and anything unexpected reads as a failure.
  */
+import { applyMessage, type ApplyMessage } from '../closed-testing/answers.ts';
+
 export type VerifyMessage = 'confirmed' | 'invalid' | 'codeRefused' | 'tooMany' | 'failed';
 
 export function verifyMessage(status: number): VerifyMessage {
@@ -46,4 +48,9 @@ export function setupKey(uri: string): string {
 export function sessionState(status: number): 'signedIn' | 'signedOut' | 'failed' {
   if (status === 200) return 'signedIn';
   return status === 401 ? 'signedOut' : 'failed';
+}
+
+/** What the sign-up and recovery pages say for an email/start answer: a 403 means new sign-ups are closed (#314). */
+export function startMessage(status: number): ApplyMessage | 'signUpsClosed' {
+  return status === 403 ? 'signUpsClosed' : applyMessage(status);
 }
