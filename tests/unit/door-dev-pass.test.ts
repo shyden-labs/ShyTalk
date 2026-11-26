@@ -154,6 +154,22 @@ describe('door with the DEV pass', () => {
     expect(net.calls).toHaveLength(0);
   });
 
+  it.each(['null', '[]', '"a-key"', '{"2026-11": 7}'])(
+    'answers 500 and calls nothing when its keys are %s, not an object of strings',
+    async (keys) => {
+      const net = network();
+      const answer = await handle(page(), { ...devEnv(), DEV_PASS_KEYS: keys }, net.send, NOW);
+      expect(answer.status).toBe(500);
+      expect(net.calls).toHaveLength(0);
+    },
+  );
+
+  it('answers 500 when it holds keys but no door secret', async () => {
+    const net = network();
+    expect((await handle(page(), { ...devEnv(), DOOR_SECRET: '' }, net.send, NOW)).status).toBe(500);
+    expect(net.calls).toHaveLength(0);
+  });
+
   it('answers 500 when it holds keys but no host', async () => {
     const net = network();
     const { HOST: _host, ...hostless } = devEnv();
