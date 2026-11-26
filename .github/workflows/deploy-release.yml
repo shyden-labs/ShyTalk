@@ -45,7 +45,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ steps.node.outputs.version }}
-          cache: 'npm'
       # shyden-labs/ShyTalk#330 (Shyden 2026-11-23): before any install or
       # deploy, the environment holds every secret this release reads, listed in
       # .github/release-secrets.json, each passed by name (test's list holds

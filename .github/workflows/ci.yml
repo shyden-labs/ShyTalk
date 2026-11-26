@@ -11,6 +11,9 @@ on:
 
 jobs:
   build-and-test:
+    # Read-only, so it may restore downloads from the cache (global rule 2026-11-26; shyden-labs/ShyTalk#375).
+    permissions:
+      contents: read
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
@@ -62,6 +65,9 @@ jobs:
   # Coverage runs apart from the 1 s unit step: one overall threshold over the
   # TypeScript under scripts/ (vitest.unit.config.ts, shyden-labs/repo-template#149).
   coverage:
+    # Read-only, so it may restore downloads from the cache (global rule 2026-11-26; shyden-labs/ShyTalk#375).
+    permissions:
+      contents: read
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
@@ -92,6 +98,9 @@ jobs:
   # with no CSP refusal (playwright.config.ts, tests/smoke/), on Chromium,
   # Firefox, WebKit (shyden-labs/ShyTalk#109) and Edge (shyden-labs/ShyTalk#239).
   web-smoke:
+    # Read-only, so it may restore downloads from the cache (global rule 2026-11-26; shyden-labs/ShyTalk#375).
+    permissions:
+      contents: read
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     # Microsoft's image for the lockfile's exact Playwright: browsers and their system libraries come
@@ -125,10 +134,51 @@ jobs:
       - id: classify
         run: node scripts/change-scope.ts
       - run: node scripts/npm-ci.ts
-      # Edge is not in Microsoft's image; its own installer adds it each run (shyden-labs/ShyTalk#239).
+      # Edge is not in Microsoft's image; its own installer adds it each run (shyden-labs/ShyTalk#239). Its .deb files,
+      # and the OS packages --with-deps pulls, are kept in the cache between runs, after yawelo-idle#1092/#1115
+      # (shyden-labs/ShyTalk#375: on 2026-11-26 a run failed when azure.archive.ubuntu.com could not be reached). apt
+      # still reads the current lists, so a newer Edge still arrives; older Edge files are dropped before saving.
+      - name: Keep apt's downloads in the Edge cache folder
+        if: steps.classify.outputs.scope != 'docs-only'
+        run: |
+          rm -f /etc/apt/apt.conf.d/docker-clean
+          mkdir -p /root/edge-debs/partial
+          printf '%s\n' 'Dir::Cache::Archives "/root/edge-debs";' 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/99-edge-cache
+      # The run id never matches, so the prefix restores the newest download.
+      - name: Restore the Edge download
+        if: steps.classify.outputs.scope != 'docs-only'
+        id: edge-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /root/edge-debs
+          key: msedge-debs-${{ github.run_id }}
+          restore-keys: msedge-debs-
       - name: Install Microsoft Edge
         if: steps.classify.outputs.scope != 'docs-only'
-        run: node_modules/.bin/playwright install --with-deps msedge
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set -o pipefail
+          status=0
+          timeout --kill-after=5 165 node_modules/.bin/playwright install --with-deps msedge 2>&1 | tee "$RUNNER_TEMP/edge-install.log" || status=$?
+          if [ "$status" = 124 ]; then
+            echo "::error::Edge install stalled at 165 s; its last download was: $(grep -E '^Get:' "$RUNNER_TEMP/edge-install.log" | tail -n 1)"
+          fi
+          exit "$status"
+      - name: Read the installed Edge version and drop older downloads
+        if: steps.classify.outputs.scope != 'docs-only'
+        id: edge
+        run: |
+          version=$(dpkg-query -W -f='${Version}' microsoft-edge-stable)
+          test -n "$version"
+          find /root/edge-debs -name 'microsoft-edge-stable_*.deb' ! -name "microsoft-edge-stable_${version}_*" -delete
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Save the Edge download for later runs
+        if: steps.classify.outputs.scope != 'docs-only' && steps.edge-cache.outputs.cache-matched-key != format('msedge-debs-{0}', steps.edge.outputs.version)
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /root/edge-debs
+          key: msedge-debs-${{ steps.edge.outputs.version }}
       - name: Build the site
         if: steps.classify.outputs.scope != 'docs-only'
         run: npm run build:web
@@ -164,6 +214,9 @@ jobs:
   # engines, from the real Wrangler config, after the real migrations
   # (vitest.integration.config.ts). CI only.
   integration:
+    # Read-only, so it may restore downloads from the cache (global rule 2026-11-26; shyden-labs/ShyTalk#375).
+    permissions:
+      contents: read
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
