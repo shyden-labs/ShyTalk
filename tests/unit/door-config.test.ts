@@ -36,8 +36,18 @@ describe('door config', () => {
     expect(Object.keys(environment(name)).sort()).toEqual(['name', 'routes', 'vars']);
   });
 
-  it.each(['test', 'dev'])('the %s environment vars hold ORIGIN alone', (name) => {
-    expect(Object.keys(environment(name)['vars'] as Config)).toEqual(['ORIGIN']);
+  it('the test environment vars hold ORIGIN alone: TEST has no gate (shyden-labs/ShyTalk#314)', () => {
+    expect(Object.keys(environment('test')['vars'] as Config)).toEqual(['ORIGIN']);
+  });
+
+  // The DEV pass (shyden-labs/ShyTalk#314): the door holds only the sign-in's public key, never a private one.
+  // kid and x were read from the deployed sign-in by the shyden.co.uk session on 2026-11-27.
+  it('the dev environment vars hold ORIGIN, its own host and the public DEV pass key alone', () => {
+    const vars = environment('dev')['vars'] as Config;
+    expect(Object.keys(vars).sort()).toEqual(['DEV_PASS_KEYS', 'HOST', 'ORIGIN']);
+    // The host every pass must name is the door's own custom domain.
+    expect(vars['HOST']).toBe((environment('dev')['routes'] as { pattern: string }[])[0]?.pattern);
+    expect(JSON.parse(vars['DEV_PASS_KEYS'] as string)).toEqual({ '2026-11': 'OBLprb_S4Kn2C--HFVaeA3_s6gEsApDiRAWPLc6WsK8' });
   });
 
   // The Non-Prod account's workers.dev subdomain, read from Cloudflare on
