@@ -139,6 +139,7 @@
     "recoveryCodeLabel": "Mã khôi phục",
     "signInWithRecoveryCode": "Đăng nhập bằng mã",
     "signInRefused": "Không thành công. Hãy kiểm tra địa chỉ và mã, rồi thử lại.",
+    "memberBlocked": "Tài khoản này đã bị chặn theo quyết định của người điều hành, nên không thể đăng nhập.",
     "codesLeftAfterSignIn": "Đã đăng nhập. Số mã khôi phục còn lại: {count}."
   },
   "holding": {

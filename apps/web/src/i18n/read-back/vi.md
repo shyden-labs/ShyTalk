@@ -127,6 +127,7 @@
 | account.recoveryCodeLabel | Recovery code | Mã khôi phục | Recovery code |
 | account.signInWithRecoveryCode | Sign in with the code | Đăng nhập bằng mã | Log in using code |
 | account.signInRefused | That did not work. Check the address and the code, and try again. | Không thành công. Hãy kiểm tra địa chỉ và mã, rồi thử lại. | It didn't work. Please check the address and code, then try again. |
+| account.memberBlocked | A moderation decision has blocked this account, so it cannot sign in. | Tài khoản này đã bị chặn theo quyết định của người điều hành, nên không thể đăng nhập. | This account has been blocked by the moderator's decision, so you cannot log in. |
 | account.codesLeftAfterSignIn | Signed in. Recovery codes left: {count}. | Đã đăng nhập. Số mã khôi phục còn lại: {count}. | Logged in. Remaining recovery codes: {count} . |
 | holding.building | The ShyTalk app is being built now. | Ứng dụng ShyTalk đang được xây dựng. | The ShyTalk app is currently under development. |
 | holding.comingSoon | Coming soon | Sắp ra mắt | Coming soon |

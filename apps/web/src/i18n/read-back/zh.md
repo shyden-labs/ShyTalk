@@ -127,6 +127,7 @@
 | account.recoveryCodeLabel | Recovery code | 恢复码 | Recovery code |
 | account.signInWithRecoveryCode | Sign in with the code | 使用恢复码登录 | Log in using recovery code |
 | account.signInRefused | That did not work. Check the address and the code, and try again. | 未成功。请检查地址和验证码，然后重试。 | Unsuccessful. Please check your address and verification code, then try again. |
+| account.memberBlocked | A moderation decision has blocked this account, so it cannot sign in. | 此账号因管理员的审核决定已被停用，因此无法登录。 | This account has been suspended due to the administrator's review decision, and therefore you cannot log in. |
 | account.codesLeftAfterSignIn | Signed in. Recovery codes left: {count}. | 已登录。剩余恢复码：{count}。 | Logged in. Remaining recovery codes: {count} . |
 | holding.building | The ShyTalk app is being built now. | ShyTalk 应用正在开发中。 | The ShyTalk app is under development. |
 | holding.comingSoon | Coming soon | 即将推出 | coming soon |

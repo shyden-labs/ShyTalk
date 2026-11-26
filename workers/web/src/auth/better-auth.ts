@@ -64,6 +64,10 @@ export interface AuthDeps {
 /** The error a sign-in meets when a ShyDesk punishment blocks the member; app sign-in answers it 403 member_blocked. */
 export const MEMBER_BLOCKED = 'MEMBER_BLOCKED';
 
+/** Whether `error` is the session hook refusing a blocked member: every sign-in answers it 403 member_blocked (#343). */
+export const isMemberBlocked = (error: unknown): boolean =>
+  error instanceof APIError && (error.body as { code?: unknown } | undefined)?.code === MEMBER_BLOCKED;
+
 /** The website session cookie's life: Better Auth's ceiling of 400 days (shyden-labs/ShyTalk#134). */
 export const SESSION_COOKIE_SECONDS = 34_560_000;
 /** A session row's stored life: 100 years, so no session ends through age (shyden-labs/ShyTalk#134 AC5). */

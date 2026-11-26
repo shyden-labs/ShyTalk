@@ -1,11 +1,12 @@
 ---
 import Base from '../layouts/Base.astro';
 import { localePath, t, type Locale } from '../i18n/t.ts';
+import { APPEAL_PATH } from '../support.ts';
 
 /**
  * Signing in on the website (plan 7 Task 7, shyden-labs/ShyTalk#134): a
  * passkey, an authenticator app's code, or a recovery code. Every refusal
- * reads the same; a success's answer sets the session cookie and the page
+ * reads the same, except a blocked member's, which links the appeal page (#343); a success's answer sets the session cookie and the page
  * goes on to the account.
  */
 interface Props {
@@ -22,6 +23,7 @@ const line = (key: string): string => t(locale, `account.${key}`);
     id="sign-in"
     data-account={localePath(locale, '/account/')}
     data-sign-in-refused={line('signInRefused')}
+    data-member-blocked={line('memberBlocked')}
     data-too-many={line('tooMany')}
     data-failed={line('failed')}
     data-codes-left={line('codesLeftAfterSignIn')}
@@ -46,6 +48,7 @@ const line = (key: string): string => t(locale, `account.${key}`);
     </form>
     <p><button id="use-recovery-code" type="button">{line('useRecoveryCode')}</button></p>
     <p id="signin-answer" role="status" hidden></p>
+    <p id="signin-appeal" hidden><a href={localePath(locale, APPEAL_PATH)}>{t(locale, 'support.appealTitle')}</a></p>
     <p id="signin-continue" hidden><a href={localePath(locale, '/account/')}>{line('accountTitle')}</a></p>
   </div>
 </Base>
@@ -70,6 +73,7 @@ const line = (key: string): string => t(locale, `account.${key}`);
   function settle({ status, body }: Answer): void {
     if (!root) return;
     const message = signInMessage(status);
+    document.querySelector<HTMLElement>('#signin-appeal')?.toggleAttribute('hidden', message !== 'memberBlocked');
     if (message !== null) return say(root.dataset[message] ?? '');
     const left = (body as { left?: unknown } | null)?.left;
     if (typeof left !== 'number') return location.assign(root.dataset['account'] ?? '/');

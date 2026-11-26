@@ -20,7 +20,9 @@ import { assert, register, type SoftCredential } from '../support/webauthn.ts';
 const ORIGIN = 'https://dev.site.example';
 const RP = 'dev.site.example';
 
-function world(options: { identity?: SetupIdentity | Response; auditFails?: boolean; passkeyWritesFail?: boolean } = {}) {
+function world(
+  options: { identity?: SetupIdentity | Response; auditFails?: boolean; passkeyWritesFail?: boolean; blocked?: Set<string> } = {},
+) {
   const store: Record<string, Record<string, unknown>[]> = { user: [], session: [], account: [], verification: [], passkey: [] };
   const prepared: PreparedPasskeys = new Map();
   const events: string[] = [];
@@ -36,6 +38,7 @@ function world(options: { identity?: SetupIdentity | Response; auditFails?: bool
       database: memoryAdapter(store),
       googleKeys: () => Promise.reject(new Error('unused')),
       appleKeys: () => Promise.reject(new Error('unused')),
+      blocked: (userId) => Promise.resolve(options.blocked?.has(userId) === true),
       passkeys: passkeyHooks(
         {
           identityByHash: (hash) =>
@@ -375,6 +378,22 @@ describe('signing in with a passkey', () => {
     const replayed = await call(w.deps, 'sign-in/verify', { response }, cookiesFrom(fresh));
     expect(replayed.status).toBe(401);
     expect(await replayed.json()).toEqual({ error: 'sign_in_refused' });
+  });
+
+  it('refuses a member a ShyDesk punishment blocks with 403 member_blocked, writing no session and no audit (#343)', async () => {
+    const blocked = new Set<string>();
+    const hash = await tokenHash('sign-up-token');
+    const w = world({ identity: { kind: 'sign-up', userId: 'u-new', email: 'new@example.test', tokenHash: hash }, blocked });
+    const { credential } = await registerThrough(w.deps, 'sign-up-token');
+    const sessions = w.store['session']?.length;
+    w.events.length = 0;
+    blocked.add('u-new');
+    const answer = await signInThrough(w.deps, credential);
+    expect(answer.status).toBe(403);
+    expect(await answer.json()).toEqual({ error: 'member_blocked' });
+    expect(answer.headers.getSetCookie().some((cookie) => cookie.includes('session_token'))).toBe(false);
+    expect(w.store['session']).toHaveLength(sessions ?? 0);
+    expect(w.events).toEqual([]);
   });
 
   it('passes a failed audit straight through', async () => {

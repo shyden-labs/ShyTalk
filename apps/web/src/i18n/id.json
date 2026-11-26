@@ -139,6 +139,7 @@
     "recoveryCodeLabel": "Kode pemulihan",
     "signInWithRecoveryCode": "Masuk dengan kode",
     "signInRefused": "Tidak berhasil. Periksa alamat dan kodenya, lalu coba lagi.",
+    "memberBlocked": "Akun ini diblokir karena keputusan moderasi, sehingga tidak bisa masuk.",
     "codesLeftAfterSignIn": "Berhasil masuk. Sisa kode pemulihan: {count}."
   },
   "holding": {

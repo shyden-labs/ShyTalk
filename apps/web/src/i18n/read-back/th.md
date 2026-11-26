@@ -127,6 +127,7 @@
 | account.recoveryCodeLabel | Recovery code | รหัสกู้คืน | Recovery code |
 | account.signInWithRecoveryCode | Sign in with the code | เข้าสู่ระบบด้วยรหัส | Log in with the code. |
 | account.signInRefused | That did not work. Check the address and the code, and try again. | ไม่สำเร็จ ตรวจสอบที่อยู่และรหัส แล้วลองอีกครั้ง | Unsuccessful. Please check your address and code, then try again. |
+| account.memberBlocked | A moderation decision has blocked this account, so it cannot sign in. | บัญชีนี้ถูกระงับตามการตัดสินของผู้ดูแล จึงไม่สามารถเข้าสู่ระบบได้ | This account has been suspended by the administrator and therefore you cannot log in. |
 | account.codesLeftAfterSignIn | Signed in. Recovery codes left: {count}. | เข้าสู่ระบบแล้ว รหัสกู้คืนที่เหลือ: {count} | Logged in. Remaining recovery codes: {count} |
 | holding.building | The ShyTalk app is being built now. | แอป ShyTalk กำลังอยู่ระหว่างการสร้าง | The ShyTalk app is currently under development. |
 | holding.comingSoon | Coming soon | เปิดตัวเร็ว ๆ นี้ | Launching soon. |

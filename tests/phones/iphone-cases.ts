@@ -21,7 +21,9 @@ import { PAGE_FILES, builtSiteOrigin, wantedPreview, type PreviewFacts } from '.
 import { PHONE_WIDTH, wantedFacts, type HoldingFacts } from '../support/holding-facts.ts';
 import { FULL_NAME_WIDTH, nextLocale, wantedLive, type MenuLive } from '../support/language-menu.ts';
 import { MILESTONES, boardDelivery, linePattern, stateEndings, type RoadmapDrawing, type RoadmapFacts } from '../support/roadmap-page.ts';
-import { smokeWebhookSecret } from '../smoke/targets.ts';
+import { smokeShydeskSecret, smokeWebhookSecret } from '../smoke/targets.ts';
+import { suspensionDelivery } from '../support/shydesk-delivery.ts';
+import { SITE_USER } from '../../packages/environment/index.ts';
 import { updatedLine } from '../../apps/web/src/roadmap/view.ts';
 import { pageWords } from '../../apps/web/src/roadmap/words.ts';
 
@@ -660,6 +662,9 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     const codes = await countWithin(page, CODES);
     check.equal(codes, 10, `ten recovery codes, not ${String(codes)}`);
     const savedCode = await page.text(CODES);
+    const shownCodes = (await page.rows(CODES, [])).map((row) => String(row.at(-1)));
+    const appCode = String(shownCodes[1]);
+    const blockedCode = String(shownCodes[2]);
     check.match(savedCode, /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
     await page.tap('#codes-saved');
 
@@ -732,8 +737,43 @@ const SIGN_UP_JOURNEY: IphoneCase = counted(
     check.match(await page.text('#recovery-pending-text'), matching(t('en', 'account.recoveryPending'), '{startedAt}'));
     await page.tap('#recovery-cancel');
     await check.poll(() => waitFor('the recovery notice to hide', async () => ((await page.isVisible(NOTICE)) ? null : true)));
+
+    // A ShyDesk suspension blocks the member (tests/smoke/site.spec.ts, #343 AC2): the app's sign-in names the member,
+    // ShyDesk's signed delivery suspends them, and the sign-in page then says so and links the appeal page.
+    const base = process.env.PHONE_BASE_URL;
+    const gate = `Basic ${btoa(`${SITE_USER}:${sitePassword()}`)}`;
+    const viaApp = await fetch(new URL('/api/app/sign-in/recovery-code', base), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: gate },
+      body: JSON.stringify({ email: address, code: appCode }),
+    });
+    check.equal(viaApp.status, 200);
+    const { userId } = (await viaApp.json()) as { userId: string };
+    const suspension = suspensionDelivery(smokeShydeskSecret(), userId, Math.floor(Date.now() / 1000));
+    const delivered = await fetch(new URL('/api/shydesk/callback', base), { method: 'POST', ...suspension });
+    check.equal(delivered.status, 200);
+    await page.goto('/sign-in');
+    await page.tap('#use-recovery-code');
+    await page.type('#signin-email', address);
+    await page.type('#signin-recovery-code', blockedCode);
+    await page.tap('#signin-recovery-submit');
+    await check.waitForText(page, '#signin-answer', t('en', 'account.memberBlocked'));
+    // In each colour mode (global rule 2026-11-25): the blocked line and its appeal link pass axe, contrast included.
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.appearance(scheme);
+      check.deepEqual(await page.axeViolations(), [], `axe, blocked, ${scheme}`);
+    }
+    await page.tap('#signin-appeal a');
+    await check.waitForText(page, H1, t('en', 'support.appealTitle'));
   },
 );
+
+/** DEV's site password, given to the phone run as SMOKE_SITE_PASSWORD; failing by name when none is given. */
+function sitePassword(): string {
+  const given = process.env.SMOKE_SITE_PASSWORD ?? '';
+  if (given === '') throw new Error("SMOKE_SITE_PASSWORD is unset: the app sign-in cannot pass DEV's password");
+  return given;
+}
 
 const NOTICE = '#recovery-pending';
 const SIGNED_IN = '[data-testid="signed-in"]';

@@ -8,7 +8,7 @@
  */
 import { serializeSignedCookie } from 'better-call';
 import { audit } from '../audit.ts';
-import type { ShyTalkAuth } from '../auth/better-auth.ts';
+import { isMemberBlocked, type ShyTalkAuth } from '../auth/better-auth.ts';
 import { json } from '../http.ts';
 import { normaliseAddress } from './email-code.ts';
 import { objectBody } from './email-routes.ts';
@@ -31,7 +31,14 @@ export async function startSession(
   extraAudit: { action: string; detail: Record<string, unknown> }[] = [],
 ): Promise<{ token: string } | Response> {
   const context = await auth.$context;
-  const session = await context.internalAdapter.createSession(userId);
+  let session: { token: string };
+  try {
+    session = await context.internalAdapter.createSession(userId);
+  } catch (error) {
+    // A ShyDesk punishment blocks the member: the session hook refused the row (shyden-labs/ShyTalk#343).
+    if (isMemberBlocked(error)) return json(403, { error: 'member_blocked' });
+    throw error;
+  }
   const actor = `user:${userId}`;
   try {
     await env.DB.batch([
