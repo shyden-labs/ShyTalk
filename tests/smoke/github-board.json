@@ -1,0 +1,3105 @@
+[
+  {
+    "data": {
+      "node": {
+        "title": "ShyTalk Stories",
+        "items": {
+          "totalCount": 181,
+          "pageInfo": { "hasNextPage": true, "endCursor": "Y3Vyc29yOnYyOpKrMDAwMDAwMDAuMDHOEeX0LA==" },
+          "nodes": [
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": { "text": "Groundwork" },
+              "publicSummary": { "text": "The workshop and safety checks everything is built with." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 7,
+                "title": "Epic: plan 2, the new repository and its fresh board",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:30:25Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": { "text": "The website" },
+              "publicSummary": { "text": "ShyTalk's website: read about it, apply to try it, get help, and follow this map." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 8,
+                "title": "Epic: plan 3, the website",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:30:58Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": { "text": "Strong foundations" },
+              "publicSummary": { "text": "Safe sign-in and the servers everything runs on." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 9,
+                "title": "Epic: plan 4, server foundations",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:31:03Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": { "text": "Voice rooms" },
+              "publicSummary": { "text": "Rooms where people meet to talk and listen." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 10,
+                "title": "Epic: plan 5, rooms on the server",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:31:09Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": { "text": "The app" },
+              "publicSummary": { "text": "ShyTalk on your phone, quick to open and easy to use." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 11,
+                "title": "Epic: plan 6, the app shell",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:31:14Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": { "text": "Find a room" },
+              "publicSummary": { "text": "Browse rooms and join a conversation in a tap." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 12,
+                "title": "Epic: plan 7, room list and room screens",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:31:19Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": { "text": "Friends" },
+              "publicSummary": { "text": "Find language partners and friends, and know when they are around." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 13,
+                "title": "Epic: plan 8, people and notifications",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:31:25Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": { "text": "Safe spaces" },
+              "publicSummary": { "text": "Spaces that fit your age, with a parent's okay where the law asks." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 14,
+                "title": "Epic: plan 9, age, country, parent consent and ID",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:31:30Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": { "text": "Kind and safe" },
+              "publicSummary": { "text": "Reporting and moderation that keep conversations friendly." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 15,
+                "title": "Epic: plan 10, moderation and staff tools",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:31:35Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": { "text": "Clear rules" },
+              "publicSummary": { "text": "Plain privacy and community rules, right for every country." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 16,
+                "title": "Epic: plan 11, legal pages and the 190 country rows",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:31:41Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": { "text": "Launch" },
+              "publicSummary": { "text": "ShyTalk on the App Store and Google Play." },
+              "estimate": null,
+              "content": {
+                "__typename": "Issue",
+                "number": 17,
+                "title": "Epic: plan 12, release",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:31:47Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 18,
+                "title": "Plan 2 Task 0: the new repository exists and the folders are swapped",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:31:57Z",
+                "closedAt": "2026-10-31T10:37:49Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 19,
+                "title": "Plan 2 Task 1: first commit, from the slim template",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:32:08Z",
+                "closedAt": "2026-10-31T10:37:55Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 20,
+                "title": "Plan 2 Task 2: rulesets, security and environments",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:32:18Z",
+                "closedAt": "2026-10-31T10:38:02Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 21,
+                "title": "Plan 2 Task 2b: the docs-only fast path",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:32:29Z",
+                "closedAt": "2026-10-31T10:38:09Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 22,
+                "title": "Plan 2 Task 3: the fresh board",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:32:41Z",
+                "closedAt": "2026-10-31T10:38:16Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 23,
+                "title": "Plan 2 Task 4: file the work on the board",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:32:52Z",
+                "closedAt": "2026-10-31T10:39:26Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 24,
+                "title": "Plan 2 Task 5: record the board",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:33:01Z",
+                "closedAt": "2026-10-31T10:41:51Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 25,
+                "title": "Plan 2 Task 6: licence check",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:33:13Z",
+                "closedAt": "2026-10-31T12:31:48Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 26,
+                "title": "Plan 2 Task 7: SonarCloud gate",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:33:24Z",
+                "closedAt": "2026-10-31T13:40:26Z",
+                "labels": { "nodes": [{ "name": "waiting-on-shyden" }] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 27,
+                "title": "Plan 2 Task E1: the ShyTalk Cloudflare login and its two accounts",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:33:38Z",
+                "closedAt": "2026-10-31T16:18:24Z",
+                "labels": { "nodes": [{ "name": "waiting-on-shyden" }] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 28,
+                "title": "Plan 2 Task E2: the door Worker, the door secret and the environment marker",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:33:51Z",
+                "closedAt": "2026-10-31T22:56:44Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 29,
+                "title": "Plan 2 Task E3: the environment checks",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:34:01Z",
+                "closedAt": "2026-10-31T23:21:18Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 30,
+                "title": "Plan 2 Task E4: deploy keys and GitHub environments",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:34:13Z",
+                "closedAt": "2026-11-01T17:03:34Z",
+                "labels": { "nodes": [{ "name": "waiting-on-shyden" }] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 31,
+                "title": "Plan 2 Task E6: the doors go live, the door spike, the WAF rule and the daily door count",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:34:33Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 32,
+                "title": "Plan 2 Task 11: the design and plans move into the repo",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:34:50Z",
+                "closedAt": "2026-10-31T23:25:16Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 33,
+                "title": "Plan 2 Task 12: tell repo-template what ShyTalk needed",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T10:35:03Z",
+                "closedAt": "2026-10-31T23:23:49Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 34,
+                "title": "Plan 2 Task 13: close-out",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:35:13Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 35,
+                "title": "iOS distribution certificate, profile and App Store Connect key",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:35:36Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "waiting-on-shyden" }] },
+                "parent": { "number": 11 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 36,
+                "title": "Android upload key as a production environment secret",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:35:51Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "waiting-on-shyden" }] },
+                "parent": { "number": 11 }
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 37,
+                "title": "ShyTalk's support page embeds ShyDesk's support piece",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:36:06Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "waiting-on-shyden" }] },
+                "parent": { "number": 13 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 38,
+                "title": "The live roadmap on the ShyTalk Stories board",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-10-31T10:36:21Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 42,
+                "title": "Brevo sends ShyTalk's sign-in emails from shytalk.app",
+                "state": "CLOSED",
+                "stateReason": "NOT_PLANNED",
+                "createdAt": "2026-10-31T16:31:25Z",
+                "closedAt": "2026-11-03T03:59:36Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 44,
+                "title": "deploy-dev deploys the changed areas to dev",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-10-31T22:56:18Z",
+                "closedAt": "2026-11-02T04:03:52Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 51,
+                "title": "Plan 3 Task 1: site skeleton, front door and languages",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-01T20:48:30Z",
+                "closedAt": "2026-11-04T11:28:47Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 52,
+                "title": "Plan 3 Task 2: the translation read-back client",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-01T20:48:43Z",
+                "closedAt": "2026-11-01T21:00:51Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 53,
+                "title": "Plan 3 Task 3: home page in five languages",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-01T20:48:54Z",
+                "closedAt": "2026-11-02T08:14:58Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 54,
+                "title": "Plan 3 Task 4: promo video",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T20:49:08Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 55,
+                "title": "Plan 3 Task 5: closed-testing form",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-01T20:49:19Z",
+                "closedAt": "2026-11-09T01:14:56Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 56,
+                "title": "Plan 3 Task 6: legal pages",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T20:49:34Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 57,
+                "title": "Plan 3 Task 7: release 3a to PROD",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T20:49:48Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 59,
+                "title": "Plan 3 Task 8: the audit trail",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-01T20:58:08Z",
+                "closedAt": "2026-11-04T18:48:29Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 60,
+                "title": "Plan 3 Task 9: email-code sign-in",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T20:58:21Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 61,
+                "title": "Plan 3 Task 10: TOTP, recovery codes and the staff gate",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T20:58:35Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 62,
+                "title": "Plan 3 Task 11: the Owner, permissions and titles",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T20:58:49Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 63,
+                "title": "Plan 3 Task 12: invites",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T20:59:01Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 64,
+                "title": "Plan 3 Task 13: own account",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T20:59:15Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 65,
+                "title": "Plan 3 Task 14: the applicants pipeline and the TEST handoff",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T20:59:27Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 66,
+                "title": "Plan 3 Task 15: release 3b to PROD",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T20:59:43Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 67,
+                "title": "Plan 3 Task 16: close-out",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-01T21:00:11Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 70,
+                "title": "The main branch exists before the first release",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-02T06:05:16Z",
+                "closedAt": "2026-11-02T07:05:36Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 72,
+                "title": "Public text uses the neutral voice",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-02T08:09:12Z",
+                "closedAt": "2026-11-02T08:15:04Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 74,
+                "title": "Plan 4 Task 1: the app's API door",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-02T13:55:21Z",
+                "closedAt": "2026-11-04T19:03:26Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 9 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 75,
+                "title": "Plan 4 Task 2: the D1 databases, migrations and environment marker",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-02T13:55:33Z",
+                "closedAt": "2026-11-04T11:46:09Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 9 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 76,
+                "title": "Plan 4 Task 3: app sign-in with Google and Apple",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-02T13:55:46Z",
+                "closedAt": "2026-11-05T13:45:45Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 9 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 77,
+                "title": "Plan 4 Task 4: the version floor",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-02T13:56:29Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 9 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 78,
+                "title": "Plan 4 Task 5: the UI document's schema",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-02T13:56:46Z",
+                "closedAt": "2026-11-05T00:24:56Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 9 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 79,
+                "title": "Plan 4 Task 6: serving and publishing the UI document",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-02T13:56:57Z",
+                "closedAt": "2026-11-06T13:48:03Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 9 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 80,
+                "title": "Plan 4 Task 7: rollout and undo",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-02T13:57:14Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 9 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 81,
+                "title": "Plan 4 Task 8: the live announcement",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-02T13:57:28Z",
+                "closedAt": "2026-11-07T00:54:45Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 9 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 82,
+                "title": "Plan 4 Task 9: close-out",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-02T13:57:41Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 9 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 85,
+                "title": "The Oracle Always Free server for voice",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-02T23:31:48Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 13 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 86,
+                "title": "ShyTalk's own support dashboard on the FreeScout backend",
+                "state": "CLOSED",
+                "stateReason": "NOT_PLANNED",
+                "createdAt": "2026-11-02T23:33:04Z",
+                "closedAt": "2026-11-02T23:36:51Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 15 }
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 87,
+                "title": "ShyTalk's own mail server for support@shytalk.app, apart from the main server",
+                "state": "CLOSED",
+                "stateReason": "NOT_PLANNED",
+                "createdAt": "2026-11-02T23:35:04Z",
+                "closedAt": "2026-11-02T23:36:54Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 13 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 88,
+                "title": "ShyTalk's own email sender for sign-in codes and closed-testing confirmations",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-03T04:00:04Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 93,
+                "title": "ShyTalk's voice and mail in the existing Oracle account",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-04T00:33:54Z",
+                "closedAt": "2026-11-07T16:36:27Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 95,
+                "title": "Live-room presence comes from LiveKit's join and leave events",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-04T03:08:55Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 10 }
+              }
+            },
+            {
+              "priority": { "name": "P4" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 96,
+                "title": "The zone's rate limit is re-measured before the live API ships",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-04T03:14:17Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 17 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 100,
+                "title": "ShyTalk's API docs: a private Swagger UI and contract tests",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-04T18:50:52Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 104,
+                "title": "The site's copy guard drops its dating words",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-05T00:26:21Z",
+                "closedAt": "2026-11-05T00:34:40Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 106,
+                "title": "Google sign-in's consent screen shows a ShyTalk support address",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-05T00:48:28Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 108,
+                "title": "Deleting an account revokes its Sign in with Apple tokens",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-05T10:36:33Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 109,
+                "title": "The website's tests run unchanged on every supported browser and phone",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-05T13:26:22Z",
+                "closedAt": "2026-11-05T23:13:20Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 110,
+                "title": "TEST and PROD hold Better Auth's secret",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-05T13:28:17Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 112,
+                "title": "The website's smoke suite runs on the OnePlus and the iPhone Air over USB",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-05T14:34:56Z",
+                "closedAt": "2026-11-06T20:29:39Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 116,
+                "title": "TEST and PROD deploy the website from a release cut",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-05T23:18:46Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P4" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 118,
+                "title": "Local containers run on Colima, started and stopped by the script that needs them",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-05T23:58:51Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 9 }
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 121,
+                "title": "Make the integration suite a required check, as decision 230 says",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-06T13:28:19Z",
+                "closedAt": "2026-11-07T07:55:26Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 122,
+                "title": "Cloudflare's analytics beacon is refused by the site's CSP on DEV",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-06T13:56:38Z",
+                "closedAt": "2026-11-06T20:26:36Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 123,
+                "title": "ShyTalk runs the newest shared versions (Nov 2026 census)",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-06T19:46:33Z",
+                "closedAt": "2026-11-06T21:41:56Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 126,
+                "title": "Every CI job fails fast when a step hangs",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-06T21:39:04Z",
+                "closedAt": "2026-11-07T00:12:06Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 129,
+                "title": "A published UI reaches the screen within 10 seconds on both phones",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-07T00:54:19Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 11 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 130,
+                "title": "Move to TypeScript 7 once typescript-eslint supports it",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-07T07:51:16Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 133,
+                "title": "Email code at sign-up and for account recovery",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-07T16:52:54Z",
+                "closedAt": "2026-11-13T06:21:26Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 13 },
+              "content": {
+                "__typename": "Issue",
+                "number": 134,
+                "title": "Passkey sign-in, TOTP as backup, and recovery codes",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-07T16:53:05Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 135,
+                "title": "ShyTalk's progress-report page, refreshed at every close-out",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-07T16:59:56Z",
+                "closedAt": "2026-11-07T17:04:09Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 137,
+                "title": "Progress figures leave out tickets closed as not planned",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-07T19:44:45Z",
+                "closedAt": "2026-11-07T19:52:07Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 142,
+                "title": "Sign-up consent is asked in plain Indonesian for Indonesian users",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-08T10:44:10Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 143,
+                "title": "Register ShyTalk as a private electronic system operator (PSE) in Indonesia",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-08T10:44:19Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 146,
+                "title": "ShyTalk's codes reach the Outlook inbox, not Junk",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-08T16:11:19Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 147,
+                "title": "Two unit suites time out under machine load",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-08T16:19:22Z",
+                "closedAt": "2026-11-09T17:20:49Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 150,
+                "title": "The closed-testing apply-and-confirm journey runs on both phones",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-08T17:03:42Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 151,
+                "title": "The smoke suite's repeated page visits become one journey each",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-08T18:15:48Z",
+                "closedAt": "2026-11-09T17:33:40Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 154,
+                "title": "A deploy fails when its fresh announce secret is not live yet",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-08T21:30:01Z",
+                "closedAt": "2026-11-08T21:53:06Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 159,
+                "title": "The integration suite fails by chance when a D1 test statement is garbage collected",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-09T00:40:56Z",
+                "closedAt": "2026-11-09T01:12:31Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 162,
+                "title": "A first press on a closed-testing button once did nothing on dev",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-09T01:15:02Z",
+                "closedAt": "2026-11-09T23:50:16Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 166,
+                "title": "The app registers and uses passkeys",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-09T23:17:33Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 11 }
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 169,
+                "title": "Devices are told at once when an account recovery starts",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-10T17:03:14Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 11 }
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 171,
+                "title": "The privacy policy says what an account keeps",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-10T17:48:12Z",
+                "closedAt": "2026-11-17T13:06:10Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 13 },
+              "content": {
+                "__typename": "Issue",
+                "number": 173,
+                "title": "Adding a sign-in method asks for proof first",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-10T18:27:36Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "data": {
+      "node": {
+        "title": "ShyTalk Stories",
+        "items": {
+          "totalCount": 181,
+          "pageInfo": { "hasNextPage": false, "endCursor": "Y3Vyc29yOnYyOpK5MDAwMDAwMDAuMDA1NTI0ODYxODc4NDUzMM4S59K1" },
+          "nodes": [
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 175,
+                "title": "Tests pin the audit actions a completed recovery writes",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-11T23:43:49Z",
+                "closedAt": "2026-11-13T03:09:38Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 177,
+                "title": "A completed recovery audits each session it ends",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-13T06:07:56Z",
+                "closedAt": "2026-11-13T06:43:13Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 180,
+                "title": "Each journey runs once again, with every executed check counted",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-13T06:40:44Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "unified-tests" }] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 182,
+                "title": "Any branch can deploy to dev and test",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-13T07:20:10Z",
+                "closedAt": "2026-11-13T07:31:18Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 184,
+                "title": "The website's sign-in cookie is renewed on use, so active members stay signed in",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-13T08:34:46Z",
+                "closedAt": "2026-11-18T20:28:15Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 185,
+                "title": "The phone run gives each test long enough for real mail to arrive",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-13T11:24:30Z",
+                "closedAt": "2026-11-14T14:00:33Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 186,
+                "title": "Every website button is readable on iPhone Safari",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-13T12:02:23Z",
+                "closedAt": "2026-11-13T16:14:35Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 189,
+                "title": "On the OnePlus, a press after typing reaches the control it aims at",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-13T16:15:17Z",
+                "closedAt": "2026-11-14T14:00:35Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 190,
+                "title": "On the iPhone, each press reaches the control it aims at",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-13T16:15:26Z",
+                "closedAt": "2026-11-14T14:00:30Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 194,
+                "title": "Astro moves to 7.4.12, past the image endpoint advisory",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-13T21:56:23Z",
+                "closedAt": "2026-11-13T22:03:11Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 196,
+                "title": "A Google or Apple sign-in keeps no copy of the provider's sign-in token",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-13T23:39:07Z",
+                "closedAt": "2026-11-15T16:24:06Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 197,
+                "title": "Audit records are deleted once they are a year old",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-14T01:06:03Z",
+                "closedAt": "2026-11-14T02:22:43Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 198,
+                "title": "A shared ShyTalk link shows a preview of the page",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-14T01:14:39Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 204,
+                "title": "Setting up an authenticator on dev never fails with a server error",
+                "state": "CLOSED",
+                "stateReason": "NOT_PLANNED",
+                "createdAt": "2026-11-14T02:34:27Z",
+                "closedAt": "2026-11-21T08:08:07Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 209,
+                "title": "On the iPhone, the phone tests reach each control with a real swipe, never a script scroll",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-14T06:47:30Z",
+                "closedAt": "2026-11-15T21:48:51Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 211,
+                "title": "The coverage figure also judges the phone and browser test helpers",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-14T07:03:05Z",
+                "closedAt": "2026-11-20T02:44:17Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 213,
+                "title": "Signing up or recovering while signed in acts for the address typed, not the signed-in account",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-14T07:26:13Z",
+                "closedAt": "2026-11-16T01:31:55Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 221,
+                "title": "A phone run keeps Appium's full log, so a failed iPhone session start shows its cause",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-15T18:03:59Z",
+                "closedAt": "2026-11-15T20:21:53Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 223,
+                "title": "A dropped test-mailbox connection is named, with its server and folder, in a phone run",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-15T19:05:35Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 224,
+                "title": "A phone run waits for WebDriverAgent's port to be free before the iPhone session starts",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-15T19:15:56Z",
+                "closedAt": "2026-11-15T20:21:58Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 226,
+                "title": "Dev's closed-testing confirm answered a failure once, and dev gets about 1,400 requests a minute from somewhere",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-15T21:47:51Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 230,
+                "title": "Wrong sign-in tries are forgotten 30 days after the last one",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-16T03:36:24Z",
+                "closedAt": "2026-11-17T13:48:56Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 232,
+                "title": "Node, Playwright and wrangler match the newest version any project runs",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-16T23:18:46Z",
+                "closedAt": "2026-11-16T23:31:54Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 234,
+                "title": "The smoke suite runs on an iPad in the iOS Simulator, with the same total as the phones",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-17T00:10:22Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "unified-tests" }] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 235,
+                "title": "The smoke suite runs on the iPhone Duo folded in the iOS Simulator, with the same total as the phones",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-17T00:10:31Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "unified-tests" }] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 236,
+                "title": "The smoke suite runs on the iPhone Duo unfolded in the iOS Simulator, with the same total as the phones",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-17T00:10:41Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "unified-tests" }] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 237,
+                "title": "The smoke suite runs on an Android tablet and foldable in the Android emulator, with the same total as the phones",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-17T00:10:51Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "unified-tests" }] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 238,
+                "title": "The phone run moves to the shared device runner, and ShyTalk's own runner is removed",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-17T00:46:47Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "unified-tests" }] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 239,
+                "title": "The desktop browser run moves to the shared package, and ShyTalk's own totals check is removed",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T02:14:39Z",
+                "closedAt": "2026-11-19T08:01:33Z",
+                "labels": { "nodes": [{ "name": "unified-tests" }] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 240,
+                "title": "SonarCloud analyses ShyTalk's source code, and its check fails when it analyses none",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T02:22:14Z",
+                "closedAt": "2026-11-17T04:32:04Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 242,
+                "title": "CI installs only the exact tool versions the lockfile names, and the Node image runs as the node user",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T03:52:31Z",
+                "closedAt": "2026-11-17T04:32:00Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 243,
+                "title": "The repo's scripts run their tools without trusting whatever PATH they inherit",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T03:52:39Z",
+                "closedAt": "2026-11-17T04:19:50Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 244,
+                "title": "The sign-in lock migration's backfill names the rows it updates",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T03:52:47Z",
+                "closedAt": "2026-11-17T04:01:33Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 245,
+                "title": "The 53 code smells SonarCloud found are cleared",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T03:52:55Z",
+                "closedAt": "2026-11-17T06:38:57Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 247,
+                "title": "Each Google read-back keeps its own table",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T03:57:51Z",
+                "closedAt": "2026-11-17T06:41:29Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 253,
+                "title": "The README links to ShyTalk's progress page",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T14:51:17Z",
+                "closedAt": "2026-11-17T16:03:51Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 254,
+                "title": "The README describes ShyTalk, not the repo template",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T14:52:52Z",
+                "closedAt": "2026-11-18T20:41:26Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 258,
+                "title": "The coverage figure measures every source folder, not a fixed list",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T16:31:28Z",
+                "closedAt": "2026-11-17T20:25:23Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 260,
+                "title": "CI's audit passes again despite the unfixed picomatch advisory GHSA-fc5q-39xc-vjpf",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T17:35:34Z",
+                "closedAt": "2026-11-18T20:09:04Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 261,
+                "title": "shytalk.app answers with a one-page holding page",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-17T18:23:28Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 262,
+                "title": "The dev and test sites ask for a password",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-17T18:23:56Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 263,
+                "title": "The partner site's link opens dev with a 60-second one-use pass",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T18:24:46Z",
+                "closedAt": "2026-11-19T07:54:43Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 264,
+                "title": "No unit test comes near the 1-second limit under coverage",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T18:42:54Z",
+                "closedAt": "2026-11-18T03:08:24Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 266,
+                "title": "The read-back tool makes its table's folder, and names the real cause when it cannot write",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T19:17:21Z",
+                "closedAt": "2026-11-18T03:14:02Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 273,
+                "title": "ShyTalk's new brand, shown on the shytalk.app holding page",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-17T23:29:22Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 274,
+                "title": "ShyTalk runs the newest shared tool versions (eslint, jose, prettier, typescript-eslint, wrangler, the Sonar action)",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-17T23:31:47Z",
+                "closedAt": "2026-11-18T01:23:57Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 281,
+                "title": "The smoke job's browser install never waits on a slow package mirror",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-18T07:25:34Z",
+                "closedAt": "2026-11-18T18:55:39Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 283,
+                "title": "A pull request into develop cannot merge until the desktop browser smoke has passed",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-18T15:00:19Z",
+                "closedAt": "2026-11-20T07:32:25Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 287,
+                "title": "Signing out of the website also removes its session cookie from the browser",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-18T20:28:31Z",
+                "closedAt": "2026-11-18T20:37:09Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 290,
+                "title": "Dev and test take the site password with any user name, as the other products' dev sites do",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-18T23:36:02Z",
+                "closedAt": "2026-11-18T23:44:42Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 293,
+                "title": "Three sonar-verdict unit tests ran past their 1-second limit on one CI run",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-19T00:03:30Z",
+                "closedAt": "2026-11-19T07:57:44Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 299,
+                "title": "Take every new release of the shared browser package: declare it as a >= range, not an exact pin",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-20T10:04:52Z",
+                "closedAt": "2026-11-20T23:05:25Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 302,
+                "title": "The OnePlus run starts Chrome's DevTools socket even after another project's unfinished Playwright launch",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-20T22:49:33Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 310,
+                "title": "ShyTalk takes ShyDesk's punishment callbacks and hosts its appeal page",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-22T01:30:41Z",
+                "closedAt": "2026-11-24T03:25:16Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 15 }
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 311,
+                "title": "A personal photo on the block list can never be used by anyone else",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T05:43:20Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 15 }
+              }
+            },
+            {
+              "priority": { "name": "P5" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 5 },
+              "content": {
+                "__typename": "Issue",
+                "number": 312,
+                "title": "Design SuperShy (VIP) for the new ShyTalk",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T05:47:01Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 314,
+                "title": "Only DEV is gated, with nothing in any build to steal; TEST opens to members; a sign-up switch everywhere",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T11:19:43Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P3" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 316,
+                "title": "The web smoke run's local server prints no TLS handshake errors",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T13:47:45Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 317,
+                "title": "While production holds, shytalk.app also serves the legal pages in English and Indonesian",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T14:48:54Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 319,
+                "title": "The board carries plain public words for the roadmap",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-22T16:04:53Z",
+                "closedAt": "2026-11-23T00:29:00Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 320,
+                "title": "A read-only GitHub App and signed webhooks feed the roadmap",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T16:05:03Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "waiting-on-shyden" }] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 321,
+                "title": "The website holds the board live and pushes every change to open roadmap pages",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T16:05:11Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 322,
+                "title": "Production serves the support page through the holding page",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T16:05:21Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 323,
+                "title": "Production serves the live roadmap through the holding page",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T16:05:32Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 324,
+                "title": "The support pages load ShyDesk's script only from a domain Shyden Labs controls",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T16:40:49Z",
+                "closedAt": null,
+                "labels": { "nodes": [{ "name": "waiting-on-shyden" }] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 325,
+                "title": "The DEV door lets ShyDesk's support piece fetch a cross-site pass",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T16:41:01Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 328,
+                "title": "Three unit tests pass the 1 s limit when the Mac is busy",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T18:17:41Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 1 },
+              "content": {
+                "__typename": "Issue",
+                "number": 329,
+                "title": "The support pages allow no inline styles once ShyDesk's piece adopts its style sheets",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-22T19:16:59Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 330,
+                "title": "A release checks every secret it reads before anything deploys, and fails naming each one missing",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-23T02:21:00Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 331,
+                "title": "A production release skips telling open apps while production holds, and says why",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-23T02:23:56Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 332,
+                "title": "Every page chooses its language the way shyden.co.uk does",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-23T02:24:12Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 333,
+                "title": "No public page shows a support email address",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-23T02:24:27Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 8 }
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 340,
+                "title": "ShyTalk's support emails reach Gmail's inbox, not spam",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-23T08:46:04Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 341,
+                "title": "The coverage-scope unit test gives the same answer on every run, whatever temporary files exist",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-23T10:59:15Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 343,
+                "title": "A blocked member is told so at every sign-in",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-24T00:25:22Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 345,
+                "title": "The link-preview pictures match the pages, with no support email address",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-24T01:59:57Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P1" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 348,
+                "title": "The live ShyDesk's punishments reach ShyTalk TEST and production, signed with ShyDesk's own secret",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-24T02:51:14Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 349,
+                "title": "ShyTalk accepts the punishment messages ShyDesk actually sends",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-24T02:54:55Z",
+                "closedAt": "2026-11-24T03:25:12Z",
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 3 },
+              "content": {
+                "__typename": "Issue",
+                "number": 352,
+                "title": "The language menu keeps the ticket and appeal links working",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-24T08:27:24Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": null
+              }
+            },
+            {
+              "priority": { "name": "P0" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 8 },
+              "content": {
+                "__typename": "Issue",
+                "number": 353,
+                "title": "SonarCloud: every open finding fixed, and every suppression and ignore rule removed",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "createdAt": "2026-11-24T23:26:55Z",
+                "closedAt": "2026-11-25T00:22:25Z",
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            },
+            {
+              "priority": { "name": "P2" },
+              "publicTitle": null,
+              "publicSummary": null,
+              "estimate": { "number": 2 },
+              "content": {
+                "__typename": "Issue",
+                "number": 355,
+                "title": "iPhone copy: the home and link-preview cases end with the same hard check as the smoke",
+                "state": "OPEN",
+                "stateReason": null,
+                "createdAt": "2026-11-24T23:55:42Z",
+                "closedAt": null,
+                "labels": { "nodes": [] },
+                "parent": { "number": 7 }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+]

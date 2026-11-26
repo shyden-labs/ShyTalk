@@ -41,13 +41,33 @@ const shydesk = shydeskOrigin(process.env.SITE_ENVIRONMENT, wrangler);
 
 <script>
   import { localePath } from '../i18n/t.ts';
-  import { browserLocale } from '../support.ts';
+  import { arrivedFromSite, browserLocale } from '../support.ts';
 
-  // An emailed or notice link names one language-free address: move to the visitor's language, keeping its query and token.
-  const piece = document.querySelector<HTMLElement>('shydesk-support[data-pick-language]');
+  const piece = document.querySelector<HTMLElement>('shydesk-support');
+
+  // The ticket and appeal pages carry their token in the address (shyden-labs/ShyTalk#352): each language in the menu
+  // opens that language's page with the same query and fragment, kept up to date if the fragment changes.
+  if (piece !== null && piece.getAttribute('view') !== 'contact') {
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('details.lang-switch a.entry')].map((link) => ({
+      link,
+      page: link.getAttribute('href') ?? '',
+    }));
+    const carry = (): void => {
+      for (const { link, page } of links) link.setAttribute('href', `${page}${location.search}${location.hash}`);
+    };
+    carry();
+    addEventListener('hashchange', carry);
+  }
+
+  // An emailed or notice link names one language-free address: move to the visitor's language, keeping its query and
+  // token, unless the visitor came here from the site's own language menu, which is a choice of English.
   const path = piece?.dataset['pickLanguage'];
-  if (path !== undefined) {
+  if (piece !== null && path !== undefined) {
     const locale = browserLocale(navigator.languages);
-    if (locale !== 'en') location.replace(`${localePath(locale, path)}${location.search}${location.hash}`);
+    if (locale !== 'en' && !arrivedFromSite(document.referrer, location.origin)) {
+      location.replace(`${localePath(locale, path)}${location.search}${location.hash}`);
+    } else {
+      piece.dataset['languageKept'] = '';
+    }
   }
 </script>

@@ -139,3 +139,66 @@
 | support.appealTitle | Appeal a decision | 对处理决定提出申诉 | Appeals against the decision |
 | support.appealIntro | If you think a moderation decision on your account was wrong, explain why here. | 如果您认为针对您账户的审核决定有误，请在此说明理由。 | If you believe the review decision regarding your account was incorrect, please explain your reasoning here. |
 | support.noScript | The support form needs JavaScript. Turn it on to send a request. | 客服表单需要 JavaScript。请启用后再发送请求。 | The customer service form requires JavaScript. Please enable it before sending a request. |
+| roadmap.title | Roadmap | 路线图 | Route map |
+| roadmap.heading | The road to launch | 通往发布之路 | The Road to Release |
+| roadmap.intro | ShyTalk's road to launch, drawn as a conversation. Press a speech bubble to see what that part brings. The page keeps itself up to date. | ShyTalk 的发布之路，画成一段对话。点按对话气泡，即可查看这一部分会带来什么。本页面会自动更新。 | ShyTalk's launch journey can be visualized as a conversation. Tap the conversation bubble to see what this part will bring. This page will update automatically. |
+| roadmap.launch | Expected launch: shown once every milestone is planned. | 预计发布时间：待每个里程碑都规划好后显示。 | Expected release time: to be shown after each milestone has been planned. |
+| roadmap.done | Done | 已完成 | Completed |
+| roadmap.started | Under way, {percent}% done | 进行中，已完成 {percent}% | In progress, completed {percent} % |
+| roadmap.notStarted | Not started yet | 尚未开始 | Not started yet |
+| roadmap.labelDone | done | 已完成 | Completed |
+| roadmap.labelStarted | under way | 进行中 | in progress |
+| roadmap.labelNotStarted | not started | 尚未开始 | Not started yet |
+| roadmap.brings | What this brings | 这部分将带来 | This part will bring |
+| roadmap.close | Close | 关闭 | closure |
+| roadmap.bar | {percent}% of the work to launch is done | 已完成 {percent}% 的发布前工作 | Pre-release work for {percent} % has been completed. |
+| roadmap.barLabel | {percent} percent done | 完成度 {percent}% | Completion rate {percent} % |
+| roadmap.mapLabel | ShyTalk's road to launch drawn as a conversation of {count} speech bubbles | ShyTalk 的发布之路，画成一段包含 {count} 个对话气泡的对话 | The launch path of ShyTalk can be visualized as a conversation containing {count} speech bubbles. |
+| roadmap.unnamed | Milestone {number} | 里程碑 {number} | Milestone {number} |
+| roadmap.updated | Last updated {date}, {time} {zone} | 最后更新于 {date} {time} {zone} | Last updated on {date} {time} {zone} |
+| milestones.m7Name | Groundwork | 基础工作 | Basic work |
+| milestones.m7Summary | The workshop and safety checks everything is built with. | 用来打造一切的工作台和安全检查。 | Workbench used to build everything and for safety checks. |
+| milestones.m7Brings1 | Behind the scenes: the tools everything else is built on | 幕后：构建其他一切所依赖的工具 | Behind the Scenes: The Tools That Everything Else Depends On |
+| milestones.m8Name | The website | 网站 | website |
+| milestones.m8Summary | ShyTalk's website: read about it, apply to try it, get help, and follow this map. | ShyTalk 的网站：了解 ShyTalk、申请试用、获取帮助，并关注这张地图。 | ShyTalk's website: Learn about ShyTalk, apply for a trial, get help, and follow this map. |
+| milestones.m8Brings1 | ShyTalk explained in five languages | 用五种语言介绍 ShyTalk | Introducing ShyTalk in five languages |
+| milestones.m8Brings2 | Apply to try ShyTalk before launch | 在发布前申请试用 ShyTalk | Apply for a trial of ShyTalk before release. |
+| milestones.m8Brings3 | A help page whenever you need it | 随时可用的帮助页面 | Help page available at any time |
+| milestones.m9Name | Strong foundations | 坚实的基础 | solid foundation |
+| milestones.m9Summary | Safe sign-in and the servers everything runs on. | 安全的登录，以及一切运行所依赖的服务器。 | Secure login, and all the servers on which it depends for operation. |
+| milestones.m9Brings1 | Sign in with Google, Apple or a passkey | 使用 Google、Apple 或通行密钥登录 | Sign in using Google, Apple, or a pass key. |
+| milestones.m9Brings2 | Improvements arrive without a store update | 无需应用商店更新即可获得改进 | Improvements available without app store updates |
+| milestones.m9Brings3 | Behind the scenes: the servers everything runs on | 幕后：一切运行所依赖的服务器 | Behind the scenes: The servers on which everything depends |
+| milestones.m10Name | Voice rooms | 语音房间 | Voice Room |
+| milestones.m10Summary | Rooms where people meet to talk and listen. | 大家相聚交谈和聆听的房间。 | A room where everyone gathers to talk and listen. |
+| milestones.m10Brings1 | Live voice rooms | 实时语音房间 | Real-time voice rooms |
+| milestones.m10Brings2 | Take a seat to speak | 坐上座位即可发言 | You can speak as soon as you sit down. |
+| milestones.m10Brings3 | Chat alongside the conversation | 在对话旁边文字聊天 | Text chat next to the conversation |
+| milestones.m11Name | The app | 应用 | application |
+| milestones.m11Summary | ShyTalk on your phone, quick to open and easy to use. | 手机上的 ShyTalk，打开快速，使用简单。 | ShyTalk on your phone is quick to open and easy to use. |
+| milestones.m11Brings1 | Join and sign in on your phone | 在手机上注册和登录 | Register and log in on your mobile phone |
+| milestones.m11Brings2 | A profile with your photos | 带有你照片的个人资料 | Profile with your photo |
+| milestones.m11Brings3 | A home screen that keeps itself fresh | 会自动更新的主屏幕 | Automatically updating home screen |
+| milestones.m12Name | Find a room | 寻找房间 | Looking for a room |
+| milestones.m12Summary | Browse rooms and join a conversation in a tap. | 浏览房间，轻点一下即可加入对话。 | Browse the rooms and join a conversation with a single tap. |
+| milestones.m12Brings1 | Browse rooms by language | 按语言浏览房间 | Browse rooms by language |
+| milestones.m12Brings2 | Join a conversation in one tap | 轻点一下即可加入对话 | Join the conversation with a single tap |
+| milestones.m13Name | Friends | 朋友 | friend |
+| milestones.m13Summary | Find language partners and friends, and know when they are around. | 寻找语言伙伴和朋友，并知道他们何时在线。 | Find language partners and friends, and know when they are online. |
+| milestones.m13Brings1 | Language partners and friends | 语言伙伴和朋友 | Language partners and friends |
+| milestones.m13Brings2 | Notifications that matter | 真正重要的通知 | Truly Important Notice |
+| milestones.m14Name | Safe spaces | 安全空间 | safe space |
+| milestones.m14Summary | Spaces that fit your age, with a parent's okay where the law asks. | 适合你年龄的空间，在法律要求时需家长同意。 | A space appropriate for your age, requiring parental consent when legally required. |
+| milestones.m14Brings1 | Separate spaces for younger members | 为年轻成员提供的独立空间 | Independent space for younger members |
+| milestones.m14Brings2 | Parent consent where it is needed | 在需要时征得家长同意 | Obtain parental consent when necessary. |
+| milestones.m15Name | Kind and safe | 友善与安全 | Friendliness and safety |
+| milestones.m15Summary | Reporting and moderation that keep conversations friendly. | 举报与管理，让对话保持友好。 | Reporting and management help maintain a friendly dialogue. |
+| milestones.m15Brings1 | Report a problem in a tap | 轻点一下即可举报问题 | Report a problem with just one tap |
+| milestones.m15Brings2 | A fair way to appeal a decision | 对决定提出申诉的公平途径 | A fair way to appeal the decision |
+| milestones.m16Name | Clear rules | 清晰的规则 | Clear rules |
+| milestones.m16Summary | Plain privacy and community rules, right for every country. | 通俗易懂的隐私和社区规则，适用于每个国家。 | The privacy and community rules are easy to understand and applicable to every country. |
+| milestones.m16Brings1 | Privacy and terms in plain words | 用通俗的语言说明隐私和条款 | Explain privacy and terms in plain language. |
+| milestones.m16Brings2 | The right protections where you live | 在你所在的地方提供合适的保护 | Provide appropriate protection in your location |
+| milestones.m17Name | Launch | 发布 | release |
+| milestones.m17Summary | ShyTalk on the App Store and Google Play. | ShyTalk 登陆 App Store 和 Google Play。 | ShyTalk is now available on the App Store and Google Play. |
+| milestones.m17Brings1 | Download ShyTalk on iPhone and Android | 在 iPhone 和 Android 上下载 ShyTalk | Download ShyTalk on iPhone and Android |

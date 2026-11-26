@@ -52,6 +52,11 @@ async function mailboxFrom(source: string, answer = { status: 200, body: {} as u
 
 type BrowserFixture = [(deps: { playwright: unknown }, use: (browser: unknown) => Promise<void>) => Promise<void>, { scope: string }];
 
+// The fixture's first load transforms it and its imports (about 100 ms, far more on a busy Mac under coverage); done
+// once here at module load, so no test body pays it. Each test still loads it afresh after `vi.resetModules()`
+// (shyden-labs/ShyTalk#328).
+await load();
+
 beforeEach(() => {
   vi.resetModules();
   base.extend.mockClear();

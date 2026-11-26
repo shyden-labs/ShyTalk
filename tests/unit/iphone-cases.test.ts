@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { IPHONE_CASES, type SafariPage } from '../phones/iphone-cases.ts';
 import { countingCheck } from '../phones/check.ts';
-import { langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
+import { LOCALES, langTag, localePath, t, type Locale } from '../../apps/web/src/i18n/t.ts';
 import { nextLocale, wantedLive } from '../support/language-menu.ts';
 import { APPEAL_PATH, SUPPORT_PATH, TICKET_PATH } from '../../apps/web/src/support.ts';
 import { SMOKE_APPEAL_TOKEN, SMOKE_TICKET_TOKEN } from '../support/support-page.ts';
@@ -11,6 +11,9 @@ import { wantedFacts } from '../support/holding-facts.ts';
 import { legalLines, legalLocale } from '../../apps/web/src/legal/legal.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, wantedPreview } from '../support/link-preview.ts';
+import { MILESTONES, boardDelivery, type RoadmapFacts } from '../support/roadmap-page.ts';
+import { updatedLine } from '../../apps/web/src/roadmap/view.ts';
+import { pageWords } from '../../apps/web/src/roadmap/words.ts';
 
 /**
  * Each case of the iPhone copy checks what its Playwright twin checks
@@ -86,6 +89,31 @@ const SUPPORT_LINK = 'footer a[data-support]';
 const SHYDESK = (JSON.parse(readFileSync('workers/web/wrangler.json', 'utf8')) as { env: { dev: { vars: { SHYDESK_ORIGIN: string } } } })
   .env.dev.vars.SHYDESK_ORIGIN;
 
+/** The roadmap page's milestone buttons and its one panel (shyden-labs/ShyTalk#321). */
+const ROADMAP_BUTTON = '.map button.spot';
+const ROADMAP_PANEL = '#roadmap-panel';
+const ROADMAP_H1 = 'h1, [role="heading"][aria-level="1"]';
+const READ_AT = '2026-11-24T23:49:00.000Z';
+
+/** The roadmap page as an iPhone in Jakarta reads it: eleven milestones, the first done, the board read once. */
+function roadmapFacts(locale: Locale, over: Partial<RoadmapFacts> = {}): RoadmapFacts {
+  const labels = Array.from({ length: MILESTONES }, (_, index) =>
+    index === 0
+      ? `Groundwork, ${t(locale, 'roadmap.labelDone')}`
+      : `Milestone ${String(index + 1)}, ${t(locale, 'roadmap.labelNotStarted')}`,
+  );
+  return { labels, readAt: READ_AT, zone: 'Asia/Jakarta', fits: true, version: 1, socket: 'open', marked: false, ...over };
+}
+
+/** The roadmap page's lines, by selector, as the page words them (shyden-labs/ShyTalk#321). */
+const ROADMAP_TEXT: Record<string, (locale: Locale) => string> = {
+  'h1, [role="heading"][aria-level="1"]': (locale) => t(locale, 'roadmap.heading'),
+  '.bar-words': (locale) => t(locale, 'roadmap.bar').replace('{percent}', '57'),
+  '#roadmap-updated': (locale) => updatedLine(READ_AT, pageWords(locale), locale, 'Asia/Jakarta'),
+  '#roadmap-panel h2': () => 'Groundwork',
+  '#roadmap-panel h3': (locale) => t(locale, 'roadmap.brings'),
+};
+
 /** Safari showing the site as it should be, in `lang`; `broken` replaces one answer. */
 function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { visited: string[] } {
   const locale = LOCALE[lang] ?? 'en';
@@ -94,12 +122,18 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
   // The language menu (shyden-labs/ShyTalk#332): a tap on its button opens or shuts it, a tap on a language opens the
   // same page in that language, which the address and `<html lang>` then show.
   let menuOpen = false;
-  let picked: { path: string; lang: string } | null = null;
+  let picked: { path: string; lang: string; locale?: Locale } | null = null;
+  // The roadmap page (shyden-labs/ShyTalk#321): a tap on a milestone opens its panel, again or on Close shuts it.
+  let panelOpen = false;
+  let marked = false;
+  const onRoadmap = (): boolean => visited.at(-1)?.endsWith('/roadmap') === true;
   return {
     visited,
     goto: (path) => {
       visited.push(path);
       menuOpen = false;
+      panelOpen = false;
+      marked = false;
       picked = null;
       return Promise.resolve(path.endsWith('/no-such-page') ? 404 : 200);
     },
@@ -118,27 +152,35 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
             ? VIEWPORT
             : selector === 'footer a[data-support]' && name === 'href'
               ? localePath(locale, SUPPORT_PATH)
-              : selector === 'shydesk-support'
-                ? ((
-                    {
-                      product: 'shytalk',
-                      view:
-                        visited.at(-1)?.includes('/ticket') === true
-                          ? 'ticket'
-                          : visited.at(-1)?.includes('/appeal') === true
-                            ? 'appeal'
-                            : 'contact',
-                      lang: locale,
-                    } as Record<string, string>
-                  )[name] ?? null)
-                : selector === 'script[src$="/embed.js"]' && name === 'src'
-                  ? `${SHYDESK}/embed.js`
-                  : null,
+              : selector.startsWith('shydesk-support[view=') && name === 'lang'
+                ? (picked?.locale ?? locale)
+                : selector === 'shydesk-support'
+                  ? ((
+                      {
+                        product: 'shytalk',
+                        view:
+                          visited.at(-1)?.includes('/ticket') === true
+                            ? 'ticket'
+                            : visited.at(-1)?.includes('/appeal') === true
+                              ? 'appeal'
+                              : 'contact',
+                        lang: locale,
+                      } as Record<string, string>
+                    )[name] ?? null)
+                  : selector === 'script[src$="/embed.js"]' && name === 'src'
+                    ? `${SHYDESK}/embed.js`
+                    : selector === ROADMAP_BUTTON && name === 'aria-expanded'
+                      ? String(panelOpen)
+                      : null,
       ),
-    isVisible: (selector) => Promise.resolve(selector !== '[data-english-only]:not([hidden])'),
+    isVisible: (selector) => Promise.resolve(selector === ROADMAP_PANEL ? panelOpen : selector !== '[data-english-only]:not([hidden])'),
     text: (selector) => {
       const at = visited.at(-1) ?? '';
       if (selector === 'footer a[data-support]') return Promise.resolve(t(locale, 'footer.contact'));
+      if (onRoadmap()) {
+        const roadmapText = ROADMAP_TEXT[selector];
+        if (roadmapText !== undefined) return Promise.resolve(roadmapText(locale));
+      }
       if (at.includes('/support') || at.includes('/appeal')) {
         const line = /data-line="(\w+)"/.exec(selector)?.[1];
         const title = at.includes('/ticket') ? 'support.ticketTitle' : at.includes('/appeal') ? 'support.appealTitle' : 'support.title';
@@ -148,10 +190,26 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     },
     rows: (selector) => Promise.resolve(selector === 'ul.hellos > li' ? HELLOS.map(({ lang: helloLang, word }) => [helloLang, word]) : []),
     holdingFacts: () => Promise.resolve(wantedFacts(420, false)),
+    roadmapFacts: () => Promise.resolve(roadmapFacts(locale, { marked })),
+    markPage: () => {
+      marked = true;
+      return Promise.resolve();
+    },
     menuLive: () => Promise.resolve(wantedLive(locale, 420, menuOpen)),
     tap: (selector) => {
-      if (selector === 'details.lang-switch > summary') {
+      if (selector === ROADMAP_BUTTON) {
+        panelOpen = !panelOpen;
+      } else if (selector === `${ROADMAP_PANEL} button.close`) {
+        panelOpen = false;
+      } else if (selector === 'details.lang-switch > summary') {
         menuOpen = !menuOpen;
+      } else if (selector.startsWith('details.lang-switch a.entry') && (visited.at(-1) ?? '').includes('#')) {
+        // On a page an emailed or notice link opened (shyden-labs/ShyTalk#352): the picked language, keeping the fragment.
+        const tag = /hreflang="([^"]+)"/.exec(selector)?.[1] ?? '';
+        const target = LOCALES.find((each) => langTag(each) === tag) ?? 'en';
+        const [path = '', hash = ''] = (visited.at(-1) ?? '').split('#');
+        if (menuOpen) picked = { path: `${localePath(target, path)}#${hash}`, lang: tag, locale: target };
+        menuOpen = false;
       } else if (selector.startsWith('details.lang-switch a.entry')) {
         const next = nextLocale(locale);
         const holding = visited.at(-1)?.endsWith('/holding') === true;
@@ -168,10 +226,13 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
     links: (name) => Promise.resolve(name === t(locale, 'home.apply') ? 1 : 0),
     count: (selector) =>
       Promise.resolve(
-        (selector === 'shydesk-support[view="ticket"]' && visited.at(-1)?.includes('/ticket') === true) ||
-          (selector === 'shydesk-support[view="appeal"]' && visited.at(-1)?.includes('/appeal') === true)
-          ? 1
-          : 0,
+        selector === ROADMAP_BUTTON && onRoadmap()
+          ? MILESTONES
+          : (selector === 'shydesk-support[data-language-kept]' && picked?.locale === 'en') ||
+              (selector === 'shydesk-support[view="ticket"]' && visited.at(-1)?.includes('/ticket') === true) ||
+              (selector === 'shydesk-support[view="appeal"]' && visited.at(-1)?.includes('/appeal') === true)
+            ? 1
+            : 0,
       ),
     axeViolations: () => Promise.resolve([]),
     previewFacts: (path) => Promise.resolve(wantedPreview(DEV, locale, lang, path, `${path} · ShyTalk`)),
@@ -212,7 +273,11 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
   // Two per page: its title is not empty, and its preview is as wanted (shyden-labs/ShyTalk#198).
   // Four more each for the support and ticket pages (#37), to be confirmed on CI's smoke-totals.
   // Two more each for the appeal page (#310 AC4), to be confirmed on CI's smoke-totals.
-  'every page carries its link preview and its language menu': { en: 36, id: 36, th: 30, vi: 30, 'zh-Hans': 30 },
+  // Two more each for the roadmap page (#321 AC3), to be confirmed on CI's smoke-totals.
+  'every page carries its link preview and its language menu': { en: 38, id: 38, th: 32, vi: 32, 'zh-Hans': 32 },
+  // The roadmap page (shyden-labs/ShyTalk#321 AC3): its Playwright twin's 20 checks, counted from it; to be confirmed on
+  // CI's smoke-totals.
+  'the roadmap page shows the board at once': { en: 20, id: 20, th: 20, vi: 20, 'zh-Hans': 20 },
 };
 
 describe('the iPhone cases', () => {
@@ -1248,19 +1313,19 @@ describe('the ticket page (shyden-labs/ShyTalk#37 AC1)', () => {
     expect(IPHONE_CASES.filter(({ title }) => title.startsWith('the ticket page opens the ticket view'))).toHaveLength(1);
   });
 
-  it('passes on the site as it should be, running the 8 checks its twin runs on CI', async () => {
+  it('passes on the site as it should be, running the 13 checks its twin runs on CI', async () => {
     const page = safari('en');
     const check = countingCheck();
     await expect(ticket?.run(page, check)).resolves.toBeUndefined();
     expect(page.visited).toEqual([TOKEN_ADDRESS]);
-    expect(check.count).toBe(8);
+    expect(check.count).toBe(13);
   });
 
   it('reads a page language the site does not have as English, the language-free page staying where it is', async () => {
     const page = safari('fr');
     const check = countingCheck();
     await expect(ticket?.run(page, check)).resolves.toBeUndefined();
-    expect(check.count).toBe(8);
+    expect(check.count).toBe(13);
   });
 
   it('fails naming the address when the page loses the emailed token', async () => {
@@ -1271,6 +1336,40 @@ describe('the ticket page (shyden-labs/ShyTalk#37 AC1)', () => {
   it('fails when the page shows one language but sits at another language’s address', async () => {
     const page = safari('th', { url: () => Promise.resolve(`${DEV}${TOKEN_ADDRESS}`) });
     await expect(ticket?.run(page)).rejects.toThrow(`/th${TICKET_PATH}`);
+  });
+
+  // shyden-labs/ShyTalk#352: the menu keeps the token, and English picked stays English.
+  it('fails naming it when the menu drops the token', async () => {
+    const page = safari('en');
+    const shown = page.url.bind(page);
+    // The address loses its fragment only on the language picked from the menu.
+    page.url = async () => {
+      const address = await shown();
+      return address.includes('/id/') ? (address.split('#')[0] ?? '') : address;
+    };
+    // The quarter-second looks pass on fake time, up to the ceiling, so the test waits on none.
+    vi.useFakeTimers({ now: 1700000000000 });
+    try {
+      const running = ticket?.run(page).catch((error: unknown) => error as Error);
+      await vi.runAllTimersAsync();
+      expect((await running)?.message).toContain('another language keeps the token');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails naming it when English picked moves to the browser’s language', async () => {
+    const page = safari('en');
+    const counted = page.count.bind(page);
+    page.count = (selector) => (selector === 'shydesk-support[data-language-kept]' ? Promise.resolve(0) : counted(selector));
+    vi.useFakeTimers({ now: 1700000000000 });
+    try {
+      const running = ticket?.run(page).catch((error: unknown) => error as Error);
+      await vi.runAllTimersAsync();
+      expect((await running)?.message).toContain('the page stays on English');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -1289,19 +1388,19 @@ describe('the appeal page (shyden-labs/ShyTalk#310 AC4)', () => {
     expect(IPHONE_CASES.filter((c) => c.title.startsWith(title))).toHaveLength(1);
   });
 
-  it('passes on the site as it should be, running the 13 checks its twin runs on CI', async () => {
+  it('passes on the site as it should be, running the 18 checks its twin runs on CI', async () => {
     const page = safari('en');
     const check = countingCheck();
     await expect(appeal?.run(page, check)).resolves.toBeUndefined();
     expect(page.visited).toEqual([TOKEN_ADDRESS]);
-    expect(check.count).toBe(13);
+    expect(check.count).toBe(18);
   });
 
   it('reads a page language the site does not have as English, the language-free page staying where it is', async () => {
     const page = safari('fr');
     const check = countingCheck();
     await expect(appeal?.run(page, check)).resolves.toBeUndefined();
-    expect(check.count).toBe(13);
+    expect(check.count).toBe(18);
   });
 
   it('fails naming the address when the page loses the notice’s token', async () => {
@@ -1322,5 +1421,178 @@ describe('the appeal page (shyden-labs/ShyTalk#310 AC4)', () => {
   it('fails when the page embeds a view other than the appeal view', async () => {
     const page = safari('en', { count: () => Promise.resolve(0) });
     await expect(appeal?.run(page)).rejects.toThrow();
+  });
+});
+
+describe('the iPhone copy of the roadmap page (shyden-labs/ShyTalk#321 AC3)', () => {
+  /** Each language's roadmap case, by language, so every test runs (and fails) even before a case exists. */
+  const roadmap = Object.keys(LOCALE).map((lang) => {
+    const found = cases('the roadmap page shows the board at once').find(({ title }) => langOf(title) === lang);
+    const missing = { title: `${lang}: (no roadmap case)`, run: () => Promise.reject(new Error(`no ${lang} roadmap case`)) };
+    return [lang, found ?? missing] as const;
+  });
+
+  beforeEach(() => {
+    vi.stubEnv('SITE_ENVIRONMENT', 'dev');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('holds the roadmap case in every language', () => {
+    expect(cases('the roadmap page shows the board at once').map(({ title }) => langOf(title))).toEqual([
+      'en',
+      'id',
+      'th',
+      'vi',
+      'zh-Hans',
+    ]);
+  });
+
+  it.each(roadmap)('%s roadmap: opens the roadmap at its own address', async (lang, c) => {
+    const page = safari(lang);
+    await c.run(page);
+    expect(page.visited).toEqual([`${PREFIX[lang] ?? '?'}/roadmap`]);
+  });
+
+  it.each(roadmap)('%s roadmap: fails naming the milestones whose button does not say its state', async (lang, c) => {
+    const locale = LOCALE[lang] ?? 'en';
+    const page = safari(lang, { roadmapFacts: () => Promise.resolve(roadmapFacts(locale, { labels: ['Groundwork'] })) });
+    await expect(c.run(page)).rejects.toThrow('Groundwork');
+  });
+
+  it.each(roadmap)('%s roadmap: fails when a press does not open the panel', async (lang, c) => {
+    const page = safari(lang, { isVisible: () => Promise.resolve(false) });
+    await expect(c.run(page)).rejects.toThrow('the panel did not open');
+  });
+
+  it.each(roadmap)('%s roadmap: fails when the panel will not shut', async (lang, c) => {
+    const page = safari(lang, { isVisible: (selector) => Promise.resolve(selector === ROADMAP_PANEL || selector === ROADMAP_H1) });
+    await expect(c.run(page)).rejects.toThrow('the panel did not shut');
+  });
+
+  it.each(roadmap)('%s roadmap: fails when the read time is not worded in the phone’s own zone', async (lang, c) => {
+    const locale = LOCALE[lang] ?? 'en';
+    const page = safari(lang, { roadmapFacts: () => Promise.resolve(roadmapFacts(locale, { zone: 'UTC' })) });
+    // Worded in UTC where the phone is in Jakarta: the error shows both.
+    await expect(c.run(page)).rejects.toThrow('UTC');
+  });
+
+  it.each(roadmap)(
+    '%s roadmap: fails naming the reason when the page’s facts cannot be read, running every other check',
+    async (lang, c) => {
+      const page = safari(lang, { roadmapFacts: () => Promise.reject(new Error('the facts script threw')) });
+      // With no facts, the panel's heading is checked against no label: both failures are named, in order.
+      await expect(c.run(page)).rejects.toThrow(/the facts script threw[\s\S]*\(no label\)/);
+    },
+  );
+
+  it.each(roadmap)('%s roadmap: fails naming no label when the page has no milestone buttons to name', async (lang, c) => {
+    const locale = LOCALE[lang] ?? 'en';
+    const page = safari(lang, { roadmapFacts: () => Promise.resolve(roadmapFacts(locale, { labels: [] })) });
+    await expect(c.run(page)).rejects.toThrow('(no label)');
+  });
+
+  it.each(roadmap)('%s roadmap: fails when the page does not fit the phone', async (lang, c) => {
+    const locale = LOCALE[lang] ?? 'en';
+    const page = safari(lang, { roadmapFacts: () => Promise.resolve(roadmapFacts(locale, { fits: false })) });
+    await expect(c.run(page)).rejects.toThrow("the page does not fit the phone's width");
+  });
+
+  it.each(roadmap)('%s roadmap: fails on a CSP refusal and on an axe violation, running every other check', async (lang, c) => {
+    const page = safari(lang, {
+      cspRefusals: () => Promise.resolve(['refused']),
+      axeViolations: () => Promise.resolve(['label: 1']),
+    });
+    const check = countingCheck();
+    const error = await c.run(page, check).catch((caught: unknown) => caught);
+    expect(String(error)).toContain('refused');
+    expect(String(error)).toContain('label: 1');
+    expect(check.count).toBe(20);
+  });
+});
+
+describe('the iPhone copy of the live roadmap (shyden-labs/ShyTalk#321 AC3)', () => {
+  const TITLE = 'the roadmap page takes a fresh board read on its own, with no reload';
+  const live = IPHONE_CASES.find(({ title }) => title === TITLE);
+  const SECRET = 'dev-webhook-secret';
+  let sent: { url: string; init: RequestInit }[];
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: 1700000000000 });
+    vi.stubEnv('PHONE_BASE_URL', 'https://dev.example');
+    vi.stubEnv('SMOKE_ROADMAP_WEBHOOK_SECRET', SECRET);
+    sent = [];
+    vi.stubGlobal('fetch', (url: URL, init: RequestInit) => {
+      sent.push({ url: String(url), init });
+      return Promise.resolve(Response.json({ state: 'reading' }, { status: 202 }));
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  /** The page's version goes up `after` looks at it, as a fresh read reaching it does. */
+  function readingPage(after: number, over: Partial<RoadmapFacts> = {}): SafariPage & { visited: string[] } {
+    let looks = 0;
+    const page = safari('en');
+    let marked = false;
+    return {
+      ...page,
+      markPage: async () => {
+        marked = true;
+        await page.markPage();
+      },
+      roadmapFacts: () => {
+        looks += 1;
+        return Promise.resolve(roadmapFacts('en', { version: looks > after ? 2 : 1, marked, ...over }));
+      },
+    };
+  }
+
+  it('sits after every language’s cases, as its Playwright twin does', () => {
+    const at = IPHONE_CASES.findIndex(({ title }) => title === TITLE);
+    expect(IPHONE_CASES[at - 1]?.title.startsWith('zh-Hans: the roadmap page')).toBe(true);
+  });
+
+  it('opens the roadmap, sends the board’s signed delivery to the site, and sees the fresh read land with no reload', async () => {
+    const page = readingPage(3);
+    const check = countingCheck();
+    const run = live?.run(page, check);
+    await vi.advanceTimersByTimeAsync(2000);
+    await expect(run).resolves.toBeUndefined();
+    expect(page.visited).toEqual(['/roadmap']);
+    const { body, headers } = boardDelivery(SECRET);
+    expect(sent).toEqual([{ url: 'https://dev.example/hooks/github', init: { method: 'POST', body, headers } }]);
+    // Its Playwright twin's six: the socket, the answer's status and words, the fresh read, no reload, the milestones.
+    expect(check.count).toBe(6);
+  });
+
+  it('fails naming the wait when no fresh read reaches the page within 10 s', async () => {
+    const run = live?.run(readingPage(Number.POSITIVE_INFINITY)).catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(10_500);
+    expect(String(await run)).toContain('no fresh read reached the page within 10 s');
+  });
+
+  it('fails when the page was reloaded to show it', async () => {
+    const page = readingPage(3);
+    const run = live?.run({ ...page, markPage: () => Promise.resolve() }).catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(await run).toBeInstanceOf(Error);
+  });
+
+  it('fails when the socket never opens, waiting no more than 10 s', async () => {
+    const run = live?.run(readingPage(3, { socket: 'closed' })).catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(10_500);
+    expect(String(await run)).toContain('closed');
+  });
+
+  it('fails when the site refuses the delivery', async () => {
+    vi.stubGlobal('fetch', () => Promise.resolve(Response.json({ error: 'bad_signature' }, { status: 401 })));
+    const run = live?.run(readingPage(3)).catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(String(await run)).toContain('401');
   });
 });
