@@ -461,6 +461,18 @@ describe('the faint hellos keep clear', () => {
     },
   );
 
+  // No faint word piles on another (shyden-labs/ShyTalk#371): after #364 they crowded into the same open patches.
+  it.each(Array.from({ length: NAMES.length + 1 }, (_, open) => open))(
+    'with the first %i milestones done, no two faint words touch',
+    (open) => {
+      const words = faint(mapSvg(board(open), WORDS, null));
+      const piled = words.flatMap(({ word, box }, i) =>
+        words.slice(i + 1).flatMap((other) => (touches(box, other.box) ? [`${word} on ${other.word}`] : [])),
+      );
+      expect(piled).toEqual([]);
+    },
+  );
+
   it('leaves a faint hello out when no spot is clear', () => {
     const everything = { left: -100, top: -100, right: 1100, bottom: 540 };
     expect(faintText('hello', () => 0.5, [everything])).toBe('');
