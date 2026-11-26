@@ -12,6 +12,7 @@ import type { SafariPage } from './iphone-cases.ts';
 import { PREVIEW_FACTS, PREVIEW_TAGS, type PreviewFacts } from '../support/link-preview.ts';
 import { BRAND_FONTS, HOLDING_FACTS, type HoldingFacts } from '../support/holding-facts.ts';
 import { MENU_LIVE, type MenuLive } from '../support/language-menu.ts';
+import { MARK_PAGE, ROADMAP_FACTS, type RoadmapFacts } from '../support/roadmap-page.ts';
 
 /** One WebDriver request to Appium, answering the response's `value`. */
 export type WebDriverCall = (method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown) => Promise<unknown>;
@@ -265,6 +266,12 @@ export function safariPage(
     },
     async menuLive() {
       return (await run(`return (${MENU_LIVE})();`)) as MenuLive;
+    },
+    async roadmapFacts() {
+      return (await run(`return (${ROADMAP_FACTS})();`)) as RoadmapFacts;
+    },
+    async markPage() {
+      await run(`(${MARK_PAGE})();`);
     },
     async count(selector) {
       return (await run(COUNT, selector)) as number;

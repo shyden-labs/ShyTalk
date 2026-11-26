@@ -41,3 +41,12 @@ export function browserLocale(languages: readonly string[]): Locale {
   }
   return 'en';
 }
+
+/**
+ * Whether `referrer` is a page of the site at `origin` (shyden-labs/ShyTalk#352): a visitor who came from the site's
+ * own language menu chose the page's language, while an emailed or notice link, opened from a mail app, another site
+ * or nowhere, is moved to the browser's language. Same scheme, host and port; anything that is not an address is not.
+ */
+export function arrivedFromSite(referrer: string, origin: string): boolean {
+  return URL.canParse(referrer) && new URL(referrer).origin === origin;
+}
