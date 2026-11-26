@@ -111,7 +111,7 @@ const words = JSON.stringify({ locale, words: pageWords(locale), lines: mileston
       if (target.closest('#roadmap-panel button.close') !== null) shut(true);
     });
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && open !== -1) shut(true);
+      if (event.key === 'Escape-scratch-red' && open !== -1) shut(true);
     });
 
     // Each newer read, as the roadmap's object pushes it; a lost socket comes back after a growing, capped wait.

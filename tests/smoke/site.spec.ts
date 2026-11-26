@@ -397,6 +397,27 @@ for (const { lang, locale, prefix } of LANGUAGES) {
 }
 
 /**
+ * Escape shuts the roadmap's open panel (shyden-labs/ShyTalk#381 AC2), checked where a keyboard has an Escape key:
+ * the desktop browsers. The shared roadmap test above shuts the panel by its Close button, as a phone user does.
+ */
+test(
+  'Escape shuts the roadmap page’s open milestone panel',
+  { tag: '@desktop', annotation: { type: 'group-only', description: 'phones have no Escape key' } },
+  async ({ page }) => {
+    await page.goto('/roadmap', { waitUntil: 'load' });
+    const first = page.locator('.map button.spot').first();
+    const panel = page.locator('#roadmap-panel');
+    await first.click();
+    await expect.soft(panel).toBeVisible();
+    await expect.soft(first).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Escape');
+    await expect.soft(panel).toBeHidden();
+    await expect.soft(first).toHaveAttribute('aria-expanded', 'false');
+    expect(test.info().errors).toEqual([]);
+  },
+);
+
+/**
  * The roadmap's live board (shyden-labs/ShyTalk#321 AC3), once per browser: an open page takes each fresh board read
  * as it comes, with no reload. A signed delivery for ShyTalk's board asks for the read, as GitHub's webhook does; on
  * CI the board is the stand-in's (tests/smoke/github-stand-in.ts), on the phones DEV's own. A real board edit reaching
