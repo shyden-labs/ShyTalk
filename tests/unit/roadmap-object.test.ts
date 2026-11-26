@@ -73,7 +73,10 @@ function harness(reads: (() => Promise<RoadmapItem[]>)[]) {
         return Promise.resolve();
       },
     },
-    acceptWebSocket: (socket: LiveSocket) => sockets.push(socket as FakeSocket),
+    acceptWebSocket: (socket: LiveSocket) => {
+      if (!(socket instanceof FakeSocket)) throw new Error('the object was given a socket the test did not make');
+      sockets.push(socket);
+    },
     getWebSockets: () => sockets,
     waitUntil: (promise: Promise<unknown>) => background.push(promise),
   };

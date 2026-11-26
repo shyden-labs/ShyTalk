@@ -64,7 +64,8 @@ function keepingStatements(db: D1): D1 {
   const kept: D1Statement[] = [];
   return {
     prepare: (sql) => new KeptStatement(db.prepare(sql), kept),
-    batch: <T = unknown>(statements: D1Statement[]) => db.batch<T>(statements.map((statement) => (statement as KeptStatement).proxied)),
+    batch: <T = unknown>(statements: D1Statement[]) =>
+      db.batch<T>(statements.map((statement) => (statement instanceof KeptStatement ? statement.proxied : statement))),
     exec: (sql) => db.exec(sql),
   };
 }

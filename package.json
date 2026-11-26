@@ -35,7 +35,7 @@
     "imapflow": "2.12.2",
     "prettier": "3.10.1",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.72.2",
+    "typescript-eslint": "8.74.0",
     "vitest": "5.1.0",
     "wrangler": "4.162.0"
   },
@@ -50,7 +50,7 @@
   "dependencies": {
     "@better-auth/passkey": "1.7.25",
     "@better-auth/utils": "0.5.1",
-    "@simplewebauthn/browser": "13.3.0",
+    "@simplewebauthn/browser": "14.0.0",
     "better-auth": "1.7.25",
     "better-call": "1.4.6",
     "jose": "6.2.17",
