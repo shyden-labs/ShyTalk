@@ -11,13 +11,14 @@
 import { createMarkerGuard, requireDoorSecret, requireSitePassword, type D1Like } from '../../../packages/environment/index.ts';
 import { handleClosedTesting, isClosedTesting, type ClosedTestingEnv } from './api/closed-testing.ts';
 import { handleAppApi, isAppApi } from './app/router.ts';
-import { devPassGate } from './dev-pass-gate.ts';
+import { boxAnsweredCookie, devPassGate } from './dev-pass-gate.ts';
 import { json } from './http.ts';
 import { SHYDESK_CALLBACK_PATH, handleShyDeskCallback, type ShyDeskCallbackEnv } from './moderation/callback-route.ts';
 import type { RateLimit } from './app/sign-in.ts';
 import type { AnnouncerNamespace } from './app/announcer.ts';
 import { HOOK_PATH, handleGithubHook, type HookEnv } from './roadmap/hook-route.ts';
 import { handleRoadmapApi, isRoadmapApi } from './roadmap/routes.ts';
+import { roadmapLocale, serveRoadmapPage } from './roadmap/page.ts';
 
 /** Everything comes from this site: no inline script or style, no `data:`, no frames. */
 export const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'";
@@ -211,6 +212,9 @@ async function served(request: Request, env: WebEnv): Promise<Response> {
   if (isRoadmapApi(pathname)) return handleRoadmapApi(request, env);
   if (isAppApi(pathname)) return handleAppApi(request, env);
   if (pathname.startsWith('/api/')) return handleApi(request, env);
+  // The roadmap page answers with the latest board already drawn in (shyden-labs/ShyTalk#321).
+  const roadmap = roadmapLocale(pathname);
+  if (roadmap !== null) return serveRoadmapPage(request, env, roadmap);
   return env.ASSETS.fetch(request);
 }
 
@@ -226,8 +230,13 @@ async function route(request: Request, env: WebEnv): Promise<Response> {
   const asked = await passRefusal(request, env);
   if (asked) return asked;
   // Holding, nothing behind the page is reached, so no database is needed.
-  if (env.HOLDING === 'true') return holding(request, env);
-  return served(request, env);
+  const answer = env.HOLDING === 'true' ? await holding(request, env) : await served(request, env);
+  const cookie = await boxAnsweredCookie(request, env, Math.floor(Date.now() / 1000));
+  // A WebSocket upgrade's 101 cannot be copied; the page that opened the socket was given the cookie already.
+  if (cookie === null || answer.status === 101) return answer;
+  const withCookie = new Response(answer.body, answer);
+  withCookie.headers.append('set-cookie', cookie);
+  return withCookie;
 }
 
 /** Routes the request and puts the security headers on whatever answers. */

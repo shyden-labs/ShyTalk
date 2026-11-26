@@ -22,6 +22,10 @@ import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, PREVIEW_FACTS, PREVIEW_TAGS, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 import { SITE_USER } from '../../packages/environment/index.ts';
+import { MILESTONES, boardDelivery, linePattern, stateEndings } from '../support/roadmap-page.ts';
+import { smokeWebhookSecret } from './targets.ts';
+import { updatedLine } from '../../apps/web/src/roadmap/view.ts';
+import { pageWords } from '../../apps/web/src/roadmap/words.ts';
 
 /**
  * The site password's box answer (shyden-labs/ShyTalk#262), for the one check that fetches with no cookie and so
@@ -79,6 +83,28 @@ async function menuPicks(page: Page, locale: Locale, href: string): Promise<void
   await page.locator(`details.lang-switch a.entry[hreflang="${next}"]`).click();
   await expect.soft(page, "the picked language's page").toHaveURL((url) => `${url.pathname}${url.search}` === href);
   await expect.soft(page.locator('html')).toHaveAttribute('lang', next);
+}
+
+/**
+ * On a page an emailed or notice link opens (shyden-labs/ShyTalk#352): another language picked from the menu opens
+ * that language's page with the address's fragment, so the piece still opens the thread; English picked from the menu
+ * stays English, keeping the fragment, whatever the browser's language.
+ */
+async function menuKeepsToken(page: Page, locale: Locale, path: string, hash: string, view: string): Promise<void> {
+  // The language after this one, never English: en, then id, th, vi, zh, and id again.
+  const other = LOCALES[(LOCALES.indexOf(locale) % (LOCALES.length - 1)) + 1] as Locale;
+  await page.locator(MENU_BUTTON).click();
+  await page.locator(`details.lang-switch a.entry[hreflang="${langTag(other)}"]`).click();
+  await expect
+    .soft(page, 'another language keeps the token')
+    .toHaveURL((url) => `${url.pathname}${url.hash}` === `${localePath(other, path)}${hash}`);
+  await expect.soft(page.locator(`shydesk-support[view="${view}"]`)).toHaveAttribute('lang', other);
+  await page.locator(MENU_BUTTON).click();
+  await page.locator('details.lang-switch a.entry[hreflang="en"]').click();
+  // The page marks that it chose to stay; one that moves to the browser's language never does.
+  await expect.soft(page.locator('shydesk-support[data-language-kept]')).toHaveCount(1);
+  await expect.soft(page, 'English stays English, keeping the token').toHaveURL((url) => `${url.pathname}${url.hash}` === `${path}${hash}`);
+  await expect.soft(page.locator('html')).toHaveAttribute('lang', 'en');
 }
 
 /** Every console line the browser writes about the CSP refusing something. */
@@ -306,7 +332,99 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     // Every soft check above held (shyden-labs/ShyTalk#353: one hard assertion SonarCloud counts, S2699).
     expect(test.info().errors).toEqual([]);
   });
+
+  // The roadmap (shyden-labs/ShyTalk#321 AC3): the board drawn at once, never a loading line, each milestone a button
+  // named with its state that opens its own panel, the one bar, and when the board was read in the visitor's own zone.
+  test(`${lang}: the roadmap page shows the board at once in ${lang}, its heading, a button named with its state for each milestone, the bar and when it was last read; a press opens that milestone's panel, Close shuts it, and Escape shuts it again; it passes axe and fits a phone's width, with no CSP refusal`, async ({
+    page,
+  }) => {
+    const refusals = cspRefusals(page);
+    const response = await page.goto(`${prefix}/roadmap`, { waitUntil: 'load' });
+    expect.soft(response?.status()).toBe(200);
+    await expect.soft(page.locator('html')).toHaveAttribute('lang', lang);
+    const heading = page.getByRole('heading', { level: 1 });
+    await expect.soft(heading).toBeVisible();
+    await expect.soft(heading).toHaveText(t(locale, 'roadmap.heading'));
+    const buttons = page.locator('.map button.spot');
+    await expect.soft(buttons).toHaveCount(MILESTONES);
+    const labels = await buttons.evaluateAll((all) => all.map((button) => button.getAttribute('aria-label') ?? ''));
+    const endings = stateEndings(locale);
+    expect.soft(labels.filter((label) => !endings.some((ending) => label.endsWith(ending)))).toEqual([]);
+    await expect.soft(page.locator('.bar-words')).toHaveText(linePattern(locale, 'roadmap.bar'));
+    // Worded in the browser's own zone, named, as the page's own code words it.
+    const updated = page.locator('#roadmap-updated');
+    const readAt = (await updated.getAttribute('data-read-at')) ?? '';
+    const zone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+    await expect.soft(updated).toHaveText(updatedLine(readAt, pageWords(locale), locale, zone));
+    // A press opens the milestone's own panel; Close shuts it; a press again, then Escape, shuts it too.
+    const first = buttons.first();
+    const panel = page.locator('#roadmap-panel');
+    await first.click();
+    await expect.soft(first).toHaveAttribute('aria-expanded', 'true');
+    await expect.soft(panel).toBeVisible();
+    await expect.soft(panel.getByRole('heading', { level: 2 })).toHaveText(labels[0]?.split(', ')[0] ?? '(no label)');
+    await expect.soft(panel.getByRole('heading', { level: 3 })).toHaveText(t(locale, 'roadmap.brings'));
+    const open = await new AxeBuilder({ page }).analyze();
+    expect.soft(open.violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+    await panel.getByRole('button', { name: t(locale, 'roadmap.close') }).click();
+    await expect.soft(panel).toBeHidden();
+    await expect.soft(first).toHaveAttribute('aria-expanded', 'false');
+    await first.click();
+    await expect.soft(panel).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect.soft(panel).toBeHidden();
+    // A phone's width: set here where the browser can take one, measured as it stands on a phone.
+    if ((await page.evaluate(() => window.innerWidth)) > PHONE_WIDTH) {
+      await page.setViewportSize({ width: NARROW_WIDTH, height: 740 });
+      await page.reload({ waitUntil: 'load' });
+    }
+    const fits = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    expect.soft(fits, "the page fits a phone's width").toBe(true);
+    expect.soft(refusals).toEqual([]);
+    expect(test.info().errors).toEqual([]);
+  });
 }
+
+/**
+ * The roadmap's live board (shyden-labs/ShyTalk#321 AC3), once per browser: an open page takes each fresh board read
+ * as it comes, with no reload. A signed delivery for ShyTalk's board asks for the read, as GitHub's webhook does; on
+ * CI the board is the stand-in's (tests/smoke/github-stand-in.ts), on the phones DEV's own. A real board edit reaching
+ * an open page within 10 s is measured by hand (AC5).
+ */
+test('the roadmap page takes a fresh board read on its own, with no reload', async ({ page, request }) => {
+  // What the browser says of its socket and in its console, so a socket that will not open fails naming why.
+  const trouble: string[] = [];
+  page.on('websocket', (socket) => {
+    socket.on('socketerror', (error) => trouble.push(`socket error: ${error}`));
+    socket.on('close', () => trouble.push('socket closed'));
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error') trouble.push(`console: ${message.text()}`);
+  });
+  await page.goto('/roadmap', { waitUntil: 'load' });
+  const live = page.locator('#roadmap-live');
+  // A wait, then one assertion: an expect.poll counts a step per try, so its count would differ by browser speed.
+  const opened = await page
+    .locator('#roadmap-live[data-socket="open"]')
+    .waitFor({ timeout: 5_000 })
+    .then(
+      () => true,
+      () => false,
+    );
+  expect(opened ? 'open' : trouble.join('; ') || 'not open yet').toBe('open');
+  const before = Number(await live.getAttribute('data-version'));
+  await page.evaluate(() => {
+    (window as { notReloaded?: boolean }).notReloaded = true;
+  });
+  const { body, headers } = boardDelivery(smokeWebhookSecret());
+  const answer = await request.post('/hooks/github', { data: body, headers });
+  expect(answer.status()).toBe(202);
+  expect(await answer.json()).toEqual({ state: 'reading' });
+  await expect(live).not.toHaveAttribute('data-version', String(before), { timeout: 10_000 });
+  expect(Number(await live.getAttribute('data-version'))).toBeGreaterThan(before);
+  expect(await page.evaluate(() => (window as { notReloaded?: boolean }).notReloaded)).toBe(true);
+  await expect(page.locator('.map button.spot')).toHaveCount(MILESTONES);
+});
 
 /**
  * The closed-testing journey, in English, once per browser (shyden-labs/ShyTalk#55
@@ -316,58 +434,69 @@ for (const { lang, locale, prefix } of LANGUAGES) {
  * (the `mailbox` fixture). Each browser applies once, inside APPLY_LIMIT's 5 a minute.
  */
 /**
- * The one ticket page ShyDesk's emailed link opens (shyden-labs/ShyTalk#37 AC1): it lands on the ticket page of the
- * language it shows, with the emailed token still in the fragment, and opens the piece's ticket view in that language.
- * Which browser language picks which page is the unit test's (tests/unit/support-page.test.ts).
+ * The two pages ShyDesk's emails and notices link to, in a Thai browser, so that English picked from the menu is a
+ * real choice against the browser's language (shyden-labs/ShyTalk#352). Titled, as one-suite reads an untitled group's tests
+ * under a name its counter does not give them.
  */
-test('the ticket page opens the ticket view in the browser’s language, keeping the emailed token, passes axe, with no CSP refusal', async ({
-  page,
-}) => {
-  const refusals = cspRefusals(page);
-  const response = await page.goto(`${TICKET_PATH}#t=${SMOKE_TICKET_TOKEN}`, { waitUntil: 'load' });
-  expect.soft(response?.status()).toBe(200);
-  const piece = page.locator('shydesk-support[view="ticket"]');
-  await expect.soft(piece).toHaveCount(1);
-  const shown = await page.locator('html').getAttribute('lang');
-  const locale = LOCALES.find((each) => langTag(each) === shown) ?? 'en';
-  const address = new URL(page.url());
-  expect.soft(`${address.pathname}${address.hash}`).toBe(`${localePath(locale, TICKET_PATH)}#t=${SMOKE_TICKET_TOKEN}`);
-  await expect.soft(page.getByRole('heading', { level: 1 })).toHaveText(t(locale, 'support.ticketTitle'));
-  await expect.soft(piece).toHaveAttribute('product', 'shytalk');
-  await expect.soft(piece).toHaveAttribute('lang', locale);
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
-  expect(refusals).toEqual([]);
-});
+test.describe('in a Thai browser', () => {
+  test.use({ locale: 'th-TH' });
 
-/**
- * The one appeal page a punishment notice links to (shyden-labs/ShyTalk#310 AC4): it lands on the appeal page of the
- * language it shows, with the notice's token still in the fragment, and opens the piece's appeal view in that language.
- */
-test('the appeal page opens the appeal view in the browser’s language, keeping the notice’s token, passes axe, with no CSP refusal', async ({
-  page,
-}) => {
-  const refusals = cspRefusals(page);
-  const response = await page.goto(`${APPEAL_PATH}#appeal=${SMOKE_APPEAL_TOKEN}`, { waitUntil: 'load' });
-  expect.soft(response?.status()).toBe(200);
-  const piece = page.locator('shydesk-support[view="appeal"]');
-  await expect.soft(piece).toHaveCount(1);
-  const shown = await page.locator('html').getAttribute('lang');
-  const locale = LOCALES.find((each) => langTag(each) === shown) ?? 'en';
-  const address = new URL(page.url());
-  expect.soft(`${address.pathname}${address.hash}`).toBe(`${localePath(locale, APPEAL_PATH)}#appeal=${SMOKE_APPEAL_TOKEN}`);
-  await expect.soft(page.getByRole('heading', { level: 1 })).toHaveText(t(locale, 'support.appealTitle'));
-  for (const line of ['appealIntro', 'englishForm']) {
-    const statement = page.locator(`[data-line="${line}"]`);
-    await expect.soft(statement).toBeVisible();
-    await expect.soft(statement).toHaveText(t(locale, `support.${line}`));
-  }
-  await expect.soft(piece).toHaveAttribute('product', 'shytalk');
-  await expect.soft(piece).toHaveAttribute('lang', locale);
-  await expect.soft(page.locator('script[src$="/embed.js"]')).toHaveAttribute('src', `${builtShydeskOrigin()}/embed.js`);
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
-  expect(refusals).toEqual([]);
+  /**
+   * The one ticket page ShyDesk's emailed link opens (shyden-labs/ShyTalk#37 AC1): it lands on the ticket page of the
+   * language it shows, with the emailed token still in the fragment, and opens the piece's ticket view in that language.
+   * Which browser language picks which page is the unit test's (tests/unit/support-page.test.ts).
+   */
+  test('the ticket page opens the ticket view in the browser’s language, keeping the emailed token, which its language menu keeps, English staying English, passes axe, with no CSP refusal', async ({
+    page,
+  }) => {
+    const refusals = cspRefusals(page);
+    const response = await page.goto(`${TICKET_PATH}#t=${SMOKE_TICKET_TOKEN}`, { waitUntil: 'load' });
+    expect.soft(response?.status()).toBe(200);
+    const piece = page.locator('shydesk-support[view="ticket"]');
+    await expect.soft(piece).toHaveCount(1);
+    const shown = await page.locator('html').getAttribute('lang');
+    const locale = LOCALES.find((each) => langTag(each) === shown) ?? 'en';
+    const address = new URL(page.url());
+    expect.soft(`${address.pathname}${address.hash}`).toBe(`${localePath(locale, TICKET_PATH)}#t=${SMOKE_TICKET_TOKEN}`);
+    await expect.soft(page.getByRole('heading', { level: 1 })).toHaveText(t(locale, 'support.ticketTitle'));
+    await expect.soft(piece).toHaveAttribute('product', 'shytalk');
+    await expect.soft(piece).toHaveAttribute('lang', locale);
+    await menuKeepsToken(page, locale, TICKET_PATH, `#t=${SMOKE_TICKET_TOKEN}`, 'ticket');
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+    expect(refusals).toEqual([]);
+  });
+
+  /**
+   * The one appeal page a punishment notice links to (shyden-labs/ShyTalk#310 AC4): it lands on the appeal page of the
+   * language it shows, with the notice's token still in the fragment, and opens the piece's appeal view in that language.
+   */
+  test('the appeal page opens the appeal view in the browser’s language, keeping the notice’s token, which its language menu keeps, English staying English, passes axe, with no CSP refusal', async ({
+    page,
+  }) => {
+    const refusals = cspRefusals(page);
+    const response = await page.goto(`${APPEAL_PATH}#appeal=${SMOKE_APPEAL_TOKEN}`, { waitUntil: 'load' });
+    expect.soft(response?.status()).toBe(200);
+    const piece = page.locator('shydesk-support[view="appeal"]');
+    await expect.soft(piece).toHaveCount(1);
+    const shown = await page.locator('html').getAttribute('lang');
+    const locale = LOCALES.find((each) => langTag(each) === shown) ?? 'en';
+    const address = new URL(page.url());
+    expect.soft(`${address.pathname}${address.hash}`).toBe(`${localePath(locale, APPEAL_PATH)}#appeal=${SMOKE_APPEAL_TOKEN}`);
+    await expect.soft(page.getByRole('heading', { level: 1 })).toHaveText(t(locale, 'support.appealTitle'));
+    for (const line of ['appealIntro', 'englishForm']) {
+      const statement = page.locator(`[data-line="${line}"]`);
+      await expect.soft(statement).toBeVisible();
+      await expect.soft(statement).toHaveText(t(locale, `support.${line}`));
+    }
+    await expect.soft(piece).toHaveAttribute('product', 'shytalk');
+    await expect.soft(piece).toHaveAttribute('lang', locale);
+    await expect.soft(page.locator('script[src$="/embed.js"]')).toHaveAttribute('src', `${builtShydeskOrigin()}/embed.js`);
+    await menuKeepsToken(page, locale, APPEAL_PATH, `#appeal=${SMOKE_APPEAL_TOKEN}`, 'appeal');
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect.soft(violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`)).toEqual([]);
+    expect(refusals).toEqual([]);
+  });
 });
 
 test('applying and following the mailed link confirms the address', async ({ page, mailbox }) => {

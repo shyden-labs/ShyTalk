@@ -1,0 +1,144 @@
+---
+/**
+ * The roadmap page (shyden-labs/ShyTalk#321 AC3), as Shyden approved it on #319: the heading and intro, the
+ * conversation of milestones, the one bar, when the board was read and the launch line. The Worker draws the latest
+ * board into the four marks before the page leaves it (workers/web/src/roadmap/page.ts), so the board shows at once;
+ * with none to draw, the page stands as built. The page's script rewords the read time in the visitor's own zone,
+ * opens each milestone's panel and swaps in every newer read live.
+ */
+import Base from '../layouts/Base.astro';
+import { t, type Locale } from '../i18n/t.ts';
+import { milestoneLines, pageWords } from '../roadmap/words.ts';
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+const line = (key: string): string => t(locale, `roadmap.${key}`);
+// The words the page's script redraws a newer board with, safe inside a script element.
+const words = JSON.stringify({ locale, words: pageWords(locale), lines: milestoneLines(locale) }).replaceAll('<', '\\u003c');
+---
+
+<Base locale={locale} title={line('title')}>
+  <h1>{line('heading')}</h1>
+  <p class="roadmap-intro">{line('intro')}</p>
+  <section class="roadmap">
+    <Fragment set:html="<!--roadmap:map-->" />
+    <Fragment set:html="<!--roadmap:bar-->" />
+    <Fragment set:html="<!--roadmap:updated-->" />
+    <p class="launch">{line('launch')}</p>
+  </section>
+  <Fragment set:html="<!--roadmap:snapshot-->" />
+  <script type="application/json" id="roadmap-words" is:inline set:html={words} />
+</Base>
+
+<script>
+  import { buttonsHtml, isNewer, mapSvg, overallPercent, panelHtml, reconnectDelay, updatedLine } from '../roadmap/view.ts';
+  import type { Lines, Milestone, Words } from '../roadmap/view.ts';
+
+  interface Board {
+    milestones: Milestone[];
+    version: number;
+    readAt: string;
+  }
+
+  const json = <T,>(id: string): T | null => {
+    const text = document.getElementById(id)?.textContent;
+    return text === undefined || text === null || text === '' ? null : (JSON.parse(text) as T);
+  };
+  const given = json<{ locale: string; words: Words; lines: Lines }>('roadmap-words');
+  let board = json<Board>('roadmap-snapshot');
+  const live = document.getElementById('roadmap-live');
+  const panel = document.getElementById('roadmap-panel');
+
+  if (given !== null && board !== null && live !== null && panel !== null) {
+    const { locale, words, lines } = given;
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let open = -1;
+
+    const buttons = (): HTMLButtonElement[] => [...live.querySelectorAll<HTMLButtonElement>('button.spot')];
+    const fill = (template: string, percent: number): string => template.replaceAll('{percent}', String(percent));
+
+    // The read time in the visitor's own zone, named.
+    const reword = (shown: Board): void => {
+      const updated = document.getElementById('roadmap-updated');
+      if (updated === null) return;
+      updated.dataset['readAt'] = shown.readAt;
+      updated.textContent = updatedLine(shown.readAt, words, locale, zone);
+    };
+
+    const shut = (focus: boolean): void => {
+      const opener = buttons()[open];
+      panel.hidden = true;
+      open = -1;
+      for (const button of buttons()) button.setAttribute('aria-expanded', 'false');
+      if (focus) opener?.focus();
+    };
+
+    const show = (index: number): void => {
+      const milestone = board?.milestones[index];
+      if (milestone === undefined) return;
+      open = index;
+      panel.innerHTML = panelHtml(milestone, index, words, lines);
+      panel.hidden = false;
+      for (const button of buttons()) button.setAttribute('aria-expanded', String(Number(button.dataset['index']) === index));
+    };
+
+    // A newer board, drawn where the old one stood: the map, the bar and the read time; an open panel stays open.
+    const draw = (next: Board): void => {
+      board = next;
+      const map = live.querySelector('.map');
+      if (map !== null) map.innerHTML = mapSvg(next.milestones, words, lines) + buttonsHtml(next.milestones, words, lines);
+      const percent = overallPercent(next.milestones);
+      document.querySelector('svg.bar')?.setAttribute('aria-label', fill(words.barLabel, percent));
+      document.querySelector('svg.bar rect.bar-done')?.setAttribute('width', String(percent));
+      const barWords = document.querySelector('.bar-words');
+      if (barWords !== null) barWords.textContent = fill(words.bar, percent);
+      reword(next);
+      live.dataset['version'] = String(next.version);
+      if (open !== -1) show(open);
+    };
+
+    live.addEventListener('click', (event) => {
+      const target = event.target as Element;
+      const button = target.closest<HTMLButtonElement>('button.spot');
+      if (button !== null) {
+        const index = Number(button.dataset['index']);
+        if (index === open) shut(false);
+        else show(index);
+        return;
+      }
+      if (target.closest('#roadmap-panel button.close') !== null) shut(true);
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && open !== -1) shut(true);
+    });
+
+    // Each newer read, as the roadmap's object pushes it; a lost socket comes back after a growing, capped wait.
+    const connect = (attempt: number): void => {
+      const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/roadmap/live`);
+      let opened = false;
+      socket.addEventListener('open', () => {
+        opened = true;
+        live.dataset['socket'] = 'open';
+      });
+      socket.addEventListener('message', (event: MessageEvent<string>) => {
+        const read = JSON.parse(event.data) as Partial<Board> & { type?: string };
+        if (read.type !== 'roadmap' || !Array.isArray(read.milestones) || typeof read.version !== 'number' || typeof read.readAt !== 'string')
+          return;
+        const next = { milestones: read.milestones, version: read.version, readAt: read.readAt };
+        if (board === null || isNewer(board, next)) draw(next);
+      });
+      socket.addEventListener('close', () => {
+        live.dataset['socket'] = 'closed';
+        const wait = reconnectDelay(opened ? 0 : attempt);
+        setTimeout(() => {
+          connect(opened ? 1 : attempt + 1);
+        }, wait);
+      });
+    };
+
+    reword(board);
+    connect(0);
+  }
+</script>

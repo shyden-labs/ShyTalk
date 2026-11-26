@@ -61,4 +61,39 @@ describe('the Worker’s roadmap object', () => {
     expect(urls).toEqual(Array(2).fill('https://api.github.com/app/installations/184830629/access_tokens'));
     vi.unstubAllGlobals();
   });
+
+  /** The CI smoke reads a recorded board from a stand-in on this machine (tests/smoke/github-stand-in.ts). */
+  it('reads the board from a stand-in on this machine when ROADMAP_GITHUB_API names one', async () => {
+    const urls: string[] = [];
+    const deps = roadmapDeps({ ...ENV, ROADMAP_GITHUB_API: 'http://127.0.0.1:8790' }, (url) => {
+      urls.push(url);
+      if (url.endsWith('/access_tokens')) return Promise.resolve(Response.json({ token: 'ghs_t' }, { status: 201 }));
+      return Promise.resolve(Response.json(emptyBoard));
+    });
+    expect(await deps.readBoard()).toEqual([]);
+    expect(urls).toEqual(['http://127.0.0.1:8790/app/installations/184830629/access_tokens', 'http://127.0.0.1:8790/graphql']);
+  });
+
+  it.each(['https://api.github.com.evil.example', 'http://api.github.com', 'https://127.0.0.1:8790', 'http://10.0.0.1:8790', 'not a url'])(
+    'refuses ROADMAP_GITHUB_API %s, which is neither GitHub nor this machine, sending nothing',
+    async (api) => {
+      const send = vi.fn();
+      await expect(roadmapDeps({ ...ENV, ROADMAP_GITHUB_API: api }, send).readBoard()).rejects.toThrow(
+        'roadmap: ROADMAP_GITHUB_API must be https://api.github.com or http://127.0.0.1:<port>',
+      );
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  it('reads GitHub itself when ROADMAP_GITHUB_API is https://api.github.com', async () => {
+    const urls: string[] = [];
+    const deps = roadmapDeps({ ...ENV, ROADMAP_GITHUB_API: 'https://api.github.com' }, (url) => {
+      urls.push(url);
+      return Promise.resolve(
+        url.endsWith('/access_tokens') ? Response.json({ token: 'ghs_t' }, { status: 201 }) : Response.json(emptyBoard),
+      );
+    });
+    await deps.readBoard();
+    expect(urls[1]).toBe('https://api.github.com/graphql');
+  });
 });
