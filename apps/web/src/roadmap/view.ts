@@ -279,18 +279,37 @@ function typing({ milestone, spot, from }: Stop, finished: boolean, boxes: reado
   return `<g class="typing" transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><rect x="-26" y="-14" width="52" height="28" rx="14"/>${dots}</g>`;
 }
 
+const FAINT_TRIES = 40;
+const segmenter = new Intl.Segmenter();
+
+/**
+ * A faint hello, drawn at the first of its steady random spots whose box touches no bubble and no label
+ * (shyden-labs/ShyTalk#364: "hallo" sat inside 你好); left out, as nothing, when no spot is clear. Its box is as wide
+ * as its letters at the full font size, wide enough for Chinese, Japanese and Korean, rounded as it is drawn.
+ */
+export function faintText(word: string, random: () => number, boxes: readonly Box[]): string {
+  const letters = [...segmenter.segment(word)].length;
+  for (let tries = 0; tries < FAINT_TRIES; tries += 1) {
+    const x = Math.round(random() * 940 + 30);
+    const y = Math.round(random() * 400 + 25);
+    const size = Math.round(11 + random() * 6);
+    const half = (letters * size) / 2;
+    const box = { left: x - half, top: y - size, right: x + half, bottom: y + size * 0.3 };
+    if (boxes.every((other) => box.right <= other.left || box.left >= other.right || box.bottom <= other.top || box.top >= other.bottom)) {
+      return `<text class="faint" x="${String(x)}" y="${String(y)}" font-size="${String(size)}" text-anchor="middle">${word}</text>`;
+    }
+  }
+  return '';
+}
+
 /** The conversation, hidden from screen readers: the buttons over it carry its words. */
 export function mapSvg(milestones: readonly Milestone[], words: Words, lines: Lines): string {
   const shown = stops(milestones);
   let svg = '<svg viewBox="0 0 1000 440" aria-hidden="true" focusable="false">';
   svg += '<rect class="field" width="1000" height="440"/>';
+  const boxes = taken(shown, words, lines);
   const random = steady(7);
-  for (const word of [...FAINT, ...FAINT].slice(0, 30)) {
-    const x = random() * 940 + 30;
-    const y = random() * 400 + 25;
-    const size = 11 + random() * 6;
-    svg += `<text class="faint" x="${x.toFixed(0)}" y="${y.toFixed(0)}" font-size="${size.toFixed(0)}" text-anchor="middle">${word}</text>`;
-  }
+  for (const word of [...FAINT, ...FAINT].slice(0, 30)) svg += faintText(word, random, boxes);
   const next = shown.find(({ milestone }) => milestone.state !== 'done');
   const openAt = next?.index ?? shown.length;
   for (const { index, spot, from } of shown) {
@@ -301,7 +320,7 @@ export function mapSvg(milestones: readonly Milestone[], words: Words, lines: Li
   }
   svg += shown.map((stop) => bubble(stop, words, lines)).join('');
   const last = shown.at(-1);
-  if (last !== undefined) svg += typing(next ?? last, next === undefined, taken(shown, words, lines));
+  if (last !== undefined) svg += typing(next ?? last, next === undefined, boxes);
   return `${svg}</svg>`;
 }
 

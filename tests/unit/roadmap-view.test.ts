@@ -11,6 +11,7 @@ import {
   reconnectDelay,
   stateLabel,
   typingPlace,
+  faintText,
   updatedLine,
   zoneName,
   type Milestone,
@@ -435,4 +436,13 @@ describe('the faint hellos keep clear', () => {
       expect(words.filter(({ box }) => boxes.some((other) => touches(box, other))).map(({ word }) => word)).toEqual([]);
     },
   );
+
+  it('leaves a faint hello out when no spot is clear', () => {
+    const everything = { left: -100, top: -100, right: 1100, bottom: 540 };
+    expect(faintText('hello', () => 0.5, [everything])).toBe('');
+  });
+
+  it('draws a faint hello at its first clear spot, rounded as it is drawn', () => {
+    expect(faintText('hello', () => 0.5, [])).toBe('<text class="faint" x="500" y="225" font-size="14" text-anchor="middle">hello</text>');
+  });
 });
