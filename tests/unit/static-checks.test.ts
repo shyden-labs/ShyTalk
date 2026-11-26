@@ -78,8 +78,11 @@ describe('ci.yml', () => {
 
   // shyden-labs/ShyTalk#109: every target the site supports runs the same suite, and their totals are compared.
   it('builds the site for dev and runs the smoke against that build, so a preview’s addresses are checked (shyden-labs/ShyTalk#198)', () => {
-    expect(yamlBlock(ci, 'web-smoke', '  ').split('\n').slice(0, 7)).toEqual([
+    expect(yamlBlock(ci, 'web-smoke', '  ').split('\n').slice(0, 9)).toEqual([
       '  web-smoke:',
+      // Read-only, so it may restore Edge from the cache (shyden-labs/ShyTalk#375).
+      '    permissions:',
+      '      contents: read',
       '    runs-on: ubuntu-26.04',
       '    timeout-minutes: 20',
       '    container:',
@@ -120,7 +123,17 @@ describe('ci.yml', () => {
       { name: '', run: '', if: '' },
       { name: '', run: 'node scripts/change-scope.ts', if: '' },
       { name: '', run: 'node scripts/npm-ci.ts', if: '' },
-      { name: 'Install Microsoft Edge', run: 'node_modules/.bin/playwright install --with-deps msedge', if: CODE },
+      // Edge and its OS packages come from the cache, and the install names its last download if it stalls
+      // (shyden-labs/ShyTalk#375; the steps are checked in ci-download-cache.test.ts).
+      { name: 'Keep apts downloads in the Edge cache folder', run: '|', if: CODE },
+      { name: 'Restore the Edge download', run: '', if: CODE },
+      { name: 'Install Microsoft Edge', run: '|', if: CODE },
+      { name: 'Read the installed Edge version and drop older downloads', run: '|', if: CODE },
+      {
+        name: 'Save the Edge download for later runs',
+        run: '',
+        if: `${CODE} && steps.edge-cache.outputs.cache-matched-key != format(msedge-debs-{0}, steps.edge.outputs.version)`,
+      },
       { name: 'Build the site', run: 'npm run build:web', if: CODE },
       { name: 'Smoke', run: '|', if: CODE },
       {
