@@ -27,7 +27,6 @@ function world(options: { codesHeld?: number; failOn?: string; tokenSpent?: numb
     ENVIRONMENT_NAME: 'dev',
     SITE_ORIGIN: 'https://site.example.test',
     BETTER_AUTH_SECRET: 'a-test-secret-that-is-long-enough-for-better-auth',
-    SIGNUPS_OPEN: 'true',
     GOOGLE_CLIENT_IDS: 'g',
     APPLE_AUDIENCES: 'a',
     DB: {

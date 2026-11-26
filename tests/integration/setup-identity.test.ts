@@ -14,7 +14,7 @@ let env: SetupEnv;
 
 beforeAll(async () => {
   ({ env: local, dispose } = await localDev());
-  env = { ENVIRONMENT_NAME: 'dev', DB: local.DB, SIGNUPS_OPEN: 'true' } as unknown as SetupEnv;
+  env = { ENVIRONMENT_NAME: 'dev', DB: local.DB } as unknown as SetupEnv;
 });
 
 afterAll(async () => {

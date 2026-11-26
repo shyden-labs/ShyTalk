@@ -7,29 +7,13 @@
   "env": {
     "test": {
       "name": "shytalk-door-test",
-      "routes": [
-        {
-          "pattern": "test.shytalk.app",
-          "custom_domain": true
-        }
-      ],
-      "vars": {
-        "ORIGIN": "https://shytalk-test.shytalk-non-prod.workers.dev"
-      }
+      "routes": [{ "pattern": "test.shytalk.app", "custom_domain": true }],
+      "vars": { "ORIGIN": "https://shytalk-test.shytalk-non-prod.workers.dev" }
     },
     "dev": {
       "name": "shytalk-door-dev",
-      "routes": [
-        {
-          "pattern": "dev.shytalk.app",
-          "custom_domain": true
-        }
-      ],
-      "vars": {
-        "ORIGIN": "https://shytalk-dev.shytalk-non-prod.workers.dev",
-        "HOST": "dev.shytalk.app",
-        "DEV_PASS_KEYS": "{\"2026-11\": \"OBLprb_S4Kn2C--HFVaeA3_s6gEsApDiRAWPLc6WsK8\"}"
-      }
+      "routes": [{ "pattern": "dev.shytalk.app", "custom_domain": true }],
+      "vars": { "ORIGIN": "https://shytalk-dev.shytalk-non-prod.workers.dev" }
     }
   }
 }

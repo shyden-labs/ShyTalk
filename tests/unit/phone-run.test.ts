@@ -281,8 +281,8 @@ describe('runPhones', () => {
     });
     await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(0);
     expect(seen).toEqual([
-      ['roadmap-webhook-value', 'shydesk-callback-value'],
-      ['roadmap-webhook-value', 'shydesk-callback-value'],
+      ['shytalk-dev-roadmap-webhook-secret-value', 'shytalk-dev-shydesk-callback-secret-value'],
+      ['shytalk-dev-roadmap-webhook-secret-value', 'shytalk-dev-shydesk-callback-secret-value'],
     ]);
   });
 
@@ -311,7 +311,8 @@ describe('runPhones', () => {
 
   it('fails naming only the DEV secret the Keychain lacks (shyden-labs/ShyTalk#379)', async () => {
     const d = deps({
-      devSecret: (name) => (name === 'shydesk-callback' ? Promise.reject(new Error('security: item not found')) : Promise.resolve('found')),
+      devSecret: (name) =>
+        name === 'shytalk-dev-shydesk-callback-secret' ? Promise.reject(new Error('security: item not found')) : Promise.resolve('found'),
     });
     await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
     expect(d.steps.at(-1)).toBe(
@@ -326,8 +327,8 @@ describe('runPhones', () => {
     expect(d.steps).toEqual([
       'mailbox password',
       'site password dev',
-      'dev secret roadmap-webhook',
-      'dev secret shydesk-callback',
+      'dev secret shytalk-dev-roadmap-webhook-secret',
+      'dev secret shytalk-dev-shydesk-callback-secret',
       'forward',
       `playwright ${DEV_ORIGIN} http://127.0.0.1:9333`,
       'unforward',
@@ -382,8 +383,8 @@ describe('runPhones', () => {
     expect(d.steps).toEqual([
       'mailbox password',
       'site password dev',
-      'dev secret roadmap-webhook',
-      'dev secret shydesk-callback',
+      'dev secret shytalk-dev-roadmap-webhook-secret',
+      'dev secret shytalk-dev-shydesk-callback-secret',
       'forward',
       'unforward',
       'print phone-smoke: npx not found',

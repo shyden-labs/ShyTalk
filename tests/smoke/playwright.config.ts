@@ -89,10 +89,9 @@ const ROADMAP_VARS = [
 
 /**
  * DEV's pass key, a throwaway one each run, as DEV has one: with it, the box's answer earns the site pass cookie, which
- * WebKit's WebSocket upgrade carries where it gives no box answer (shyden-labs/ShyTalk#321). Sign-ups are open, as
- * DEV's switch is (shyden-labs/ShyTalk#314).
+ * WebKit's WebSocket upgrade carries where it gives no box answer (shyden-labs/ShyTalk#321).
  */
-const PASS_VARS = `--var DEV_PASS_SECRET:${randomBytes(32).toString('base64url')} --var SIGNUPS_OPEN:true`;
+const PASS_VARS = `--var DEV_PASS_SECRET:${randomBytes(32).toString('base64url')}`;
 
 export default defineConfig({
   testDir: '.',

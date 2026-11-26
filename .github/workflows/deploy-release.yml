@@ -85,7 +85,6 @@ jobs:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
           ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}
-          SIGNUPS_OPEN: ${{ vars.SIGNUPS_OPEN }}
           ROADMAP_WEBHOOK_SECRET: ${{ secrets.ROADMAP_WEBHOOK_SECRET }}
           SHYDESK_CALLBACK_SECRET: ${{ secrets.SHYDESK_CALLBACK_SECRET }}
         run: |
@@ -96,9 +95,6 @@ jobs:
             "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --dry-run --env prod --outdir "$RUNNER_TEMP/prod" || { echo "::error title=deploy-release failed::workers/web did not bundle for prod"; exit 1; }
             exit 0
           fi
-          # The sign-up switch (shyden-labs/ShyTalk#314): this environment's SIGNUPS_OPEN variable becomes the
-          # Worker's var; nothing is changed without exactly true or false.
-          case "$SIGNUPS_OPEN" in true|false) ;; *) echo "::error title=SIGNUPS_OPEN missing::Set SIGNUPS_OPEN to true or false in the $TARGET environment variables (shyden-labs/ShyTalk#314)."; exit 1 ;; esac
           info=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 info "shytalk-$TARGET" --env "$TARGET" 2>&1) || {
             printf '%s\n' "$info"
             case "$info" in
@@ -123,7 +119,7 @@ jobs:
           # nothing when the target already serves that document.
           ui_db=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 info "shytalk-$TARGET" --env "$TARGET" --json | jq -er '.uuid') || { echo "::error title=deploy-release failed::the shytalk-$TARGET id could not be read"; exit 1; }
           (cd "$GITHUB_WORKSPACE" && UI_ENVIRONMENT="$TARGET" UI_DATABASE_NAME="shytalk-$TARGET" UI_DATABASE_ID="$ui_db" UI_PUBLISHED_BY=ci:deploy-release node scripts/publish-ui.ts) || { echo "::error title=deploy-release failed::the UI document was not published to $TARGET"; exit 1; }
-          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --env "$TARGET" --var SIGNUPS_OPEN:"$SIGNUPS_OPEN" || { echo "::error title=deploy-release failed::workers/web did not deploy to $TARGET"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --env "$TARGET" || { echo "::error title=deploy-release failed::workers/web did not deploy to $TARGET"; exit 1; }
           # App sign-in answers 503 until the Worker holds Better Auth's
           # secret (shyden-labs/ShyTalk#110); test and production each hold
           # their own value.

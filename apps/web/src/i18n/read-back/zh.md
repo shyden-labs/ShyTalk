@@ -84,7 +84,6 @@
 | account.codeRefused | That code is not right, or it has expired. Ask for a new one if needed. | 验证码不正确或已过期。如有需要，请重新获取。 | The verification code is incorrect or has expired. Please obtain a new one if needed. |
 | account.failed | Something went wrong. Please try again later. | 出现问题。请稍后再试。 | There was a problem. Please try again later. |
 | account.signUpConfirmed | Your email address is confirmed. | 您的电子邮件地址已确认。 | Your email address has been verified. |
-| account.signUpsClosed | New sign-ups are closed right now. If you already have an account, you can still sign in. | 目前暂停新用户注册。如果您已有账号，仍然可以登录。 | New user registration is currently suspended. If you already have an account, you can still log in. |
 | account.recoveryStarted | The recovery has started. From {completesAt}, a new way to sign in can be added on this device. | 恢复已经开始。从 {completesAt} 起，可以在此设备上添加新的登录方式。 | Recovery has begun. Starting with {completesAt} , you can add new sign-in methods on this device. |
 | account.cancelTitle | Cancel a recovery | 取消恢复 | Cancel recovery |
 | account.cancelIntro | Press the button to cancel the recovery of your ShyTalk account. | 按下按钮即可取消您的 ShyTalk 账户恢复。 | Press the button to cancel your ShyTalk account recovery. |

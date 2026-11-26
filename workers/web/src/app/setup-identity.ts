@@ -6,7 +6,6 @@
  * id is made once and kept on the token, so a passkey and an authenticator
  * started from one token name one member.
  */
-import { SIGN_UPS_CLOSED, signUpsOpen, type SignUpsEnv } from './signups.ts';
 import type { AuditDatabase } from '../audit.ts';
 import { json } from '../http.ts';
 import { tokenHash } from './email-code.ts';
@@ -17,7 +16,7 @@ interface D1Answer {
   results?: unknown[];
 }
 
-export interface SetupEnv extends SignUpsEnv {
+export interface SetupEnv {
   ENVIRONMENT_NAME: 'prod' | 'test' | 'dev';
   DB: AuditDatabase<unknown> & { batch(statements: unknown[]): Promise<D1Answer[]> };
 }
@@ -77,8 +76,6 @@ export async function setupIdentityByHash(env: SetupEnv, hash: string, deps: Set
   if (row?.used_at !== null || row.expires_at < now) return refused();
 
   if (row.purpose === 'sign-up') {
-    // A sign-up token from before the switch was turned off finishes nothing (shyden-labs/ShyTalk#314).
-    if (!signUpsOpen(env)) return json(403, SIGN_UPS_CLOSED);
     const [existing] = await DB.batch([DB.prepare(USER_SQL).bind(row.email)]);
     if (firstRow(existing) !== undefined) return json(409, { error: 'account_exists' });
     if (row.user_id !== null) return { kind: 'sign-up', userId: row.user_id, email: row.email, tokenHash: hash };

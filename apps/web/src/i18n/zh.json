@@ -96,7 +96,6 @@
     "codeRefused": "验证码不正确或已过期。如有需要，请重新获取。",
     "failed": "出现问题。请稍后再试。",
     "signUpConfirmed": "您的电子邮件地址已确认。",
-    "signUpsClosed": "目前暂停新用户注册。如果您已有账号，仍然可以登录。",
     "recoveryStarted": "恢复已经开始。从 {completesAt} 起，可以在此设备上添加新的登录方式。",
     "cancelTitle": "取消恢复",
     "cancelIntro": "按下按钮即可取消您的 ShyTalk 账户恢复。",

@@ -24,7 +24,6 @@ beforeAll(async () => {
     ENVIRONMENT_NAME: 'dev',
     SITE_ORIGIN: 'https://site.example.test',
     BETTER_AUTH_SECRET: 'an-integration-secret-long-enough-for-better-auth',
-    SIGNUPS_OPEN: 'true',
     GOOGLE_CLIENT_IDS: 'g',
     APPLE_AUDIENCES: 'a',
   } as const;

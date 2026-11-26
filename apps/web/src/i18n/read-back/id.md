@@ -84,7 +84,6 @@
 | account.codeRefused | That code is not right, or it has expired. Ask for a new one if needed. | Kode itu salah atau sudah kedaluwarsa. Minta kode baru jika perlu. | The code is incorrect or expired. Request a new code if necessary. |
 | account.failed | Something went wrong. Please try again later. | Terjadi kesalahan. Silakan coba lagi nanti. | An error occurred. Please try again later. |
 | account.signUpConfirmed | Your email address is confirmed. | Alamat email kamu sudah dikonfirmasi. | Your email address has been confirmed. |
-| account.signUpsClosed | New sign-ups are closed right now. If you already have an account, you can still sign in. | Pendaftaran baru sedang ditutup. Jika kamu sudah punya akun, kamu tetap bisa masuk. | New registrations are currently closed. If you already have an account, you can still log in. |
 | account.recoveryStarted | The recovery has started. From {completesAt}, a new way to sign in can be added on this device. | Pemulihan telah dimulai. Mulai {completesAt}, cara masuk baru dapat ditambahkan di perangkat ini. | Recovery has begun. Starting at {completesAt} , new sign-in methods can be added on this device. |
 | account.cancelTitle | Cancel a recovery | Batalkan pemulihan | Cancel restore |
 | account.cancelIntro | Press the button to cancel the recovery of your ShyTalk account. | Tekan tombol untuk membatalkan pemulihan akun ShyTalk kamu. | Press the button to cancel your ShyTalk account recovery. |

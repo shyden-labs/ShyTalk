@@ -16,7 +16,7 @@ interface Props {
 const { locale, purpose } = Astro.props;
 const line = (key: string): string => t(locale, `account.${key}`);
 const title = line(purpose === 'sign-up' ? 'signUpTitle' : 'recoverTitle');
-const messages = ['sent', 'invalid', 'tooMany', 'sendFailed', 'codeRefused', 'failed', 'signUpConfirmed', 'recoveryStarted', 'passkeyFailed', 'signUpsClosed'];
+const messages = ['sent', 'invalid', 'tooMany', 'sendFailed', 'codeRefused', 'failed', 'signUpConfirmed', 'recoveryStarted', 'passkeyFailed'];
 const data = Object.fromEntries(messages.map((key) => [`data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`, line(key)]));
 ---
 
@@ -76,7 +76,8 @@ const data = Object.fromEntries(messages.map((key) => [`data-${key.replace(/[A-Z
 
 <script>
   import { startRegistration, type PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
-  import { sessionState, setupKey, startMessage, verifyMessage } from '../account/answers.ts';
+  import { applyMessage } from '../closed-testing/answers.ts';
+  import { sessionState, setupKey, verifyMessage } from '../account/answers.ts';
   import { call } from '../account/api.ts';
 
   const SIGN_UP_KEY = 'shytalk.signUpToken';
@@ -176,7 +177,7 @@ const data = Object.fromEntries(messages.map((key) => [`data-${key.replace(/[A-Z
     emailForm.addEventListener('submit', (event) => {
       event.preventDefault();
       void call('email/start', { email: field(emailForm, 'email'), purpose, locale: root.dataset['locale'] }).then(({ status }) => {
-        say(startMessage(status));
+        say(applyMessage(status));
         if (status === 202) codeForm.hidden = false;
       });
     });

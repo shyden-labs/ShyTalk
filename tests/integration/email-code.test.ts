@@ -34,7 +34,6 @@ beforeAll(async () => {
     ENVIRONMENT_NAME: 'dev',
     SITE_ORIGIN: 'https://site.example.test',
     BETTER_AUTH_SECRET: SECRET,
-    SIGNUPS_OPEN: 'true',
     GOOGLE_CLIENT_IDS: 'g',
     APPLE_AUDIENCES: 'a',
     DB: local.DB,

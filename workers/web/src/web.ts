@@ -63,8 +63,6 @@ export interface WebEnv extends HookEnv {
   SITE_PASSWORD?: string;
   /** The key the partner site signs dev passes with (a Wrangler secret, DEV only; shyden-labs/ShyTalk#263). */
   DEV_PASS_SECRET?: string;
-  /** Whether organic sign-ups are open: exactly `true`, set at deploy from the environment's GitHub variable (a var; shyden-labs/ShyTalk#314). */
-  SIGNUPS_OPEN?: string;
   /** The secret ShyDesk signs punishment deliveries with (a Wrangler secret; shyden-labs/ShyTalk#310). */
   SHYDESK_CALLBACK_SECRET?: string;
   /** The ShyDesk whose support piece this environment's support pages embed (a var; shyden-labs/ShyTalk#37). */

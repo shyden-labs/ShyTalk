@@ -97,7 +97,6 @@ jobs:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TOTP_KEY: ${{ secrets.TOTP_KEY }}
           ROADMAP_APP_KEY: ${{ secrets.ROADMAP_APP_KEY }}
-          SIGNUPS_OPEN: ${{ vars.SIGNUPS_OPEN }}
           ROADMAP_WEBHOOK_SECRET: ${{ secrets.ROADMAP_WEBHOOK_SECRET }}
           SHYDESK_CALLBACK_SECRET: ${{ secrets.SHYDESK_CALLBACK_SECRET }}
         run: |
@@ -111,9 +110,6 @@ jobs:
             "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --dry-run --env dev --outdir "$RUNNER_TEMP/web" || { echo "::error title=deploy-dev failed::workers/web did not bundle"; exit 1; }
             exit 0
           fi
-          # The sign-up switch (shyden-labs/ShyTalk#314): this environment's SIGNUPS_OPEN variable becomes the
-          # Worker's var; nothing is changed without exactly true or false.
-          case "$SIGNUPS_OPEN" in true|false) ;; *) echo "::error title=SIGNUPS_OPEN missing::Set SIGNUPS_OPEN to true or false in the dev environment variables (shyden-labs/ShyTalk#314)."; exit 1 ;; esac
           # Plan 4 Task 2 (shyden-labs/ShyTalk#75, decisions 219, 220): the
           # database exists, is migrated and is marked `dev` before the Worker
           # deploys, or the site answers 503 to everyone. Only Wrangler's
@@ -142,7 +138,7 @@ jobs:
           # dev already serves that document.
           ui_db=$("$GITHUB_WORKSPACE/node_modules/.bin/wrangler" d1 info shytalk-dev --env dev --json | jq -er '.uuid') || { echo "::error title=deploy-dev failed::the shytalk-dev id could not be read"; exit 1; }
           (cd "$GITHUB_WORKSPACE" && UI_ENVIRONMENT=dev UI_DATABASE_NAME=shytalk-dev UI_DATABASE_ID="$ui_db" UI_PUBLISHED_BY=ci:deploy-dev node scripts/publish-ui.ts) || { echo "::error title=deploy-dev failed::the UI document was not published"; exit 1; }
-          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --env dev --var SIGNUPS_OPEN:"$SIGNUPS_OPEN" || { echo "::error title=deploy-dev failed::workers/web did not deploy"; exit 1; }
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" deploy --env dev || { echo "::error title=deploy-dev failed::workers/web did not deploy"; exit 1; }
           if [ -z "$DOOR_SECRET" ]; then
             echo "::error title=DOOR_SECRET missing::Set DOOR_SECRET in the dev environment (decision 216); until then the dev origin refuses every request."
             exit 1

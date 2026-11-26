@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { CONTENT_SECURITY_POLICY, handle, type WebEnv } from '../../workers/web/src/web.ts';
 import { json } from '../../workers/web/src/http.ts';
-import { isAppApi, readyForSignIn } from '../../workers/web/src/app/router.ts';
+import { isAppApi } from '../../workers/web/src/app/router.ts';
 import { DOOR_SECRET_HEADER, SITE_PASSWORD_HEADER, type D1Like } from '../../packages/environment/index.ts';
 
 /** The dev and test site password (shyden-labs/ShyTalk#262), given in its header as the app gives it beside a bearer token. */
@@ -123,44 +123,6 @@ describe('/api/app/sign-in and sign-out', () => {
       expect(await response.json()).toEqual({ error: 'bad_request' });
     },
   );
-
-  // The sign-up switch reaches the handlers through the router (shyden-labs/ShyTalk#314): a narrowed settings
-  // object that dropped SIGNUPS_OPEN would close sign-ups everywhere.
-  const signUpStart = (): Request =>
-    new Request('https://site.example.test/api/app/email/start', {
-      method: 'POST',
-      body: JSON.stringify({ email: 'new@example.test', purpose: 'sign-up', locale: 'en' }),
-      headers: { [DOOR_SECRET_HEADER]: SECRET, [SITE_PASSWORD_HEADER]: PASSWORD, 'content-type': 'application/json' },
-    });
-  /** As `ready`, with a database whose send-limit insert changes nothing, so a start that passes the switch answers 429. */
-  const limited = (SIGNUPS_OPEN: string): WebEnv => ({
-    ...ready(),
-    SIGNUPS_OPEN,
-    DB: {
-      prepare: () => ({ first: <T>() => Promise.resolve({ name: 'dev' } as T), bind: () => ({}) }),
-      batch: () =>
-        Promise.resolve([
-          { meta: { changes: 0 } },
-          { meta: { changes: 0 } },
-          { meta: { changes: 0 } },
-          { meta: { changes: 0 } },
-          { results: [] },
-        ]),
-      exec: () => Promise.resolve({}),
-    } as D1Like,
-  });
-
-  it('a sign-up start is refused when SIGNUPS_OPEN is false', async () => {
-    const response = await handle(signUpStart(), limited('false'));
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: 'sign_ups_closed' });
-  });
-
-  // The setup routes (passkey, authenticator, finish) get only the sign-in settings, so the sign-up switch must be
-  // among them, or every sign-up would be refused at its last step (shyden-labs/ShyTalk#314).
-  it.each(['true', 'false'])('the sign-in settings carry SIGNUPS_OPEN %s to the setup routes', (value) => {
-    expect(readyForSignIn({ ...ready(), SIGNUPS_OPEN: value })?.SIGNUPS_OPEN).toBe(value);
-  });
 
   it('/api/app/recovery/cancel reaches the recovery handler (a body not sent as JSON answers 400)', async () => {
     const response = await handle(postTo('/api/app/recovery/cancel', '{}'), ready());
