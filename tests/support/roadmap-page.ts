@@ -92,9 +92,16 @@ export const ROADMAP_DRAWING = `() => {
     return 'faint "' + words(element) + '"';
   };
   const held = all('path.bubble, rect.label');
-  const covered = all('text.faint, g.typing').flatMap((over) =>
-    held.filter((under) => touches(box(over), box(under))).map((under) => name(over) + ' over ' + name(under)),
-  );
+  const faint = all('text.faint');
+  const covered = [
+    ...all('text.faint, g.typing').flatMap((over) =>
+      held.filter((under) => touches(box(over), box(under))).map((under) => name(over) + ' over ' + name(under)),
+    ),
+    // No faint word piles on another (shyden-labs/ShyTalk#371).
+    ...faint.flatMap((one, i) =>
+      faint.slice(i + 1).filter((other) => touches(box(one), box(other))).map((other) => name(one) + ' over ' + name(other)),
+    ),
+  ];
   const seeThrough = all('path.bubble')
     .filter((bubble) => Number(getComputedStyle(bubble).fillOpacity) < 1)
     .map((bubble) => words(bubble.nextElementSibling));
