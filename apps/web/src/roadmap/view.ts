@@ -295,18 +295,24 @@ const segmenter = new Intl.Segmenter();
 
 /**
  * A faint hello, drawn at the first of its steady random spots whose box touches no bubble and no label
- * (shyden-labs/ShyTalk#364: "hallo" sat inside 你好); left out, as nothing, when no spot is clear. Its box is as wide
- * as its letters at the full font size, wide enough for Chinese, Japanese and Korean, rounded as it is drawn.
+ * (shyden-labs/ShyTalk#364: "hallo" sat inside 你好) and no faint word already drawn, whose box it then adds to `boxes`
+ * (#371); left out, as nothing, when no spot is clear. Its box is as large
+ * as Firefox draws it, the largest of the three engines, rounded as it is drawn.
  */
-export function faintText(word: string, random: () => number, boxes: readonly Box[]): string {
+export function faintText(word: string, random: () => number, boxes: Box[]): string {
   const letters = [...segmenter.segment(word)].length;
   for (let tries = 0; tries < FAINT_TRIES; tries += 1) {
     const x = Math.round(random() * 940 + 30);
     const y = Math.round(random() * 400 + 25);
     const size = Math.round(11 + random() * 6);
-    const half = (letters * size) / 2;
-    const box = { left: x - half, top: y - size, right: x + half, bottom: y + size * 0.3 };
+    // Measured 2026-11-26 in the drawing with the site's font (#371): Firefox draws a faint word up to 1.28 sizes above
+    // its baseline and 0.50 below, and up to 0.54 of a size wider than a size per letter; Chromium and WebKit draw
+    // smaller. This box holds all three.
+    const half = ((letters + 0.6) * size) / 2;
+    const box = { left: x - half, top: y - size * 1.3, right: x + half, bottom: y + size * 0.55 };
     if (boxes.every((other) => box.right <= other.left || box.left >= other.right || box.bottom <= other.top || box.top >= other.bottom)) {
+      // Taken from here on, with the same gap, so the next faint word never piles on this one (shyden-labs/ShyTalk#371).
+      boxes.push({ left: box.left - GAP, top: box.top - GAP, right: box.right + GAP, bottom: box.bottom + GAP });
       return `<text class="faint" x="${String(x)}" y="${String(y)}" font-size="${String(size)}" text-anchor="middle">${word}</text>`;
     }
   }
@@ -320,7 +326,8 @@ export function mapSvg(milestones: readonly Milestone[], words: Words, lines: Li
   svg += '<rect class="field" width="1000" height="440"/>';
   const boxes = taken(shown, words, lines);
   const random = steady(7);
-  for (const word of [...FAINT, ...FAINT].slice(0, 30)) svg += faintText(word, random, boxes);
+  const faintClear = [...boxes];
+  for (const word of [...FAINT, ...FAINT].slice(0, 30)) svg += faintText(word, random, faintClear);
   const next = shown.find(({ milestone }) => milestone.state !== 'done');
   const openAt = next?.index ?? shown.length;
   for (const { index, spot, from } of shown) {

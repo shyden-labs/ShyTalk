@@ -396,8 +396,8 @@ describe('the typing bubble keeps clear', () => {
 
 /**
  * The faint hellos never lie over a bubble or a label (shyden-labs/ShyTalk#364): on DEV "hallo" sat inside 你好 and
- * "salam" under "Voice rooms". Each faint word's box is read from the drawing, as wide as its letters at the full font
- * size (an upper bound, wide enough for Chinese, Japanese and Korean) and its size tall.
+ * "salam" under "Voice rooms". Each faint word's box is read from the drawing, as large as
+ * Firefox draws it with the site's font (the largest of the three engines, measured 2026-11-26).
  */
 describe('the faint hellos keep clear', () => {
   const NAMES = [
@@ -436,8 +436,9 @@ describe('the faint hellos keep clear', () => {
   function faint(svg: string): { word: string; box: Box }[] {
     return [...svg.matchAll(/<text class="faint" x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="([\d.]+)"[^>]*>([^<]*)<\/text>/g)].map(
       ([, x, y, size, word = '']) => {
-        const half = ([...new Intl.Segmenter().segment(word)].length * n(size)) / 2;
-        return { word, box: { left: n(x) - half, top: n(y) - n(size), right: n(x) + half, bottom: n(y) + n(size) * 0.3 } };
+        // As Firefox draws it with the site's font, the largest of the three engines (measured 2026-11-26, #371).
+        const half = (([...new Intl.Segmenter().segment(word)].length + 0.6) * n(size)) / 2;
+        return { word, box: { left: n(x) - half, top: n(y) - n(size) * 1.3, right: n(x) + half, bottom: n(y) + n(size) * 0.55 } };
       },
     );
   }
