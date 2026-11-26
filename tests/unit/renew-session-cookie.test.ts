@@ -48,6 +48,10 @@ const request = (cookie?: string): Request =>
 const sessionCookies = (response: Response, name: string): string[] =>
   response.headers.getSetCookie().filter((cookie) => cookie.startsWith(`${name}=`));
 
+// The first session cookie in a process pays one-off warm-up (Better Auth's context, the signing key's import);
+// paid once here at module load, in a world of its own, so no test body pays it (shyden-labs/ShyTalk#328).
+await signedIn(world());
+
 describe('renewSessionCookie', () => {
   it('re-sets the session cookie of a signed-in request with a fresh 400-day life, keeping the answer', async () => {
     const w = world();
