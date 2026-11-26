@@ -13,6 +13,12 @@ import { spawnSync } from 'node:child_process';
 import { commandPath } from './command-path.ts';
 import { runIfEntry } from './cli.ts';
 
+/**
+ * npm is stopped after this long, and the stall named (global rule 2026-11-26: a download step runs inside a timeout and
+ * names what it was doing; shyden-labs/ShyTalk#375). 53 CI installs measured 2026-11-26 took 4-33 s, median 7.
+ */
+const LIMIT_SECONDS = 120;
+
 const WARNING = [/^npm warn\b/i, /^\(node:\d+\) (?:\[\w+\] )?\w*Warning\b/];
 
 /** Each line of npm's output that is a warning. */
@@ -21,7 +27,22 @@ export function warnings(output: string): string[] {
 }
 
 export function main(): number {
-  const run = spawnSync(commandPath('npm'), ['ci'], { encoding: 'utf8', stdio: ['inherit', 'pipe', 'pipe'] });
+  const run = spawnSync(commandPath('npm'), ['ci'], {
+    encoding: 'utf8',
+    stdio: ['inherit', 'pipe', 'pipe'],
+    timeout: LIMIT_SECONDS * 1000,
+    killSignal: 'SIGKILL',
+  });
+  if ((run.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT') {
+    const last =
+      `${run.stdout}\n${run.stderr}`
+        .split('\n')
+        .filter((line) => line.trim() !== '')
+        .at(-1) ?? '(nothing printed)';
+    process.stdout.write(run.stdout);
+    process.stderr.write(run.stderr);
+    throw new Error(`npm ci stalled at ${String(LIMIT_SECONDS)} s; its last line was: ${last}`);
+  }
   if (run.error) throw new Error(`npm ci did not run: ${run.error.message}`);
   process.stdout.write(run.stdout);
   process.stderr.write(run.stderr);

@@ -108,7 +108,9 @@ jobs:
     # keeps the tag equal to the lockfile's version. It runs as root so Edge can be installed
     # (shyden-labs/ShyTalk#239).
     container:
-      image: mcr.microsoft.com/playwright:v1.65.1-resolute
+      # Pinned by digest as well as tag: a tag can be repointed, a digest cannot (global rule 2026-11-26;
+      # shyden-labs/ShyTalk#375). The digest is read from mcr.microsoft.com for the tag when Playwright moves.
+      image: mcr.microsoft.com/playwright:v1.65.1-resolute@sha256:dcf385f7a31aa1cbb0a7a0c97a539142bf70480b661f89f26a774ec1fe2edd1d
     # Built for dev, so each page's preview names the dev origin, and the smoke checks it (shyden-labs/ShyTalk#198).
     env:
       SITE_ENVIRONMENT: dev
