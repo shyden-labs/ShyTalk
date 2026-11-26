@@ -117,6 +117,10 @@ export default defineConfig({
     // A project's headers replace the top-level ones, so the door secret is repeated here.
     use: {
       ...project.use,
+      // Chromium and Edge refused wrangler's self-signed certificate at the TLS layer before ignoreHTTPSErrors let the
+      // request through, so the local server logged ~290 `CertificateUnknown` lines a run (shyden-labs/ShyTalk#316: all
+      // 292 measured were theirs). The site is still served over https.
+      ...(project.use?.defaultBrowserType === 'chromium' ? { launchOptions: { args: ['--ignore-certificate-errors'] } } : {}),
       extraHTTPHeaders: { [DOOR_SECRET_HEADER]: secret, 'cf-connecting-ip': `198.51.100.${String(index + 1)}` },
     },
   })),
