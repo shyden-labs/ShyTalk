@@ -332,16 +332,16 @@ describe('the typing bubble keeps clear', () => {
       return milestone({ name, closed: 0, total: 5, percent: 0, state: 'not started' });
     });
 
-  it.each(NAMES.map((name, index) => [name, index] as const))(
-    'with %s the first unfinished milestone, at every share done from 0 to 95%%',
-    (_name, open) => {
-      for (let closed = 0; closed < 20; closed += 1) {
-        const { typing, others } = boxes(mapSvg(board(open, closed), WORDS, null));
-        const hit = others.find((box) => touches(typing, box));
-        expect(hit, `${String(closed)} of 20 done`).toBeUndefined();
-      }
-    },
+  // One test per milestone and share (shyden-labs/ShyTalk#387): a loop of 20 drawings in one test reached the 1 s limit
+  // on a busy Mac under coverage.
+  const CASES = NAMES.flatMap((name, open) =>
+    Array.from({ length: 20 }, (_, closed) => [`${name} first unfinished, ${String(closed * 5)} percent done`, open, closed] as const),
   );
+  it.each(CASES)('the typing bubble is clear with %s', (_title, open, closed) => {
+    const { typing, others } = boxes(mapSvg(board(open, closed), WORDS, null));
+    const hit = others.find((box) => touches(typing, box));
+    expect(hit, `${String(closed)} of 20 done`).toBeUndefined();
+  });
 
   it('with every milestone done', () => {
     const { typing, others } = boxes(mapSvg(board(NAMES.length, 0), WORDS, null));
