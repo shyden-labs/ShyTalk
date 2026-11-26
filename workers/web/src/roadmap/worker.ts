@@ -6,7 +6,7 @@
  */
 import { workersRuntime } from '../app/announcer.ts';
 import { SHYTALK } from './hook-route.ts';
-import { readRoadmapBoard, type GithubFetch, type RoadmapApp } from './github.ts';
+import { GITHUB_API, readRoadmapBoard, type GithubFetch, type RoadmapApp } from './github.ts';
 import { Roadmap as RoadmapCore, type RoadmapDeps, type RoadmapState } from './object.ts';
 
 /** The board's recorded title, asserted before its items are used (ShyTalk's CLAUDE.md). */
@@ -16,6 +16,20 @@ export interface RoadmapEnv {
   ROADMAP_APP_ID?: string;
   ROADMAP_INSTALLATION_ID?: string;
   ROADMAP_APP_KEY?: string;
+  /** Where GitHub's API answers: GitHub itself unless the CI smoke names its stand-in on this machine. */
+  ROADMAP_GITHUB_API?: string;
+}
+
+/** A stand-in for GitHub on this machine, as the CI smoke runs one (tests/smoke/github-stand-in.ts). */
+const LOOPBACK = /^http:\/\/127\.0\.0\.1:\d{1,5}$/u;
+
+/**
+ * Where the App reads GitHub: GitHub itself, unless the env names a stand-in on this machine. Nothing else is
+ * believed, so no setting can send the App's token elsewhere.
+ */
+function apiOf(named: string | undefined): string {
+  if (named === undefined || named === GITHUB_API || LOOPBACK.test(named)) return named ?? GITHUB_API;
+  throw new Error('roadmap: ROADMAP_GITHUB_API must be https://api.github.com or http://127.0.0.1:<port>');
 }
 
 /** The App the env names, or throws naming the first setting it lacks. */
@@ -24,7 +38,7 @@ function appOf(env: RoadmapEnv): RoadmapApp {
   if (!appId) throw new Error('roadmap: ROADMAP_APP_ID is not set');
   if (!installationId) throw new Error('roadmap: ROADMAP_INSTALLATION_ID is not set');
   if (!key) throw new Error('roadmap: ROADMAP_APP_KEY is not set');
-  return { appId, installationId, key, board: { id: SHYTALK.boardId, title: BOARD_TITLE } };
+  return { appId, installationId, key, board: { id: SHYTALK.boardId, title: BOARD_TITLE }, api: apiOf(env.ROADMAP_GITHUB_API) };
 }
 
 export function roadmapDeps(env: RoadmapEnv, send: GithubFetch = (url, init) => fetch(url, init)): RoadmapDeps {

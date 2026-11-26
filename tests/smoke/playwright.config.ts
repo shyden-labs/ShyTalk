@@ -10,7 +10,7 @@ import { desktopProjects } from '@shyden-labs/playwright-devices/desktop';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { DOOR_SECRET_HEADER, SITE_USER } from '../../packages/environment/index.ts';
-import { MAIL_STAND_IN_PORT, SMOKE_TARGETS } from './targets.ts';
+import { GITHUB_STAND_IN_PORT, MAIL_STAND_IN_PORT, SMOKE_TARGETS, roadmapWebhookSecret } from './targets.ts';
 
 const PORT = 8787;
 /**
@@ -71,6 +71,26 @@ const MAIL_VARS = [
   .map((value) => `--var "${value}"`)
   .join(' ');
 
+/**
+ * The roadmap (shyden-labs/ShyTalk#321) reads the board from GitHub's stand-in (tests/smoke/github-stand-in.ts) as
+ * its App, so it needs a real key to sign with: a throwaway one each run, PKCS#1 as GitHub hands them out. Its webhook
+ * secret is made from the door secret, so the tests that sign a delivery know it too.
+ */
+const roadmapKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs1', format: 'pem' });
+const ROADMAP_VARS = [
+  `ROADMAP_GITHUB_API:http://127.0.0.1:${String(GITHUB_STAND_IN_PORT)}`,
+  `ROADMAP_APP_KEY:${roadmapKey.trim().replace(/\n/g, ' ')}`,
+  `ROADMAP_WEBHOOK_SECRET:${roadmapWebhookSecret(secret)}`,
+]
+  .map((value) => `--var "${value}"`)
+  .join(' ');
+
+/**
+ * DEV's pass key, a throwaway one each run, as DEV has one: with it, the box's answer earns the site pass cookie, which
+ * WebKit's WebSocket upgrade carries where it gives no box answer (shyden-labs/ShyTalk#321).
+ */
+const PASS_VARS = `--var DEV_PASS_SECRET:${randomBytes(32).toString('base64url')}`;
+
 export default defineConfig({
   testDir: '.',
   forbidOnly: true,
@@ -108,10 +128,16 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
+      command: `node tests/smoke/github-stand-in.ts ${String(GITHUB_STAND_IN_PORT)}`,
+      url: `http://127.0.0.1:${String(GITHUB_STAND_IN_PORT)}/health`,
+      cwd: ROOT,
+      reuseExistingServer: false,
+    },
+    {
       command: [
         `npx wrangler d1 migrations apply DB ${LOCAL_D1}`,
         `npx wrangler d1 execute DB ${LOCAL_D1} --command "${MARKER_SQL}"`,
-        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --local-protocol https --var DOOR_SECRET:${secret} --var SITE_PASSWORD:${password} ${MAIL_VARS}`,
+        `npx wrangler dev --config workers/web/wrangler.json --env dev --persist-to .wrangler/smoke-state --ip 127.0.0.1 --port ${String(PORT)} --local-protocol https --var DOOR_SECRET:${secret} --var SITE_PASSWORD:${password} ${MAIL_VARS} ${ROADMAP_VARS} ${PASS_VARS}`,
       ].join(' && '),
       // Playwright counts a 403 as up: the door answers before the secret is sent (and a 401 for the password after it).
       url: `${SITE}/`,

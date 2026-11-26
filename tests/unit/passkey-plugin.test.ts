@@ -121,6 +121,12 @@ async function signInWith(auth: ShyTalkAuth, credential: SoftCredential, replay?
   }
 }
 
+// The first registration in a process pays one-off warm-up (key generation, lazily loaded parts of the WebAuthn
+// libraries): 24-94 ms against 6-10 ms after. Paid once here at module load, in a world of its own, so no test body
+// pays it (shyden-labs/ShyTalk#328).
+const warm = world();
+await registerWith(warm.auth, await member(warm.auth, warm.store));
+
 describe('the passkey plugin as ShyTalk sets it up', () => {
   it('registers a passkey for a signed-in member, keeping only its public key', async () => {
     const { auth, store, hooks } = world();
