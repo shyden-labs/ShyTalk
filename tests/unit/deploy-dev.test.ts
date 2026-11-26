@@ -107,7 +107,7 @@ describe('deploy-dev', () => {
     const step = deployStep().join('\n');
     const rehearsal = step.indexOf('if [ $DEPLOY_REHEARSAL = true ]; then');
     const dryRun = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --dry-run --env dev --outdir $RUNNER_TEMP/web');
-    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||');
+    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||');
     expect(rehearsal).toBeGreaterThan(-1);
     expect(dryRun).toBeGreaterThan(rehearsal);
     expect(deploy).toBeGreaterThan(dryRun);
@@ -119,7 +119,7 @@ describe('deploy-dev', () => {
   // refuses everything.
   it('sets the door secret after the deploy, and fails naming it when the environment lacks it', () => {
     const step = deployStep().join('\n');
-    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||');
+    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||');
     const missing = step.indexOf('if [ -z $DOOR_SECRET ]; then');
     const put = step.indexOf(
       "printf '%s' $DOOR_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put DOOR_SECRET --env dev ||".replaceAll("'", ''),
@@ -168,7 +168,7 @@ describe('deploy-dev', () => {
   // exists, and stops naming the secret when the environment has none.
   it('puts the Better Auth secret after the deploy, and stops naming it when the environment lacks it', () => {
     const step = deployStep().join('\n');
-    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||');
+    const deploy = step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||');
     const missing = step.indexOf('if [ -z $BETTER_AUTH_SECRET ]; then');
     const put = step.indexOf(
       'printf %s $BETTER_AUTH_SECRET | $GITHUB_WORKSPACE/node_modules/.bin/wrangler secret put BETTER_AUTH_SECRET --env dev ||',
@@ -325,7 +325,7 @@ describe('deploy-dev', () => {
       '$GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 migrations apply DB --remote --env dev ||',
       '$GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 execute DB --remote --env dev --command CREATE TABLE IF NOT EXISTS environment_marker (name TEXT NOT NULL); INSERT INTO environment_marker (name) SELECT dev WHERE NOT EXISTS (SELECT 1 FROM environment_marker); ||',
       'marker=$($GITHUB_WORKSPACE/node_modules/.bin/wrangler d1 execute DB --remote --env dev --json --command SELECT name FROM environment_marker) ||',
-      '$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||',
+      '$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||',
     ].map((line) => step.indexOf(line));
     expect(order.every((at) => at > -1)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -345,7 +345,9 @@ describe('deploy-dev', () => {
     const check = step.indexOf('if [ $(printf %s $marker | jq -c [.[0].results[].name]) != [dev] ]; then');
     expect(read).toBeGreaterThan(-1);
     expect(check).toBeGreaterThan(read);
-    expect(step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||')).toBeGreaterThan(check);
+    expect(
+      step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||'),
+    ).toBeGreaterThan(check);
   });
 
   // shyden-labs/ShyTalk#79: the app's UI document, published to the migrated
@@ -362,7 +364,9 @@ describe('deploy-dev', () => {
     expect(marker).toBeGreaterThan(-1);
     expect(id).toBeGreaterThan(marker);
     expect(publish).toBeGreaterThan(id);
-    expect(step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev ||')).toBeGreaterThan(publish);
+    expect(
+      step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||'),
+    ).toBeGreaterThan(publish);
   });
 
   // Plan 4 Task 8 (shyden-labs/ShyTalk#81; Shyden 2026-11-07, a secret
@@ -406,6 +410,24 @@ describe('deploy-dev', () => {
   it('no longer deploys or deletes the echo Worker, which is gone (#31 AC5)', () => {
     expect(workflow()).not.toContain('workers/echo');
     expect(workflow()).not.toContain('-X DELETE');
+  });
+
+  // The sign-up switch (shyden-labs/ShyTalk#314; Shyden 2026-11-27, "Setting in GitHub"): the dev environment's
+  // SIGNUPS_OPEN variable reaches the Worker as a var at each deploy, and a deploy without a true or false value
+  // fails naming it before anything deploys.
+  it('passes SIGNUPS_OPEN from the environment variables to the Worker', () => {
+    const step = deployStep();
+    expect(step).toContain('          SIGNUPS_OPEN: ${{ vars.SIGNUPS_OPEN }}');
+    expect(step.join('\n')).toContain('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev --var SIGNUPS_OPEN:$SIGNUPS_OPEN ||');
+  });
+
+  it('fails naming SIGNUPS_OPEN, before deploying, unless it is exactly true or false', () => {
+    const step = deployStep().join('\n');
+    const check = step.indexOf(
+      'case $SIGNUPS_OPEN in true|false) ;; *) echo ::error title=SIGNUPS_OPEN missing::Set SIGNUPS_OPEN to true or false in the dev environment variables (shyden-labs/ShyTalk#314).; exit 1 ;; esac',
+    );
+    expect(check).toBeGreaterThan(-1);
+    expect(step.indexOf('$GITHUB_WORKSPACE/node_modules/.bin/wrangler deploy --env dev --var')).toBeGreaterThan(check);
   });
 
   it('never deploys a door', () => {

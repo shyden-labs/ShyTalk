@@ -84,6 +84,7 @@
 | account.codeRefused | That code is not right, or it has expired. Ask for a new one if needed. | รหัสไม่ถูกต้องหรือหมดอายุแล้ว ขอรหัสใหม่หากจำเป็น | The code is incorrect or has expired. Please request a new code if necessary. |
 | account.failed | Something went wrong. Please try again later. | เกิดข้อผิดพลาด กรุณาลองอีกครั้งในภายหลัง | An error occurred. Please try again later. |
 | account.signUpConfirmed | Your email address is confirmed. | ยืนยันที่อยู่อีเมลของคุณแล้ว | Your email address has been verified. |
+| account.signUpsClosed | New sign-ups are closed right now. If you already have an account, you can still sign in. | ขณะนี้ปิดรับการสมัครใหม่ หากคุณมีบัญชีอยู่แล้ว คุณยังเข้าสู่ระบบได้ตามปกติ | New applications are currently closed. If you already have an account, you can still log in as usual. |
 | account.recoveryStarted | The recovery has started. From {completesAt}, a new way to sign in can be added on this device. | การกู้คืนได้เริ่มขึ้นแล้ว ตั้งแต่ {completesAt} จะสามารถเพิ่มวิธีเข้าสู่ระบบใหม่บนอุปกรณ์นี้ได้ | Recovery has begun. From {completesAt} a new login method can be added to this device. |
 | account.cancelTitle | Cancel a recovery | ยกเลิกการกู้คืน | Cancel recovery. |
 | account.cancelIntro | Press the button to cancel the recovery of your ShyTalk account. | กดปุ่มเพื่อยกเลิกการกู้คืนบัญชี ShyTalk ของคุณ | Press the button to cancel the recovery of your ShyTalk account. |

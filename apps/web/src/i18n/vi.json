@@ -96,6 +96,7 @@
     "codeRefused": "Mã không đúng hoặc đã hết hạn. Hãy yêu cầu mã mới nếu cần.",
     "failed": "Đã xảy ra lỗi. Vui lòng thử lại sau.",
     "signUpConfirmed": "Địa chỉ email của bạn đã được xác nhận.",
+    "signUpsClosed": "Hiện đang tạm ngừng nhận đăng ký mới. Nếu bạn đã có tài khoản, bạn vẫn có thể đăng nhập.",
     "recoveryStarted": "Quá trình khôi phục đã bắt đầu. Từ {completesAt}, có thể thêm một cách đăng nhập mới trên thiết bị này.",
     "cancelTitle": "Hủy việc khôi phục",
     "cancelIntro": "Nhấn nút để hủy việc khôi phục tài khoản ShyTalk của bạn.",
