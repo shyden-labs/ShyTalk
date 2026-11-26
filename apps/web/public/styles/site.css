@@ -14,7 +14,7 @@
   --roadmap-on-bubble: #ffffff;
   --roadmap-surface: #ffffff;
   --roadmap-edge: #d3dbe8;
-  --roadmap-dashed: #6f7891;
+  --roadmap-dashed: #6a738b;
   --roadmap-done: #1a7f5a;
   --roadmap-typing: #2a2350;
 }
@@ -578,7 +578,6 @@ shydesk-support {
 
 .roadmap .bubble.not-started {
   fill: var(--roadmap-surface);
-  fill-opacity: 0.55;
   stroke: var(--roadmap-dashed);
   stroke-width: 2;
   stroke-dasharray: 5 5;

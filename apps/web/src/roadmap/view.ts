@@ -209,14 +209,20 @@ export interface Box {
   bottom: number;
 }
 
-/** What the typing bubble must keep clear of: each bubble with its tail, and each label (shyden-labs/ShyTalk#362). */
+/** What the typing bubble and the faint hellos keep clear of: each bubble with its tail, and each label, with a gap (#362, #364). */
+/** The clear space kept around each bubble and label: Firefox's boxes take in half of each outline (shyden-labs/ShyTalk#364). */
+const GAP = 4;
+
 function taken(shown: readonly Stop[], words: Words, lines: Lines): Box[] {
   return shown.flatMap(({ milestone, index, spot: { x, y } }) => {
     const top = y - HEIGHT / 2 - 6;
-    const half = labelWidthOf(labelOf(milestone, index, words, lines)) / 2;
+    // An under-way label at its widest (100%), so the clear space is the same at every stage and the typing bubble
+    // never steps back along its line as the label grows.
+    const widest = milestone.state === 'started' ? { ...milestone, percent: 100 } : milestone;
+    const half = labelWidthOf(labelOf(widest, index, words, lines)) / 2;
     return [
-      { left: x - WIDTH / 2, top, right: x + WIDTH / 2, bottom: top + HEIGHT + 14 },
-      { left: x - half, top: y + 42, right: x + half, bottom: y + 64 },
+      { left: x - WIDTH / 2 - GAP, top: top - GAP, right: x + WIDTH / 2 + GAP, bottom: top + HEIGHT + 14 + GAP },
+      { left: x - half - GAP, top: y + 42 - GAP, right: x + half + GAP, bottom: y + 64 + GAP },
     ];
   });
 }
@@ -225,7 +231,7 @@ const PILL_HALF_WIDTH = 26;
 const PILL_HALF_HEIGHT = 14;
 /** How far beside the line the typing bubble may sit, nearest first: just below it, on it, then further off. */
 const BELOW = 20;
-const BESIDE = [BELOW, 0, -BELOW, 2 * BELOW, -2 * BELOW];
+const BESIDE = [BELOW, 0, -BELOW, 2 * BELOW, -2 * BELOW, 3 * BELOW, -3 * BELOW];
 const STEPS = 50;
 
 const clear = (x: number, y: number, boxes: readonly Box[]): boolean =>
@@ -258,25 +264,53 @@ export function typingPlace(
 ): readonly [number, number] {
   const [fx, fy] = from;
   const [tx, ty] = to;
+  // Beside means across the line: the unit normal, turned to point down the field (right, on a line that runs
+  // straight up or down), so a positive step is below a level line and never along a steep one.
+  const length = Math.hypot(tx - fx, ty - fy);
+  let [nx, ny] = [-(ty - fy) / length, (tx - fx) / length];
+  if (ny < 0 || (ny === 0 && nx < 0)) [nx, ny] = [-nx, -ny];
   let best: { x: number; y: number; cost: number } | undefined;
   for (let step = 0; step <= STEPS; step += 1) {
     const along = step / STEPS;
     BESIDE.forEach((beside, rank) => {
-      const x = fx + (tx - fx) * along;
-      const y = fy + (ty - fy) * along + beside;
+      const x = fx + (tx - fx) * along + nx * beside;
+      const y = fy + (ty - fy) * along + ny * beside;
       const cost = Math.abs(along - wanted) + rank / 1000;
       if (clear(x, y, boxes) && (best === undefined || cost < best.cost)) best = { x, y, cost };
     });
   }
-  return best === undefined ? [fx + (tx - fx) * wanted, fy + (ty - fy) * wanted + BELOW] : [best.x, best.y];
+  return best === undefined ? [fx + (tx - fx) * wanted + nx * BELOW, fy + (ty - fy) * wanted + ny * BELOW] : [best.x, best.y];
 }
 
 function typing({ milestone, spot, from }: Stop, finished: boolean, boxes: readonly Box[]): string {
   const [x, y] = finished
-    ? typingPlace([spot.x, spot.y], [spot.x + 140, spot.y], 0.5, boxes)
+    ? typingPlace([spot.x, spot.y], [spot.x + 200, spot.y], 0.5, boxes)
     : typingPlace(from, [spot.x, spot.y], milestone.closed / Math.max(1, milestone.total), boxes);
   const dots = [-11, 0, 11].map((dx, n) => `<circle class="dot dot-${String(n)}" cx="${String(dx)}" cy="0" r="4"/>`).join('');
   return `<g class="typing" transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><rect x="-26" y="-14" width="52" height="28" rx="14"/>${dots}</g>`;
+}
+
+const FAINT_TRIES = 40;
+const segmenter = new Intl.Segmenter();
+
+/**
+ * A faint hello, drawn at the first of its steady random spots whose box touches no bubble and no label
+ * (shyden-labs/ShyTalk#364: "hallo" sat inside 你好); left out, as nothing, when no spot is clear. Its box is as wide
+ * as its letters at the full font size, wide enough for Chinese, Japanese and Korean, rounded as it is drawn.
+ */
+export function faintText(word: string, random: () => number, boxes: readonly Box[]): string {
+  const letters = [...segmenter.segment(word)].length;
+  for (let tries = 0; tries < FAINT_TRIES; tries += 1) {
+    const x = Math.round(random() * 940 + 30);
+    const y = Math.round(random() * 400 + 25);
+    const size = Math.round(11 + random() * 6);
+    const half = (letters * size) / 2;
+    const box = { left: x - half, top: y - size, right: x + half, bottom: y + size * 0.3 };
+    if (boxes.every((other) => box.right <= other.left || box.left >= other.right || box.bottom <= other.top || box.top >= other.bottom)) {
+      return `<text class="faint" x="${String(x)}" y="${String(y)}" font-size="${String(size)}" text-anchor="middle">${word}</text>`;
+    }
+  }
+  return '';
 }
 
 /** The conversation, hidden from screen readers: the buttons over it carry its words. */
@@ -284,13 +318,9 @@ export function mapSvg(milestones: readonly Milestone[], words: Words, lines: Li
   const shown = stops(milestones);
   let svg = '<svg viewBox="0 0 1000 440" aria-hidden="true" focusable="false">';
   svg += '<rect class="field" width="1000" height="440"/>';
+  const boxes = taken(shown, words, lines);
   const random = steady(7);
-  for (const word of [...FAINT, ...FAINT].slice(0, 30)) {
-    const x = random() * 940 + 30;
-    const y = random() * 400 + 25;
-    const size = 11 + random() * 6;
-    svg += `<text class="faint" x="${x.toFixed(0)}" y="${y.toFixed(0)}" font-size="${size.toFixed(0)}" text-anchor="middle">${word}</text>`;
-  }
+  for (const word of [...FAINT, ...FAINT].slice(0, 30)) svg += faintText(word, random, boxes);
   const next = shown.find(({ milestone }) => milestone.state !== 'done');
   const openAt = next?.index ?? shown.length;
   for (const { index, spot, from } of shown) {
@@ -301,7 +331,7 @@ export function mapSvg(milestones: readonly Milestone[], words: Words, lines: Li
   }
   svg += shown.map((stop) => bubble(stop, words, lines)).join('');
   const last = shown.at(-1);
-  if (last !== undefined) svg += typing(next ?? last, next === undefined, taken(shown, words, lines));
+  if (last !== undefined) svg += typing(next ?? last, next === undefined, boxes);
   return `${svg}</svg>`;
 }
 
