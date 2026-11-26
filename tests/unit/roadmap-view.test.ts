@@ -311,7 +311,11 @@ describe('the typing bubble keeps clear', () => {
     const [x, y] = [n(at[1]), n(at[2])];
     return { typing: { left: x - 26, top: y - 14, right: x + 26, bottom: y + 14 }, others };
   }
-  const touches = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  // A gap of 4 around each bubble and label: Firefox's boxes take in half of each outline, so pieces drawn edge to edge
+  // overlapped there (shyden-labs/ShyTalk#364, web-smoke on Firefox).
+  const GAP = 4;
+  const touches = (a: Box, b: Box): boolean =>
+    a.left < b.right + GAP && b.left - GAP < a.right && a.top < b.bottom + GAP && b.top - GAP < a.bottom;
   const typingAt = (svg: string): [number, number] => {
     const at = /class="typing" transform="translate\((-?[\d.]+),(-?[\d.]+)\)"/.exec(svg);
     return [n(at?.[1]), n(at?.[2])];
@@ -349,17 +353,33 @@ describe('the typing bubble keeps clear', () => {
     (_name, open) => {
       const spot = SPOTS[open];
       if (spot === undefined) throw new Error('no spot');
-      const distances = [1, 5, 10, 15, 19].map((closed) => {
+      // How far along the line from the bubble before (or the left edge) it sits: its projection onto the line, so a
+      // move to the other side of the line is not counted as going back.
+      const [fx, fy] = open === 0 ? [20, 200] : [SPOTS[open - 1]?.x ?? 0, SPOTS[open - 1]?.y ?? 0];
+      const length = Math.hypot(spot.x - fx, spot.y - fy);
+      const along = [1, 5, 10, 15, 19].map((closed) => {
         const [x, y] = typingAt(mapSvg(board(open, closed), WORDS, null));
-        return Math.hypot(spot.x - x, spot.y - y);
+        return ((x - fx) * (spot.x - fx) + (y - fy) * (spot.y - fy)) / length;
       });
-      for (let i = 1; i < distances.length; i += 1) expect(distances[i]).toBeLessThanOrEqual(distances[i - 1] ?? 0);
+      for (let i = 1; i < along.length; i += 1) expect(along[i]).toBeGreaterThanOrEqual(along[i - 1] ?? 0);
     },
   );
 
-  it('sits just below its point on the line when no place is clear', () => {
+  it('sits 20 across the line from its point, on the lower side, when no place is clear', () => {
     const everything = { left: 0, top: 0, right: 1000, bottom: 440 };
-    expect(typingPlace([100, 100], [300, 200], 0.5, [everything])).toEqual([200, 170]);
+    // The line runs (200, 100) long; its lower normal is (-100, 200) over 223.6, so 20 across from (200, 150).
+    const [x, y] = typingPlace([100, 100], [300, 200], 0.5, [everything]);
+    expect(x).toBeCloseTo(200 - (20 * 100) / Math.hypot(200, 100));
+    expect(y).toBeCloseTo(150 + (20 * 200) / Math.hypot(200, 100));
+  });
+
+  it('steps across a line that runs straight down, not along it', () => {
+    // Clear everywhere: it sits on the line at its point, then 20 to the right when the line itself is taken.
+    expect(typingPlace([500, 100], [500, 300], 0.5, [])).toEqual([520, 200]);
+    const onTheLine = { left: 490, top: 0, right: 510, bottom: 440 };
+    const [x, y] = typingPlace([500, 100], [500, 300], 0.5, [onTheLine]);
+    expect(y).toBe(200);
+    expect(Math.abs(x - 500)).toBeGreaterThanOrEqual(40);
   });
 
   it('keeps inside the field: as far along as fits, below the line where above would leave it', () => {
@@ -395,7 +415,11 @@ describe('the faint hellos keep clear', () => {
   ];
   type Box = { left: number; top: number; right: number; bottom: number };
   const n = (text: string | undefined): number => Number(text);
-  const touches = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  // A gap of 4 around each bubble and label: Firefox's boxes take in half of each outline, so pieces drawn edge to edge
+  // overlapped there (shyden-labs/ShyTalk#364, web-smoke on Firefox).
+  const GAP = 4;
+  const touches = (a: Box, b: Box): boolean =>
+    a.left < b.right + GAP && b.left - GAP < a.right && a.top < b.bottom + GAP && b.top - GAP < a.bottom;
 
   function held(svg: string): Box[] {
     const boxes: Box[] = [];
