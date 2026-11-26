@@ -267,3 +267,67 @@ describe('reconnectDelay', () => {
     expect([0, 1, 2, 5, 6, 7, 20].map(reconnectDelay)).toEqual([1000, 2000, 4000, 32_000, 60_000, 60_000, 60_000]);
   });
 });
+
+/**
+ * The faint hellos never lie over a bubble or a label (shyden-labs/ShyTalk#364): on DEV "hallo" sat inside 你好 and
+ * "salam" under "Voice rooms". Each faint word's box is read from the drawing, as wide as its letters at the full font
+ * size (an upper bound, wide enough for Chinese, Japanese and Korean) and its size tall.
+ */
+describe('the faint hellos keep clear', () => {
+  const NAMES = [
+    'Groundwork',
+    'The website',
+    'The app',
+    'Strong foundations',
+    'Voice rooms',
+    'Find a room',
+    'Friends',
+    'Safe spaces',
+    'Kind and safe',
+    'Clear rules',
+    'Launch',
+  ];
+  type Box = { left: number; top: number; right: number; bottom: number };
+  const n = (text: string | undefined): number => Number(text);
+  const touches = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+  function held(svg: string): Box[] {
+    const boxes: Box[] = [];
+    for (const [, x, y] of svg.matchAll(/<path class="bubble [^"]*" d="M(-?[\d.]+),(-?[\d.]+)/g)) {
+      const left = n(x) - 16;
+      boxes.push({ left, top: n(y), right: left + 104, bottom: n(y) + 58 + 14 });
+    }
+    for (const [, x, y, w, h] of svg.matchAll(/<rect class="label" x="(-?[\d.]+)" y="(-?[\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)) {
+      boxes.push({ left: n(x), top: n(y), right: n(x) + n(w), bottom: n(y) + n(h) });
+    }
+    return boxes;
+  }
+
+  function faint(svg: string): { word: string; box: Box }[] {
+    return [...svg.matchAll(/<text class="faint" x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="([\d.]+)"[^>]*>([^<]*)<\/text>/g)].map(
+      ([, x, y, size, word = '']) => {
+        const half = ([...new Intl.Segmenter().segment(word)].length * n(size)) / 2;
+        return { word, box: { left: n(x) - half, top: n(y) - n(size), right: n(x) + half, bottom: n(y) + n(size) * 0.3 } };
+      },
+    );
+  }
+
+  /** The board with the first `open` milestones done and the next half done. */
+  const board = (open: number): Milestone[] =>
+    NAMES.map((name, index) => {
+      if (index < open) return milestone({ name, closed: 20, total: 20, percent: 100, state: 'done' });
+      if (index === open) return milestone({ name, closed: 10, total: 20, percent: 50, state: 'started' });
+      return milestone({ name, closed: 0, total: 5, percent: 0, state: 'not started' });
+    });
+
+  it.each(Array.from({ length: NAMES.length + 1 }, (_, open) => open))(
+    'with the first %i milestones done, no faint word touches a bubble or a label',
+    (open) => {
+      const svg = mapSvg(board(open), WORDS, null);
+      const boxes = held(svg);
+      const words = faint(svg);
+      expect(words.length).toBeGreaterThan(0);
+      expect(words.filter(({ box }) => boxes.some((other) => touches(box, other))).map(({ word }) => word)).toEqual([]);
+    },
+  );
+});

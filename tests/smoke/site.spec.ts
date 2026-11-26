@@ -22,7 +22,7 @@ import { ACCOUNT_PRIVACY_KEYS } from '../support/account-privacy.ts';
 import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, PREVIEW_FACTS, PREVIEW_TAGS, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 import { SITE_USER } from '../../packages/environment/index.ts';
-import { MILESTONES, boardDelivery, linePattern, stateEndings } from '../support/roadmap-page.ts';
+import { MILESTONES, ROADMAP_DRAWING, boardDelivery, linePattern, stateEndings, type RoadmapDrawing } from '../support/roadmap-page.ts';
 import { smokeWebhookSecret } from './targets.ts';
 import { updatedLine } from '../../apps/web/src/roadmap/view.ts';
 import { pageWords } from '../../apps/web/src/roadmap/words.ts';
@@ -373,6 +373,16 @@ for (const { lang, locale, prefix } of LANGUAGES) {
     await expect.soft(panel).toBeVisible();
     await page.keyboard.press('Escape');
     await expect.soft(panel).toBeHidden();
+    // In each colour mode (global rule 2026-11-25; shyden-labs/ShyTalk#362, #364): nothing lies over a bubble or a
+    // label, no bubble lets what is under it show through, and every hello and label reads at 4.5:1 or more.
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      const drawing = await page.evaluate<RoadmapDrawing>(`(${ROADMAP_DRAWING})()`);
+      expect.soft(drawing.scheme).toBe(scheme);
+      expect.soft(drawing.covered, `${scheme}: covered`).toEqual([]);
+      expect.soft(drawing.seeThrough, `${scheme}: see-through bubbles`).toEqual([]);
+      expect.soft(drawing.lowContrast, `${scheme}: under 4.5:1`).toEqual([]);
+    }
     // A phone's width: set here where the browser can take one, measured as it stands on a phone.
     if ((await page.evaluate(() => window.innerWidth)) > PHONE_WIDTH) {
       await page.setViewportSize({ width: NARROW_WIDTH, height: 740 });

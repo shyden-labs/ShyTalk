@@ -20,7 +20,7 @@ import { pagePath, pageUrl, sitePages } from '../../apps/web/src/preview.ts';
 import { PAGE_FILES, builtSiteOrigin, wantedPreview, type PreviewFacts } from '../support/link-preview.ts';
 import { PHONE_WIDTH, wantedFacts, type HoldingFacts } from '../support/holding-facts.ts';
 import { FULL_NAME_WIDTH, nextLocale, wantedLive, type MenuLive } from '../support/language-menu.ts';
-import { MILESTONES, boardDelivery, linePattern, stateEndings, type RoadmapFacts } from '../support/roadmap-page.ts';
+import { MILESTONES, boardDelivery, linePattern, stateEndings, type RoadmapDrawing, type RoadmapFacts } from '../support/roadmap-page.ts';
 import { smokeWebhookSecret } from '../smoke/targets.ts';
 import { updatedLine } from '../../apps/web/src/roadmap/view.ts';
 import { pageWords } from '../../apps/web/src/roadmap/words.ts';
@@ -64,6 +64,10 @@ export interface SafariPage {
   roadmapFacts(): Promise<RoadmapFacts>;
   /** Marks the page, so a reload since shows as the mark gone (shyden-labs/ShyTalk#321). */
   markPage(): Promise<void>;
+  /** Turns the iPhone to its light or dark appearance, as its own setting does (shyden-labs/ShyTalk#364). */
+  appearance(style: 'light' | 'dark'): Promise<void>;
+  /** The roadmap's drawing as the smoke reads it, by an in-page check (shyden-labs/ShyTalk#364). */
+  roadmapDrawing(): Promise<RoadmapDrawing>;
 }
 
 export interface IphoneCase {
@@ -464,6 +468,30 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
             await page.tap(SPOT);
             check.ok(!(await page.isVisible(PANEL)), 'the panel did not shut again');
           },
+          // In each colour mode (global rule 2026-11-25; shyden-labs/ShyTalk#362, #364): nothing lies over a bubble
+          // or a label, no bubble lets what is under it show through, and every hello and label reads at 4.5:1.
+          ...(['light', 'dark'] as const).flatMap((scheme) => {
+            let drawing: RoadmapDrawing | undefined;
+            return [
+              async () => {
+                await page.appearance(scheme);
+                drawing = await page.roadmapDrawing();
+                check.equal(drawing.scheme, scheme);
+              },
+              () => {
+                check.deepEqual(drawing?.covered, [], `${scheme}: covered`);
+                return Promise.resolve();
+              },
+              () => {
+                check.deepEqual(drawing?.seeThrough, [], `${scheme}: see-through bubbles`);
+                return Promise.resolve();
+              },
+              () => {
+                check.deepEqual(drawing?.lowContrast, [], `${scheme}: under 4.5:1`);
+                return Promise.resolve();
+              },
+            ];
+          }),
           async () => {
             check.ok((await page.roadmapFacts()).fits, "the page does not fit the phone's width");
           },

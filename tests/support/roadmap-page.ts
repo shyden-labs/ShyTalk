@@ -62,4 +62,69 @@ export const ROADMAP_FACTS = `() => {
   };
 }`;
 
+/** The roadmap's drawing as one colour mode shows it (shyden-labs/ShyTalk#362, #364). Each list is empty when all is well. */
+export interface RoadmapDrawing {
+  /** The colour mode the page is in: `light` or `dark`. */
+  scheme: string;
+  /** A faint word or the typing bubble over a bubble or a label, named as `<what> over <what>`. */
+  covered: string[];
+  /** A bubble whose fill lets what lies under it show through, named by its hello. */
+  seeThrough: string[];
+  /** A hello or label under 4.5:1 against its own bubble or pill, named with its ratio. */
+  lowContrast: string[];
+}
+
+/**
+ * Reads the drawing as drawn, in screen boxes and computed colours: what lies over a bubble or a label, what a bubble
+ * lets show through, and each hello's and label's contrast against its own background (global rule, 2026-11-25:
+ * every design change proven in light and dark mode).
+ */
+export const ROADMAP_DRAWING = `() => {
+  const svg = document.querySelector('#roadmap-live svg');
+  const all = (selector) => (svg === null ? [] : [...svg.querySelectorAll(selector)]);
+  const box = (element) => element.getBoundingClientRect();
+  const touches = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const words = (element) => (element === null ? '' : (element.textContent ?? '').trim());
+  const name = (element) => {
+    if (element.matches('path.bubble')) return 'bubble "' + words(element.nextElementSibling) + '"';
+    if (element.matches('rect.label')) return 'label "' + words(element.nextElementSibling) + '"';
+    if (element.matches('g.typing')) return 'typing bubble';
+    return 'faint "' + words(element) + '"';
+  };
+  const held = all('path.bubble, rect.label');
+  const covered = all('text.faint, g.typing').flatMap((over) =>
+    held.filter((under) => touches(box(over), box(under))).map((under) => name(over) + ' over ' + name(under)),
+  );
+  const seeThrough = all('path.bubble')
+    .filter((bubble) => Number(getComputedStyle(bubble).fillOpacity) < 1)
+    .map((bubble) => words(bubble.nextElementSibling));
+  const channels = (colour) => (colour.match(/[\\d.]+/g) ?? []).slice(0, 3).map(Number);
+  const luminance = (colour) => {
+    const [r, g, b] = channels(colour).map((value) => {
+      const c = value / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => {
+    const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (high + 0.05) / (low + 0.05);
+  };
+  const pairs = [
+    ...all('path.bubble').map((bubble) => [bubble.nextElementSibling, bubble]),
+    ...all('rect.label').map((pill) => [pill.nextElementSibling, pill]),
+  ];
+  const lowContrast = pairs.flatMap(([text, back]) => {
+    if (text === null) return ['no text after ' + name(back)];
+    const found = ratio(getComputedStyle(text).fill, getComputedStyle(back).fill);
+    return found < 4.5 ? ['"' + words(text) + '" ' + found.toFixed(2) + ':1'] : [];
+  });
+  return {
+    scheme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+    covered,
+    seeThrough,
+    lowContrast,
+  };
+}`;
+
 export const MARK_PAGE = `() => { window.roadmapMarked = true; }`;

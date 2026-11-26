@@ -115,9 +115,10 @@ const ROADMAP_TEXT: Record<string, (locale: Locale) => string> = {
 };
 
 /** Safari showing the site as it should be, in `lang`; `broken` replaces one answer. */
-function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { visited: string[] } {
+function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { visited: string[]; appearances: string[] } {
   const locale = LOCALE[lang] ?? 'en';
   const visited: string[] = [];
+  const appearances: string[] = [];
   let onLegalPage = false;
   // The language menu (shyden-labs/ShyTalk#332): a tap on its button opens or shuts it, a tap on a language opens the
   // same page in that language, which the address and `<html lang>` then show.
@@ -126,9 +127,12 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
   // The roadmap page (shyden-labs/ShyTalk#321): a tap on a milestone opens its panel, again or on Close shuts it.
   let panelOpen = false;
   let marked = false;
+  // The phone's appearance (shyden-labs/ShyTalk#364): what the drawing check then reads it in.
+  let scheme = 'light';
   const onRoadmap = (): boolean => visited.at(-1)?.endsWith('/roadmap') === true;
   return {
     visited,
+    appearances,
     goto: (path) => {
       visited.push(path);
       menuOpen = false;
@@ -195,6 +199,12 @@ function safari(lang: string, broken: Partial<SafariPage> = {}): SafariPage & { 
       marked = true;
       return Promise.resolve();
     },
+    appearance: (style) => {
+      scheme = style;
+      appearances.push(style);
+      return Promise.resolve();
+    },
+    roadmapDrawing: () => Promise.resolve({ scheme, covered: [], seeThrough: [], lowContrast: [] }),
     menuLive: () => Promise.resolve(wantedLive(locale, 420, menuOpen)),
     tap: (selector) => {
       if (selector === ROADMAP_BUTTON) {
@@ -275,9 +285,9 @@ const CI_ASSERTIONS: Record<string, Record<string, number>> = {
   // Two more each for the appeal page (#310 AC4), to be confirmed on CI's smoke-totals.
   // Two more each for the roadmap page (#321 AC3), to be confirmed on CI's smoke-totals.
   'every page carries its link preview and its language menu': { en: 38, id: 38, th: 32, vi: 32, 'zh-Hans': 32 },
-  // The roadmap page (shyden-labs/ShyTalk#321 AC3): its Playwright twin's 20 checks, counted from it; to be confirmed on
-  // CI's smoke-totals.
-  'the roadmap page shows the board at once': { en: 20, id: 20, th: 20, vi: 20, 'zh-Hans': 20 },
+  // The roadmap page (shyden-labs/ShyTalk#321 AC3): its Playwright twin's 20 checks, plus 4 per colour mode (#364),
+  // counted from it; to be confirmed on CI's smoke-totals.
+  'the roadmap page shows the board at once': { en: 28, id: 28, th: 28, vi: 28, 'zh-Hans': 28 },
 };
 
 describe('the iPhone cases', () => {
@@ -1493,6 +1503,31 @@ describe('the iPhone copy of the roadmap page (shyden-labs/ShyTalk#321 AC3)', ()
     await expect(c.run(page)).rejects.toThrow('(no label)');
   });
 
+  it.each(roadmap)('%s roadmap: reads the drawing in the light appearance, then the dark one', async (lang, c) => {
+    const page = safari(lang);
+    await c.run(page);
+    expect(page.appearances).toEqual(['light', 'dark']);
+  });
+
+  it.each(roadmap)('%s roadmap: fails naming what covers a bubble or label, in which mode, running every other check', async (lang, c) => {
+    const page = safari(lang, {
+      roadmapDrawing: () =>
+        Promise.resolve({
+          scheme: 'dark',
+          covered: ['faint "hallo" over bubble "你好"'],
+          seeThrough: ['你好'],
+          lowContrast: ['"Launch" 3.10:1'],
+        }),
+    });
+    // Read as dark both times: the light step fails on its mode, and each list is named.
+    await expect(c.run(page)).rejects.toThrow(/'light'[\s\S]*faint "hallo" over bubble "你好"[\s\S]*你好[\s\S]*"Launch" 3\.10:1/);
+  });
+
+  it.each(roadmap)('%s roadmap: fails naming the reason when the drawing cannot be read', async (lang, c) => {
+    const page = safari(lang, { roadmapDrawing: () => Promise.reject(new Error('the drawing script threw')) });
+    await expect(c.run(page)).rejects.toThrow('the drawing script threw');
+  });
+
   it.each(roadmap)('%s roadmap: fails when the page does not fit the phone', async (lang, c) => {
     const locale = LOCALE[lang] ?? 'en';
     const page = safari(lang, { roadmapFacts: () => Promise.resolve(roadmapFacts(locale, { fits: false })) });
@@ -1508,7 +1543,7 @@ describe('the iPhone copy of the roadmap page (shyden-labs/ShyTalk#321 AC3)', ()
     const error = await c.run(page, check).catch((caught: unknown) => caught);
     expect(String(error)).toContain('refused');
     expect(String(error)).toContain('label: 1');
-    expect(check.count).toBe(20);
+    expect(check.count).toBe(28);
   });
 });
 
