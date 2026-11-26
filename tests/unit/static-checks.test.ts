@@ -86,7 +86,11 @@ describe('ci.yml', () => {
       '    runs-on: ubuntu-26.04',
       '    timeout-minutes: 20',
       '    container:',
-      `      image: mcr.microsoft.com/playwright:v${playwrightVersion}-resolute`,
+      expect.stringMatching(
+        new RegExp(
+          `^ {6}image: mcr\\.microsoft\\.com/playwright:v${playwrightVersion.replaceAll('.', '\\.')}-resolute@sha256:[0-9a-f]{64}$`,
+        ),
+      ),
       '    env:',
       '      SITE_ENVIRONMENT: dev',
     ]);
@@ -96,7 +100,11 @@ describe('ci.yml', () => {
   // in the lockfile, so no run waits on the runner's apt mirror.
   it('runs web-smoke in the Playwright image of the lockfile’s Playwright version', () => {
     expect(playwrightVersion).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(yamlBlock(ci, 'web-smoke', '  ')).toContain(`image: mcr.microsoft.com/playwright:v${playwrightVersion}-resolute\n`);
+    // Pinned by digest as well as tag (global rule 2026-11-26: a container image cannot be cached by a step, so it is
+    // pinned by digest; shyden-labs/ShyTalk#375). A Playwright bump moves both, read from the registry.
+    expect(yamlBlock(ci, 'web-smoke', '  ')).toMatch(
+      new RegExp(`image: mcr\\.microsoft\\.com/playwright:v${playwrightVersion.replaceAll('.', '\\.')}-resolute@sha256:[0-9a-f]{64}\\n`),
+    );
   });
 
   // shyden-labs/ShyTalk#239: the desktop browsers and the one-suite checks come from the shared package

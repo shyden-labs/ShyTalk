@@ -64,7 +64,13 @@ describe('main', () => {
   it('runs npm ci with its output captured, and passes a clean install', () => {
     spawn.mockReturnValue(result({ stdout: 'added 212 packages\n' }));
     expect(main()).toBe(0);
-    expect(spawn).toHaveBeenCalledWith('/resolved/npm', ['ci'], { encoding: 'utf8', stdio: ['inherit', 'pipe', 'pipe'] });
+    // Killed after 120 s (shyden-labs/ShyTalk#375): 53 CI installs measured 2026-11-26 took 4-33 s, median 7.
+    expect(spawn).toHaveBeenCalledWith('/resolved/npm', ['ci'], {
+      encoding: 'utf8',
+      stdio: ['inherit', 'pipe', 'pipe'],
+      timeout: 120_000,
+      killSignal: 'SIGKILL',
+    });
     expect(out).toHaveBeenCalledWith('added 212 packages\n');
   });
 
@@ -87,6 +93,25 @@ describe('main', () => {
   it('fails closed when npm is killed', () => {
     spawn.mockReturnValue(result({ status: null, signal: 'SIGKILL' }));
     expect(() => main()).toThrow('npm ci exited on SIGKILL');
+  });
+
+  it('names a stall: the limit, and the last thing npm printed before it was stopped', () => {
+    const timedOut = Object.assign(new Error('spawnSync npm ETIMEDOUT'), { code: 'ETIMEDOUT' });
+    spawn.mockReturnValue(
+      result({
+        status: null,
+        signal: 'SIGKILL',
+        error: timedOut,
+        stderr: 'npm http fetch GET 200 https://registry.npmjs.org/a\nnpm http fetch GET https://registry.npmjs.org/stuck\n',
+      }),
+    );
+    expect(() => main()).toThrow('npm ci stalled at 120 s; its last line was: npm http fetch GET https://registry.npmjs.org/stuck');
+  });
+
+  it('names a stall with no output at all', () => {
+    const timedOut = Object.assign(new Error('spawnSync npm ETIMEDOUT'), { code: 'ETIMEDOUT' });
+    spawn.mockReturnValue(result({ status: null, signal: 'SIGKILL', error: timedOut }));
+    expect(() => main()).toThrow('npm ci stalled at 120 s; its last line was: (nothing printed)');
   });
 
   it('fails closed when npm cannot start', () => {
