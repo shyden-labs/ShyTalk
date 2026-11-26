@@ -127,7 +127,9 @@ describe('renewSessionCookie', () => {
   it('leaves a WebSocket upgrade as it is', async () => {
     const w = world();
     const { pair } = await signedIn(w);
-    const upgrade = { status: 101 } as Response;
+    // A Worker answers an upgrade with a real 101 Response; Node's own Response refuses 101 in its constructor, so a
+    // real one is made and given the upgrade's status.
+    const upgrade = Object.defineProperty(new Response(null), 'status', { value: 101 });
     expect(await renewSessionCookie(request(pair), upgrade, w.auth)).toBe(upgrade);
   });
 });

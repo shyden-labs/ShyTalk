@@ -6,7 +6,7 @@ import { safariPage, type WebDriverCall } from '../phones/safari.ts';
 import { PREVIEW_FACTS, PREVIEW_TAGS } from '../support/link-preview.ts';
 import { BRAND_FONTS, HOLDING_FACTS, wantedFacts } from '../support/holding-facts.ts';
 import { MENU_LIVE } from '../support/language-menu.ts';
-import { MARK_PAGE, ROADMAP_FACTS } from '../support/roadmap-page.ts';
+import { MARK_PAGE, ROADMAP_DRAWING, ROADMAP_FACTS } from '../support/roadmap-page.ts';
 
 /**
  * Safari on the iPhone Air, driven through Appium's WebDriver API
@@ -271,6 +271,22 @@ describe('safariPage: reading the page', () => {
     await expect(safariPage(fake.call, 's1', BASE).roadmapFacts()).resolves.toEqual(facts);
     expect(lastScript(fake).script).toBe(`return (${ROADMAP_FACTS})();`);
   });
+
+  it('reads the roadmap drawing with the shared in-page check, and answers what it found (shyden-labs/ShyTalk#364)', async () => {
+    const drawing = { scheme: 'dark', covered: ['faint "hallo" over bubble "你好"'], seeThrough: [], lowContrast: [] };
+    const fake = appium({}, [drawing]);
+    await expect(safariPage(fake.call, 's1', BASE).roadmapDrawing()).resolves.toEqual(drawing);
+    expect(lastScript(fake).script).toBe(`return (${ROADMAP_DRAWING})();`);
+  });
+
+  it.each(['light', 'dark'] as const)(
+    'turns the iPhone to its %s appearance through XCUITest, as its own setting does (shyden-labs/ShyTalk#364)',
+    async (style) => {
+      const fake = appium();
+      await safariPage(fake.call, 's1', BASE).appearance(style);
+      expect(lastScript(fake)).toEqual({ script: 'mobile: setAppearance', args: [{ style }] });
+    },
+  );
 
   it('marks the page with the shared mark, so a reload since shows as the mark gone (shyden-labs/ShyTalk#321)', async () => {
     const fake = appium();

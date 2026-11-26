@@ -10,6 +10,8 @@ import {
   panelHtml,
   reconnectDelay,
   stateLabel,
+  typingPlace,
+  faintText,
   updatedLine,
   zoneName,
   type Milestone,
@@ -156,8 +158,11 @@ describe('mapSvg', () => {
   it('marks every line said and puts the typing bubble past the last bubble when every milestone is done', () => {
     const drawn = mapSvg([done, done], WORDS, null);
     expect(drawn.match(/class="line[^"]*"/g)).toEqual(['class="line said"', 'class="line said"']);
-    // The second bubble sits at 255,95: the typing bubble sits 70 past it and 20 below.
-    expect(drawn).toContain('class="typing" transform="translate(325.0,115.0)"');
+    // The second bubble sits at 255,95 and ends at 307: the typing bubble's pill (52 wide) starts past it, on or beside
+    // its row (shyden-labs/ShyTalk#362: 70 past and 20 below had it over the bubble's edge).
+    const at = /class="typing" transform="translate\((-?[\d.]+),(-?[\d.]+)\)"/.exec(drawn);
+    expect(Number(at?.[1]) - 26).toBeGreaterThanOrEqual(307);
+    expect(Math.abs(Number(at?.[2]) - 95)).toBeLessThanOrEqual(40);
   });
 
   it('draws an empty board as the field alone, with no bubble, line or typing bubble', () => {
@@ -265,5 +270,203 @@ describe('isNewer', () => {
 describe('reconnectDelay', () => {
   it('waits a second, then doubles each time, up to a minute', () => {
     expect([0, 1, 2, 5, 6, 7, 20].map(reconnectDelay)).toEqual([1000, 2000, 4000, 32_000, 60_000, 60_000, 60_000]);
+  });
+});
+
+/**
+ * The typing bubble never covers a bubble or a label (shyden-labs/ShyTalk#362): Shyden saw its dots over
+ * "Groundwork · 77%" on DEV. Boxes are read back from the drawing itself: each bubble's body and tail, each label, and
+ * the typing bubble's pill.
+ */
+describe('the typing bubble keeps clear', () => {
+  // The board's real public names, in its order (DEV, 2026-11-26).
+  const NAMES = [
+    'Groundwork',
+    'The website',
+    'The app',
+    'Strong foundations',
+    'Voice rooms',
+    'Find a room',
+    'Friends',
+    'Safe spaces',
+    'Kind and safe',
+    'Clear rules',
+    'Launch',
+  ];
+  type Box = { left: number; top: number; right: number; bottom: number };
+  const n = (text: string | undefined): number => Number(text);
+
+  function boxes(svg: string): { typing: Box; others: Box[] } {
+    const others: Box[] = [];
+    for (const [, x, y] of svg.matchAll(/<path class="bubble [^"]*" d="M(-?[\d.]+),(-?[\d.]+)/g)) {
+      const left = n(x) - 16;
+      const top = n(y);
+      others.push({ left, top, right: left + 104, bottom: top + 58 + 14 });
+    }
+    for (const [, x, y, w, h] of svg.matchAll(/<rect class="label" x="(-?[\d.]+)" y="(-?[\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)) {
+      others.push({ left: n(x), top: n(y), right: n(x) + n(w), bottom: n(y) + n(h) });
+    }
+    const at = /class="typing" transform="translate\((-?[\d.]+),(-?[\d.]+)\)"/.exec(svg);
+    if (at === null) throw new Error('no typing bubble');
+    const [x, y] = [n(at[1]), n(at[2])];
+    return { typing: { left: x - 26, top: y - 14, right: x + 26, bottom: y + 14 }, others };
+  }
+  // A gap of 4 around each bubble and label: Firefox's boxes take in half of each outline, so pieces drawn edge to edge
+  // overlapped there (shyden-labs/ShyTalk#364, web-smoke on Firefox).
+  const GAP = 4;
+  const touches = (a: Box, b: Box): boolean =>
+    a.left < b.right + GAP && b.left - GAP < a.right && a.top < b.bottom + GAP && b.top - GAP < a.bottom;
+  const typingAt = (svg: string): [number, number] => {
+    const at = /class="typing" transform="translate\((-?[\d.]+),(-?[\d.]+)\)"/.exec(svg);
+    return [n(at?.[1]), n(at?.[2])];
+  };
+
+  /** The board with the first `open` milestones done and the next `closed` of 20 done. */
+  const board = (open: number, closed: number): Milestone[] =>
+    NAMES.map((name, index) => {
+      if (index < open) return milestone({ name, closed: 20, total: 20, percent: 100, state: 'done' });
+      if (index === open) {
+        const percent = Math.floor((closed / 20) * 100);
+        return milestone({ name, closed, total: 20, percent, state: closed === 0 ? 'not started' : 'started' });
+      }
+      return milestone({ name, closed: 0, total: 5, percent: 0, state: 'not started' });
+    });
+
+  it.each(NAMES.map((name, index) => [name, index] as const))(
+    'with %s the first unfinished milestone, at every share done from 0 to 95%%',
+    (_name, open) => {
+      for (let closed = 0; closed < 20; closed += 1) {
+        const { typing, others } = boxes(mapSvg(board(open, closed), WORDS, null));
+        const hit = others.find((box) => touches(typing, box));
+        expect(hit, `${String(closed)} of 20 done`).toBeUndefined();
+      }
+    },
+  );
+
+  it('with every milestone done', () => {
+    const { typing, others } = boxes(mapSvg(board(NAMES.length, 0), WORDS, null));
+    expect(others.find((box) => touches(typing, box))).toBeUndefined();
+  });
+
+  it.each(NAMES.map((name, index) => [name, index] as const))(
+    'moves no further back along the line into %s as more of it is done',
+    (_name, open) => {
+      const spot = SPOTS[open];
+      if (spot === undefined) throw new Error('no spot');
+      // How far along the line from the bubble before (or the left edge) it sits: its projection onto the line, so a
+      // move to the other side of the line is not counted as going back.
+      const [fx, fy] = open === 0 ? [20, 200] : [SPOTS[open - 1]?.x ?? 0, SPOTS[open - 1]?.y ?? 0];
+      const length = Math.hypot(spot.x - fx, spot.y - fy);
+      const along = [1, 5, 10, 15, 19].map((closed) => {
+        const [x, y] = typingAt(mapSvg(board(open, closed), WORDS, null));
+        return ((x - fx) * (spot.x - fx) + (y - fy) * (spot.y - fy)) / length;
+      });
+      for (let i = 1; i < along.length; i += 1) expect(along[i]).toBeGreaterThanOrEqual(along[i - 1] ?? 0);
+    },
+  );
+
+  it('sits 20 across the line from its point, on the lower side, when no place is clear', () => {
+    const everything = { left: 0, top: 0, right: 1000, bottom: 440 };
+    // The line runs (200, 100) long; its lower normal is (-100, 200) over 223.6, so 20 across from (200, 150).
+    const [x, y] = typingPlace([100, 100], [300, 200], 0.5, [everything]);
+    expect(x).toBeCloseTo(200 - (20 * 100) / Math.hypot(200, 100));
+    expect(y).toBeCloseTo(150 + (20 * 200) / Math.hypot(200, 100));
+  });
+
+  it('steps across a line that runs straight down, not along it', () => {
+    // Clear everywhere: it sits on the line at its point, then 20 to the right when the line itself is taken.
+    expect(typingPlace([500, 100], [500, 300], 0.5, [])).toEqual([520, 200]);
+    const onTheLine = { left: 490, top: 0, right: 510, bottom: 440 };
+    const [x, y] = typingPlace([500, 100], [500, 300], 0.5, [onTheLine]);
+    expect(y).toBe(200);
+    expect(Math.abs(x - 500)).toBeGreaterThanOrEqual(40);
+  });
+
+  it('keeps inside the field: as far along as fits, below the line where above would leave it', () => {
+    // Along a line off the right edge, 74% is the furthest a 52-wide pill fits; 40 below would pass the bottom.
+    const [rightX, rightY] = typingPlace([900, 400], [1000, 400], 1, []);
+    expect(rightX).toBeCloseTo(974);
+    expect(rightY).toBeCloseTo(420);
+    // Along the top edge, on the line or above it would leave the field, so it sits 20 below.
+    const [leftX, leftY] = typingPlace([100, 0], [0, 0], 1, []);
+    expect(leftX).toBeCloseTo(26);
+    expect(leftY).toBeCloseTo(20);
+  });
+});
+
+/**
+ * The faint hellos never lie over a bubble or a label (shyden-labs/ShyTalk#364): on DEV "hallo" sat inside 你好 and
+ * "salam" under "Voice rooms". Each faint word's box is read from the drawing, as wide as its letters at the full font
+ * size (an upper bound, wide enough for Chinese, Japanese and Korean) and its size tall.
+ */
+describe('the faint hellos keep clear', () => {
+  const NAMES = [
+    'Groundwork',
+    'The website',
+    'The app',
+    'Strong foundations',
+    'Voice rooms',
+    'Find a room',
+    'Friends',
+    'Safe spaces',
+    'Kind and safe',
+    'Clear rules',
+    'Launch',
+  ];
+  type Box = { left: number; top: number; right: number; bottom: number };
+  const n = (text: string | undefined): number => Number(text);
+  // A gap of 4 around each bubble and label: Firefox's boxes take in half of each outline, so pieces drawn edge to edge
+  // overlapped there (shyden-labs/ShyTalk#364, web-smoke on Firefox).
+  const GAP = 4;
+  const touches = (a: Box, b: Box): boolean =>
+    a.left < b.right + GAP && b.left - GAP < a.right && a.top < b.bottom + GAP && b.top - GAP < a.bottom;
+
+  function held(svg: string): Box[] {
+    const boxes: Box[] = [];
+    for (const [, x, y] of svg.matchAll(/<path class="bubble [^"]*" d="M(-?[\d.]+),(-?[\d.]+)/g)) {
+      const left = n(x) - 16;
+      boxes.push({ left, top: n(y), right: left + 104, bottom: n(y) + 58 + 14 });
+    }
+    for (const [, x, y, w, h] of svg.matchAll(/<rect class="label" x="(-?[\d.]+)" y="(-?[\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)) {
+      boxes.push({ left: n(x), top: n(y), right: n(x) + n(w), bottom: n(y) + n(h) });
+    }
+    return boxes;
+  }
+
+  function faint(svg: string): { word: string; box: Box }[] {
+    return [...svg.matchAll(/<text class="faint" x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="([\d.]+)"[^>]*>([^<]*)<\/text>/g)].map(
+      ([, x, y, size, word = '']) => {
+        const half = ([...new Intl.Segmenter().segment(word)].length * n(size)) / 2;
+        return { word, box: { left: n(x) - half, top: n(y) - n(size), right: n(x) + half, bottom: n(y) + n(size) * 0.3 } };
+      },
+    );
+  }
+
+  /** The board with the first `open` milestones done and the next half done. */
+  const board = (open: number): Milestone[] =>
+    NAMES.map((name, index) => {
+      if (index < open) return milestone({ name, closed: 20, total: 20, percent: 100, state: 'done' });
+      if (index === open) return milestone({ name, closed: 10, total: 20, percent: 50, state: 'started' });
+      return milestone({ name, closed: 0, total: 5, percent: 0, state: 'not started' });
+    });
+
+  it.each(Array.from({ length: NAMES.length + 1 }, (_, open) => open))(
+    'with the first %i milestones done, no faint word touches a bubble or a label',
+    (open) => {
+      const svg = mapSvg(board(open), WORDS, null);
+      const boxes = held(svg);
+      const words = faint(svg);
+      expect(words.length).toBeGreaterThan(0);
+      expect(words.filter(({ box }) => boxes.some((other) => touches(box, other))).map(({ word }) => word)).toEqual([]);
+    },
+  );
+
+  it('leaves a faint hello out when no spot is clear', () => {
+    const everything = { left: -100, top: -100, right: 1100, bottom: 540 };
+    expect(faintText('hello', () => 0.5, [everything])).toBe('');
+  });
+
+  it('draws a faint hello at its first clear spot, rounded as it is drawn', () => {
+    expect(faintText('hello', () => 0.5, [])).toBe('<text class="faint" x="500" y="225" font-size="14" text-anchor="middle">hello</text>');
   });
 });
