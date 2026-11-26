@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { accessSync, statSync, type Stats } from 'node:fs';
+import { accessSync, statSync } from 'node:fs';
 import { commandPath } from '../../scripts/command-path.ts';
 
 /**
@@ -11,13 +11,15 @@ import { commandPath } from '../../scripts/command-path.ts';
 vi.mock('node:fs', () => ({ accessSync: vi.fn(), statSync: vi.fn(), constants: { X_OK: 1 } }));
 const access = vi.mocked(accessSync);
 const stat = vi.mocked(statSync);
+const realStats = (await vi.importActual<typeof import('node:fs')>('node:fs')).statSync(import.meta.filename);
 
 /** The files that exist, each executable or not, and the folders. */
 function disk(files: Record<string, 'run' | 'read' | 'folder'>): void {
   stat.mockImplementation(((path: string) => {
     const kind = files[path];
     if (kind === undefined) throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
-    return { isFile: () => kind !== 'folder' } as Stats;
+    // A real Stats from Node's own fs (this one is stood in), answering isFile as the stand-in disk says.
+    return Object.assign(realStats, { isFile: () => kind !== 'folder' });
   }) as typeof statSync);
   access.mockImplementation((path) => {
     // A folder can be entered, so it passes X_OK as a real one does; only isFile tells it apart.
