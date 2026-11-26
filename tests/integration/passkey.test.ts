@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createAuth, type ShyTalkAuth } from '../../workers/web/src/auth/better-auth.ts';
-import { sessionCookie, startSession } from '../../workers/web/src/app/code-sign-in.ts';
+import { handleCodeSignIn, sessionCookie, startSession } from '../../workers/web/src/app/code-sign-in.ts';
 import { tokenHash } from '../../workers/web/src/app/email-code.ts';
 import { prepareSetup } from '../../workers/web/src/app/finish-setup.ts';
 import {
@@ -14,6 +14,7 @@ import { passkeyHooks, type PreparedPasskeys } from '../../workers/web/src/app/p
 import { appSession } from '../../workers/web/src/app/session.ts';
 import { setupIdentity, setupIdentityByHash, type SetupEnv } from '../../workers/web/src/app/setup-identity.ts';
 import type { SignInEnv } from '../../workers/web/src/app/sign-in.ts';
+import { codeVerifier, type ReadyEnv } from '../../workers/web/src/app/wiring.ts';
 import { issuer } from '../support/id-tokens.ts';
 import { assert, register } from '../support/webauthn.ts';
 import { localDev, type LocalDevEnv } from './d1.ts';
@@ -94,7 +95,7 @@ const cookiesFrom = (response: Response): string =>
     .join('; ');
 
 describe('a passkey on D1', () => {
-  it('signs up with #133 token and a passkey, refuses a second registration with the spent token, then signs in with the passkey', async () => {
+  it('signs up with #133 token and a passkey, refuses a second registration with the spent token, then signs in with the passkey, and refuses the passkey and a recovery code once a suspension blocks the member', async () => {
     await local.DB.prepare("INSERT INTO one_time_token (token_hash, purpose, user_id, email, expires_at) VALUES (?, 'sign-up', NULL, ?, ?)")
       .bind(await tokenHash('d1-sign-up'), 'passkey-person@example.test', Date.now() + 600_000)
       .run();
@@ -131,5 +132,39 @@ describe('a passkey on D1', () => {
       .bind(`user:${made.userId}`)
       .first<{ n: number }>();
     expect(audited?.n).toBe(3);
+
+    // A ShyDesk suspension blocks the member (shyden-labs/ShyTalk#343 AC1): the passkey and a recovery code are each
+    // refused with 403 member_blocked, and no session row is written.
+    await local.DB.prepare(
+      "INSERT INTO punishment (id, user_id, key, label, blocks, starts_at, ends_at, report_ticket_id, appeal_url, issued_at) VALUES ('p-343', ?, 'suspend-7d', 'Suspended', 1, 0, NULL, 'tkt-343', 'https://site.example.test/appeal', '2026-11-26T00:00:00Z')",
+    )
+      .bind(made.userId)
+      .run();
+    const sessions = async (): Promise<number> =>
+      (await local.DB.prepare('SELECT COUNT(*) AS n FROM "session" WHERE "userId" = ?').bind(made.userId).first<{ n: number }>())?.n ?? -1;
+    const before = await sessions();
+    const blockedOptions = await call('sign-in/options', {});
+    const blockedChallenge = (await blockedOptions.json()) as { challenge: string };
+    const blockedPasskey = await call(
+      'sign-in/verify',
+      { response: await assert(credential, { rpId: RP, origin: ORIGIN, challenge: blockedChallenge.challenge }) },
+      cookiesFrom(blockedOptions),
+    );
+    expect.soft(blockedPasskey.status).toBe(403);
+    expect.soft(await blockedPasskey.json()).toEqual({ error: 'member_blocked' });
+    const blockedCode = await handleCodeSignIn(
+      new Request(`${ORIGIN}/api/app/sign-in/recovery-code`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'cf-connecting-ip': '203.0.113.7' },
+        body: JSON.stringify({ email: 'passkey-person@example.test', code: made.recoveryCodes[0] }),
+      }),
+      env,
+      auth,
+      'recovery-code',
+      codeVerifier('recovery-code', env as ReadyEnv, undefined),
+    );
+    expect.soft(blockedCode.status).toBe(403);
+    expect.soft(await blockedCode.json()).toEqual({ error: 'member_blocked' });
+    expect.soft(await sessions()).toBe(before);
   });
 });

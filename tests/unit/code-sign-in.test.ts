@@ -18,7 +18,7 @@ interface Bound {
   values: unknown[];
 }
 
-function world(options: { auditFails?: boolean; limited?: boolean } = {}) {
+function world(options: { auditFails?: boolean; limited?: boolean; blocked?: string[] } = {}) {
   const audits: Bound[] = [];
   const store: Record<string, Record<string, unknown>[]> = {
     user: [{ id: 'u-1', name: 'Member', email: 'm@example.test', emailVerified: true, createdAt: new Date(), updatedAt: new Date() }],
@@ -46,6 +46,7 @@ function world(options: { auditFails?: boolean; limited?: boolean } = {}) {
     database: memoryAdapter(store),
     googleKeys: () => Promise.reject(new Error('unused')),
     appleKeys: () => Promise.reject(new Error('unused')),
+    blocked: (userId) => Promise.resolve(options.blocked?.includes(userId) === true),
   });
   return { env, auth, store, audits };
 }
@@ -63,6 +64,25 @@ const accepts =
     Promise.resolve(answer);
 
 describe('POST /api/app/sign-in/totp and /sign-in/recovery-code', () => {
+  it.each(['totp', 'recovery-code'] as const)(
+    'refuses a member a ShyDesk punishment blocks with 403 member_blocked on %s, writing no session and no audit row (#343)',
+    async (kind) => {
+      const w = world({ blocked: ['u-1'] });
+      const response = await handleCodeSignIn(
+        post(`sign-in/${kind}`, { email: 'm@example.test', code: '123456' }),
+        w.env,
+        w.auth,
+        kind,
+        accepts({ userId: 'u-1', left: 9 }),
+      );
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'member_blocked' });
+      expect(response.headers.get('set-cookie')).toBeNull();
+      expect(w.store['session']).toHaveLength(0);
+      expect(w.audits).toHaveLength(0);
+    },
+  );
+
   it('starts a session the bearer token reaches, and audits it with the method, never the code', async () => {
     const w = world();
     const response = await handleCodeSignIn(
