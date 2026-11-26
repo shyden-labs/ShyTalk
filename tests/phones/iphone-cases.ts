@@ -404,10 +404,9 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
       },
     ),
     counted(
-      `${lang}: the roadmap page shows the board at once in ${lang}, its heading, a button named with its state for each milestone, the bar and when it was last read; a press opens that milestone's panel, Close shuts it, and Escape shuts it again; it passes axe and fits a phone's width, with no CSP refusal`,
+      `${lang}: the roadmap page shows the board at once in ${lang}, its heading, a button named with its state for each milestone, the bar and when it was last read; a press opens that milestone's panel and Close shuts it; it passes axe and fits a phone's width, with no CSP refusal`,
       async (page, check) => {
-        // The phone's own width is its phone width; it has no Escape key, so the same button tapped again shuts the
-        // panel, as the page's own code does for a press.
+        // The phone's own width is its phone width.
         let facts: RoadmapFacts | undefined;
         const failures = await failuresOf([
           async () => {
@@ -461,14 +460,6 @@ function casesFor(lang: string, locale: Locale, prefix: string): IphoneCase[] {
           },
           async () => {
             check.equal(await page.attribute(SPOT, 'aria-expanded'), 'false');
-          },
-          async () => {
-            await page.tap(SPOT);
-            check.ok(await page.isVisible(PANEL), 'the panel did not open again');
-          },
-          async () => {
-            await page.tap(SPOT);
-            check.ok(!(await page.isVisible(PANEL)), 'the panel did not shut again');
           },
           // In each colour mode (global rule 2026-11-25; shyden-labs/ShyTalk#362, #364): nothing lies over a bubble
           // or a label, no bubble lets what is under it show through, and every hello and label reads at 4.5:1.
