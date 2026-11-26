@@ -807,8 +807,8 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     const check = countingCheck();
     await run(page, check);
     // Its twin on CI runs 30: 19 (shyden-labs/ShyTalk#180 AC7), 9 for the signed-in pages and the sign-in, 1 for the
-    // codes left and 1 for the sign-up form showing before it is typed in (#213), and 4 for the blocked member (#343).
-    expect(check.count).toBe(34);
+    // codes left and 1 for the sign-up form showing before it is typed in (#213), and 6 for the blocked member (#343).
+    expect(check.count).toBe(36);
     const address = 'box+iphone-air-1700000000000@mail.test';
     expect(steps.slice(steps.indexOf('goto /sign-up', 1))).toEqual([
       'goto /sign-up',
@@ -863,7 +863,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     };
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(34);
+    expect(check.count).toBe(36);
   });
 
   it('waits for the recovery codes, which show once the confirm answers: their hidden heading already holds its text', async () => {
@@ -878,7 +878,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     };
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(34);
+    expect(check.count).toBe(36);
   });
 
   it('waits for the authenticator to read On, which the account page fills in after its heading shows (#190 run 8)', async () => {
@@ -887,7 +887,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     page.text = (selector) => (selector === '[data-testid="method-authenticator"]' ? Promise.resolve('') : text(selector));
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(34);
+    expect(check.count).toBe(36);
     expect(steps).toContain(`wait [data-testid="method-authenticator"] ${t('en', 'account.authenticatorOn')}`);
   });
 
@@ -903,7 +903,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     };
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(34);
+    expect(check.count).toBe(36);
   });
 
   it('fails naming the count when no recovery codes show within 15 s', async () => {
@@ -976,6 +976,13 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     await expect(run(page)).rejects.toThrow('Something else');
   });
 
+  it('fails naming SMOKE_SITE_PASSWORD when the phone run gives none, asking nothing of DEV (#343)', async () => {
+    vi.stubEnv('SMOKE_SITE_PASSWORD', undefined);
+    const { page } = accountPages();
+    await expect(run(page)).rejects.toThrow('SMOKE_SITE_PASSWORD is unset');
+    expect(sent).toEqual([]);
+  });
+
   it.each([
     ['the app sign-in', '/api/app/sign-in/recovery-code'],
     ['the suspension', '/api/shydesk/callback'],
@@ -1017,7 +1024,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     await run(page, check);
     expect(typedWhileHidden).toBe(false);
     expect(steps).toContain('type #email-address box+iphone-air-1700000000000@mail.test');
-    expect(check.count).toBe(34);
+    expect(check.count).toBe(36);
   });
 
   it('waits for the signed-in line, which shows once the page has asked whether it is signed in (#213 run 4: read hidden on the recovery page)', async () => {
@@ -1030,7 +1037,7 @@ describe('the iPhone joining journey: a recovery shows on the signed-in device (
     };
     const check = countingCheck();
     await run(page, check);
-    expect(check.count).toBe(34);
+    expect(check.count).toBe(36);
   });
 
   it('fails naming the page when its signed-in line never shows', async () => {

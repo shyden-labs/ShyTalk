@@ -18,10 +18,14 @@ export function cancelMessage(status: number): 'cancelled' | 'failed' {
   return status === 200 ? 'cancelled' : 'failed';
 }
 
-/** A sign-in's answer (plan 7 Task 7, #134): null goes on to the account page; every refusal reads the same. */
-export function signInMessage(status: number): 'tooMany' | 'signInRefused' | 'failed' | null {
+/**
+ * A sign-in's answer (plan 7 Task 7, #134): null goes on to the account page; every refusal reads the same, but a
+ * member a ShyDesk suspension or ban blocks is told so (#343).
+ */
+export function signInMessage(status: number): 'tooMany' | 'signInRefused' | 'memberBlocked' | 'failed' | null {
   if (status === 200) return null;
   if (status === 429) return 'tooMany';
+  if (status === 403) return 'memberBlocked';
   if (status === 400 || status === 401) return 'signInRefused';
   return 'failed';
 }

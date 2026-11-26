@@ -18,7 +18,7 @@ interface Bound {
   values: unknown[];
 }
 
-function world(options: { auditFails?: boolean; limited?: boolean; blocked?: string[] } = {}) {
+function world(options: { auditFails?: boolean; limited?: boolean; blocked?: string[]; blockCheckFails?: boolean } = {}) {
   const audits: Bound[] = [];
   const store: Record<string, Record<string, unknown>[]> = {
     user: [{ id: 'u-1', name: 'Member', email: 'm@example.test', emailVerified: true, createdAt: new Date(), updatedAt: new Date() }],
@@ -46,7 +46,10 @@ function world(options: { auditFails?: boolean; limited?: boolean; blocked?: str
     database: memoryAdapter(store),
     googleKeys: () => Promise.reject(new Error('unused')),
     appleKeys: () => Promise.reject(new Error('unused')),
-    blocked: (userId) => Promise.resolve(options.blocked?.includes(userId) === true),
+    blocked: (userId) =>
+      options.blockCheckFails === true
+        ? Promise.reject(new Error('D1 is down'))
+        : Promise.resolve(options.blocked?.includes(userId) === true),
   });
   return { env, auth, store, audits };
 }
@@ -64,6 +67,20 @@ const accepts =
     Promise.resolve(answer);
 
 describe('POST /api/app/sign-in/totp and /sign-in/recovery-code', () => {
+  it('lets a session that fails for any other reason through as the Worker error, writing no audit row (#343)', async () => {
+    const w = world({ blockCheckFails: true });
+    const signingIn = handleCodeSignIn(
+      post('sign-in/totp', { email: 'm@example.test', code: '123456' }),
+      w.env,
+      w.auth,
+      'totp',
+      accepts({ userId: 'u-1' }),
+    );
+    await expect(signingIn).rejects.toThrow('D1 is down');
+    expect(w.store['session']).toHaveLength(0);
+    expect(w.audits).toHaveLength(0);
+  });
+
   it.each(['totp', 'recovery-code'] as const)(
     'refuses a member a ShyDesk punishment blocks with 403 member_blocked on %s, writing no session and no audit row (#343)',
     async (kind) => {

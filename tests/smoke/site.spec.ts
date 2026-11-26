@@ -638,7 +638,12 @@ test('joining with the mailed code and an authenticator app, then signing back i
 
   // A ShyDesk suspension blocks the member (#343 AC2): the app's sign-in names the member, ShyDesk's signed delivery
   // suspends them and ends their sessions, and the sign-in page then says the account is blocked and links the appeal page.
-  const viaApp = await page.request.post('/api/app/sign-in/recovery-code', { data: { email: mailbox.address, code: appCode } });
+  // The app is the member's phone, another device with its own address, so it spends nothing of this browser's
+  // sign-in limit (10 a minute per address), which the recovery test after this one needs.
+  const viaApp = await page.request.post('/api/app/sign-in/recovery-code', {
+    data: { email: mailbox.address, code: appCode },
+    headers: { 'cf-connecting-ip': '203.0.113.43' },
+  });
   expect(viaApp.status()).toBe(200);
   const { userId } = (await viaApp.json()) as { userId: string };
   const suspension = suspensionDelivery(smokeShydeskSecret(), userId, Math.floor(Date.now() / 1000));
@@ -650,6 +655,17 @@ test('joining with the mailed code and an authenticator app, then signing back i
   await page.getByLabel(t('en', 'account.recoveryCodeLabel')).pressSequentially(blockedCode);
   await page.getByRole('button', { name: t('en', 'account.signInWithRecoveryCode'), exact: true }).click();
   await expect(answer).toHaveText(t('en', 'account.memberBlocked'));
+  // In each colour mode (global rule 2026-11-25): the blocked line and its appeal link pass axe, contrast included.
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect
+      .soft(
+        violations.map(({ id, nodes }) => `${id}: ${String(nodes.length)}`),
+        `axe, blocked, ${scheme}`,
+      )
+      .toEqual([]);
+  }
   await page
     .locator('#signin-appeal')
     .getByRole('link', { name: t('en', 'support.appealTitle'), exact: true })
