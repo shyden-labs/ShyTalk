@@ -178,6 +178,7 @@ function deps(overrides: Partial<PhoneDeps> = {}): PhoneDeps & { steps: string[]
     steps,
     mailboxPassword: step('mailbox password', 'secret'),
     sitePassword: step('site password', 'site-pw'),
+    devSecret: (name: string) => (steps.push(`dev secret ${name}`), Promise.resolve(`${name}-value`)),
     forward: step('forward', 'http://127.0.0.1:9333'),
     unforward: step('unforward'),
     playwright: step('playwright', 0),
@@ -268,12 +269,65 @@ describe('runPhones', () => {
     expect(d.steps).toEqual(['print phone-smoke: security: item not found']);
   });
 
+  it('hands DEV’s roadmap webhook and ShyDesk callback secrets from the Keychain to both phones’ runs on DEV (shyden-labs/ShyTalk#379)', async () => {
+    vi.stubEnv('SMOKE_ROADMAP_WEBHOOK_SECRET', undefined);
+    vi.stubEnv('SMOKE_SHYDESK_CALLBACK_SECRET', undefined);
+    const seen: (string | undefined)[][] = [];
+    const look = () => seen.push([process.env.SMOKE_ROADMAP_WEBHOOK_SECRET, process.env.SMOKE_SHYDESK_CALLBACK_SECRET]);
+    const d = deps({
+      playwright: () => (look(), Promise.resolve(0)),
+      readOneplusCounts: () => Promise.resolve({ a: 0 }),
+      cases: [{ title: 'a', run: () => (look(), Promise.resolve()) }],
+    });
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(0);
+    expect(seen).toEqual([
+      ['roadmap-webhook-value', 'shydesk-callback-value'],
+      ['roadmap-webhook-value', 'shydesk-callback-value'],
+    ]);
+  });
+
+  it.each([TEST_ORIGIN, PROD_ORIGIN])(
+    'asks the Keychain for none of DEV’s secrets when the run targets %s (shyden-labs/ShyTalk#379)',
+    async (address) => {
+      vi.stubEnv('SMOKE_ROADMAP_WEBHOOK_SECRET', undefined);
+      vi.stubEnv('SMOKE_SHYDESK_CALLBACK_SECRET', undefined);
+      const d = deps();
+      await expect(runPhones(address, d)).resolves.toBe(0);
+      expect(d.steps.filter((line) => line.startsWith('dev secret'))).toEqual([]);
+      expect(process.env.SMOKE_ROADMAP_WEBHOOK_SECRET).toBeUndefined();
+      expect(process.env.SMOKE_SHYDESK_CALLBACK_SECRET).toBeUndefined();
+    },
+  );
+
+  it('fails naming each of DEV’s secrets the Keychain lacks, before touching a phone, printing no value (shyden-labs/ShyTalk#379)', async () => {
+    const d = deps({ devSecret: () => Promise.reject(new Error('security: item not found')) });
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
+    expect(d.steps).toEqual([
+      'mailbox password',
+      'site password dev',
+      "print phone-smoke: DEV's secrets are missing from this Mac's Keychain: shytalk-dev-roadmap-webhook-secret (SMOKE_ROADMAP_WEBHOOK_SECRET), shytalk-dev-shydesk-callback-secret (SMOKE_SHYDESK_CALLBACK_SECRET)",
+    ]);
+  });
+
+  it('fails naming only the DEV secret the Keychain lacks (shyden-labs/ShyTalk#379)', async () => {
+    const d = deps({
+      devSecret: (name) => (name === 'shydesk-callback' ? Promise.reject(new Error('security: item not found')) : Promise.resolve('found')),
+    });
+    await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
+    expect(d.steps.at(-1)).toBe(
+      "print phone-smoke: DEV's secrets are missing from this Mac's Keychain: shytalk-dev-shydesk-callback-secret (SMOKE_SHYDESK_CALLBACK_SECRET)",
+    );
+    expect(d.steps.some((line) => line.includes('found'))).toBe(false);
+  });
+
   it('runs the OnePlus, then the iPhone, then prints the verdict, and passes', async () => {
     const d = deps();
     await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(0);
     expect(d.steps).toEqual([
       'mailbox password',
       'site password dev',
+      'dev secret roadmap-webhook',
+      'dev secret shydesk-callback',
       'forward',
       `playwright ${DEV_ORIGIN} http://127.0.0.1:9333`,
       'unforward',
@@ -325,7 +379,15 @@ describe('runPhones', () => {
   it('removes the adb forward when Playwright cannot run, and fails naming why', async () => {
     const d = deps({ playwright: () => Promise.reject(new Error('npx not found')) });
     await expect(runPhones(DEV_ORIGIN, d)).resolves.toBe(1);
-    expect(d.steps).toEqual(['mailbox password', 'site password dev', 'forward', 'unforward', 'print phone-smoke: npx not found']);
+    expect(d.steps).toEqual([
+      'mailbox password',
+      'site password dev',
+      'dev secret roadmap-webhook',
+      'dev secret shydesk-callback',
+      'forward',
+      'unforward',
+      'print phone-smoke: npx not found',
+    ]);
   });
 
   it('closes the session and stops Appium when a case throws outside its checks', async () => {
