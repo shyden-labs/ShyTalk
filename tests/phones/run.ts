@@ -10,6 +10,7 @@
  * (tests/phones/devices.ts gives the real ones), so the order and the
  * clean-up are unit-tested.
  */
+import { MAC_DEV_SECRETS } from '../../scripts/dev-secrets.ts';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { assertionTotals, smokeTotals } from '../../scripts/smoke-totals.ts';
@@ -36,8 +37,8 @@ export interface PhoneDeps {
   mailboxPassword(): Promise<string>;
   /** An environment's site password, from this Mac's Keychain (service shytalk-<environment>-site-password). */
   sitePassword(environment: string): Promise<string>;
-  /** One of DEV's own secrets, from this Mac's Keychain (service shytalk-dev-<name>-secret, shyden-labs/ShyTalk#379). */
-  devSecret(name: DevSecret): Promise<string>;
+  /** One of DEV's own secrets, from this Mac's Keychain by its service name (shyden-labs/ShyTalk#379, #386). */
+  devSecret(service: string): Promise<string>;
   /** Forwards Chrome's DevTools socket on the OnePlus; answers the endpoint. */
   forward(): Promise<string>;
   unforward(): Promise<void>;
@@ -60,22 +61,20 @@ export const PHONES = ['oneplus', 'iphone-air'] as const;
 
 /**
  * DEV's secrets the phones sign deliveries with, each given as the variable tests/smoke/targets.ts reads: the live
- * roadmap's board delivery and the ShyDesk suspension of the sign-in journey (shyden-labs/ShyTalk#379).
+ * roadmap's board delivery and the ShyDesk suspension of the sign-in journey (shyden-labs/ShyTalk#379). The list is
+ * the one scripts/dev-secret.ts sets them from, so the two never disagree (shyden-labs/ShyTalk#386).
  */
-export const DEV_SECRETS = {
-  'roadmap-webhook': 'SMOKE_ROADMAP_WEBHOOK_SECRET',
-  'shydesk-callback': 'SMOKE_SHYDESK_CALLBACK_SECRET',
-} as const;
-export type DevSecret = keyof typeof DEV_SECRETS;
+export const DEV_SECRETS = MAC_DEV_SECRETS;
 
-/** Sets each of DEV's secrets from the Keychain, or fails naming every one missing, never a value. */
+/** Sets each of DEV's secrets the smoke tests read from the Keychain, or fails naming every one missing, never a value. */
 async function giveDevSecrets(d: PhoneDeps): Promise<void> {
   const missing: string[] = [];
-  for (const [name, variable] of Object.entries(DEV_SECRETS) as [DevSecret, string][]) {
+  for (const { keychain, smoke } of DEV_SECRETS) {
+    if (smoke === undefined) continue;
     try {
-      process.env[variable] = await d.devSecret(name);
+      process.env[smoke] = await d.devSecret(keychain);
     } catch {
-      missing.push(`shytalk-dev-${name}-secret (${variable})`);
+      missing.push(`${keychain} (${smoke})`);
     }
   }
   if (missing.length > 0) throw new Error(`DEV's secrets are missing from this Mac's Keychain: ${missing.join(', ')}`);

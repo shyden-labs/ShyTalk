@@ -187,9 +187,10 @@ export function realDeps(): PhoneDeps {
       ]);
       return stdout.trim();
     },
-    async devSecret(name) {
-      // Copies of DEV's GitHub environment secrets, kept on this Mac only (shyden-labs/ShyTalk#379).
-      const { stdout } = await exec('security', ['find-generic-password', '-s', `shytalk-dev-${name}-secret`, '-a', SITE_USER, '-w']);
+    async devSecret(service) {
+      // Copies of DEV's GitHub environment secrets, kept on this Mac only, set by scripts/dev-secret.ts
+      // (shyden-labs/ShyTalk#379, #386).
+      const { stdout } = await exec('security', ['find-generic-password', '-s', service, '-a', SITE_USER, '-w']);
       return stdout.trim();
     },
     async forward() {

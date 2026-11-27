@@ -101,7 +101,7 @@ describe('the real phone steps', () => {
 
   it('read one of DEV’s secrets from the Keychain, alone, without its line end (shyden-labs/ShyTalk#379)', async () => {
     printed = { security: 'the-webhook-secret\n' };
-    expect(await realDeps().devSecret('roadmap-webhook')).toBe('the-webhook-secret');
+    expect(await realDeps().devSecret('shytalk-dev-roadmap-webhook-secret')).toBe('the-webhook-secret');
     expect(ran).toEqual([['security', 'find-generic-password', '-s', 'shytalk-dev-roadmap-webhook-secret', '-a', 'shytalk', '-w']]);
   });
 
