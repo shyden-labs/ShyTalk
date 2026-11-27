@@ -169,6 +169,63 @@ describe('a holding production', () => {
     },
   );
 
+  /** Production holding with the roadmap's Durable Object, which records what it is asked and answers a snapshot. */
+  function holdingWithRoadmap(): { env: WebEnv; asked: string[]; object: string[] } {
+    const base = holding();
+    const object: string[] = [];
+    const ROADMAP = {
+      idFromName: (name: string) => name,
+      get: () => ({
+        fetch: (request: Request) => {
+          object.push(new URL(request.url).pathname);
+          return Promise.resolve(new Response('{"version":7}', { status: 200, headers: { 'content-type': 'application/json' } }));
+        },
+      }),
+    };
+    return { asked: base.asked, object, env: { ...base.env, ROADMAP } };
+  }
+
+  // shyden-labs/ShyTalk#323 (Shyden 2026-11-22: shytalk.app goes live as soon as possible): while production holds,
+  // the live roadmap answers too, in every language, with the two addresses its page reads.
+  it.each(['/roadmap', '/roadmap/', '/id/roadmap', '/th/roadmap', '/vi/roadmap/', '/zh/roadmap'])(
+    'serves the roadmap page %s from the built page, 200, not the holding page',
+    async (path) => {
+      const { env, asked } = holdingWithRoadmap();
+      const response = await handle(visit(path, { headers: { 'accept-language': 'vi' } }), env);
+      expect(response.status).toBe(200);
+      expect(asked).toEqual([path]);
+    },
+  );
+
+  it('answers /api/roadmap.json with the roadmap’s snapshot, never cached', async () => {
+    const { env, asked, object } = holdingWithRoadmap();
+    const response = await handle(visit('/api/roadmap.json'), env);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('{"version":7}');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(object).toEqual(['/snapshot']);
+    expect(asked).toEqual([]);
+  });
+
+  it('hands /api/roadmap/live to the roadmap object to connect', async () => {
+    const { env, asked, object } = holdingWithRoadmap();
+    const response = await handle(visit('/api/roadmap/live', { headers: { upgrade: 'websocket' } }), env);
+    expect(response.status).toBe(200);
+    expect(object).toEqual(['/connect']);
+    expect(asked).toEqual([]);
+  });
+
+  it.each(['/en/roadmap', '/roadmap/more', '/fr/roadmap', '/api/roadmap', '/api/roadmap.json/more', '/api/progress'])(
+    'answers %s, which is no roadmap address, with the holding page as a 404',
+    async (path) => {
+      const { env, asked, object } = holdingWithRoadmap();
+      const response = await handle(visit(path, { headers: { 'accept-language': 'vi' } }), env);
+      expect(response.status).toBe(404);
+      expect(asked).toEqual(['/vi/holding']);
+      expect(object).toEqual([]);
+    },
+  );
+
   it('answers each language’s home with that language’s holding page, whatever the header asks, so the switch works', async () => {
     const { env, asked } = holding();
     const response = await handle(visit('/th/', { headers: { 'accept-language': 'en' } }), env);
